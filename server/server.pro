@@ -32,15 +32,23 @@ RCC_DIR = ./.rcc/$${DEST_FOLDER}
 UI_DIR = ./.ui/$${DEST_FOLDER}
 DESTDIR = ../../bin/$${DEST_FOLDER}
 
+INCLUDEPATH += ../common/src
 
 
 SOURCES += src/main.cpp \
-    src/rfm22b/rfm22b.cpp \
-    src/rfm22b/rfm22b_spi.cpp
+    ../common/src/Comms.cpp \
+    ../common/src/CRC.cpp \
+    ../common/src/rfm22b/rfm22b.cpp \
+    ../common/src/rfm22b/rfm22b_spi.cpp
 
 HEADERS += \
-    src/rfm22b/rfm22b.h \
-    src/rfm22b/rfm22b_enums.h \
-    src/rfm22b/rfm22b_spi.h
+    ../common/src/Comms.h \
+    ../common/src/CRC.h \
+    ../common/src/Data_Defs.h \
+    ../common/src/rfm22b/rfm22b.h \
+    ../common/src/rfm22b/rfm22b_enums.h \
+    ../common/src/rfm22b/rfm22b_spi.h
+
+DISTFILES +=
 
 

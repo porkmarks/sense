@@ -8,6 +8,7 @@ namespace data
 
 enum class Type : uint8_t
 {
+    RESPONSE,
     MEASUREMENT,
     PAIR_REQUEST,
     PAIR_RESPONSE,
@@ -29,10 +30,10 @@ struct Measurement
         vcc -= 2.f;
         this->vcc = static_cast<uint8_t>(fmin(fmax(vcc, 0.f), 2.55f) * 100.f);
         this->humidity = static_cast<uint8_t>(humidity * 2.55f);
-        this->temperature = static_cast<uint8_t>(temperature * 100.f);
+        this->temperature = static_cast<uint16_t>(temperature * 100.f);
     }
 
-    void unpack(uint32_t& timestamp, uint8_t& index, float& vcc, float& humidity, float& temperature)
+    void unpack(uint32_t& timestamp, uint8_t& index, float& vcc, float& humidity, float& temperature) const
     {
         timestamp = this->timestamp;
         index = this->index;
@@ -47,6 +48,12 @@ struct Measurement
     uint8_t vcc; //(vcc - 2) * 100
     uint8_t humidity; //*2.55
     int16_t temperature; //*100
+};
+
+struct Response
+{
+    uint16_t ack : 1;
+    uint16_t req_id : 15;
 };
 
 struct Pair_Request

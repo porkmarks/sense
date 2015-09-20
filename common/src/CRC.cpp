@@ -1,5 +1,11 @@
 #include "CRC.h"
-#include <avr/pgmspace.h>
+
+#ifdef RASPBERRY_PI
+#   define PROGMEM
+#   define pgm_read_dword_near(x) (*(x))
+#else
+#   include <avr/pgmspace.h>
+#endif
 
 static const PROGMEM uint32_t crc_table[16] =
 {

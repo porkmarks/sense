@@ -2,12 +2,12 @@
 #include "SPI.h"
 #include "Low_Power.h"
 #include "DHT.h"
-#include "Pack.h"
 #include "LEDs.h"
 #include "Buttons.h"
 #include "Battery.h"
 #include "Comms.h"
 #include "Data_Defs.h"
+#include "avr_stdio.h"
 
 enum class State
 {
@@ -25,6 +25,7 @@ DHT s_dht(DHT_DATA_PIN1, DHT22);
 Comms s_comms;
 
 uint32_t s_readingIndex = 0;
+uint32_t s_timestamp = 0;
 
 void setup()
 {
@@ -40,6 +41,10 @@ void setup()
     // put your setup code here, to run once:
     Serial.begin(2400);
     delay(500);
+
+    FILE uart_output;
+    fdev_setup_stream(&uart_output, uart_putchar, NULL, _FDEV_SETUP_WRITE);
+    stdout = &uart_output;
     
     s_dht.begin();
     delay(500);
@@ -88,60 +93,68 @@ void pair()
 {
     uint32_t addr = Comms::PAIR_ADDRESS_BEGIN + random() % (Comms::PAIR_ADDRESS_END - Comms::PAIR_ADDRESS_BEGIN);
     s_comms.set_address(addr);
+    s_comms.set_destination_address(Comms::SERVER_ADDRESS);
 
     wait_for_release(Button::BUTTON1);
     bool done = false;
     while (!done)
     {
         //wait actively for a while for the user to press the button
-        for (uint8_t i = 0; i < 20; i++)
+        uint8_t tries = 0;
+        while (tries++ < 10)
         {
             if (is_pressed(Button::BUTTON1))
             {
+                tries = 0;
                 set_leds(YELLOW_LED);
 
                 //wait for the user to release the button
                 wait_for_release(Button::BUTTON1);
 
-                s_comms.begin_pack(data::Type::PAIR_REQUEST);
+                s_comms.begin_packet(data::Type::PAIR_REQUEST);
                 s_comms.pack(data::Pair_Request());
-                if (s_comms.send_pack(5))
+                if (s_comms.send_packet(5))
                 {
                     set_leds(GREEN_LED);
+                    Low_Power::power_down(500);
 
-                    data::Pair_Response response;
-                    if (s_comms.receive(data::Type::PAIR_RESPONSE, response, 1000))
+                    uint8_t size = s_comms.receive_packet(1000);
+                    if (size == sizeof(data::Pair_Response) &&
+                        s_comms.get_packet_type() == data::Type::PAIR_RESPONSE)
                     {
-                        s_comms.set_address(response.address);
+                        const data::Pair_Response* response_ptr = reinterpret_cast<const data::Pair_Response*>(s_comms.get_packet_payload());
+                        s_comms.set_address(response_ptr->address);
                         //s_clock.set_timestamp(response.timestamp);
+                        s_timestamp = response_ptr->timestamp;
                         done = true;
                         break;
                     }
                 }
-                set_leds(RED_LED);
-                Low_Power::power_down(1000);
-                fade_out_leds(RED_LED, 1000);
+                blink_leds(RED_LED, 3, 500);
             }
 
             blink_leds(YELLOW_LED, 3, 100);
             Low_Power::power_down_int(2000);
         }
 
-        fade_out_leds(YELLOW_LED, 1000);
+        if (!done)
+        {
+            fade_out_leds(YELLOW_LED, 1000);
 
-        //the user didn't press it - sleep for a loooong time
-        Low_Power::power_down_int(1000ULL * 3600 * 24 * 30);
+            //the user didn't press it - sleep for a loooong time
+            Low_Power::power_down_int(1000ULL * 3600 * 24 * 30);
 
-        fade_in_leds(YELLOW_LED, 1000);
+            fade_in_leds(YELLOW_LED, 1000);
 
-        //we probably woken up because the user pressed the button - wait for him to release it
-        wait_for_release(Button::BUTTON1);
+            //we probably woken up because the user pressed the button - wait for him to release it
+            wait_for_release(Button::BUTTON1);
+        }
     }
 
     //wait for the user to release the button
     wait_for_release(Button::BUTTON1);
 
-    blink_leds(GREEN_LED, 3, 300);
+    blink_leds(GREEN_LED, 3, 500);
     s_state = State::READ_DATA;
 
     //sleep a bit
@@ -188,10 +201,10 @@ void read_data()
         //Serial.println(F("Sending..."));
 
         s_comms.idle_mode();
-        data::Measurement item(s_readingIndex, s_readingIndex, vcc, h, t);
-        s_comms.begin_pack(data::Type::MEASUREMENT);
+        data::Measurement item(s_timestamp, s_readingIndex, vcc, h, t);
+        s_comms.begin_packet(data::Type::MEASUREMENT);
         s_comms.pack(item);
-        s_comms.send_pack(3);
+        s_comms.send_packet(3);
 
         uint32_t sendingD = millis() - lastTP;
         lastTP = millis();
@@ -227,6 +240,7 @@ void read_data()
         //delay(600);
 
         Low_Power::power_down_int(10000);
+        s_timestamp += 10;
     }
 }
 
