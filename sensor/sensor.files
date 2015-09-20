@@ -9,3 +9,12 @@ src/SPI.h
 src/rfm22b/rfm22b.cpp
 src/rfm22b/rfm22b.h
 src/rfm22b/rfm22b_enums.h
+src/Buttons.cpp
+src/Buttons.h
+src/Comms.cpp
+src/Comms.h
+src/CRC.cpp
+src/CRC.h
+src/LEDs.h
+src/Battery.h
+src/Data_Defs.h

@@ -111,27 +111,32 @@ class Low_Power
 {
 public:
 #if defined (__AVR_ATmega328P__) || defined (__AVR_ATmega168__)
-    void	idle(Period_t period, ADC_t adc, Timer2_t timer2,
+    static void	idle(Period_t period, ADC_t adc, Timer2_t timer2,
                  Timer1_t timer1, Timer0_t timer0, SPI_t spi,
                  USART0_t usart0, TWI_t twi);
 #elif defined __AVR_ATmega2560__
-    void	idle(Period_t period, ADC_t adc, Timer5_t timer5,
+    static void	idle(Period_t period, ADC_t adc, Timer5_t timer5,
                  Timer4_t timer4, Timer3_t timer3, Timer2_t timer2,
                  Timer1_t timer1, Timer0_t timer0, SPI_t spi,
                  USART3_t usart3, USART2_t usart2, USART1_t usart1,
                  USART0_t usart0, TWI_t twi);
 #elif defined __AVR_ATmega32U4__
-    void	idle(Period_t period, ADC_t adc, Timer4_t timer4, Timer3_t timer3,
+    static void	idle(Period_t period, ADC_t adc, Timer4_t timer4, Timer3_t timer3,
                  Timer1_t timer1, Timer0_t timer0, SPI_t spi,
                  USART1_t usart1, TWI_t twi, USB_t usb);
 #else
 #error "Please ensure chosen MCU is either 328P, 32U4 or 2560."
 #endif
-    void	adc_noise_reduction(Period_t period, ADC_t adc, Timer2_t timer2);
-    void	power_down(Period_t period, ADC_t adc, BOD_t bod);
-    void	power_save(Period_t period, ADC_t adc, BOD_t bod, Timer2_t timer2);
-    void	power_standby(Period_t period, ADC_t adc, BOD_t bod);
-    void	power_ext_standby(Period_t period, ADC_t adc, BOD_t bod, Timer2_t timer2);
-    void 	deep_sleep(uint32_t millis);
+    static void	adc_noise_reduction(Period_t period, ADC_t adc, Timer2_t timer2);
+
+    static void	power_down(Period_t period, ADC_t adc = ADC_OFF, BOD_t bod = BOD_OFF);
+    static uint32_t power_down(uint32_t millis, ADC_t adc = ADC_OFF, BOD_t bod = BOD_OFF);
+    static uint32_t power_down_int(uint32_t millis, ADC_t adc = ADC_OFF, BOD_t bod = BOD_OFF);
+
+    static void	power_save(Period_t period, ADC_t adc = ADC_OFF, BOD_t bod = BOD_OFF, Timer2_t timer2 = TIMER2_OFF);
+    static void	power_standby(Period_t period, ADC_t adc = ADC_OFF, BOD_t bod = BOD_OFF);
+    static void	power_ext_standby(Period_t period, ADC_t adc = ADC_OFF, BOD_t bod = BOD_OFF, Timer2_t timer2 = TIMER2_OFF);
+
+    static bool s_interrupt_fired;
 };
 

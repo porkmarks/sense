@@ -28,70 +28,73 @@
 #include <avr/wdt.h>
 #include <avr/power.h>
 #include <avr/interrupt.h>
+#include <Arduino.h>
 #include "Low_Power.h"
 
 // Only Pico Power devices can change BOD settings through software
 #if defined __AVR_ATmega328P__
 #ifndef sleep_bod_disable
 #define sleep_bod_disable() 										\
-do { 																\
-  unsigned char tempreg; 													\
-  __asm__ __volatile__("in %[tempreg], %[mcucr]" "\n\t" 			\
-                       "ori %[tempreg], %[bods_bodse]" "\n\t" 		\
-                       "out %[mcucr], %[tempreg]" "\n\t" 			\
-                       "andi %[tempreg], %[not_bodse]" "\n\t" 		\
-                       "out %[mcucr], %[tempreg]" 					\
-                       : [tempreg] "=&d" (tempreg) 					\
-                       : [mcucr] "I" _SFR_IO_ADDR(MCUCR), 			\
-                         [bods_bodse] "i" (_BV(BODS) | _BV(BODSE)), \
-                         [not_bodse] "i" (~_BV(BODSE))); 			\
-} while (0)
+    do { 																\
+    unsigned char tempreg; 													\
+    __asm__ __volatile__("in %[tempreg], %[mcucr]" "\n\t" 			\
+    "ori %[tempreg], %[bods_bodse]" "\n\t" 		\
+    "out %[mcucr], %[tempreg]" "\n\t" 			\
+    "andi %[tempreg], %[not_bodse]" "\n\t" 		\
+    "out %[mcucr], %[tempreg]" 					\
+    : [tempreg] "=&d" (tempreg) 					\
+    : [mcucr] "I" _SFR_IO_ADDR(MCUCR), 			\
+    [bods_bodse] "i" (_BV(BODS) | _BV(BODSE)), \
+    [not_bodse] "i" (~_BV(BODSE))); 			\
+    } while (0)
 #endif
 #endif
 
 #define	lowPowerBodOn(mode)	\
-do { 						\
-      set_sleep_mode(mode); \
-      cli();				\
-      sleep_enable();		\
-      sei();				\
-      sleep_cpu();			\
-      sleep_disable();		\
-      sei();				\
-} while (0);
+    do { 						\
+    set_sleep_mode(mode); \
+    cli();				\
+    sleep_enable();		\
+    sei();				\
+    sleep_cpu();			\
+    sleep_disable();		\
+    sei();				\
+    } while (0);
 
 // Only Pico Power devices can change BOD settings through software
 #if defined __AVR_ATmega328P__
 #define	lowPowerBodOff(mode)\
-do { 						\
-      set_sleep_mode(mode); \
-      cli();				\
-      sleep_enable();		\
-			sleep_bod_disable(); \
-      sei();				\
-      sleep_cpu();			\
-      sleep_disable();		\
-      sei();				\
-} while (0);
+    do { 						\
+    set_sleep_mode(mode); \
+    cli();				\
+    sleep_enable();		\
+    sleep_bod_disable(); \
+    sei();				\
+    sleep_cpu();			\
+    sleep_disable();		\
+    sei();				\
+    } while (0);
 #endif
 
 // Some macros is still missing from AVR GCC distribution for ATmega32U4
 #if defined __AVR_ATmega32U4__
-	// Timer 4 PRR bit is currently not defined in iom32u4.h 
-	#ifndef PRTIM4
-		#define PRTIM4 4
-	#endif
-
-	// Timer 4 power reduction macro is not defined currently in power.h
-	#ifndef power_timer4_disable
-		#define power_timer4_disable()	(PRR1 |= (uint8_t)(1 << PRTIM4)) 									
-	#endif
-
-	#ifndef power_timer4_enable
-		#define power_timer4_enable()		(PRR1 &= (uint8_t)~(1 << PRTIM4))							
-	#endif
+// Timer 4 PRR bit is currently not defined in iom32u4.h
+#ifndef PRTIM4
+#define PRTIM4 4
 #endif
-  
+
+// Timer 4 power reduction macro is not defined currently in power.h
+#ifndef power_timer4_disable
+#define power_timer4_disable()	(PRR1 |= (uint8_t)(1 << PRTIM4))
+#endif
+
+#ifndef power_timer4_enable
+#define power_timer4_enable()		(PRR1 &= (uint8_t)~(1 << PRTIM4))
+#endif
+#endif
+
+bool Low_Power::s_interrupt_fired = false;
+
 /*******************************************************************************
 * Name: idle
 * Description: Putting ATmega328P/168 into idle state. Please make sure you 
@@ -144,66 +147,66 @@ do { 						\
 *******************************************************************************/
 #if defined (__AVR_ATmega328P__) || defined (__AVR_ATmega168__)
 void	Low_Power::idle(Period_t period, ADC_t adc, Timer2_t timer2,
-                            Timer1_t timer1, Timer0_t timer0,
-                            SPI_t spi, USART0_t usart0,	TWI_t twi)
+                        Timer1_t timer1, Timer0_t timer0,
+                        SPI_t spi, USART0_t usart0,	TWI_t twi)
 {
-	// Temporary clock source variable 
-	unsigned char clockSource = 0;
-	
-	if (timer2 == TIMER2_OFF)
-	{
-		if (TCCR2B & CS22) clockSource |= (1 << CS22);
-		if (TCCR2B & CS21) clockSource |= (1 << CS21);
-		if (TCCR2B & CS20) clockSource |= (1 << CS20);
-	
-		// Remove the clock source to shutdown Timer2
-		TCCR2B &= ~(1 << CS22);
-		TCCR2B &= ~(1 << CS21);
-		TCCR2B &= ~(1 << CS20);
-		
-		power_timer2_disable();
-	}
-	
-	if (adc == ADC_OFF)	
-	{
-		ADCSRA &= ~(1 << ADEN);
-		power_adc_disable();
-	}
-	
-	if (timer1 == TIMER1_OFF)	power_timer1_disable();	
-	if (timer0 == TIMER0_OFF)	power_timer0_disable();	
-	if (spi == SPI_OFF)			power_spi_disable();
-	if (usart0 == USART0_OFF)	power_usart0_disable();
-	if (twi == TWI_OFF)			power_twi_disable();
-	
-	if (period != SLEEP_FOREVER)
-	{
-		wdt_enable(period);
-		WDTCSR |= (1 << WDIE);	
-	}
-	
-	lowPowerBodOn(SLEEP_MODE_IDLE);
-	
-	if (adc == ADC_OFF)
-	{
-		power_adc_enable();
-		ADCSRA |= (1 << ADEN);
-	}
-	
-	if (timer2 == TIMER2_OFF)
-	{
-		if (clockSource & CS22) TCCR2B |= (1 << CS22);
-		if (clockSource & CS21) TCCR2B |= (1 << CS21);
-		if (clockSource & CS20) TCCR2B |= (1 << CS20);
-		
-		power_timer2_enable();
-	}
-	
-	if (timer1 == TIMER1_OFF)	power_timer1_enable();	
-	if (timer0 == TIMER0_OFF)	power_timer0_enable();	
-	if (spi == SPI_OFF)			power_spi_enable();
-	if (usart0 == USART0_OFF)	power_usart0_enable();
-	if (twi == TWI_OFF)			power_twi_enable();
+    // Temporary clock source variable
+    unsigned char clockSource = 0;
+
+    if (timer2 == TIMER2_OFF)
+    {
+        if (TCCR2B & CS22) clockSource |= (1 << CS22);
+        if (TCCR2B & CS21) clockSource |= (1 << CS21);
+        if (TCCR2B & CS20) clockSource |= (1 << CS20);
+
+        // Remove the clock source to shutdown Timer2
+        TCCR2B &= ~(1 << CS22);
+        TCCR2B &= ~(1 << CS21);
+        TCCR2B &= ~(1 << CS20);
+
+        power_timer2_disable();
+    }
+
+    if (adc == ADC_OFF)
+    {
+        ADCSRA &= ~(1 << ADEN);
+        power_adc_disable();
+    }
+
+    if (timer1 == TIMER1_OFF)	power_timer1_disable();
+    if (timer0 == TIMER0_OFF)	power_timer0_disable();
+    if (spi == SPI_OFF)			power_spi_disable();
+    if (usart0 == USART0_OFF)	power_usart0_disable();
+    if (twi == TWI_OFF)			power_twi_disable();
+
+    if (period != SLEEP_FOREVER)
+    {
+        wdt_enable(period);
+        WDTCSR |= (1 << WDIE);
+    }
+
+    lowPowerBodOn(SLEEP_MODE_IDLE);
+
+    if (adc == ADC_OFF)
+    {
+        power_adc_enable();
+        ADCSRA |= (1 << ADEN);
+    }
+
+    if (timer2 == TIMER2_OFF)
+    {
+        if (clockSource & CS22) TCCR2B |= (1 << CS22);
+        if (clockSource & CS21) TCCR2B |= (1 << CS21);
+        if (clockSource & CS20) TCCR2B |= (1 << CS20);
+
+        power_timer2_enable();
+    }
+
+    if (timer1 == TIMER1_OFF)	power_timer1_enable();
+    if (timer0 == TIMER0_OFF)	power_timer0_enable();
+    if (spi == SPI_OFF)			power_spi_enable();
+    if (usart0 == USART0_OFF)	power_usart0_enable();
+    if (twi == TWI_OFF)			power_twi_enable();
 }
 #endif
 
@@ -268,47 +271,47 @@ void	Low_Power::idle(Period_t period, ADC_t adc, Timer2_t timer2,
 *******************************************************************************/
 #if defined __AVR_ATmega32U4__
 void	Low_Power::idle(Period_t period, ADC_t adc,
-                                                    Timer4_t timer4, Timer3_t timer3,
-                                        Timer1_t timer1, Timer0_t timer0,
-                                        SPI_t spi, USART1_t usart1,	TWI_t twi, usb_t usb)
+                        Timer4_t timer4, Timer3_t timer3,
+                        Timer1_t timer1, Timer0_t timer0,
+                        SPI_t spi, USART1_t usart1,	TWI_t twi, usb_t usb)
 {
-	if (adc == ADC_OFF)	
-	{
-		ADCSRA &= ~(1 << ADEN);
-		power_adc_disable();
-	}
+    if (adc == ADC_OFF)
+    {
+        ADCSRA &= ~(1 << ADEN);
+        power_adc_disable();
+    }
 
-	if (timer4 == TIMER4_OFF)	power_timer4_disable();	
-	if (timer3 == TIMER3_OFF)	power_timer3_disable();		
-	if (timer1 == TIMER1_OFF)	power_timer1_disable();	
-	if (timer0 == TIMER0_OFF)	power_timer0_disable();	
-	if (spi == SPI_OFF)				power_spi_disable();
-	if (usart1 == USART1_OFF)	power_usart1_disable();
-	if (twi == TWI_OFF)				power_twi_disable();
-	if (usb == USB_OFF)				power_usb_disable();
-	
-	if (period != SLEEP_FOREVER)
-	{
-		wdt_enable(period);
-		WDTCSR |= (1 << WDIE);	
-	}
-	
-	lowPowerBodOn(SLEEP_MODE_IDLE);
-	
-	if (adc == ADC_OFF)
-	{
-		power_adc_enable();
-		ADCSRA |= (1 << ADEN);
-	}
+    if (timer4 == TIMER4_OFF)	power_timer4_disable();
+    if (timer3 == TIMER3_OFF)	power_timer3_disable();
+    if (timer1 == TIMER1_OFF)	power_timer1_disable();
+    if (timer0 == TIMER0_OFF)	power_timer0_disable();
+    if (spi == SPI_OFF)				power_spi_disable();
+    if (usart1 == USART1_OFF)	power_usart1_disable();
+    if (twi == TWI_OFF)				power_twi_disable();
+    if (usb == USB_OFF)				power_usb_disable();
 
-	if (timer4 == TIMER4_OFF)	power_timer4_enable();	
-	if (timer3 == TIMER3_OFF)	power_timer3_enable();	
-	if (timer1 == TIMER1_OFF)	power_timer1_enable();	
-	if (timer0 == TIMER0_OFF)	power_timer0_enable();	
-	if (spi == SPI_OFF)				power_spi_enable();
-	if (usart1 == USART1_OFF)	power_usart1_enable();
-	if (twi == TWI_OFF)				power_twi_enable();
-	if (usb == USB_OFF)				power_usb_enable();
+    if (period != SLEEP_FOREVER)
+    {
+        wdt_enable(period);
+        WDTCSR |= (1 << WDIE);
+    }
+
+    lowPowerBodOn(SLEEP_MODE_IDLE);
+
+    if (adc == ADC_OFF)
+    {
+        power_adc_enable();
+        ADCSRA |= (1 << ADEN);
+    }
+
+    if (timer4 == TIMER4_OFF)	power_timer4_enable();
+    if (timer3 == TIMER3_OFF)	power_timer3_enable();
+    if (timer1 == TIMER1_OFF)	power_timer1_enable();
+    if (timer0 == TIMER0_OFF)	power_timer0_enable();
+    if (spi == SPI_OFF)				power_spi_enable();
+    if (usart1 == USART1_OFF)	power_usart1_enable();
+    if (twi == TWI_OFF)				power_twi_enable();
+    if (usb == USB_OFF)				power_usb_enable();
 }
 #endif
 
@@ -391,80 +394,80 @@ void	Low_Power::idle(Period_t period, ADC_t adc,
 *******************************************************************************/
 #if defined (__AVR_ATmega2560__) || defined (__AVR_ATmega1280__)
 void	Low_Power::idle(Period_t period, ADC_t adc, Timer5_t timer5,
-                                    Timer4_t timer4, Timer3_t timer3, Timer2_t timer2,
-                                                    Timer1_t timer1, Timer0_t timer0, SPI_t spi,
-                                                    USART3_t usart3, USART2_t usart2, USART1_t usart1,
-                                USART0_t usart0, TWI_t twi)
+                        Timer4_t timer4, Timer3_t timer3, Timer2_t timer2,
+                        Timer1_t timer1, Timer0_t timer0, SPI_t spi,
+                        USART3_t usart3, USART2_t usart2, USART1_t usart1,
+                        USART0_t usart0, TWI_t twi)
 {
-	// Temporary clock source variable 
-	unsigned char clockSource = 0;
-	
-	if (timer2 == TIMER2_OFF)
-	{
-		if (TCCR2B & CS22) clockSource |= (1 << CS22);
-		if (TCCR2B & CS21) clockSource |= (1 << CS21);
-		if (TCCR2B & CS20) clockSource |= (1 << CS20);
-	
-		// Remove the clock source to shutdown Timer2
-		TCCR2B &= ~(1 << CS22);
-		TCCR2B &= ~(1 << CS21);
-		TCCR2B &= ~(1 << CS20);
-		
-		power_timer2_disable();
-	}
-	
-	if (adc == ADC_OFF)	
-	{
-		ADCSRA &= ~(1 << ADEN);
-		power_adc_disable();
-	}
-	
-	if (timer5 == TIMER5_OFF)	power_timer5_disable();	
-	if (timer4 == TIMER4_OFF)	power_timer4_disable();	
-	if (timer3 == TIMER3_OFF)	power_timer3_disable();	
-	if (timer1 == TIMER1_OFF)	power_timer1_disable();	
-	if (timer0 == TIMER0_OFF)	power_timer0_disable();	
-	if (spi == SPI_OFF)			  power_spi_disable();
-	if (usart3 == USART3_OFF)	power_usart3_disable();
-	if (usart2 == USART2_OFF)	power_usart2_disable();
-	if (usart1 == USART1_OFF)	power_usart1_disable();
-	if (usart0 == USART0_OFF)	power_usart0_disable();
-	if (twi == TWI_OFF)			  power_twi_disable();
-	
-	if (period != SLEEP_FOREVER)
-	{
-		wdt_enable(period);
-		WDTCSR |= (1 << WDIE);	
-	}
-	
-	lowPowerBodOn(SLEEP_MODE_IDLE);
-	
-	if (adc == ADC_OFF)
-	{
-		power_adc_enable();
-		ADCSRA |= (1 << ADEN);
-	}
-	
-	if (timer2 == TIMER2_OFF)
-	{
-		if (clockSource & CS22) TCCR2B |= (1 << CS22);
-		if (clockSource & CS21) TCCR2B |= (1 << CS21);
-		if (clockSource & CS20) TCCR2B |= (1 << CS20);
-		
-		power_timer2_enable();
-	}
+    // Temporary clock source variable
+    unsigned char clockSource = 0;
 
-	if (timer5 == TIMER5_OFF)	power_timer5_enable();	
-	if (timer4 == TIMER4_OFF)	power_timer4_enable();		
-	if (timer3 == TIMER3_OFF)	power_timer3_enable();	
-	if (timer1 == TIMER1_OFF)	power_timer1_enable();	
-	if (timer0 == TIMER0_OFF)	power_timer0_enable();	
-	if (spi == SPI_OFF)			  power_spi_enable();
-	if (usart3 == USART3_OFF)	power_usart3_enable();
-	if (usart2 == USART2_OFF)	power_usart2_enable();
-	if (usart1 == USART1_OFF)	power_usart1_enable();
-	if (usart0 == USART0_OFF)	power_usart0_enable();
-	if (twi == TWI_OFF)			  power_twi_enable();
+    if (timer2 == TIMER2_OFF)
+    {
+        if (TCCR2B & CS22) clockSource |= (1 << CS22);
+        if (TCCR2B & CS21) clockSource |= (1 << CS21);
+        if (TCCR2B & CS20) clockSource |= (1 << CS20);
+
+        // Remove the clock source to shutdown Timer2
+        TCCR2B &= ~(1 << CS22);
+        TCCR2B &= ~(1 << CS21);
+        TCCR2B &= ~(1 << CS20);
+
+        power_timer2_disable();
+    }
+
+    if (adc == ADC_OFF)
+    {
+        ADCSRA &= ~(1 << ADEN);
+        power_adc_disable();
+    }
+
+    if (timer5 == TIMER5_OFF)	power_timer5_disable();
+    if (timer4 == TIMER4_OFF)	power_timer4_disable();
+    if (timer3 == TIMER3_OFF)	power_timer3_disable();
+    if (timer1 == TIMER1_OFF)	power_timer1_disable();
+    if (timer0 == TIMER0_OFF)	power_timer0_disable();
+    if (spi == SPI_OFF)			  power_spi_disable();
+    if (usart3 == USART3_OFF)	power_usart3_disable();
+    if (usart2 == USART2_OFF)	power_usart2_disable();
+    if (usart1 == USART1_OFF)	power_usart1_disable();
+    if (usart0 == USART0_OFF)	power_usart0_disable();
+    if (twi == TWI_OFF)			  power_twi_disable();
+
+    if (period != SLEEP_FOREVER)
+    {
+        wdt_enable(period);
+        WDTCSR |= (1 << WDIE);
+    }
+
+    lowPowerBodOn(SLEEP_MODE_IDLE);
+
+    if (adc == ADC_OFF)
+    {
+        power_adc_enable();
+        ADCSRA |= (1 << ADEN);
+    }
+
+    if (timer2 == TIMER2_OFF)
+    {
+        if (clockSource & CS22) TCCR2B |= (1 << CS22);
+        if (clockSource & CS21) TCCR2B |= (1 << CS21);
+        if (clockSource & CS20) TCCR2B |= (1 << CS20);
+
+        power_timer2_enable();
+    }
+
+    if (timer5 == TIMER5_OFF)	power_timer5_enable();
+    if (timer4 == TIMER4_OFF)	power_timer4_enable();
+    if (timer3 == TIMER3_OFF)	power_timer3_enable();
+    if (timer1 == TIMER1_OFF)	power_timer1_enable();
+    if (timer0 == TIMER0_OFF)	power_timer0_enable();
+    if (spi == SPI_OFF)			  power_spi_enable();
+    if (usart3 == USART3_OFF)	power_usart3_enable();
+    if (usart2 == USART2_OFF)	power_usart2_enable();
+    if (usart1 == USART1_OFF)	power_usart1_enable();
+    if (usart0 == USART0_OFF)	power_usart0_enable();
+    if (twi == TWI_OFF)			  power_twi_enable();
 }
 #endif
 
@@ -501,46 +504,46 @@ void	Low_Power::idle(Period_t period, ADC_t adc, Timer5_t timer5,
 *
 *******************************************************************************/
 void	Low_Power::adc_noise_reduction(Period_t period, ADC_t adc,
-                                         Timer2_t timer2)
+                                       Timer2_t timer2)
 {
-	// Temporary clock source variable 
-	unsigned char clockSource = 0;
-	
-	#if !defined(__AVR_ATmega32U4__)
-	if (timer2 == TIMER2_OFF)
-	{
-		if (TCCR2B & CS22) clockSource |= (1 << CS22);
-		if (TCCR2B & CS21) clockSource |= (1 << CS21);
-		if (TCCR2B & CS20) clockSource |= (1 << CS20);
-	
-		// Remove the clock source to shutdown Timer2
-		TCCR2B &= ~(1 << CS22);
-		TCCR2B &= ~(1 << CS21);
-		TCCR2B &= ~(1 << CS20);
-	}
-	#endif
-	
-	if (adc == ADC_OFF)	ADCSRA &= ~(1 << ADEN);
-	
-	if (period != SLEEP_FOREVER)
-	{
-		wdt_enable(period);
-		WDTCSR |= (1 << WDIE);	
-	}
-	
-	lowPowerBodOn(SLEEP_MODE_ADC);
-	
-	if (adc == ADC_OFF) ADCSRA |= (1 << ADEN);
-	
-	#if !defined(__AVR_ATmega32U4__)
-	if (timer2 == TIMER2_OFF)
-	{
-		if (clockSource & CS22) TCCR2B |= (1 << CS22);
-		if (clockSource & CS21) TCCR2B |= (1 << CS21);
-		if (clockSource & CS20) TCCR2B |= (1 << CS20);
-		
-	}
-	#endif
+    // Temporary clock source variable
+    unsigned char clockSource = 0;
+
+#if !defined(__AVR_ATmega32U4__)
+    if (timer2 == TIMER2_OFF)
+    {
+        if (TCCR2B & CS22) clockSource |= (1 << CS22);
+        if (TCCR2B & CS21) clockSource |= (1 << CS21);
+        if (TCCR2B & CS20) clockSource |= (1 << CS20);
+
+        // Remove the clock source to shutdown Timer2
+        TCCR2B &= ~(1 << CS22);
+        TCCR2B &= ~(1 << CS21);
+        TCCR2B &= ~(1 << CS20);
+    }
+#endif
+
+    if (adc == ADC_OFF)	ADCSRA &= ~(1 << ADEN);
+
+    if (period != SLEEP_FOREVER)
+    {
+        wdt_enable(period);
+        WDTCSR |= (1 << WDIE);
+    }
+
+    lowPowerBodOn(SLEEP_MODE_ADC);
+
+    if (adc == ADC_OFF) ADCSRA |= (1 << ADEN);
+
+#if !defined(__AVR_ATmega32U4__)
+    if (timer2 == TIMER2_OFF)
+    {
+        if (clockSource & CS22) TCCR2B |= (1 << CS22);
+        if (clockSource & CS21) TCCR2B |= (1 << CS21);
+        if (clockSource & CS20) TCCR2B |= (1 << CS20);
+
+    }
+#endif
 }
 
 /*******************************************************************************
@@ -578,27 +581,27 @@ void	Low_Power::adc_noise_reduction(Period_t period, ADC_t adc,
 *******************************************************************************/
 void	Low_Power::power_down(Period_t period, ADC_t adc, BOD_t bod)
 {
-	if (adc == ADC_OFF)	ADCSRA &= ~(1 << ADEN);
-	
-	if (period != SLEEP_FOREVER)
-	{
-		wdt_enable(period);
-		WDTCSR |= (1 << WDIE);	
-	}
-	if (bod == BOD_OFF)	
-	{
-		#if defined __AVR_ATmega328P__
-			lowPowerBodOff(SLEEP_MODE_PWR_DOWN);
-		#else
-			lowPowerBodOn(SLEEP_MODE_PWR_DOWN);
-		#endif
-	}
-	else	
-	{
-		lowPowerBodOn(SLEEP_MODE_PWR_DOWN);
-	}
-	
-	if (adc == ADC_OFF) ADCSRA |= (1 << ADEN);
+    if (adc == ADC_OFF)	ADCSRA &= ~(1 << ADEN);
+
+    if (period != SLEEP_FOREVER)
+    {
+        wdt_enable(period);
+        WDTCSR |= (1 << WDIE);
+    }
+    if (bod == BOD_OFF)
+    {
+#if defined __AVR_ATmega328P__
+        lowPowerBodOff(SLEEP_MODE_PWR_DOWN);
+#else
+        lowPowerBodOn(SLEEP_MODE_PWR_DOWN);
+#endif
+    }
+    else
+    {
+        lowPowerBodOn(SLEEP_MODE_PWR_DOWN);
+    }
+
+    if (adc == ADC_OFF) ADCSRA |= (1 << ADEN);
 }
 
 /*******************************************************************************
@@ -645,56 +648,56 @@ void	Low_Power::power_down(Period_t period, ADC_t adc, BOD_t bod)
 *
 *******************************************************************************/
 void	Low_Power::power_save(Period_t period, ADC_t adc, BOD_t bod,
-							     Timer2_t timer2)
+                              Timer2_t timer2)
 {
-	// Temporary clock source variable 
-	unsigned char clockSource = 0;
+    // Temporary clock source variable
+    unsigned char clockSource = 0;
 
-	#if !defined(__AVR_ATmega32U4__)
-	if (timer2 == TIMER2_OFF)
-	{
-		if (TCCR2B & CS22) clockSource |= (1 << CS22);
-		if (TCCR2B & CS21) clockSource |= (1 << CS21);
-		if (TCCR2B & CS20) clockSource |= (1 << CS20);
-	
-		// Remove the clock source to shutdown Timer2
-		TCCR2B &= ~(1 << CS22);
-		TCCR2B &= ~(1 << CS21);
-		TCCR2B &= ~(1 << CS20);
-	}
-	#endif
-	
-	if (adc == ADC_OFF)	ADCSRA &= ~(1 << ADEN);
-	
-	if (period != SLEEP_FOREVER)
-	{
-		wdt_enable(period);
-		WDTCSR |= (1 << WDIE);	
-	}
-	
-	if (bod == BOD_OFF)	
-	{
-		#if defined __AVR_ATmega328P__
-			lowPowerBodOff(SLEEP_MODE_PWR_SAVE);
-		#else
-			lowPowerBodOn(SLEEP_MODE_PWR_SAVE);
-		#endif
-	}
-	else
-	{
-		lowPowerBodOn(SLEEP_MODE_PWR_SAVE);
-	}
-	
-	if (adc == ADC_OFF) ADCSRA |= (1 << ADEN);
-	
-	#if !defined(__AVR_ATmega32U4__)
-	if (timer2 == TIMER2_OFF)
-	{
-		if (clockSource & CS22) TCCR2B |= (1 << CS22);
-		if (clockSource & CS21) TCCR2B |= (1 << CS21);
-		if (clockSource & CS20) TCCR2B |= (1 << CS20);
-	}
-	#endif
+#if !defined(__AVR_ATmega32U4__)
+    if (timer2 == TIMER2_OFF)
+    {
+        if (TCCR2B & CS22) clockSource |= (1 << CS22);
+        if (TCCR2B & CS21) clockSource |= (1 << CS21);
+        if (TCCR2B & CS20) clockSource |= (1 << CS20);
+
+        // Remove the clock source to shutdown Timer2
+        TCCR2B &= ~(1 << CS22);
+        TCCR2B &= ~(1 << CS21);
+        TCCR2B &= ~(1 << CS20);
+    }
+#endif
+
+    if (adc == ADC_OFF)	ADCSRA &= ~(1 << ADEN);
+
+    if (period != SLEEP_FOREVER)
+    {
+        wdt_enable(period);
+        WDTCSR |= (1 << WDIE);
+    }
+
+    if (bod == BOD_OFF)
+    {
+#if defined __AVR_ATmega328P__
+        lowPowerBodOff(SLEEP_MODE_PWR_SAVE);
+#else
+        lowPowerBodOn(SLEEP_MODE_PWR_SAVE);
+#endif
+    }
+    else
+    {
+        lowPowerBodOn(SLEEP_MODE_PWR_SAVE);
+    }
+
+    if (adc == ADC_OFF) ADCSRA |= (1 << ADEN);
+
+#if !defined(__AVR_ATmega32U4__)
+    if (timer2 == TIMER2_OFF)
+    {
+        if (clockSource & CS22) TCCR2B |= (1 << CS22);
+        if (clockSource & CS21) TCCR2B |= (1 << CS21);
+        if (clockSource & CS20) TCCR2B |= (1 << CS20);
+    }
+#endif
 }
 
 /*******************************************************************************
@@ -729,28 +732,28 @@ void	Low_Power::power_save(Period_t period, ADC_t adc, BOD_t bod,
 *******************************************************************************/
 void	Low_Power::power_standby(Period_t period, ADC_t adc, BOD_t bod)
 {
-	if (adc == ADC_OFF)	ADCSRA &= ~(1 << ADEN);
-	
-	if (period != SLEEP_FOREVER)
-	{
-		wdt_enable(period);
-		WDTCSR |= (1 << WDIE);	
-	}
-	
-	if (bod == BOD_OFF)	
-	{
-		#if defined __AVR_ATmega328P__
-			lowPowerBodOff(SLEEP_MODE_STANDBY);
-		#else
-			lowPowerBodOn(SLEEP_MODE_STANDBY);
-		#endif
-	}
-	else
-	{
-		lowPowerBodOn(SLEEP_MODE_STANDBY);
-	}
-	
-	if (adc == ADC_OFF) ADCSRA |= (1 << ADEN);
+    if (adc == ADC_OFF)	ADCSRA &= ~(1 << ADEN);
+
+    if (period != SLEEP_FOREVER)
+    {
+        wdt_enable(period);
+        WDTCSR |= (1 << WDIE);
+    }
+
+    if (bod == BOD_OFF)
+    {
+#if defined __AVR_ATmega328P__
+        lowPowerBodOff(SLEEP_MODE_STANDBY);
+#else
+        lowPowerBodOn(SLEEP_MODE_STANDBY);
+#endif
+    }
+    else
+    {
+        lowPowerBodOn(SLEEP_MODE_STANDBY);
+    }
+
+    if (adc == ADC_OFF) ADCSRA |= (1 << ADEN);
 }
 
 /*******************************************************************************
@@ -789,115 +792,145 @@ void	Low_Power::power_standby(Period_t period, ADC_t adc, BOD_t bod)
 *
 *******************************************************************************/
 void	Low_Power::power_ext_standby(Period_t period, ADC_t adc, BOD_t bod, 
-									   Timer2_t timer2)
+                                     Timer2_t timer2)
 {
-	// Temporary clock source variable 
-	unsigned char clockSource = 0;
-	
-	#if !defined(__AVR_ATmega32U4__)
-	if (timer2 == TIMER2_OFF)
-	{
-		if (TCCR2B & CS22) clockSource |= (1 << CS22);
-		if (TCCR2B & CS21) clockSource |= (1 << CS21);
-		if (TCCR2B & CS20) clockSource |= (1 << CS20);
-	
-		// Remove the clock source to shutdown Timer2
-		TCCR2B &= ~(1 << CS22);
-		TCCR2B &= ~(1 << CS21);
-		TCCR2B &= ~(1 << CS20);
-	}
-	#endif
-	
-	if (adc == ADC_OFF)	ADCSRA &= ~(1 << ADEN);
-	
-	if (period != SLEEP_FOREVER)
-	{
-		wdt_enable(period);
-		WDTCSR |= (1 << WDIE);	
-	}
-	if (bod == BOD_OFF)	
-	{
-		#if defined __AVR_ATmega328P__
-			lowPowerBodOff(SLEEP_MODE_EXT_STANDBY);
-		#else
-			lowPowerBodOn(SLEEP_MODE_EXT_STANDBY);
-		#endif
-	}
-	else	
-	{
-		lowPowerBodOn(SLEEP_MODE_EXT_STANDBY);
-	}
-		
-	if (adc == ADC_OFF) ADCSRA |= (1 << ADEN);
-	
-	#if !defined(__AVR_ATmega32U4__)
-	if (timer2 == TIMER2_OFF)
-	{
-		if (clockSource & CS22) TCCR2B |= (1 << CS22);
-		if (clockSource & CS21) TCCR2B |= (1 << CS21);
-		if (clockSource & CS20) TCCR2B |= (1 << CS20);	
-	}
-	#endif
+    // Temporary clock source variable
+    unsigned char clockSource = 0;
+
+#if !defined(__AVR_ATmega32U4__)
+    if (timer2 == TIMER2_OFF)
+    {
+        if (TCCR2B & CS22) clockSource |= (1 << CS22);
+        if (TCCR2B & CS21) clockSource |= (1 << CS21);
+        if (TCCR2B & CS20) clockSource |= (1 << CS20);
+
+        // Remove the clock source to shutdown Timer2
+        TCCR2B &= ~(1 << CS22);
+        TCCR2B &= ~(1 << CS21);
+        TCCR2B &= ~(1 << CS20);
+    }
+#endif
+
+    if (adc == ADC_OFF)	ADCSRA &= ~(1 << ADEN);
+
+    if (period != SLEEP_FOREVER)
+    {
+        wdt_enable(period);
+        WDTCSR |= (1 << WDIE);
+    }
+    if (bod == BOD_OFF)
+    {
+#if defined __AVR_ATmega328P__
+        lowPowerBodOff(SLEEP_MODE_EXT_STANDBY);
+#else
+        lowPowerBodOn(SLEEP_MODE_EXT_STANDBY);
+#endif
+    }
+    else
+    {
+        lowPowerBodOn(SLEEP_MODE_EXT_STANDBY);
+    }
+
+    if (adc == ADC_OFF) ADCSRA |= (1 << ADEN);
+
+#if !defined(__AVR_ATmega32U4__)
+    if (timer2 == TIMER2_OFF)
+    {
+        if (clockSource & CS22) TCCR2B |= (1 << CS22);
+        if (clockSource & CS21) TCCR2B |= (1 << CS21);
+        if (clockSource & CS20) TCCR2B |= (1 << CS20);
+    }
+#endif
 }
 
-void Low_Power::deep_sleep(uint32_t millis)
+uint32_t Low_Power::power_down(uint32_t millis, ADC_t adc, BOD_t bod)
 {
-  while (millis >= 15)
-  {
-    Period_t period = SLEEP_15MS;
-    if (millis >= 8000)
+    Serial.flush();
+
+    while (millis >= 15 && s_interrupt_fired == false)
     {
-        period = SLEEP_8S;
-        millis -= 8000;
-    }
-    else if (millis >= 4000)
-    {
-        period = SLEEP_4S;
-        millis -= 4000;
-    }
-    else if (millis >= 2000)
-    {
-        period = SLEEP_2S;
-        millis -= 2000;
-    }
-    else if (millis >= 1000)
-    {
-        period = SLEEP_1S;
-        millis -= 1000;
-    }
-    else if (millis >= 500)
-    {
-        period = SLEEP_500MS;
-        millis -= 500;
-    }
-    else if (millis >= 250)
-    {
-        period = SLEEP_250MS;
-        millis -= 250;
-    }
-    else if (millis >= 120)
-    {
-        period = SLEEP_120MS;
-        millis -= 120;
-    }
-    else if (millis >= 60)
-    {
-        period = SLEEP_60MS;
-        millis -= 60;
-    }
-    else if (millis >= 30)
-    {
-        period = SLEEP_30MS;
-        millis -= 30;
-    }
-    else if (millis >= 15)
-    {
-        period = SLEEP_15MS;
-        millis -= 15;
+        Period_t period = SLEEP_15MS;
+        if (millis >= 8000)
+        {
+            period = SLEEP_8S;
+            millis -= 8000;
+        }
+        else if (millis >= 4000)
+        {
+            period = SLEEP_4S;
+            millis -= 4000;
+        }
+        else if (millis >= 2000)
+        {
+            period = SLEEP_2S;
+            millis -= 2000;
+        }
+        else if (millis >= 1000)
+        {
+            period = SLEEP_1S;
+            millis -= 1000;
+        }
+        else if (millis >= 500)
+        {
+            period = SLEEP_500MS;
+            millis -= 500;
+        }
+        else if (millis >= 250)
+        {
+            period = SLEEP_250MS;
+            millis -= 250;
+        }
+        else if (millis >= 120)
+        {
+            period = SLEEP_120MS;
+            millis -= 120;
+        }
+        else if (millis >= 60)
+        {
+            period = SLEEP_60MS;
+            millis -= 60;
+        }
+        else if (millis >= 30)
+        {
+            period = SLEEP_30MS;
+            millis -= 30;
+        }
+        else if (millis >= 15)
+        {
+            period = SLEEP_15MS;
+            millis -= 15;
+        }
+
+        power_down(period, adc, bod);
     }
 
-    power_down(period, ADC_OFF, BOD_OFF);
-  }
+    return millis;
+}
+
+static void pinInterrupt(void)
+{
+    detachInterrupt(0);
+    Low_Power::s_interrupt_fired = true;
+}
+
+uint32_t Low_Power::power_down_int(uint32_t millis, ADC_t adc, BOD_t bod)
+{
+    s_interrupt_fired = false;
+
+    attachInterrupt(0, pinInterrupt, FALLING);
+    if (s_interrupt_fired)
+    {
+        detachInterrupt(0);
+        s_interrupt_fired = false;
+        return millis;
+    }
+
+    uint32_t remaining = power_down(millis, adc, bod);
+
+    detachInterrupt(0);
+    s_interrupt_fired = false;
+
+    return remaining;
 }
 
 
@@ -910,7 +943,7 @@ void Low_Power::deep_sleep(uint32_t millis)
 *******************************************************************************/
 ISR (WDT_vect)
 {
-	// WDIE & WDIF is cleared in hardware upon entering this ISR
-	wdt_disable();
+    // WDIE & WDIF is cleared in hardware upon entering this ISR
+    wdt_disable();
 }
 
