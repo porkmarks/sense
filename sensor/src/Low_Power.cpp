@@ -28,7 +28,7 @@
 #include <avr/wdt.h>
 #include <avr/power.h>
 #include <avr/interrupt.h>
-#include "LowPower.h"
+#include "Low_Power.h"
 
 // Only Pico Power devices can change BOD settings through software
 #if defined __AVR_ATmega328P__
@@ -143,9 +143,9 @@ do { 						\
 *
 *******************************************************************************/
 #if defined (__AVR_ATmega328P__) || defined (__AVR_ATmega168__)
-void	LowPowerClass::idle(period_t period, adc_t adc, timer2_t timer2, 
-							timer1_t timer1, timer0_t timer0,
-							spi_t spi, usart0_t usart0,	twi_t twi)
+void	Low_Power::idle(Period_t period, ADC_t adc, Timer2_t timer2,
+                            Timer1_t timer1, Timer0_t timer0,
+                            SPI_t spi, USART0_t usart0,	TWI_t twi)
 {
 	// Temporary clock source variable 
 	unsigned char clockSource = 0;
@@ -267,10 +267,10 @@ void	LowPowerClass::idle(period_t period, adc_t adc, timer2_t timer2,
 *				(b) USB_ON - Leave USB module in its default state
 *******************************************************************************/
 #if defined __AVR_ATmega32U4__
-void	LowPowerClass::idle(period_t period, adc_t adc, 
-													timer4_t timer4, timer3_t timer3, 
-							            timer1_t timer1, timer0_t timer0,
-							            spi_t spi, usart1_t usart1,	twi_t twi, usb_t usb)
+void	Low_Power::idle(Period_t period, ADC_t adc,
+                                                    Timer4_t timer4, Timer3_t timer3,
+                                        Timer1_t timer1, Timer0_t timer0,
+                                        SPI_t spi, USART1_t usart1,	TWI_t twi, usb_t usb)
 {
 	if (adc == ADC_OFF)	
 	{
@@ -390,11 +390,11 @@ void	LowPowerClass::idle(period_t period, adc_t adc,
 *
 *******************************************************************************/
 #if defined (__AVR_ATmega2560__) || defined (__AVR_ATmega1280__)
-void	LowPowerClass::idle(period_t period, adc_t adc, timer5_t timer5, 
-					                timer4_t timer4, timer3_t timer3, timer2_t timer2, 
-													timer1_t timer1, timer0_t timer0, spi_t spi, 
-													usart3_t usart3, usart2_t usart2, usart1_t usart1, 
-			                    usart0_t usart0, twi_t twi)
+void	Low_Power::idle(Period_t period, ADC_t adc, Timer5_t timer5,
+                                    Timer4_t timer4, Timer3_t timer3, Timer2_t timer2,
+                                                    Timer1_t timer1, Timer0_t timer0, SPI_t spi,
+                                                    USART3_t usart3, USART2_t usart2, USART1_t usart1,
+                                USART0_t usart0, TWI_t twi)
 {
 	// Temporary clock source variable 
 	unsigned char clockSource = 0;
@@ -500,8 +500,8 @@ void	LowPowerClass::idle(period_t period, adc_t adc, timer5_t timer5,
 *				(b) TIMER2_ON - Leave Timer 2 module in its default state
 *
 *******************************************************************************/
-void	LowPowerClass::adcNoiseReduction(period_t period, adc_t adc, 
-										 timer2_t timer2)
+void	Low_Power::adc_noise_reduction(Period_t period, ADC_t adc,
+                                         Timer2_t timer2)
 {
 	// Temporary clock source variable 
 	unsigned char clockSource = 0;
@@ -576,7 +576,7 @@ void	LowPowerClass::adcNoiseReduction(period_t period, adc_t adc,
 *				(b) BOD_ON - Leave BOD module in its default state
 *
 *******************************************************************************/
-void	LowPowerClass::powerDown(period_t period, adc_t adc, bod_t bod)
+void	Low_Power::power_down(Period_t period, ADC_t adc, BOD_t bod)
 {
 	if (adc == ADC_OFF)	ADCSRA &= ~(1 << ADEN);
 	
@@ -644,8 +644,8 @@ void	LowPowerClass::powerDown(period_t period, adc_t adc, bod_t bod)
 *				(b) TIMER2_ON - Leave Timer 2 module in its default state
 *
 *******************************************************************************/
-void	LowPowerClass::powerSave(period_t period, adc_t adc, bod_t bod, 
-							     timer2_t timer2)
+void	Low_Power::power_save(Period_t period, ADC_t adc, BOD_t bod,
+							     Timer2_t timer2)
 {
 	// Temporary clock source variable 
 	unsigned char clockSource = 0;
@@ -727,7 +727,7 @@ void	LowPowerClass::powerSave(period_t period, adc_t adc, bod_t bod,
 *				(b) BOD_ON - Leave BOD module in its default state
 *
 *******************************************************************************/
-void	LowPowerClass::powerStandby(period_t period, adc_t adc, bod_t bod)
+void	Low_Power::power_standby(Period_t period, ADC_t adc, BOD_t bod)
 {
 	if (adc == ADC_OFF)	ADCSRA &= ~(1 << ADEN);
 	
@@ -788,8 +788,8 @@ void	LowPowerClass::powerStandby(period_t period, adc_t adc, bod_t bod)
 *				(b) TIMER2_ON - Leave Timer 2 module in its default state
 *
 *******************************************************************************/
-void	LowPowerClass::powerExtStandby(period_t period, adc_t adc, bod_t bod, 
-									   timer2_t timer2)
+void	Low_Power::power_ext_standby(Period_t period, ADC_t adc, BOD_t bod, 
+									   Timer2_t timer2)
 {
 	// Temporary clock source variable 
 	unsigned char clockSource = 0;
@@ -840,11 +840,11 @@ void	LowPowerClass::powerExtStandby(period_t period, adc_t adc, bod_t bod,
 	#endif
 }
 
-void LowPowerClass::deepSleep(uint32_t millis)
+void Low_Power::deep_sleep(uint32_t millis)
 {
   while (millis >= 15)
   {
-    period_t period = SLEEP_15MS;
+    Period_t period = SLEEP_15MS;
     if (millis >= 8000)
     {
         period = SLEEP_8S;
@@ -896,7 +896,7 @@ void LowPowerClass::deepSleep(uint32_t millis)
         millis -= 15;
     }
 
-    powerDown(period, ADC_OFF, BOD_OFF);
+    power_down(period, ADC_OFF, BOD_OFF);
   }
 }
 
@@ -914,4 +914,3 @@ ISR (WDT_vect)
 	wdt_disable();
 }
 
-LowPowerClass LowPower;
