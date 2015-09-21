@@ -137,6 +137,8 @@ public:
     static void	power_standby(Period_t period, ADC_t adc = ADC_OFF, BOD_t bod = BOD_OFF);
     static void	power_ext_standby(Period_t period, ADC_t adc = ADC_OFF, BOD_t bod = BOD_OFF, Timer2_t timer2 = TIMER2_OFF);
 
+    static uint64_t s_sleep_time;
+
     static bool s_interrupt_fired;
 };
 

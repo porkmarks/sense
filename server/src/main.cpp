@@ -66,7 +66,7 @@ int main()
                 uint8_t index;
                 float vcc, t, h;
                 packet_ptr->unpack(timestamp, index, vcc, h, t);
-                std::cout << date_time(timestamp) << "\t" << int(index) << "\tVcc:" << vcc << "V\tH:" << h << "%\tT:" << t << "C" << "\n";
+                std::cout << date_time(timestamp) << " / " << current_date_time() << "\t" << int(index) << "\tVcc:" << vcc << "V\tH:" << h << "%\tT:" << t << "C" << "\n";
             }
         }
         std::cout << std::flush;

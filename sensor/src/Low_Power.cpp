@@ -94,6 +94,7 @@
 #endif
 
 bool Low_Power::s_interrupt_fired = false;
+uint64_t Low_Power::s_sleep_time = 0;
 
 /*******************************************************************************
 * Name: idle
@@ -854,51 +855,61 @@ uint32_t Low_Power::power_down(uint32_t millis, ADC_t adc, BOD_t bod)
         {
             period = SLEEP_8S;
             millis -= 8000;
+            s_sleep_time += 8000;
         }
         else if (millis >= 4000)
         {
             period = SLEEP_4S;
             millis -= 4000;
+            s_sleep_time += 4000;
         }
         else if (millis >= 2000)
         {
             period = SLEEP_2S;
             millis -= 2000;
+            s_sleep_time += 2000;
         }
         else if (millis >= 1000)
         {
             period = SLEEP_1S;
             millis -= 1000;
+            s_sleep_time += 1000;
         }
         else if (millis >= 500)
         {
             period = SLEEP_500MS;
             millis -= 500;
+            s_sleep_time += 500;
         }
         else if (millis >= 250)
         {
             period = SLEEP_250MS;
             millis -= 250;
+            s_sleep_time += 250;
         }
         else if (millis >= 120)
         {
             period = SLEEP_120MS;
             millis -= 120;
+            s_sleep_time += 120;
         }
         else if (millis >= 60)
         {
             period = SLEEP_60MS;
             millis -= 60;
+            s_sleep_time += 60;
         }
         else if (millis >= 30)
         {
             period = SLEEP_30MS;
             millis -= 30;
+            s_sleep_time += 30;
         }
         else if (millis >= 15)
         {
             period = SLEEP_15MS;
             millis -= 15;
+            s_sleep_time += 15;
         }
 
         power_down(period, adc, bod);

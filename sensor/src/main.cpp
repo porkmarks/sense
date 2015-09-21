@@ -8,6 +8,23 @@
 #include "Comms.h"
 #include "Data_Defs.h"
 #include "avr_stdio.h"
+#include "deque"
+
+__extension__ typedef int __guard __attribute__((mode (__DI__)));
+
+extern "C" int __cxa_guard_acquire(__guard *g) {return !*(char *)(g);};
+extern "C" void __cxa_guard_release (__guard *g) {*(char *)g = 1;};
+extern "C" void __cxa_guard_abort (__guard *) {};
+//extern "C" void __cxa_pure_virtual() { while (1); }
+
+#include <stdlib.h>
+inline void* operator new(size_t size) { return malloc(size); }
+inline void* operator new[](size_t size) { return malloc(size); }
+inline void operator delete(void* p) { free(p); }
+inline void operator delete[](void* p) { free(p); }
+inline void* operator new(size_t size_, void *ptr_) { return ptr_; }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum class State
 {
@@ -24,8 +41,14 @@ DHT s_dht(DHT_DATA_PIN1, DHT22);
 
 Comms s_comms;
 
-uint32_t s_readingIndex = 0;
-uint32_t s_timestamp = 0;
+constexpr uint8_t MAX_MEASUREMENTS = 32;
+std::deque<data::Measurement> s_measurements;
+uint32_t s_measurement_index = 0;
+uint64_t s_timestamp = 0;
+uint32_t s_sleep_duration = 10000;
+
+
+
 
 void setup()
 {
@@ -37,6 +60,7 @@ void setup()
     pinMode(static_cast<uint8_t>(Button::BUTTON1), INPUT);
     digitalWrite(static_cast<uint8_t>(Button::BUTTON1), HIGH);
 
+    //s_measurements.reserve(MAX_MEASUREMENTS);
 
     // put your setup code here, to run once:
     Serial.begin(2400);
@@ -116,7 +140,6 @@ void pair()
                 if (s_comms.send_packet(5))
                 {
                     set_leds(GREEN_LED);
-                    Low_Power::power_down(500);
 
                     uint8_t size = s_comms.receive_packet(1000);
                     if (size == sizeof(data::Pair_Response) &&
@@ -125,7 +148,7 @@ void pair()
                         const data::Pair_Response* response_ptr = reinterpret_cast<const data::Pair_Response*>(s_comms.get_packet_payload());
                         s_comms.set_address(response_ptr->address);
                         //s_clock.set_timestamp(response.timestamp);
-                        s_timestamp = response_ptr->timestamp;
+                        s_timestamp = response_ptr->server_timestamp * 1000ULL;
                         done = true;
                         break;
                     }
@@ -151,28 +174,72 @@ void pair()
         }
     }
 
+    blink_leds(GREEN_LED, 3, 500);
+
     //wait for the user to release the button
     wait_for_release(Button::BUTTON1);
 
-    blink_leds(GREEN_LED, 3, 500);
     s_state = State::READ_DATA;
 
     //sleep a bit
     Low_Power::power_down(1000 * 1);
 }
 
+void listen(uint32_t timeout)
+{
+    uint8_t size = s_comms.receive_packet(timeout);
+    if (size == 0)
+    {
+        return;
+    }
+
+    data::Type type = s_comms.get_packet_type();
+    if (type == data::Type::CONFIG && size == sizeof(data::Config))
+    {
+        const data::Config* ptr = reinterpret_cast<const data::Config*>(s_comms.get_packet_payload());
+        s_timestamp = ptr->server_timestamp * 1000ULL;
+        if (ptr->scheduled_timestamp > ptr->server_timestamp)
+        {
+            s_sleep_duration = ptr->scheduled_timestamp - ptr->server_timestamp;
+        }
+    }
+}
+
+void request_config()
+{
+    s_comms.begin_packet(data::Type::CONFIG_REQUEST);
+    s_comms.pack(data::Config_Request());
+    if (s_comms.send_packet(5))
+    {
+        uint8_t size = s_comms.receive_packet(500);
+        data::Type type = s_comms.get_packet_type();
+        if (type == data::Type::CONFIG && size == sizeof(data::Config))
+        {
+            const data::Config* ptr = reinterpret_cast<const data::Config*>(s_comms.get_packet_payload());
+            s_timestamp = ptr->server_timestamp * 1000ULL;
+            if (ptr->scheduled_timestamp > ptr->server_timestamp)
+            {
+                s_sleep_duration = ptr->scheduled_timestamp - ptr->server_timestamp;
+            }
+        }
+    }
+}
+
 void read_data()
 {
     while (true)
     {
+        uint32_t start_tp = millis();
+        uint64_t start_sleep_tp = Low_Power::s_sleep_time;
+
         if (is_pressed(Button::BUTTON1))
         {
             s_state = State::PAIR;
             return;
         }
 
-        // put your main code here, to run repeatedly:
-        s_readingIndex++;
+        uint8_t flags = 0;
+        s_measurement_index++;
 
         //digitalWrite(DHT_POWER_PIN, HIGH);
         digitalWrite(RED_LED_PIN, HIGH);   // turn the LED on (HIGH is the voltage level)
@@ -185,6 +252,7 @@ void read_data()
         float t, h;
         if (!s_dht.read(t, h))
         {
+            flags |= data::Measurement::FLAG_SENSOR_ERROR;
             Serial.println(F("Failed to read from DHT sensor!"));
         }
 
@@ -201,10 +269,33 @@ void read_data()
         //Serial.println(F("Sending..."));
 
         s_comms.idle_mode();
-        data::Measurement item(s_timestamp, s_readingIndex, vcc, h, t);
-        s_comms.begin_packet(data::Type::MEASUREMENT);
-        s_comms.pack(item);
-        s_comms.send_packet(3);
+        data::Measurement item(s_timestamp / 1000ULL, s_measurement_index, flags, vcc, h, t);
+
+        //add it to the ring. IF needed, pop old elements
+        if (s_measurements.size() + 1 > MAX_MEASUREMENTS)
+        {
+            s_measurements.pop_front();
+        }
+        s_measurements.push_back(item);
+
+        for (uint8_t i = 0; i < s_measurements.size();)
+        {
+            data::Measurement& item = s_measurements[i];
+            s_comms.begin_packet(data::Type::MEASUREMENT);
+            s_comms.pack(item);
+            if (s_comms.send_packet(3))
+            {
+                s_measurements.erase(s_measurements.begin() + i);
+            }
+            else
+            {
+                item.flags |= data::Measurement::FLAG_COMMS_FAILED;
+                i++;
+            }
+        }
+
+        request_config();
+        //listen(500);
 
         uint32_t sendingD = millis() - lastTP;
         lastTP = millis();
@@ -239,8 +330,11 @@ void read_data()
         digitalWrite(RED_LED_PIN, LOW);    // turn the LED off by making the voltage LOW
         //delay(600);
 
-        Low_Power::power_down_int(10000);
-        s_timestamp += 10;
+
+        s_timestamp += millis() - start_tp;
+
+        Low_Power::power_down_int(s_sleep_duration);
+        s_timestamp += Low_Power::s_sleep_time - start_sleep_tp;
     }
 }
 
