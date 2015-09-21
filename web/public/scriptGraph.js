@@ -1,5 +1,6 @@
 
-function plotGraph(fileName, beginDate, endDate)
+
+function plotGraph(fileNames, beginDate, endDate)
 {
 	var parseDate = d3.time.format("%d/%m/%Y").parse;
 
@@ -20,7 +21,7 @@ function plotGraph(fileName, beginDate, endDate)
 	    .orient("bottom").ticks(d3.time.days).tickFormat(d3.time.format('%d %b'));
 
 	var yAxis = d3.svg.axis().scale(y)
-	    .orient("left").ticks(5);
+	    .orient("left").ticks(5).tickFormat(function(d) { return d + "°C"; });
 
 	// Define the line
 	var valueline = d3.svg.line()
@@ -35,61 +36,66 @@ function plotGraph(fileName, beginDate, endDate)
 				.append("g")
 				.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
+	
 	// Get the data
-	d3.tsv(fileName, function(data) 
-	{	
-		//parse data into correct type
-	    data.forEach(function(d) 
-	    {
-	        d.idx = +d.idx;
-	        d.date = parseDate(d.date);
-	        d.temperature = +d.temperature;
-	        d.humidity = +d.humidity;
-	        
-	    });
-		//data filter for indice
-	    var filteredData = [];
-	    for (var i = 0; i < data.length; i++)
-	    {
-	    	console.log(data[i].date);
-	    	if (data[i].date.getTime() >= beginDate.getTime() && data[i].date.getTime() <= endDate.getTime())
-	    	{
-	    		filteredData.push(data[i]);
-	    	}
-	    }
-	    //console.log(filteredData);
-	    
-	    // Scale the range of the data
-	    x.domain(d3.extent(filteredData, function(d) { return d.date; }));
-	    y.domain([0, d3.max(filteredData, function(d) { return d.temperature; })]);
+	for(var i = 0; i < fileNames.length; i++)
+	{
+		d3.tsv(fileNames[i], function(data) 
+		{	
+			//parse data into correct type
+		    data.forEach(function(d) 
+		    {
+		        d.idx = +d.idx;
+		        d.date = parseDate(d.date);
+		        d.temperature = +d.temperature;
+		        d.humidity = +d.humidity;
+		        
+		    });
+			//data filter for indice
 
-	    // Add the valueline path.
-	    svg.append("path")
-	        .attr("class", "line")
-	        .attr("d", valueline(filteredData));
+		    var filteredData = [];
+		    for (var i = 0; i < data.length; i++)
+		    {
+		    	console.log(data[i].date);
+		    	if (data[i].date.getTime() >= beginDate.getTime() && data[i].date.getTime() <= endDate.getTime())
+		    	{
+		    		filteredData.push(data[i]);
+		    	}
+		    }
+	    	
+			x.domain(d3.extent(filteredData, function(d) { return d.date; }));
+			y.domain([0, d3.max(filteredData, function(d) { return d.temperature; })]);
+			// Add the valueline path.
+			svg.append("path")
+				.attr("class", "line")
+				.attr("d", valueline(filteredData));
+			// Add the X Axis
 
-	    // Add the X Axis
-	    svg.append("g")
-	        .attr("class", "x axis")
-	        .attr("transform", "translate(0," + height + ")")
-	        .call(xAxis);
-
-	    // Add the Y Axis
-	    svg.append("g")
-	        .attr("class", "y axis")
-	        .call(yAxis);
-
-		svg.append("g")
-			.attr("class", "y axis")
-			.call(yAxis)
-			.append("text")
-			.style("font-size","11px")
-			.attr("transform", "rotate(-90)")
-			.attr("y", 6)
-			.attr("dy", "0.71em")
-			.style("text-anchor", "end")
-			.text("Temperature (ºC)");
+			    var t = svg.transition().duration(100);
+						    t.select(".y.axis").call(yAxis);
+						    t.select(".x.axis").call(xAxis);
+						    t.select(".area").attr("d", area(values));
+						    t.select(".line").attr("d", line(values));
 
 
-	});
+		    
+		});
+	}
+
+	svg.append("g")
+		.attr("class", "x axis")
+		.attr("transform", "translate(0," + height + ")")
+		.call(xAxis);
+
+	// Add the Y Axis
+	svg.append("g")
+	.attr("class", "y axis")
+	.call(yAxis);
+
+
+
+
+    
+
+	
 }

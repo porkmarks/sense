@@ -10,13 +10,13 @@
 function refreshGraphs()
 {
 	var parser = d3.time.format("%d/%m/%Y").parse;
-
+	var fileArray = ["data.tsv", "data1.tsv", "data2.tsv"];
 	var beginDate = $("#beginDate").datepicker('getDate'); 
 	var endDate = $("#endDate").datepicker('getDate'); 
 
 	if (beginDate != null && endDate != null && beginDate.getTime() < endDate.getTime())
 	{
-		plotGraph("data.tsv", beginDate, endDate)
+		plotGraph(fileArray, beginDate, endDate)
 	}
 }
 </script>
