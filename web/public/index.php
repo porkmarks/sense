@@ -27,6 +27,7 @@
 </style>
 </head>
 <body>
+
 <div style="float:left","margin: 20px">Begin Date: <input type="text" id="beginDate"></div>
 <script>
 $('#beginDate')
@@ -51,6 +52,7 @@ $('#endDate')
 		defaultDate: new Date(),
 		onSelect: function(date) {
 			refreshGraphs();
+
 	    }
 	})
 	.datepicker('setDate', new Date()); 
@@ -111,6 +113,8 @@ function refreshGraphs()
 	var beginDate = $("#beginDate").datepicker('getDate'); 
 	var endDate = $("#endDate").datepicker('getDate'); 
 
+	d3.selectAll('.line').remove();
+
 	if (beginDate != null && endDate != null && beginDate.getTime() < endDate.getTime())
 	{
 		plotGraph( plotData, fileArray, beginDate, endDate)
@@ -120,7 +124,22 @@ function refreshGraphs()
 refreshGraphs();
 
 </script>
+<li>
+<label><input type="checkbox" name="checkbox" value="value">Hall</label>
+<label><input type="checkbox" name="checkbox" value="value">Bedroom</label>
+<label><input type="checkbox" name="checkbox" value="value">Living</label>
 
+<button type='button' onclick='checkAll()'>Check</button>
+<button type='button' onclick='uncheckAll()'>Uncheck</button>
+</li>
+<script>
+function checkAll() {
+    d3.selectAll('input').property('checked', true);
+}
+function uncheckAll() {
+    d3.selectAll('input').property('checked', false);
+}
+</script>
 
 <div style="float:right; margin:10px">
 </div>
