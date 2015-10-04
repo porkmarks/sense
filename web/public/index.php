@@ -10,7 +10,7 @@
 
 </script>
 <style>
-	body { font: 14px Arial;}
+	body { font: 14px Arial; width 1600px; margin: 0 auto;}
 
 	path {
 	    stroke-width: 1.5;
@@ -24,12 +24,66 @@
 	    stroke-width: 1.5;
 	    shape-rendering: crispEdges;
 	}
+
+	#datePkr {
+		float:left;
+		width: 900px;
+		height: 200px;
+		margin-left: 40px;
+    	margin-right: 40px;
+    	margin-top: 20px;
+    	margin-bottom: 20px; 
+	}
+
+	.checkboxList {
+    	list-style-type:none;
+	}
+
+	.checkboxListScroll {
+		float: left;
+		position:relative;
+		margin-left: 40px;
+    	margin-right: 40px;
+    	margin-top: 20px;
+    	margin-bottom: 20px; 
+    	width: 200px;
+    	height:200px;
+    	overflow: scroll;
+    	overflow-x: hidden;
+	}
+
+	#graphContainer {
+	    float: left;
+	    width: 900px;
+	    height:900px;
+	    margin-top: 40px;
+		margin-left: 40px;
+    	margin-right: 40px;
+    
+	}
+	.itemList{
+		font-size: 14px;
+		margin-top: 4px;
+		margin-bottom: 4px;
+	}
 </style>
 </head>
 <body>
 
-<div style="float:left","margin: 20px">Begin Date: <input type="text" id="beginDate"></div>
+<div id="datePkr">
+Begin Date: <input type="text" id="beginDate">
+End Date: <input type="text" id="endDate">
+</div>
+
+<div class="checkboxListScroll">
+<ul id="checkboxList" class="checkboxList"> </ul>
+</div>
+
+<div id ="graphContainer"></div>
+
+
 <script>
+
 $('#beginDate')
 	.datepicker({
 		//showButtonPanel: true,
@@ -41,9 +95,6 @@ $('#beginDate')
 	})
 	.datepicker('setDate', -7); 
 
-</script>
-<div style="float:left","margin: 30px">End Date: <input type="text" id="endDate"></div>
-<script>
 $('#endDate')
 	.datepicker
 	({
@@ -55,17 +106,15 @@ $('#endDate')
 
 	    }
 	})
-	.datepicker('setDate', new Date()); 
+	.datepicker('setDate', new Date());
 
 
 
-</script>
 
-
-<script>
+var fileArray = ["living.tsv", "hall.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv"];
 	// Set the dimensions of the canvas / graph
 var margin = {top: 30, right: 20, bottom: 30, left: 50};
-var width = 800 - margin.left - margin.right;
+var width = 900 - margin.left - margin.right;
 var height = 300 - margin.top - margin.bottom;
 
 // Set the ranges
@@ -74,12 +123,12 @@ var y = d3.scale.linear().range([height, 0]);
 
 // Define the axes
 var xAxis = d3.svg.axis().scale(x)
-    .orient("bottom").ticks(d3.time.days).tickFormat(d3.time.format('%d %b'));
+    .orient("bottom").ticks(width/100).tickFormat(d3.time.format('%d %b'));
 
 var yAxis = d3.svg.axis().scale(y)
     .orient("left").ticks(5).tickFormat(function(d) { return d + "°C"; });
 	// Adds the svg canvas
-var svg = d3.select("body")
+var svg = d3.select("#graphContainer")
 			.append("svg")
 			.attr("width", width + margin.left + margin.right)
 			.attr("height", height + margin.top + margin.bottom)
@@ -104,12 +153,56 @@ var plotData = {
 	width: width,
 	height: height
 }
+var selectedFiles = [];
+
+function displayCheckboxes(fileNames)
+{	
+	var checkboxList = document.getElementById("checkboxList");
+	fileNames.forEach(function(fileName) 
+	{	
+
+		var cb = document.createElement('input');
+		cb.type = "checkbox";
+		cb.name = fileName;
+		cb.value = "value";
+		cb.onchange = function()
+		{
+			if (cb.checked == true)
+			{
+				selectedFiles.push(cb.name);
+			}
+			else
+			{
+				var index = selectedFiles.indexOf(cb.name);
+				if (index > -1)
+				{
+					selectedFiles.splice(index, 1);
+				}
+			}
+			
+			refreshGraphs();
+		};
+
+		var label = document.createElement('label')
+		label.htmlFor = "id";
+		label.appendChild(document.createTextNode(fileName.substr(0, fileName.length-4)));
+
+		var item = document.createElement('li');
+		item.className = "itemList";
+
+		item.appendChild(cb);
+		item.appendChild(label);
+
+		checkboxList.appendChild(item);
+		
+	});
+}
 
 
 function refreshGraphs()
-{
+{	
 	var parser = d3.time.format("%d/%m/%Y").parse;
-	var fileArray = ["living.tsv", "hall.tsv", "bedroom.tsv"];
+	
 	var beginDate = $("#beginDate").datepicker('getDate'); 
 	var endDate = $("#endDate").datepicker('getDate'); 
 
@@ -117,31 +210,14 @@ function refreshGraphs()
 
 	if (beginDate != null && endDate != null && beginDate.getTime() < endDate.getTime())
 	{
-		plotGraph( plotData, fileArray, beginDate, endDate)
+		plotGraph( plotData, selectedFiles, beginDate, endDate)
 	}
 }
 
+
+
+displayCheckboxes(fileArray);
 refreshGraphs();
-
 </script>
-<li>
-<label><input type="checkbox" name="checkbox" value="value">Hall</label>
-<label><input type="checkbox" name="checkbox" value="value">Bedroom</label>
-<label><input type="checkbox" name="checkbox" value="value">Living</label>
-
-<button type='button' onclick='checkAll()'>Check</button>
-<button type='button' onclick='uncheckAll()'>Uncheck</button>
-</li>
-<script>
-function checkAll() {
-    d3.selectAll('input').property('checked', true);
-}
-function uncheckAll() {
-    d3.selectAll('input').property('checked', false);
-}
-</script>
-
-<div style="float:right; margin:10px">
-</div>
 </body>
 </html>
