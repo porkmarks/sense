@@ -1,19 +1,22 @@
 
 
-function plotGraph(plotData, fileNames, beginDate, endDate)
+function plotGraph(plotData, fileDatas, beginDate, endDate)
 {
 	var parseDate = d3.time.format("%Y-%m-%d").parse;
 
 	// Define the line
-	var valueline = d3.svg.line()
+	var valuelineTemp = d3.svg.line()
 	    .x(function(d) { return plotData.x(d.date); })
-	    .y(function(d) { return plotData.y(d.temperature); });
-	    
+	    .y(function(d) { return plotData.y0(d.temperature); });
 
+	var valuelineHum = d3.svg.line()
+	    .x(function(d) { return plotData.x(d.date); })
+	    .y(function(d) { return plotData.y1(d.humidity); });
+	       
 
 	var readData = function(plotIdx)
 	{
-		d3.tsv(fileNames[plotIdx], function(data) 
+		d3.tsv(fileDatas[plotIdx].fileName, function(data) 
 		{	
 			//parse data into correct type
 		    data.forEach(function(d) 
@@ -22,7 +25,7 @@ function plotGraph(plotData, fileNames, beginDate, endDate)
 		        d.date = parseDate(d.date);
 		        d.temperature = +d.temperature;
 		        d.humidity = +d.humidity;
-		        d.symbol  = fileNames[i];
+		        d.symbol  = fileDatas[plotIdx].fileName;
 		    });
 			//data filter for indice
 
@@ -39,29 +42,40 @@ function plotGraph(plotData, fileNames, beginDate, endDate)
 	    	
 
 			plotData.x.domain(d3.extent(filteredData, function(d) { return d.date; }));
-			plotData.y.domain(d3.extent(filteredData, function(d) { return d.temperature; }));
+			plotData.y0.domain(d3.extent(filteredData, function(d) { return d.temperature; }));
+			plotData.y1.domain(d3.extent(filteredData, function(d) { return d.humidity; }));
 			// Add the valueline path.
 			
 			//console.log(plotIdx);
 
 		    var t = plotData.graph.transition().duration(100);
-		    t.select(".y.axis").call(plotData.yAxis);
+		    t.select(".y.axis").call(plotData.y0Axis);
 		    t.select(".x.axis").call(plotData.xAxis);
+
+		    var s = plotData.graph.transition().duration(100);
+		    s.select(".y.axis").call(plotData.y1Axis);
+		    s.select(".x.axis").call(plotData.xAxis);
 		
 			
-			var colors = ["#ff9900", "#109618", "#990099", "#0099c6", "#dd4477", "#66aa00", "#b82e2e", "#316395", "#994499", "#22aa99", "#aaaa11", "#6633cc", "#e67300", "#8b0707", "#651067", "#329262", "#5574a6", "#3b3eac"];
+			
   			
 		    plotData.graph.append("path")
 				.attr("class", "line")
-				.attr("stroke", colors[plotIdx])
-				//.style("stroke-dasharray", ("10,2"))
-				.attr("d", valueline(filteredData));
-					    
+				.attr("stroke", fileDatas[plotIdx].color)
+				//.style("stroke-dasharray", ("10,2"))valueline
+				.attr("d", valuelineTemp(filteredData));
+
+			 plotData.graph.append("path")
+				.attr("class", "line")
+				.attr("stroke", fileDatas[plotIdx].color)
+				.style("stroke-dasharray", ("3,3"))
+				.attr("d", valuelineHum(filteredData));
+						    
 		});
 	};
 
 	// Get the data
-	for(var i = 0; i < fileNames.length; i++)
+	for(var i = 0; i < fileDatas.length; i++)
 	{
 		readData(i);
 	}
