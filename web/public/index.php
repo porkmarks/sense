@@ -110,8 +110,9 @@ $('#endDate')
 
 
 
+var colors = ["#7A0000", "#0074D9", "#39CCCC", "#3D9970", "#2ECC40", "#3D0000", "#FF4136", "#854144b", "#FF3399", "#AAAAAA", "#B10DC9"];
+var fileArray = ["living.tsv", "hall.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv"];
 
-var fileArray = ["living.tsv", "hall.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv"];
 	// Set the dimensions of the canvas / graph
 var margin = {top: 30, right: 20, bottom: 30, left: 50};
 var width = 900 - margin.left - margin.right;
@@ -119,15 +120,19 @@ var height = 300 - margin.top - margin.bottom;
 
 // Set the ranges
 var x = d3.time.scale().range([0, width]);
-var y = d3.scale.linear().range([height, 0]);
+var y0 = d3.scale.linear().range([height, 0]);
+var y1 = d3.scale.linear().range([height, 0]);
 
 // Define the axes
 var xAxis = d3.svg.axis().scale(x)
     .orient("bottom").ticks(width/100).tickFormat(d3.time.format('%d %b'));
 
-var yAxis = d3.svg.axis().scale(y)
+var y0Axis = d3.svg.axis().scale(y0)
     .orient("left").ticks(5).tickFormat(function(d) { return d + "°C"; });
-	// Adds the svg canvas
+var y1Axis = d3.svg.axis().scale(y1)
+    .orient("right").ticks(5).tickFormat(function(d) { return d + "%"; });
+
+// Adds the svg canvas
 var svg = d3.select("#graphContainer")
 			.append("svg")
 			.attr("width", width + margin.left + margin.right)
@@ -142,50 +147,71 @@ svg.append("g")
 // Add the Y Axis
 svg.append("g")
 	.attr("class", "y axis")
-	.call(yAxis);
+	.call(y0Axis);
+svg.append("g")
+	.attr("class", "y axis")
+	.call(y1Axis);
 
 var plotData = {
 	x: x,
-	y: y,
+	y0: y0,
+	y1:y1,
 	graph: svg,
 	xAxis: xAxis,
-	yAxis: yAxis,
+	y0Axis: y0Axis,
+	y1Axis:y1Axis,
 	width: width,
 	height: height
 }
-var selectedFiles = [];
+var selectedObjects = [];
+
 
 function displayCheckboxes(fileNames)
 {	
 	var checkboxList = document.getElementById("checkboxList");
-	fileNames.forEach(function(fileName) 
+
+	var createCheckbox = function(idx)
 	{	
+		var fileName = fileNames[idx];
+		var color = colors[idx];
 
 		var cb = document.createElement('input');
 		cb.type = "checkbox";
 		cb.name = fileName;
 		cb.value = "value";
+
+
+		var label = document.createElement('label')
+		label.htmlFor = "id";
+		label.appendChild(document.createTextNode(fileName.substr(0, fileName.length-4)));
+		label.style.color = color;
+
+		label.onclick = function()
+		{
+			cb.checked = !cb.checked;
+			cb.onchange();
+		};
+
 		cb.onchange = function()
 		{
-			if (cb.checked == true)
+			if (cb.checked == true || label.onClick == true)
 			{
-				selectedFiles.push(cb.name);
+				selectedObjects.push({ fileName: fileName, color: color });
 			}
 			else
 			{
-				var index = selectedFiles.indexOf(cb.name);
-				if (index > -1)
+				for (var i = 0; i < selectedObjects.length; i++)
 				{
-					selectedFiles.splice(index, 1);
+					if (selectedObjects[i].fileName == fileName)
+					{
+						selectedObjects.splice(i, 1);
+						break;
+					}
 				}
 			}
 			
 			refreshGraphs();
 		};
-
-		var label = document.createElement('label')
-		label.htmlFor = "id";
-		label.appendChild(document.createTextNode(fileName.substr(0, fileName.length-4)));
 
 		var item = document.createElement('li');
 		item.className = "itemList";
@@ -194,8 +220,12 @@ function displayCheckboxes(fileNames)
 		item.appendChild(label);
 
 		checkboxList.appendChild(item);
-		
-	});
+	};
+
+	for (var idx = 0; idx < fileNames.length; idx++)
+	{	
+		createCheckbox(idx);
+	}
 }
 
 
@@ -210,7 +240,7 @@ function refreshGraphs()
 
 	if (beginDate != null && endDate != null && beginDate.getTime() < endDate.getTime())
 	{
-		plotGraph( plotData, selectedFiles, beginDate, endDate)
+		plotGraph(plotData, selectedObjects, beginDate, endDate)
 	}
 }
 
