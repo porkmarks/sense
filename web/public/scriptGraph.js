@@ -49,15 +49,12 @@ function plotGraph(plotData, fileDatas, beginDate, endDate)
 			//console.log(plotIdx);
 
 		    var t = plotData.graph.transition().duration(100);
-		    t.select(".y.axis").call(plotData.y0Axis);
+		    //var y = t.selectAll(".y.axis");
+			
 		    t.select(".x.axis").call(plotData.xAxis);
+		    t.select(".y.axisLeft").call(plotData.yAxisLeft);
+		    t.select(".y.axisRight").call(plotData.yAxisRight);
 
-		    var s = plotData.graph.transition().duration(100);
-		    s.select(".y.axis").call(plotData.y1Axis);
-		    s.select(".x.axis").call(plotData.xAxis);
-		
-			
-			
   			
 		    plotData.graph.append("path")
 				.attr("class", "line")

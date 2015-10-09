@@ -20,8 +20,8 @@
 	.axis path,
 	.axis line {
 	    fill: none;
-	    stroke: red;
-	    stroke-width: 1.5;
+	    stroke: grey;
+	    stroke-width: 1.2;
 	    shape-rendering: crispEdges;
 	}
 
@@ -54,7 +54,7 @@
 
 	#graphContainer {
 	    float: left;
-	    width: 900px;
+	    width: 1000px;
 	    height:900px;
 	    margin-top: 40px;
 		margin-left: 40px;
@@ -127,10 +127,10 @@ var y1 = d3.scale.linear().range([height, 0]);
 var xAxis = d3.svg.axis().scale(x)
     .orient("bottom").ticks(width/100).tickFormat(d3.time.format('%d %b'));
 
-var y0Axis = d3.svg.axis().scale(y0)
+var yAxisLeft = d3.svg.axis().scale(y0)
     .orient("left").ticks(5).tickFormat(function(d) { return d + "°C"; });
-var y1Axis = d3.svg.axis().scale(y1)
-    .orient("right").ticks(5).tickFormat(function(d) { return d + "%"; });
+var yAxisRight = d3.svg.axis().scale(y1)
+    .orient("left").ticks(5).tickFormat(function(d) { return d + "%"; });
 
 // Adds the svg canvas
 var svg = d3.select("#graphContainer")
@@ -146,20 +146,21 @@ svg.append("g")
 
 // Add the Y Axis
 svg.append("g")
-	.attr("class", "y axis")
-	.call(y0Axis);
+	.attr("class", "y axis axisLeft")
+	.call(yAxisLeft);
 svg.append("g")
-	.attr("class", "y axis")
-	.call(y1Axis);
+	.attr("class", "y axis axisRight")
+	.attr("transform", "translate(" + width + " ,0)")
+	.call(yAxisRight);
 
 var plotData = {
 	x: x,
 	y0: y0,
-	y1:y1,
+	y1: y1,
 	graph: svg,
 	xAxis: xAxis,
-	y0Axis: y0Axis,
-	y1Axis:y1Axis,
+	yAxisLeft: yAxisLeft,
+	yAxisRight: yAxisRight,
 	width: width,
 	height: height
 }
