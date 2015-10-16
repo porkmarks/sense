@@ -54,8 +54,8 @@
 
 	#graphContainer {
 	    float: left;
-	    width: 1000px;
-	    height:900px;
+	    width: 1200px;
+	    height:350px;
 	    margin-top: 40px;
 		margin-left: 40px;
     	margin-right: 40px;
@@ -65,6 +65,23 @@
 		font-size: 14px;
 		margin-top: 4px;
 		margin-bottom: 4px;
+	}
+	#checkboxes{
+		float: left;
+	    width: 500px;
+	    height:30px;
+	    margin-top: 20px;
+		margin-left: 40px;
+    	margin-right: 40px;
+	}
+	#option{
+		float: left;
+		width: 600px;
+		height: 30px;
+		margin-left: 60px;
+    	margin-right: 20px;
+    	margin-top: 10px;
+    	margin-bottom: 20px; 
 	}
 </style>
 </head>
@@ -78,9 +95,38 @@ End Date: <input type="text" id="endDate">
 <div class="checkboxListScroll">
 <ul id="checkboxList" class="checkboxList"> </ul>
 </div>
-
 <div id ="graphContainer"></div>
 
+<div id="option">
+    <input name="DayButton" 
+           type="button" 
+           value="Day" 
+           onclick="updateData()" />
+    <input name="weekButton" 
+           type="button" 
+           value="Week" 
+           onclick="updateData()" />
+
+    <input name="MonthButton" 
+           type="button" 
+           value="Month" 
+           onclick="updateData()" />
+
+    <input name="SemesterButton" 
+           type="button" 
+           value="Semester" 
+           onclick="updateData()" />
+
+    <input name="YearButton" 
+           type="button" 
+           value="Year" 
+           onclick="updateData()" />
+</div>
+
+<div id = "checkboxes"> 
+    <label><input type="checkbox"  id = "temp" checked="true"> Temperature</label>
+    <input type="checkbox" id = "hum" checked="true"> Humidity
+</div>
 
 <script>
 
@@ -89,7 +135,7 @@ $('#beginDate')
 		//showButtonPanel: true,
 		dateFormat: "dd/mm/yy",
 		defaultDate: -12,
-		onSelect: function(date) {
+		onSelect: function(dateStr) {
 			refreshGraphs();
 	    }
 	})
@@ -101,20 +147,31 @@ $('#endDate')
 		//showButtonPanel: true,
 		dateFormat: "dd/mm/yy",
 		defaultDate: new Date(),
-		onSelect: function(date) {
+		onSelect: function(dateStr) {
 			refreshGraphs();
-
 	    }
 	})
 	.datepicker('setDate', new Date());
 
 
 
+var checkbTemp = document.getElementById("temp");
+var checkbHum = document.getElementById("hum");
+
+checkbTemp.onchange = function()
+{
+	refreshGraphs();
+};
+checkbHum.onchange = function()
+{
+	refreshGraphs();
+};
+
 var colors = ["#7A0000", "#0074D9", "#39CCCC", "#3D9970", "#2ECC40", "#3D0000", "#FF4136", "#854144b", "#FF3399", "#AAAAAA", "#B10DC9"];
-var fileArray = ["living.tsv", "hall.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv", "bedroom.tsv"];
+var fileArray = ["living.tsv", "hall.tsv", "bedroom.tsv", "bathroom.tsv", "kitchen.tsv" ];
 
 	// Set the dimensions of the canvas / graph
-var margin = {top: 30, right: 20, bottom: 30, left: 50};
+var margin = {top: 30, right: 60, bottom: 30, left: 60};
 var width = 900 - margin.left - margin.right;
 var height = 300 - margin.top - margin.bottom;
 
@@ -125,12 +182,13 @@ var y1 = d3.scale.linear().range([height, 0]);
 
 // Define the axes
 var xAxis = d3.svg.axis().scale(x)
-    .orient("bottom").ticks(width/100).tickFormat(d3.time.format('%d %b'));
+    .orient("bottom").ticks(width/100).tickFormat(d3.time.format('%d %b %H:%M'));
 
+var formatter = d3.format(".1f")
 var yAxisLeft = d3.svg.axis().scale(y0)
-    .orient("left").ticks(5).tickFormat(function(d) { return d + "°C"; });
+    .orient("left").ticks(5).tickFormat(function(d) { return formatter(d) + "°C"; });
 var yAxisRight = d3.svg.axis().scale(y1)
-    .orient("left").ticks(5).tickFormat(function(d) { return d + "%"; });
+    .orient("right").ticks(5).tickFormat(function(d) { return formatter(d) + "%"; });
 
 // Adds the svg canvas
 var svg = d3.select("#graphContainer")
@@ -232,23 +290,47 @@ function displayCheckboxes(fileNames)
 
 function refreshGraphs()
 {	
+	var filter = 0;// 1- show temperature, 2- show humidity, 3- show both
+
+	var checkbTemp = document.getElementById("temp");
+	var checkbHum = document.getElementById("hum");
+	if (checkbTemp.checked == true)
+	{
+		filter += 1;
+		plotData.graph.select(".y.axisLeft").attr("visibility","visible");
+	}
+	else
+	{
+		plotData.graph.select(".y.axisLeft").attr("visibility","hidden");
+	}
+	if (checkbHum.checked == true)
+	{
+		filter += 2;
+		plotData.graph.select(".y.axisRight").attr("visibility","visible");
+	}
+	else
+	{
+		plotData.graph.select(".y.axisRight").attr("visibility","hidden");
+	}
+
 	var parser = d3.time.format("%d/%m/%Y").parse;
 	
 	var beginDate = $("#beginDate").datepicker('getDate'); 
 	var endDate = $("#endDate").datepicker('getDate'); 
+	var min = endDate.getMinutes();
+	endDate.setMinutes(min + 1439);
 
 	d3.selectAll('.line').remove();
 
 	if (beginDate != null && endDate != null && beginDate.getTime() < endDate.getTime())
 	{
-		plotGraph(plotData, selectedObjects, beginDate, endDate)
+		plotGraph(plotData, selectedObjects, beginDate, endDate, filter)
 	}
 }
-
-
 
 displayCheckboxes(fileArray);
 refreshGraphs();
 </script>
+
 </body>
 </html>

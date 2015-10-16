@@ -1,8 +1,8 @@
 
 
-function plotGraph(plotData, fileDatas, beginDate, endDate)
+function plotGraph(plotData, fileDatas, beginDate, endDate, what)
 {
-	var parseDate = d3.time.format("%Y-%m-%d").parse;
+	var parseDate = d3.time.format("%Y-%m-%d %H:%M:%S").parse;
 
 	// Define the line
 	var valuelineTemp = d3.svg.line()
@@ -25,7 +25,6 @@ function plotGraph(plotData, fileDatas, beginDate, endDate)
 		        d.date = parseDate(d.date);
 		        d.temperature = +d.temperature;
 		        d.humidity = +d.humidity;
-		        d.symbol  = fileDatas[plotIdx].fileName;
 		    });
 			//data filter for indice
 
@@ -42,8 +41,26 @@ function plotGraph(plotData, fileDatas, beginDate, endDate)
 	    	
 
 			plotData.x.domain(d3.extent(filteredData, function(d) { return d.date; }));
-			plotData.y0.domain(d3.extent(filteredData, function(d) { return d.temperature; }));
-			plotData.y1.domain(d3.extent(filteredData, function(d) { return d.humidity; }));
+			if (what == 1 || what == 3)
+			{
+				plotData.y0.domain(d3.extent(filteredData, function(d) { return d.temperature; }));
+			    plotData.graph.append("path")
+					.attr("class", "line")
+					.attr("stroke", fileDatas[plotIdx].color)
+					//.style("stroke-dasharray", ("10,2"))valueline
+					.attr("d", valuelineTemp(filteredData));
+			}
+
+			if (what == 2 || what == 3)
+			{
+				plotData.y1.domain(d3.extent(filteredData, function(d) { return d.humidity; }));
+				plotData.graph.append("path")
+					.attr("class", "line")
+					.attr("stroke", fileDatas[plotIdx].color)
+					.style("stroke-dasharray", ("3,3"))
+					.attr("d", valuelineHum(filteredData));
+			}
+			
 			// Add the valueline path.
 			
 			//console.log(plotIdx);
@@ -54,20 +71,6 @@ function plotGraph(plotData, fileDatas, beginDate, endDate)
 		    t.select(".x.axis").call(plotData.xAxis);
 		    t.select(".y.axisLeft").call(plotData.yAxisLeft);
 		    t.select(".y.axisRight").call(plotData.yAxisRight);
-
-  			
-		    plotData.graph.append("path")
-				.attr("class", "line")
-				.attr("stroke", fileDatas[plotIdx].color)
-				//.style("stroke-dasharray", ("10,2"))valueline
-				.attr("d", valuelineTemp(filteredData));
-
-			 plotData.graph.append("path")
-				.attr("class", "line")
-				.attr("stroke", fileDatas[plotIdx].color)
-				.style("stroke-dasharray", ("3,3"))
-				.attr("d", valuelineHum(filteredData));
-						    
 		});
 	};
 
