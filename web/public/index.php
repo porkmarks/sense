@@ -100,27 +100,28 @@ End Date: <input type="text" id="endDate">
 <div id="option">
     <input name="DayButton" 
            type="button" 
-           value="Day" 
-           onclick="updateData()" />
+           value="Last Day"
+           onclick="updateDay()" />
+
     <input name="weekButton" 
            type="button" 
-           value="Week" 
-           onclick="updateData()" />
+           value="Last Week"
+           onclick="updateWeek()"/>
 
     <input name="MonthButton" 
            type="button" 
-           value="Month" 
-           onclick="updateData()" />
+           value="Last Month"
+           onclick="updateMonth()"/>
 
     <input name="SemesterButton" 
            type="button" 
-           value="Semester" 
-           onclick="updateData()" />
+           value="Last Semester"
+           onclick="updateSemester()"/>
 
     <input name="YearButton" 
            type="button" 
-           value="Year" 
-           onclick="updateData()" />
+           value="Last Year"
+           onclick="updateYear()"/>
 </div>
 
 <div id = "checkboxes"> 
@@ -153,6 +154,51 @@ $('#endDate')
 	})
 	.datepicker('setDate', new Date());
 
+function updateDay()
+{			
+	$("#endDate").datepicker('setDate', new Date());
+	var date = $("#endDate").datepicker('getDate'); 
+	var days = date.getDate() -1;
+	date.setDate(days);
+	$("#beginDate").datepicker('setDate', date);
+	refreshGraphs();
+
+}
+
+function updateMonth() {
+	$("#endDate").datepicker('setDate', new Date());
+	var date = $("#endDate").datepicker('getDate'); 
+	var month = date.getMonth() - 1;
+	date.setMonth(month);
+	$("#beginDate").datepicker('setDate', date);
+	refreshGraphs();
+}
+function updateWeek()
+{			
+	$("#endDate").datepicker('setDate', new Date());
+	var date = $("#endDate").datepicker('getDate'); 
+	var days = date.getDate() -7;
+	date.setDate(days);
+	$("#beginDate").datepicker('setDate', date);
+	refreshGraphs();
+
+}
+function updateSemester() {
+	$("#endDate").datepicker('setDate', new Date());
+	var date = $("#endDate").datepicker('getDate'); 
+	var month = date.getMonth() - 6;
+	date.setMonth(month);
+	$("#beginDate").datepicker('setDate', date);
+	refreshGraphs();
+}
+function updateYear() {
+	$("#endDate").datepicker('setDate', new Date());
+	var date = $("#endDate").datepicker('getDate'); 
+	var month = date.getMonth() - 12;
+	date.setMonth(month);
+	$("#beginDate").datepicker('setDate', date);
+	refreshGraphs();
+}
 
 
 var checkbTemp = document.getElementById("temp");
@@ -181,8 +227,9 @@ var y0 = d3.scale.linear().range([height, 0]);
 var y1 = d3.scale.linear().range([height, 0]);
 
 // Define the axes
+
 var xAxis = d3.svg.axis().scale(x)
-    .orient("bottom").ticks(width/100).tickFormat(d3.time.format('%d %b %H:%M'));
+    .orient("bottom").ticks(width/100).tickFormat(d3.time.format('%d %b'));
 
 var formatter = d3.format(".1f")
 var yAxisLeft = d3.svg.axis().scale(y0)
@@ -326,6 +373,18 @@ function refreshGraphs()
 	{
 		plotGraph(plotData, selectedObjects, beginDate, endDate, filter)
 	}
+	if ((endDate.getTime() - beginDate.getTime()) <= 86340000)
+	{
+		 xAxis.tickFormat(d3.time.format('%d %b %H:%M'));
+
+	}
+	else
+	{
+
+		 xAxis.tickFormat(d3.time.format('%d %b'));
+
+	}
+
 }
 
 displayCheckboxes(fileArray);
