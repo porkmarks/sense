@@ -24,20 +24,10 @@ struct Measurement
     enum Flag
     {
         FLAG_SENSOR_ERROR   = 1 << 0,
-        FLAG_COMMS_FAILED   = 1 << 1
+        FLAG_COMMS_ERROR    = 1 << 1
     };
 
-    Measurement() = default;
-
-    Measurement(uint32_t timestamp,
-              uint32_t index,
-              uint8_t flags,
-              float vcc,
-              float humidity,
-              float temperature)
-        : timestamp(timestamp)
-        , index(index)
-        , flags(flags)
+    void pack(float vcc, float humidity, float temperature)
     {
         vcc -= 2.f;
         this->vcc = static_cast<uint8_t>(fmin(fmax(vcc, 0.f), 2.55f) * 100.f);

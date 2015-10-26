@@ -13,6 +13,10 @@
 
 #include "rfm22b/rfm22b.h"
 
+
+#define LOG(x) std::cout << x
+#define LOG_LN(x) std::cout << x << std::endl
+
 static Comms s_comms;
 
 uint32_t s_last_address = Comms::SLAVE_ADDRESS_BEGIN;
@@ -126,11 +130,13 @@ int main()
         if (size > 0)
         {
             data::Type type = s_comms.get_packet_type();
+            LOG_LN("Received packed of " << (int)size << " bytes. Type: "<< (int)type);
             if (type == data::Type::PAIR_REQUEST && size == sizeof(data::Pair_Request))
             {
                 data::Pair_Response packet;
                 packet.address = s_last_address++;
                 packet.server_timestamp = time(nullptr);
+                LOG_LN("Pair requested. Replying with address " << packet.address << " and timestamp " << packet.server_timestamp);
                 s_comms.begin_packet(data::Type::PAIR_RESPONSE);
                 s_comms.pack(packet);
                 s_comms.send_packet(3);
@@ -138,11 +144,9 @@ int main()
             else if (type == data::Type::MEASUREMENT && size == sizeof(data::Measurement))
             {
                 const data::Measurement* ptr = reinterpret_cast<const data::Measurement*>(s_comms.get_packet_payload());
-                uint32_t timestamp;
-                uint8_t index;
                 float vcc, t, h;
                 ptr->unpack(vcc, h, t);
-                std::cout << date_time(ptr->timestamp) << " / " << current_date_time() << "\t" << int(ptr->index) << "\tVcc:" << vcc << "V\tH:" << h << "%\tT:" << t << "C" << "\n";
+                std::cout << s_comms.get_packet_source_address() << "::: " << date_time(ptr->timestamp) << " / " << current_date_time() << "\t" << int(ptr->index) << "\tVcc:" << vcc << "V\tH:" << h << "%\tT:" << t << "C" << "\n";
             }
         }
         std::cout << std::flush;

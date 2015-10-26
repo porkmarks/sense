@@ -24,6 +24,12 @@ inline void operator delete(void* p) { free(p); }
 inline void operator delete[](void* p) { free(p); }
 inline void* operator new(size_t size_, void *ptr_) { return ptr_; }
 
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#define LOG_LN(x) Serial.println(x)
+#define LOG(x) Serial.print(x)
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum class State
@@ -81,8 +87,8 @@ void setup()
         float s = vcc + t + h;
         uint32_t seed = *reinterpret_cast<uint32_t*>(&s);
         srandom(seed);
-        Serial.print("Random seed: ");
-        Serial.println(seed);
+        LOG(F("Random seed: "));
+        LOG_LN(seed);
     }
 
     //  pinMode(SS, OUTPUT);
@@ -100,11 +106,11 @@ void setup()
     SPI.setClockDivider(SPI_CLOCK_DIV2);
     SPI.begin();
     
-    Serial.println(F("Starting rfm22b setup..."));
+    LOG_LN(F("Starting rfm22b setup..."));
     
     while (!s_comms.init(5))
     {
-        Serial.println(F("init failed"));
+        LOG_LN(F("init failed"));
         blink_leds(RED_LED, 3, 100);
         Low_Power::power_down(5000);
     }
@@ -118,6 +124,8 @@ void pair()
     uint32_t addr = Comms::PAIR_ADDRESS_BEGIN + random() % (Comms::PAIR_ADDRESS_END - Comms::PAIR_ADDRESS_BEGIN);
     s_comms.set_address(addr);
     s_comms.set_destination_address(Comms::SERVER_ADDRESS);
+
+    LOG_LN(F("Starting pairing"));
 
     wait_for_release(Button::BUTTON1);
     bool done = false;
@@ -135,23 +143,48 @@ void pair()
                 //wait for the user to release the button
                 wait_for_release(Button::BUTTON1);
 
+                LOG_LN(F("Sending request..."));
+
                 s_comms.begin_packet(data::Type::PAIR_REQUEST);
                 s_comms.pack(data::Pair_Request());
                 if (s_comms.send_packet(5))
                 {
+                    LOG_LN(F("Request sent. Waiting for response..."));
+
                     set_leds(GREEN_LED);
 
                     uint8_t size = s_comms.receive_packet(1000);
-                    if (size == sizeof(data::Pair_Response) &&
-                        s_comms.get_packet_type() == data::Type::PAIR_RESPONSE)
+                    if (size > 0)
+                    {
+                        LOG(F("Received packet of "));
+                        LOG(size);
+                        LOG(F(" bytes. Type: "));
+                        LOG_LN((int)s_comms.get_packet_type());
+                    }
+
+                    if (size == sizeof(data::Pair_Response) && s_comms.get_packet_type() == data::Type::PAIR_RESPONSE)
                     {
                         const data::Pair_Response* response_ptr = reinterpret_cast<const data::Pair_Response*>(s_comms.get_packet_payload());
                         s_comms.set_address(response_ptr->address);
                         //s_clock.set_timestamp(response.timestamp);
                         s_timestamp = response_ptr->server_timestamp * 1000ULL;
+
+                        LOG(F("Response received: addr: "));
+                        LOG(response_ptr->address);
+                        LOG(F(" timestamp: "));
+                        LOG_LN(response_ptr->server_timestamp);
+
                         done = true;
                         break;
                     }
+                    else
+                    {
+                        LOG_LN(F("Timeout"));
+                    }
+                }
+                else
+                {
+                    LOG_LN(F("Request failed."));
                 }
                 blink_leds(RED_LED, 3, 500);
             }
@@ -162,10 +195,14 @@ void pair()
 
         if (!done)
         {
+            LOG_LN(F("Going to sleep."));
+
             fade_out_leds(YELLOW_LED, 1000);
 
             //the user didn't press it - sleep for a loooong time
             Low_Power::power_down_int(1000ULL * 3600 * 24 * 30);
+
+            LOG_LN(F("Wake up."));
 
             fade_in_leds(YELLOW_LED, 1000);
 
@@ -241,10 +278,9 @@ void read_data()
         uint8_t flags = 0;
         s_measurement_index++;
 
-        //digitalWrite(DHT_POWER_PIN, HIGH);
-        digitalWrite(RED_LED_PIN, HIGH);   // turn the LED on (HIGH is the voltage level)
+        set_leds(GREEN_LED);
 
-        Serial.print(F("Awake for..."));
+        LOG(F("Awake for..."));
         uint32_t lastTP = millis();
 
         // Reading temperature or humidity takes about 250 milliseconds!
@@ -253,7 +289,7 @@ void read_data()
         if (!s_dht.read(t, h))
         {
             flags |= data::Measurement::FLAG_SENSOR_ERROR;
-            Serial.println(F("Failed to read from DHT sensor!"));
+            LOG_LN(F("Failed to read from DHT sensor!"));
         }
 
         float vcc = read_vcc();
@@ -261,15 +297,13 @@ void read_data()
         uint32_t readingD = millis() - lastTP;
         lastTP = millis();
 
-        //Serial.print(F("Humidity: "));
-        //Serial.print(h);
-        //Serial.print(F("% Temperature: "));
-        //Serial.println(t);
-
-        //Serial.println(F("Sending..."));
-
         s_comms.idle_mode();
-        data::Measurement item(s_timestamp / 1000ULL, s_measurement_index, flags, vcc, h, t);
+        data::Measurement item;
+
+        item.timestamp = s_timestamp / 1000ULL;
+        item.index = s_measurement_index;
+        item.flags = flags;
+        item.pack(vcc, h, t);
 
         //add it to the ring. IF needed, pop old elements
         if (s_measurements.size() + 1 > MAX_MEASUREMENTS)
@@ -289,10 +323,12 @@ void read_data()
             }
             else
             {
-                item.flags |= data::Measurement::FLAG_COMMS_FAILED;
+                item.flags |= data::Measurement::FLAG_COMMS_ERROR;
                 i++;
             }
         }
+
+        set_leds(0);
 
         request_config();
         //listen(500);
@@ -300,34 +336,33 @@ void read_data()
         uint32_t sendingD = millis() - lastTP;
         lastTP = millis();
 
-        //Serial.println(F("Waiting for reply..."));
+        //LOG_LN(F("Waiting for reply..."));
         {
 //            uint8_t buf[RFM22B::MAX_PACKET_LENGTH];
 //            int8_t len = rf22.receive(buf, RFM22B::MAX_PACKET_LENGTH, 100);
 //            if (len > 0)
 //            {
-//                Serial.print(F("got reply: "));
-//                Serial.println((char*)buf);
+//                LOG(F("got reply: "));
+//                LOG_LN((char*)buf);
 //            }
 //            else
 //            {
-//                //Serial.println(F("nothing.."));
+//                //LOG_LN(F("nothing.."));
 //            }
         }
 
         uint32_t listeningD = millis() - lastTP;
 
 
-        Serial.print(readingD);
-        Serial.print(F("ms, "));
-        Serial.print(sendingD);
-        Serial.print(F("ms, "));
-        Serial.print(listeningD);
-        Serial.println(F("ms"));
+        LOG(readingD);
+        LOG(F("ms, "));
+        LOG(sendingD);
+        LOG(F("ms, "));
+        LOG(listeningD);
+        LOG_LN(F("ms"));
 
         s_comms.stand_by_mode();
 
-        digitalWrite(RED_LED_PIN, LOW);    // turn the LED off by making the voltage LOW
         //delay(600);
 
 

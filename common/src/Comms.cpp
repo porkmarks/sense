@@ -193,17 +193,39 @@ void Comms::send_response(const Header& header)
 
 uint8_t Comms::receive_packet(uint32_t timeout)
 {
-    int8_t size = m_rf22.receive(m_buffer, RFM22B::MAX_PACKET_LENGTH, timeout);
-    if (size > 0 && static_cast<uint8_t>(size) > sizeof(Header))
-    {
-        if (validate_packet(m_buffer, size, 0))
-        {
-            Header* header_ptr = reinterpret_cast<Header*>(m_buffer);
-            send_response(*header_ptr);
+#ifdef RASPBERRY_PI
+    auto start = std::chrono::high_resolution_clock::now();
+    uint32_t elapsed = 0;
+#else
+    uint32_t start = millis();
+    uint32_t elapsed = 0;
+#endif
 
-            return size - sizeof(Header);
+    do
+    {
+        int8_t size = m_rf22.receive(m_buffer, RFM22B::MAX_PACKET_LENGTH, timeout - elapsed);
+        if (size > 0 && static_cast<uint8_t>(size) > sizeof(Header))
+        {
+            if (validate_packet(m_buffer, size, 0))
+            {
+                if (get_packet_type() != data::Type::RESPONSE) //ignore protocol packets
+                {
+                    Header* header_ptr = reinterpret_cast<Header*>(m_buffer);
+                    send_response(*header_ptr);
+
+                    return size - sizeof(Header);
+                }
+            }
         }
-    }
+
+#ifdef RASPBERRY_PI
+        elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+#else
+        elapsed = millis() - start;
+#endif
+
+    } while (elapsed < timeout);
+
     return 0;
 }
 
