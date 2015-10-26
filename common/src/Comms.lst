@@ -713,112 +713,153 @@
  701               		.section	.text._ZN5Comms14receive_packetEm,"ax",@progbits
  702               	.global	_ZN5Comms14receive_packetEm
  704               	_ZN5Comms14receive_packetEm:
- 705 0000 EF92      		push r14
- 706 0002 FF92      		push r15
- 707 0004 0F93      		push r16
- 708 0006 1F93      		push r17
- 709 0008 CF93      		push r28
- 710 000a DF93      		push r29
- 711               	/* prologue: function */
- 712               	/* frame size = 0 */
- 713               	/* stack size = 6 */
- 714               	.L__stack_usage = 6
- 715 000c EC01      		movw r28,r24
- 716 000e 7C01      		movw r14,r24
- 717 0010 87E0      		ldi r24,7
- 718 0012 E80E      		add r14,r24
- 719 0014 F11C      		adc r15,__zero_reg__
- 720 0016 8A01      		movw r16,r20
- 721 0018 9B01      		movw r18,r22
- 722 001a 40E4      		ldi r20,lo8(64)
- 723 001c B701      		movw r22,r14
- 724 001e CE01      		movw r24,r28
- 725 0020 0E94 0000 		call _ZN6RFM22B7receiveEPhhm
- 726 0024 182F      		mov r17,r24
- 727 0026 1816      		cp __zero_reg__,r24
- 728 0028 04F0      		brlt .L50
- 729               	.L52:
- 730 002a 80E0      		ldi r24,0
- 731 002c 00C0      		rjmp .L51
- 732               	.L50:
- 733 002e 8C30      		cpi r24,lo8(12)
- 734 0030 00F0      		brlo .L52
- 735 0032 20E0      		ldi r18,0
- 736 0034 482F      		mov r20,r24
- 737 0036 B701      		movw r22,r14
- 738 0038 CE01      		movw r24,r28
- 739 003a 0E94 0000 		call _ZN5Comms15validate_packetEPhhh
- 740 003e 8823      		tst r24
- 741 0040 01F0      		breq .L52
- 742 0042 B701      		movw r22,r14
- 743 0044 CE01      		movw r24,r28
- 744 0046 0E94 0000 		call _ZN5Comms13send_responseERKNS_6HeaderE
- 745 004a 85EF      		ldi r24,lo8(-11)
- 746 004c 810F      		add r24,r17
- 747               	.L51:
- 748               	/* epilogue start */
- 749 004e DF91      		pop r29
- 750 0050 CF91      		pop r28
- 751 0052 1F91      		pop r17
- 752 0054 0F91      		pop r16
- 753 0056 FF90      		pop r15
- 754 0058 EF90      		pop r14
- 755 005a 0895      		ret
- 757               		.section	.text._ZNK5Comms15get_packet_typeEv,"ax",@progbits
- 758               	.global	_ZNK5Comms15get_packet_typeEv
- 760               	_ZNK5Comms15get_packet_typeEv:
- 761               	/* prologue: function */
- 762               	/* frame size = 0 */
- 763               	/* stack size = 0 */
- 764               	.L__stack_usage = 0
- 765 0000 FC01      		movw r30,r24
- 766 0002 8189      		ldd r24,Z+17
- 767 0004 0895      		ret
- 769               		.section	.text._ZNK5Comms18get_packet_payloadEv,"ax",@progbits
- 770               	.global	_ZNK5Comms18get_packet_payloadEv
- 772               	_ZNK5Comms18get_packet_payloadEv:
- 773               	/* prologue: function */
- 774               	/* frame size = 0 */
- 775               	/* stack size = 0 */
- 776               	.L__stack_usage = 0
- 777 0000 4296      		adiw r24,18
- 778 0002 0895      		ret
- 780               		.section	.text._ZNK5Comms25get_packet_source_addressEv,"ax",@progbits
- 781               	.global	_ZNK5Comms25get_packet_source_addressEv
- 783               	_ZNK5Comms25get_packet_source_addressEv:
- 784               	/* prologue: function */
- 785               	/* frame size = 0 */
- 786               	/* stack size = 0 */
- 787               	.L__stack_usage = 0
- 788 0000 FC01      		movw r30,r24
- 789 0002 8385      		ldd r24,Z+11
- 790 0004 9485      		ldd r25,Z+12
- 791 0006 0895      		ret
- 793               		.ident	"GCC: (GNU) 4.8.1"
- 794               	.global __do_copy_data
+ 705 0000 4F92      		push r4
+ 706 0002 5F92      		push r5
+ 707 0004 6F92      		push r6
+ 708 0006 7F92      		push r7
+ 709 0008 AF92      		push r10
+ 710 000a BF92      		push r11
+ 711 000c CF92      		push r12
+ 712 000e DF92      		push r13
+ 713 0010 EF92      		push r14
+ 714 0012 FF92      		push r15
+ 715 0014 0F93      		push r16
+ 716 0016 1F93      		push r17
+ 717 0018 CF93      		push r28
+ 718 001a DF93      		push r29
+ 719               	/* prologue: function */
+ 720               	/* frame size = 0 */
+ 721               	/* stack size = 14 */
+ 722               	.L__stack_usage = 14
+ 723 001c EC01      		movw r28,r24
+ 724 001e 6A01      		movw r12,r20
+ 725 0020 7B01      		movw r14,r22
+ 726 0022 0E94 0000 		call millis
+ 727 0026 2B01      		movw r4,r22
+ 728 0028 3C01      		movw r6,r24
+ 729 002a 60E0      		ldi r22,0
+ 730 002c 70E0      		ldi r23,0
+ 731 002e CB01      		movw r24,r22
+ 732 0030 5E01      		movw r10,r28
+ 733 0032 27E0      		ldi r18,7
+ 734 0034 A20E      		add r10,r18
+ 735 0036 B11C      		adc r11,__zero_reg__
+ 736               	.L52:
+ 737 0038 9701      		movw r18,r14
+ 738 003a 8601      		movw r16,r12
+ 739 003c 061B      		sub r16,r22
+ 740 003e 170B      		sbc r17,r23
+ 741 0040 280B      		sbc r18,r24
+ 742 0042 390B      		sbc r19,r25
+ 743 0044 40E4      		ldi r20,lo8(64)
+ 744 0046 B501      		movw r22,r10
+ 745 0048 CE01      		movw r24,r28
+ 746 004a 0E94 0000 		call _ZN6RFM22B7receiveEPhhm
+ 747 004e 182F      		mov r17,r24
+ 748 0050 1816      		cp __zero_reg__,r24
+ 749 0052 04F4      		brge .L50
+ 750 0054 8C30      		cpi r24,lo8(12)
+ 751 0056 00F0      		brlo .L50
+ 752 0058 20E0      		ldi r18,0
+ 753 005a 482F      		mov r20,r24
+ 754 005c B501      		movw r22,r10
+ 755 005e CE01      		movw r24,r28
+ 756 0060 0E94 0000 		call _ZN5Comms15validate_packetEPhhh
+ 757 0064 8823      		tst r24
+ 758 0066 01F0      		breq .L50
+ 759 0068 8989      		ldd r24,Y+17
+ 760 006a 8823      		tst r24
+ 761 006c 01F0      		breq .L50
+ 762 006e B501      		movw r22,r10
+ 763 0070 CE01      		movw r24,r28
+ 764 0072 0E94 0000 		call _ZN5Comms13send_responseERKNS_6HeaderE
+ 765 0076 85EF      		ldi r24,lo8(-11)
+ 766 0078 810F      		add r24,r17
+ 767 007a 00C0      		rjmp .L51
+ 768               	.L50:
+ 769 007c 0E94 0000 		call millis
+ 770 0080 6419      		sub r22,r4
+ 771 0082 7509      		sbc r23,r5
+ 772 0084 8609      		sbc r24,r6
+ 773 0086 9709      		sbc r25,r7
+ 774 0088 6C15      		cp r22,r12
+ 775 008a 7D05      		cpc r23,r13
+ 776 008c 8E05      		cpc r24,r14
+ 777 008e 9F05      		cpc r25,r15
+ 778 0090 00F0      		brlo .L52
+ 779 0092 80E0      		ldi r24,0
+ 780               	.L51:
+ 781               	/* epilogue start */
+ 782 0094 DF91      		pop r29
+ 783 0096 CF91      		pop r28
+ 784 0098 1F91      		pop r17
+ 785 009a 0F91      		pop r16
+ 786 009c FF90      		pop r15
+ 787 009e EF90      		pop r14
+ 788 00a0 DF90      		pop r13
+ 789 00a2 CF90      		pop r12
+ 790 00a4 BF90      		pop r11
+ 791 00a6 AF90      		pop r10
+ 792 00a8 7F90      		pop r7
+ 793 00aa 6F90      		pop r6
+ 794 00ac 5F90      		pop r5
+ 795 00ae 4F90      		pop r4
+ 796 00b0 0895      		ret
+ 798               		.section	.text._ZNK5Comms15get_packet_typeEv,"ax",@progbits
+ 799               	.global	_ZNK5Comms15get_packet_typeEv
+ 801               	_ZNK5Comms15get_packet_typeEv:
+ 802               	/* prologue: function */
+ 803               	/* frame size = 0 */
+ 804               	/* stack size = 0 */
+ 805               	.L__stack_usage = 0
+ 806 0000 FC01      		movw r30,r24
+ 807 0002 8189      		ldd r24,Z+17
+ 808 0004 0895      		ret
+ 810               		.section	.text._ZNK5Comms18get_packet_payloadEv,"ax",@progbits
+ 811               	.global	_ZNK5Comms18get_packet_payloadEv
+ 813               	_ZNK5Comms18get_packet_payloadEv:
+ 814               	/* prologue: function */
+ 815               	/* frame size = 0 */
+ 816               	/* stack size = 0 */
+ 817               	.L__stack_usage = 0
+ 818 0000 4296      		adiw r24,18
+ 819 0002 0895      		ret
+ 821               		.section	.text._ZNK5Comms25get_packet_source_addressEv,"ax",@progbits
+ 822               	.global	_ZNK5Comms25get_packet_source_addressEv
+ 824               	_ZNK5Comms25get_packet_source_addressEv:
+ 825               	/* prologue: function */
+ 826               	/* frame size = 0 */
+ 827               	/* stack size = 0 */
+ 828               	.L__stack_usage = 0
+ 829 0000 FC01      		movw r30,r24
+ 830 0002 8385      		ldd r24,Z+11
+ 831 0004 9485      		ldd r25,Z+12
+ 832 0006 0895      		ret
+ 834               		.ident	"GCC: (GNU) 4.8.1"
+ 835               	.global __do_copy_data
 DEFINED SYMBOLS
                             *ABS*:0000000000000000 Comms.cpp
-     /tmp/ccSJkHGO.s:2      *ABS*:000000000000003e __SP_H__
-     /tmp/ccSJkHGO.s:3      *ABS*:000000000000003d __SP_L__
-     /tmp/ccSJkHGO.s:4      *ABS*:000000000000003f __SREG__
-     /tmp/ccSJkHGO.s:5      *ABS*:0000000000000000 __tmp_reg__
-     /tmp/ccSJkHGO.s:6      *ABS*:0000000000000001 __zero_reg__
-     /tmp/ccSJkHGO.s:10     .text._ZN5CommsC2Ev:0000000000000000 _ZN5CommsC2Ev
-     /tmp/ccSJkHGO.s:10     .text._ZN5CommsC2Ev:0000000000000000 _ZN5CommsC1Ev
-     /tmp/ccSJkHGO.s:51     .text._ZN5Comms4initEh:0000000000000000 _ZN5Comms4initEh
-     /tmp/ccSJkHGO.s:231    .text._ZN5Comms9idle_modeEv:0000000000000000 _ZN5Comms9idle_modeEv
-     /tmp/ccSJkHGO.s:241    .text._ZN5Comms13stand_by_modeEv:0000000000000000 _ZN5Comms13stand_by_modeEv
-     /tmp/ccSJkHGO.s:251    .text._ZN5Comms11set_addressEj:0000000000000000 _ZN5Comms11set_addressEj
-     /tmp/ccSJkHGO.s:264    .text._ZN5Comms23set_destination_addressEj:0000000000000000 _ZN5Comms23set_destination_addressEj
-     /tmp/ccSJkHGO.s:277    .text._ZN5Comms12begin_packetEN4data4TypeE:0000000000000000 _ZN5Comms12begin_packetEN4data4TypeE
-     /tmp/ccSJkHGO.s:316    .text._ZN5Comms4packEPKvh:0000000000000000 _ZN5Comms4packEPKvh
-     /tmp/ccSJkHGO.s:358    .text._ZN5Comms15validate_packetEPhhh:0000000000000000 _ZN5Comms15validate_packetEPhhh
-     /tmp/ccSJkHGO.s:434    .text._ZN5Comms11send_packetEh:0000000000000000 _ZN5Comms11send_packetEh
-     /tmp/ccSJkHGO.s:597    .text._ZN5Comms13send_responseERKNS_6HeaderE:0000000000000000 _ZN5Comms13send_responseERKNS_6HeaderE
-     /tmp/ccSJkHGO.s:704    .text._ZN5Comms14receive_packetEm:0000000000000000 _ZN5Comms14receive_packetEm
-     /tmp/ccSJkHGO.s:760    .text._ZNK5Comms15get_packet_typeEv:0000000000000000 _ZNK5Comms15get_packet_typeEv
-     /tmp/ccSJkHGO.s:772    .text._ZNK5Comms18get_packet_payloadEv:0000000000000000 _ZNK5Comms18get_packet_payloadEv
-     /tmp/ccSJkHGO.s:783    .text._ZNK5Comms25get_packet_source_addressEv:0000000000000000 _ZNK5Comms25get_packet_source_addressEv
+     /tmp/cczadAjE.s:2      *ABS*:000000000000003e __SP_H__
+     /tmp/cczadAjE.s:3      *ABS*:000000000000003d __SP_L__
+     /tmp/cczadAjE.s:4      *ABS*:000000000000003f __SREG__
+     /tmp/cczadAjE.s:5      *ABS*:0000000000000000 __tmp_reg__
+     /tmp/cczadAjE.s:6      *ABS*:0000000000000001 __zero_reg__
+     /tmp/cczadAjE.s:10     .text._ZN5CommsC2Ev:0000000000000000 _ZN5CommsC2Ev
+     /tmp/cczadAjE.s:10     .text._ZN5CommsC2Ev:0000000000000000 _ZN5CommsC1Ev
+     /tmp/cczadAjE.s:51     .text._ZN5Comms4initEh:0000000000000000 _ZN5Comms4initEh
+     /tmp/cczadAjE.s:231    .text._ZN5Comms9idle_modeEv:0000000000000000 _ZN5Comms9idle_modeEv
+     /tmp/cczadAjE.s:241    .text._ZN5Comms13stand_by_modeEv:0000000000000000 _ZN5Comms13stand_by_modeEv
+     /tmp/cczadAjE.s:251    .text._ZN5Comms11set_addressEj:0000000000000000 _ZN5Comms11set_addressEj
+     /tmp/cczadAjE.s:264    .text._ZN5Comms23set_destination_addressEj:0000000000000000 _ZN5Comms23set_destination_addressEj
+     /tmp/cczadAjE.s:277    .text._ZN5Comms12begin_packetEN4data4TypeE:0000000000000000 _ZN5Comms12begin_packetEN4data4TypeE
+     /tmp/cczadAjE.s:316    .text._ZN5Comms4packEPKvh:0000000000000000 _ZN5Comms4packEPKvh
+     /tmp/cczadAjE.s:358    .text._ZN5Comms15validate_packetEPhhh:0000000000000000 _ZN5Comms15validate_packetEPhhh
+     /tmp/cczadAjE.s:434    .text._ZN5Comms11send_packetEh:0000000000000000 _ZN5Comms11send_packetEh
+     /tmp/cczadAjE.s:597    .text._ZN5Comms13send_responseERKNS_6HeaderE:0000000000000000 _ZN5Comms13send_responseERKNS_6HeaderE
+     /tmp/cczadAjE.s:704    .text._ZN5Comms14receive_packetEm:0000000000000000 _ZN5Comms14receive_packetEm
+     /tmp/cczadAjE.s:801    .text._ZNK5Comms15get_packet_typeEv:0000000000000000 _ZNK5Comms15get_packet_typeEv
+     /tmp/cczadAjE.s:813    .text._ZNK5Comms18get_packet_payloadEv:0000000000000000 _ZNK5Comms18get_packet_payloadEv
+     /tmp/cczadAjE.s:824    .text._ZNK5Comms25get_packet_source_addressEv:0000000000000000 _ZNK5Comms25get_packet_source_addressEv
 
 UNDEFINED SYMBOLS
 _ZN6RFM22B4initEv
@@ -848,4 +889,5 @@ _ZN6RFM22B7receiveEPhhm
 random
 __divmodsi4
 __muluhisi3
+millis
 __do_copy_data

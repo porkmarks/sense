@@ -188,13 +188,13 @@
  194               		.ident	"GCC: (GNU) 4.8.1"
 DEFINED SYMBOLS
                             *ABS*:0000000000000000 CRC.cpp
-     /tmp/ccXQ80go.s:2      *ABS*:000000000000003e __SP_H__
-     /tmp/ccXQ80go.s:3      *ABS*:000000000000003d __SP_L__
-     /tmp/ccXQ80go.s:4      *ABS*:000000000000003f __SREG__
-     /tmp/ccXQ80go.s:5      *ABS*:0000000000000000 __tmp_reg__
-     /tmp/ccXQ80go.s:6      *ABS*:0000000000000001 __zero_reg__
-     /tmp/ccXQ80go.s:10     .text._Z10crc_updatemh:0000000000000000 _Z10crc_updatemh
-     /tmp/ccXQ80go.s:129    .progmem.data._ZL9crc_table:0000000000000000 _ZL9crc_table
-     /tmp/ccXQ80go.s:91     .text._Z5crc32PKhj:0000000000000000 _Z5crc32PKhj
+     /tmp/cc9lIVjn.s:2      *ABS*:000000000000003e __SP_H__
+     /tmp/cc9lIVjn.s:3      *ABS*:000000000000003d __SP_L__
+     /tmp/cc9lIVjn.s:4      *ABS*:000000000000003f __SREG__
+     /tmp/cc9lIVjn.s:5      *ABS*:0000000000000000 __tmp_reg__
+     /tmp/cc9lIVjn.s:6      *ABS*:0000000000000001 __zero_reg__
+     /tmp/cc9lIVjn.s:10     .text._Z10crc_updatemh:0000000000000000 _Z10crc_updatemh
+     /tmp/cc9lIVjn.s:129    .progmem.data._ZL9crc_table:0000000000000000 _ZL9crc_table
+     /tmp/cc9lIVjn.s:91     .text._Z5crc32PKhj:0000000000000000 _Z5crc32PKhj
 
 NO UNDEFINED SYMBOLS
