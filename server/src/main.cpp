@@ -130,7 +130,7 @@ int main()
         if (size > 0)
         {
             data::Type type = s_comms.get_packet_type();
-            LOG_LN("Received packed of " << (int)size << " bytes. Type: "<< (int)type);
+            //LOG_LN("Received packed of " << (int)size << " bytes. Type: "<< (int)type);
             if (type == data::Type::PAIR_REQUEST && size == sizeof(data::Pair_Request))
             {
                 data::Pair_Response packet;
@@ -147,6 +147,8 @@ int main()
                 float vcc, t, h;
                 ptr->unpack(vcc, h, t);
                 std::cout << s_comms.get_packet_source_address() << "::: " << date_time(ptr->timestamp) << " / " << current_date_time() << "\t" << int(ptr->index) << "\tVcc:" << vcc << "V\tH:" << h << "%\tT:" << t << "C" << "\n";
+
+                s_last_address = std::max(s_comms.get_packet_source_address() + 1u, s_last_address);
             }
         }
         std::cout << std::flush;

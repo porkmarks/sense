@@ -149,10 +149,10 @@ public:
     void clear_tx_fifo();
 
     // Send data
-    void send(uint8_t *data, uint8_t length);
+    bool send(uint8_t *data, uint8_t length, uint32_t timeout = 200);
 
     // Receive data (blocking with timeout). Returns number of bytes received
-    int8_t receive(uint8_t *data, uint8_t length, uint32_t timeout=30000);
+    int8_t receive(uint8_t *data, uint8_t length, uint32_t timeout = 30000);
 
     // Helper functions for getting and getting individual registers
     uint8_t get_register(Register reg);

@@ -9,6 +9,7 @@
 #include "Data_Defs.h"
 #include "avr_stdio.h"
 #include "deque"
+#include "Storage.h"
 
 __extension__ typedef int __guard __attribute__((mode (__DI__)));
 

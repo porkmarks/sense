@@ -27,6 +27,7 @@
 #	include <stdio.h>
 #	include <stdlib.h>
 #	include <math.h>
+#   include <iostream>
 #else
 #   include <SPI.h>
 #endif
@@ -622,7 +623,7 @@ void RFM22B::clear_tx_fifo()
 }
 
 // Send data
-void RFM22B::send(uint8_t *data, uint8_t length)
+bool RFM22B::send(uint8_t *data, uint8_t length, uint32_t timeout)
 {
     // Clear TX FIFO
     clear_tx_fifo();
@@ -654,11 +655,37 @@ void RFM22B::send(uint8_t *data, uint8_t length)
     // Enter TX mode
     tx_mode();
 
-    // Loop until packet has been sent (device has left TX mode)
-    while (((get_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_1)>>3) & 1))
-    {}
+    // Timing for the interrupt loop timeout
+#ifdef RASPBERRY_PI
+    auto start = std::chrono::high_resolution_clock::now();
+    uint32_t elapsed = 0;
+#else
+    uint32_t start = millis();
+    uint32_t elapsed = 0;
+#endif
 
-    return;
+    // Loop until packet has been sent (device has left TX mode)
+    while (((get_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_1)>>3) & 1) && elapsed < timeout)
+    {
+        // Determine elapsed time
+#ifdef RASPBERRY_PI
+        elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+#else
+        elapsed = millis() - start;
+#endif
+    }
+
+    // If timeout occured, return -1
+    if (elapsed >= timeout)
+    {
+#ifdef RASPBERRY_PI
+        std::cout << "Failed to send, resetting chip\n";
+#endif
+        reset();
+        return false;
+    }
+
+    return true;
 };
 
 // Receive data (blocking with timeout). Returns number of bytes received

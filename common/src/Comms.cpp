@@ -112,7 +112,7 @@ bool Comms::send_packet(uint8_t retries)
     uint8_t i = 0;
     for (i = 0; i < retries; i++)
     {
-        m_rf22.send(m_buffer, sizeof(Header) + m_offset);
+        m_rf22.send(m_buffer, sizeof(Header) + m_offset, 100);
         int8_t size = m_rf22.receive(response_buffer, sizeof(response_buffer), 100);
         if (size > 0)
         {
