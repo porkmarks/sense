@@ -65,13 +65,14 @@ path {
 }
 
 #datePkr {
-	float:left;
-	width: 900px;
-	height: 120px;
+	position:fixed; top:75px; left: 110px;
+	width: 1000px;
+	height: 60px;
 	margin-left: 20px;
-	margin-right: 40px;
+	margin-right: 20px;
 	margin-top: 20px;
 	margin-bottom: 20px; 
+	font-family: 'Open Sans', sans-serif;
 }
 
 .checkboxList {
@@ -80,54 +81,62 @@ path {
 }
 
 .checkboxListScroll {
-	float: left;
+	float: right;
 	position:relative;
 	margin-left: 40px;
-	margin-right: 40px;
+	margin-right: 80px;
 	margin-top: 20px;
 	margin-bottom: 20px; 
 	width: 200px;
-	height:120px;
+	height:800px;
 	overflow: scroll;
 	overflow-x: hidden;
+	font-family: 'Open Sans', sans-serif;
 }
 
 #graphContainer {
     float: left;
-    width: 70%;
+    width: auto;
     height:340px;
-    margin-top: 40px;
+    margin-top: 100px;
 	margin-left: 20px;
-	margin-right: 40px;
+	margin-right: 20px;
+	font-family: 'Open Sans', sans-serif;
 
 }
 .itemList{
 	font-size: 12px;
 	margin-top: 4px;
 	margin-bottom: 4px;
+	font-family: 'Open Sans', sans-serif;
 }
 #checkboxes{
+	font-family: 'Open Sans', sans-serif;
 	float: left;
     width: 500px;
     height:30px;
     margin-top: 20px;
 	margin-left: 40px;
 	margin-right: 40px;
+	font-family: 'Open Sans', sans-serif;
 }
 #option{
-	float: left;
+	position:fixed; top:75px; left: 700px;
 	width: 600px;
 	height: 30px;
-	margin-left: 100px;
+	margin-left: 20px;
 	margin-right: 20px;
-	margin-top: 10px;
+	margin-top: 20px;
 	margin-bottom: 20px;
+	font-family: 'Open Sans', sans-serif;
 }
 #temp{
-	font-size: 11px; 
+	font-size: 9px; 
+	font-family: 'Open Sans', sans-serif;
 }
 #hum{
-	font-size: 11px; 
+	font-family: 'Open Sans', sans-serif; 
+	ont-size: 9px;
 }
 </style>
 <header>
@@ -146,12 +155,6 @@ Data<br>
 Begin Date: <input type="text" id="beginDate">
 End Date: <input type="text" id="endDate">
 </div>
-
-<div class="checkboxListScroll">
-<ul id="checkboxList" class="checkboxList"> </ul>
-</div>
-<div id ="graphContainer"></div>
-
 <div id="option">
     <input name="DayButton" 
            type="button" 
@@ -178,6 +181,12 @@ End Date: <input type="text" id="endDate">
            value="Last Year"
            onclick="updateYear()"/>
 </div>
+<div class="checkboxListScroll">
+<ul id="checkboxList" class="checkboxList"> </ul>
+</div>
+<div id ="graphContainer"></div>
+
+
 <!--highlight the current section of the navigation bar-->
 <script>
 $(function(){
@@ -219,6 +228,41 @@ $('#endDate')
 	})
 	.datepicker('setDate', new Date());
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Globals
+
+var graphData = {}; //will be filled later
+
+var colors = ["#7A0000", "#0074D9", "#39CCCC", "#3D9970", "#2ECC40", "#3D0000", "#FF4136", "#854144b", "#FF3399", "#AAAAAA", "#B10DC9"];
+var sensorFiles = ["living.tsv", "hall.tsv", "bedroom.tsv", "bathroom.tsv", "kitchen.tsv" ];
+
+var selectedPlots = [];
+
+var checkbTemp = document.getElementById("temp");
+var checkbHum = document.getElementById("hum");
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Functions
+
+checkbTemp.onchange = function()
+{
+	refreshGraphs();
+};
+checkbHum.onchange = function()
+{
+	refreshGraphs();
+};
+
+window.onresize = function(event) 
+{
+
+	d3.select("svg").remove();
+	graphData = createGraphs();
+	refreshGraphs();
+};
+
+
 function updateDay()
 {			
 	$("#endDate").datepicker('setDate', new Date());
@@ -227,10 +271,10 @@ function updateDay()
 	date.setDate(days);
 	$("#beginDate").datepicker('setDate', date);
 	refreshGraphs();
-
 }
 
-function updateMonth() {
+function updateMonth()
+{
 	$("#endDate").datepicker('setDate', new Date());
 	var date = $("#endDate").datepicker('getDate'); 
 	var month = date.getMonth() - 1;
@@ -248,7 +292,8 @@ function updateWeek()
 	refreshGraphs();
 
 }
-function updateSemester() {
+function updateSemester() 
+{
 	$("#endDate").datepicker('setDate', new Date());
 	var date = $("#endDate").datepicker('getDate'); 
 	var month = date.getMonth() - 6;
@@ -256,7 +301,8 @@ function updateSemester() {
 	$("#beginDate").datepicker('setDate', date);
 	refreshGraphs();
 }
-function updateYear() {
+function updateYear() 
+{
 	$("#endDate").datepicker('setDate', new Date());
 	var date = $("#endDate").datepicker('getDate'); 
 	var month = date.getMonth() - 12;
@@ -265,77 +311,63 @@ function updateYear() {
 	refreshGraphs();
 }
 
-
-var checkbTemp = document.getElementById("temp");
-var checkbHum = document.getElementById("hum");
-
-checkbTemp.onchange = function()
+function createGraphs() 
 {
-	refreshGraphs();
-};
-checkbHum.onchange = function()
-{
-	refreshGraphs();
-};
-
-var colors = ["#7A0000", "#0074D9", "#39CCCC", "#3D9970", "#2ECC40", "#3D0000", "#FF4136", "#854144b", "#FF3399", "#AAAAAA", "#B10DC9"];
-var fileArray = ["living.tsv", "hall.tsv", "bedroom.tsv", "bathroom.tsv", "kitchen.tsv" ];
-
 	// Set the dimensions of the canvas / graph
-var margin = {top: 30, right: 60, bottom: 30, left: 60};
-var width = 900 - margin.left - margin.right;
-var height = 300 - margin.top - margin.bottom;
+	var windowWidth = window.innerWidth;
+	var margin = {top: 30, right: 60, bottom: 30, left: 60};
+	var graphWidth = windowWidth- 500- margin.left - margin.right;
+	var graphHeight = 300 - margin.top - margin.bottom;
 
-// Set the ranges
-var x = d3.time.scale().range([0, width]);
-var y0 = d3.scale.linear().range([height, 0]);
-var y1 = d3.scale.linear().range([height, 0]);
+	// Set the ranges
+	var xRange = d3.time.scale().range([0, graphWidth]);
+	var y0Range = d3.scale.linear().range([graphHeight, 0]);
+	var y1Range = d3.scale.linear().range([graphHeight, 0]);
 
-// Define the axes
+	// Define the axes
 
-var xAxis = d3.svg.axis().scale(x)
-    .orient("bottom").ticks(width/100).tickFormat(d3.time.format('%d %b'));
+	var xAxis = d3.svg.axis().scale(xRange)
+	    .orient("bottom").ticks(graphWidth/100).tickFormat(d3.time.format('%d %b'));
 
-var formatter = d3.format(".1f")
-var yAxisLeft = d3.svg.axis().scale(y0)
-    .orient("left").ticks(5).tickFormat(function(d) { return formatter(d) + "°C"; });
-var yAxisRight = d3.svg.axis().scale(y1)
-    .orient("right").ticks(5).tickFormat(function(d) { return formatter(d) + "%"; });
+	var formatter = d3.format(".1f")
+	var yAxisLeft = d3.svg.axis().scale(y0Range)
+	    .orient("left").ticks(5).tickFormat(function(d) { return formatter(d) + "°C"; });
+	var yAxisRight = d3.svg.axis().scale(y1Range)
+	    .orient("right").ticks(5).tickFormat(function(d) { return formatter(d) + "%"; });
 
-// Adds the svg canvas
-var svg = d3.select("#graphContainer")
-			.append("svg")
-			.attr("width", width + margin.left + margin.right)
-			.attr("height", height + margin.top + margin.bottom)
-			.append("g")
-			.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-svg.append("g")
-	.attr("class", "x axis")
-	.attr("transform", "translate(0," + height + ")")
-	.call(xAxis);
+	// Adds the svg canvas
+	var svg = d3.select("#graphContainer")
+				.append("svg")
+				.attr("width", graphWidth + margin.left + margin.right)
+				.attr("height", graphHeight + margin.top + margin.bottom)
+				.append("g")
+				.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+	svg.append("g")
+		.attr("class", "x axis")
+		.attr("transform", "translate(0," + graphHeight + ")")
+		.call(xAxis);
 
-// Add the Y Axis
-svg.append("g")
-	.attr("class", "y axis axisLeft")
-	.call(yAxisLeft);
-svg.append("g")
-	.attr("class", "y axis axisRight")
-	.attr("transform", "translate(" + width + " ,0)")
-	.call(yAxisRight);
+	// Add the Y Axis
+	svg.append("g")
+		.attr("class", "y axis axisLeft")
+		.call(yAxisLeft);
+	svg.append("g")
+		.attr("class", "y axis axisRight")
+		.attr("transform", "translate(" + graphWidth + " ,0)")
+		.call(yAxisRight);
 
-var plotData = {
-	x: x,
-	y0: y0,
-	y1: y1,
-	graph: svg,
-	xAxis: xAxis,
-	yAxisLeft: yAxisLeft,
-	yAxisRight: yAxisRight,
-	width: width,
-	height: height
+
+	var pd = {
+		xRange: xRange,
+		y0Range: y0Range,
+		y1Range: y1Range,
+		graph: svg,
+		xAxis: xAxis,
+		yAxisLeft: yAxisLeft,
+		yAxisRight: yAxisRight
+	}
+	return pd;
 }
-var selectedObjects = [];
-
 
 function displayCheckboxes(fileNames)
 {	
@@ -367,15 +399,15 @@ function displayCheckboxes(fileNames)
 		{
 			if (cb.checked == true || label.onClick == true)
 			{
-				selectedObjects.push({ fileName: fileName, color: color });
+				selectedPlots.push({ fileName: fileName, color: color });
 			}
 			else
 			{
-				for (var i = 0; i < selectedObjects.length; i++)
+				for (var i = 0; i < selectedPlots.length; i++)
 				{
-					if (selectedObjects[i].fileName == fileName)
+					if (selectedPlots[i].fileName == fileName)
 					{
-						selectedObjects.splice(i, 1);
+						selectedPlots.splice(i, 1);
 						break;
 					}
 				}
@@ -409,20 +441,20 @@ function refreshGraphs()
 	if (checkbTemp.checked == true)
 	{
 		filter += 1;
-		plotData.graph.select(".y.axisLeft").attr("visibility","visible");
+		graphData.graph.select(".y.axisLeft").attr("visibility","visible");
 	}
 	else
 	{
-		plotData.graph.select(".y.axisLeft").attr("visibility","hidden");
+		graphData.graph.select(".y.axisLeft").attr("visibility","hidden");
 	}
 	if (checkbHum.checked == true)
 	{
 		filter += 2;
-		plotData.graph.select(".y.axisRight").attr("visibility","visible");
+		graphData.graph.select(".y.axisRight").attr("visibility","visible");
 	}
 	else
 	{
-		plotData.graph.select(".y.axisRight").attr("visibility","hidden");
+		graphData.graph.select(".y.axisRight").attr("visibility","hidden");
 	}
 
 	var parser = d3.time.format("%d/%m/%Y").parse;
@@ -436,24 +468,25 @@ function refreshGraphs()
 
 	if (beginDate != null && endDate != null && beginDate.getTime() < endDate.getTime())
 	{
-		plotGraph(plotData, selectedObjects, beginDate, endDate, filter)
+		plotGraph(graphData, selectedPlots, beginDate, endDate, filter)
 	}
 	if ((endDate.getTime() - beginDate.getTime()) <= 86340000)
 	{
-		 xAxis.tickFormat(d3.time.format('%d %b %H:%M'));
+		 graphData.xAxis.tickFormat(d3.time.format('%d %b %H:%M'));
 
 	}
 	else
 	{
-
-		 xAxis.tickFormat(d3.time.format('%d %b'));
-
+		 graphData.xAxis.tickFormat(d3.time.format('%d %b'));
 	}
-
 }
 
-displayCheckboxes(fileArray);
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+graphData = createGraphs();
+displayCheckboxes(sensorFiles);
 refreshGraphs();
+
 </script>
 
 </body>

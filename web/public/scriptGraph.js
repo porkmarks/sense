@@ -1,17 +1,17 @@
 
 
-function plotGraph(plotData, fileDatas, beginDate, endDate, what)
+function plotGraph(graphData, fileDatas, beginDate, endDate, what)
 {
 	var parseDate = d3.time.format("%Y-%m-%d %H:%M:%S").parse;
 
 	// Define the line
 	var valuelineTemp = d3.svg.line()
-	    .x(function(d) { return plotData.x(d.date); })
-	    .y(function(d) { return plotData.y0(d.temperature); });
+	    .x(function(d) { return graphData.xRange(d.date); })
+	    .y(function(d) { return graphData.y0Range(d.temperature); });
 
 	var valuelineHum = d3.svg.line()
-	    .x(function(d) { return plotData.x(d.date); })
-	    .y(function(d) { return plotData.y1(d.humidity); });
+	    .x(function(d) { return graphData.xRange(d.date); })
+	    .y(function(d) { return graphData.y1Range(d.humidity); });
 	       
 
 	var readData = function(plotIdx)
@@ -40,11 +40,11 @@ function plotGraph(plotData, fileDatas, beginDate, endDate, what)
 		    }
 	    	
 
-			plotData.x.domain(d3.extent(filteredData, function(d) { return d.date; }));
+			graphData.xRange.domain(d3.extent(filteredData, function(d) { return d.date; }));
 			if (what == 1 || what == 3)
 			{
-				plotData.y0.domain(d3.extent(filteredData, function(d) { return d.temperature; }));
-			    plotData.graph.append("path")
+				graphData.y0Range.domain(d3.extent(filteredData, function(d) { return d.temperature; }));
+			    graphData.graph.append("path")
 					.attr("class", "line")
 					.attr("stroke", fileDatas[plotIdx].color)
 					//.style("stroke-dasharray", ("10,2"))valueline
@@ -53,8 +53,8 @@ function plotGraph(plotData, fileDatas, beginDate, endDate, what)
 
 			if (what == 2 || what == 3)
 			{
-				plotData.y1.domain(d3.extent(filteredData, function(d) { return d.humidity; }));
-				plotData.graph.append("path")
+				graphData.y1Range.domain(d3.extent(filteredData, function(d) { return d.humidity; }));
+				graphData.graph.append("path")
 					.attr("class", "line")
 					.attr("stroke", fileDatas[plotIdx].color)
 					.style("stroke-dasharray", ("3,3"))
@@ -65,12 +65,12 @@ function plotGraph(plotData, fileDatas, beginDate, endDate, what)
 			
 			//console.log(plotIdx);
 
-		    var t = plotData.graph.transition().duration(100);
+		    var t = graphData.graph.transition().duration(100);
 		    //var y = t.selectAll(".y.axis");
 			
-		    t.select(".x.axis").call(plotData.xAxis);
-		    t.select(".y.axisLeft").call(plotData.yAxisLeft);
-		    t.select(".y.axisRight").call(plotData.yAxisRight);
+		    t.select(".x.axis").call(graphData.xAxis);
+		    t.select(".y.axisLeft").call(graphData.yAxisLeft);
+		    t.select(".y.axisRight").call(graphData.yAxisRight);
 		});
 	};
 
