@@ -3,144 +3,13 @@
 <head><title>GRAFICE</title>
 <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
 <link rel="stylesheet" href="//code.jquery.com/ui/1.11.4/themes/smoothness/jquery-ui.css">
+<link href= "main.css" rel="stylesheet" type ="text/css">
 <script src="//code.jquery.com/jquery-1.10.2.js"></script>
 <script src="//code.jquery.com/ui/1.11.4/jquery-ui.js"></script>
 <script src="scriptGraph.js"></script>
-<script>
 
-</script>
-<style>
-@import url(//fonts.googleapis.com/css?family=Open+Sans);
-header {
-    color:grey;
-    text-align:left;
-    padding:5px; 
-    font-family: 'Open Sans', sans-serif;
-    margin-left: 10px;
-}
-nav {
-    line-height:30px;
-    background-color:#eeeeee;
-    margin-left: 10px;
-    height:200px;
-    width:80px;
-    float:left;
-    padding:5px; 
-    font-family: 'Open Sans', sans-serif;
-}
-a:link {
-    color: tomato;
-}
-
-a:visited {
-    color: tomato;
-}
-nav a.current {
-  
-  color:steelblue;
-}
-section {
-    width:400px;
-    float:left;
-    padding:10px; 
-    font-family: 'Open Sans', sans-serif;
-}
-body { 
-	font-family: 'Open Sans', sans-serif;
-	width: 100%; 
-	margin: 0 auto;
-}
-
-path {
-    stroke-width: 1.5;
-    fill: none;
-}
-
-.axis path,
-.axis line {
-    fill: none;
-    stroke: grey;
-    stroke-width: 1.2;
-    shape-rendering: crispEdges;
-}
-
-#datePkr {
-	position:fixed; top:75px; left: 110px;
-	width: 1000px;
-	height: 60px;
-	margin-left: 20px;
-	margin-right: 20px;
-	margin-top: 20px;
-	margin-bottom: 20px; 
-	font-family: 'Open Sans', sans-serif;
-}
-
-.checkboxList {
-	list-style-type:none;
-
-}
-
-.checkboxListScroll {
-	float: right;
-	position:relative;
-	margin-left: 40px;
-	margin-right: 80px;
-	margin-top: 20px;
-	margin-bottom: 20px; 
-	width: 200px;
-	height:800px;
-	overflow: scroll;
-	overflow-x: hidden;
-	font-family: 'Open Sans', sans-serif;
-}
-
-#graphContainer {
-    float: left;
-    width: auto;
-    height:340px;
-    margin-top: 100px;
-	margin-left: 20px;
-	margin-right: 20px;
-	font-family: 'Open Sans', sans-serif;
-
-}
-.itemList{
-	font-size: 12px;
-	margin-top: 4px;
-	margin-bottom: 4px;
-	font-family: 'Open Sans', sans-serif;
-}
-#checkboxes{
-	font-family: 'Open Sans', sans-serif;
-	float: left;
-    width: 500px;
-    height:30px;
-    margin-top: 20px;
-	margin-left: 40px;
-	margin-right: 40px;
-	font-family: 'Open Sans', sans-serif;
-}
-#option{
-	position:fixed; top:75px; left: 700px;
-	width: 600px;
-	height: 30px;
-	margin-left: 20px;
-	margin-right: 20px;
-	margin-top: 20px;
-	margin-bottom: 20px;
-	font-family: 'Open Sans', sans-serif;
-}
-#temp{
-	font-size: 9px; 
-	font-family: 'Open Sans', sans-serif;
-}
-#hum{
-	font-family: 'Open Sans', sans-serif; 
-	ont-size: 9px;
-}
-</style>
 <header>
-<h1><a href="http://localhost/sense/index.php"style="text-decoration: none">Sense</a></h1>
+<h1><a href="http://localhost/sense/index.php" style="text-decoration: none">/ tempr /</a></h1>
 </header>
 <body>
 <nav>
@@ -199,8 +68,8 @@ $(function(){
 </script>
 
 <div id = "checkboxes"> 
-    <label><input type="checkbox"  id = "temp" checked="true"> Temperature</label>
-    <input type="checkbox" id = "hum" checked="true"> Humidity
+    <label><input type="checkbox"  id = "temp" checked="true"  > Temperature</label>
+   <label><input type="checkbox"  id = "hum" checked="true"   > Humidity</label>
 </div>
 
 <script>
@@ -233,7 +102,7 @@ $('#endDate')
 
 var graphData = {}; //will be filled later
 
-var colors = ["#7A0000", "#0074D9", "#39CCCC", "#3D9970", "#2ECC40", "#3D0000", "#FF4136", "#854144b", "#FF3399", "#AAAAAA", "#B10DC9"];
+var colors = ["#FF33AA", "#08B37F", "#22ADFF", "#FF4136", "#FF9900", "#3D0000", , "#854144b", "#FF3399", "#AAAAAA", ];
 var sensorFiles = ["living.tsv", "hall.tsv", "bedroom.tsv", "bathroom.tsv", "kitchen.tsv" ];
 
 var selectedPlots = [];
@@ -258,7 +127,7 @@ window.onresize = function(event)
 {
 
 	d3.select("svg").remove();
-	graphData = createGraphs();
+	graphData =createGraphs();
 	refreshGraphs();
 };
 
@@ -316,7 +185,7 @@ function createGraphs()
 	// Set the dimensions of the canvas / graph
 	var windowWidth = window.innerWidth;
 	var margin = {top: 30, right: 60, bottom: 30, left: 60};
-	var graphWidth = windowWidth- 500- margin.left - margin.right;
+	var graphWidth = windowWidth- 550- margin.left - margin.right;
 	var graphHeight = 300 - margin.top - margin.bottom;
 
 	// Set the ranges
@@ -382,6 +251,7 @@ function displayCheckboxes(fileNames)
 		cb.type = "checkbox";
 		cb.name = fileName;
 		cb.value = "value";
+
 
 
 		var label = document.createElement('label')
