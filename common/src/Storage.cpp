@@ -6,7 +6,9 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#pragma pack(push, 1) // exact fit - no padding
+#ifndef __AVR__
+#   pragma pack(push, 1) // exact fit - no padding
+#endif
 
 struct Item8
 {
@@ -41,10 +43,14 @@ struct Item16
     Data unpack(const Data& last_data) const;
 };
 
-#pragma pack(pop)
+#ifndef __AVR__
+#   pragma pack(pop)
+#endif
 
-static_assert(sizeof(Item8) == 1, "");
-static_assert(sizeof(Item16) == 2, "");
+static_assert(sizeof(Item8) == 1, "Item8 is broken");
+static_assert(sizeof(Item16) == 2, "Item16 is broken");
+
+static_assert(sizeof(Storage) < 37 * 30 + 18, "Storage is too big");
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -181,9 +187,9 @@ bool Storage::Group::unpack_next(Storage::iterator& it) const
     }
 }
 
-size_t Storage::Group::get_data_count() const
+uint8_t Storage::Group::get_data_count() const
 {
-    size_t data_count = 0;
+    uint8_t data_count = 0;
     Storage::iterator it;
 
     while (unpack_next(it))
@@ -237,7 +243,7 @@ bool Storage::_unpack_next(iterator& it) const
             return false;
         }
 
-        it.group_idx++;
+        it.group_idx = (it.group_idx + 1) % MAX_GROUP_COUNT;
         it.offset = -1;
         return unpack_next(it);
     }
@@ -257,7 +263,7 @@ size_t Storage::get_data_count() const
     return data_count;
 }
 
-size_t Storage::get_group_count() const
+uint8_t Storage::get_group_count() const
 {
     return m_group_count;
 }

@@ -25,7 +25,7 @@ public:
     bool unpack_next(iterator& it) const;
 
     size_t get_data_count() const;
-    size_t get_group_count() const;
+    uint8_t get_group_count() const;
     uint8_t get_first_group_idx() const;
     uint8_t get_last_group_idx() const;
 
@@ -36,7 +36,9 @@ public:
 
 private:
 
-#pragma pack(push, 1) // exact fit - no padding
+#ifndef __AVR__
+#   pragma pack(push, 1) // exact fit - no padding
+#endif
 
     struct Group
     {
@@ -56,14 +58,16 @@ private:
         void pack(const Data& data);
         Data unpack() const;
 
-        size_t get_data_count() const;
+        uint8_t get_data_count() const;
         bool unpack_next(Storage::iterator& it) const;
 
         static constexpr uint8_t DATA_SIZE   = 32;
         uint8_t m_data[DATA_SIZE];
     };
 
-#pragma pack(pop)
+#ifndef __AVR__
+#   pragma pack(pop)
+#endif
 
     const Group& get_first_group() const;
     Group& get_first_group();
@@ -76,13 +80,13 @@ private:
 
     static constexpr uint8_t MAX_GROUP_COUNT = 30;
 
-    static_assert(sizeof(Group) == 37, "");
+    static_assert(sizeof(Group) == 37, "Storage::Group is broken");
+
+    Data m_last_data;
 
     Group m_groups[MAX_GROUP_COUNT];
     uint8_t m_first_group_idx = 0;
     uint8_t m_group_count = 0;
     uint8_t m_first_group_skip_count = 0;
-
-    Data m_last_data;
 };
 

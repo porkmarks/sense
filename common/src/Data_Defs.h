@@ -17,7 +17,9 @@ enum class Type : uint8_t
 };
 
 
-#pragma pack(push, 1) // exact fit - no padding
+#ifndef __AVR__
+#   pragma pack(push, 1) // exact fit - no padding
+#endif
 
 struct Measurement
 {
@@ -75,6 +77,8 @@ struct Pair_Response
     uint16_t address = 0;
 };
 
-#pragma pack(pop)
+#ifndef __AVR__
+#   pragma pack(pop)
+#endif
 
 }

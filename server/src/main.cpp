@@ -130,7 +130,6 @@ int main()
 
     s_comms.set_address(Comms::SERVER_ADDRESS);
 
-    size_t i = 0;
     while (true)
     {
         uint8_t size = s_comms.receive_packet(1000);

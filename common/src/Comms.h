@@ -45,7 +45,9 @@ private:
     uint16_t m_destination_address = BROADCAST_ADDRESS;
     uint16_t m_last_req_id = 0;
 
-#pragma pack(push, 1) // exact fit - no padding
+#ifndef __AVR__
+#   pragma pack(push, 1) // exact fit - no padding
+#endif
     struct Header
     {
         uint32_t crc;
@@ -55,7 +57,9 @@ private:
         data::Type type;
     };
 
-#pragma pack(pop)
+#ifndef __AVR__
+#   pragma pack(pop)
+#endif
 
 
     static const uint8_t RESPONSE_BUFFER_SIZE = sizeof(Header) + sizeof(data::Response);

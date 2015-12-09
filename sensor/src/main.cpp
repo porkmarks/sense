@@ -86,7 +86,7 @@ void setup()
         s_dht.read(t, h);
         float vcc = read_vcc();
         float s = vcc + t + h;
-        uint32_t seed = *reinterpret_cast<uint32_t*>(&s);
+        uint32_t seed = reinterpret_cast<uint32_t&>(s);
         srandom(seed);
         LOG(F("Random seed: "));
         LOG_LN(seed);
