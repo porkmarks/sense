@@ -74,3 +74,9 @@ Thumbs.db
 *.creator.user
 /sensor.creator.user.0b13243
 /sensor.creator.user.9039fc9
+*.eep
+*.elf
+*.hex
+*.lss
+*.map
+/sensor.sym

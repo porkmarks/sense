@@ -54,7 +54,7 @@ uint32_t s_measurement_index = 0;
 uint64_t s_timestamp = 0;
 uint32_t s_sleep_duration = 10000;
 
-
+Storage s_storage;
 
 
 void setup()

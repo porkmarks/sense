@@ -10,6 +10,7 @@
 #include <time.h>
 #include "CRC.h"
 #include "Comms.h"
+#include "Storage.h"
 
 #include "rfm22b/rfm22b.h"
 
@@ -111,9 +112,15 @@ std::string current_date_time()
     return date_time(time(nullptr));
 }
 
+extern void test_storage();
+
 int main()
 {
     std::cout << "Starting...\n";
+
+    srand(time(nullptr));
+
+    test_storage();
 
     while (!s_comms.init(5))
     {

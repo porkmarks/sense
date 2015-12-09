@@ -19,6 +19,7 @@
  */
 
 #include "rfm22b.h"
+#include <math.h>
 
 #ifdef RASPBERRY_PI
 #   include "rfm22b_spi.h"
@@ -28,8 +29,13 @@
 #	include <stdlib.h>
 #	include <math.h>
 #   include <iostream>
-#else
+#elif defined __AVR__
 #   include <SPI.h>
+#else
+
+static void delay(int) {}
+static int millis() { return 0; }
+
 #endif
 
 
@@ -806,9 +812,10 @@ void RFM22B::transfer(uint8_t* data, size_t size)
 {
 #ifdef RASPBERRY_PI
     m_spi.transfer(data, data, size);
-#else
+#elif defined __AVR__
     digitalWrite(SS, LOW);
     SPI.transfer(data, size);
     digitalWrite(SS, HIGH);
+#else
 #endif
 }

@@ -39,7 +39,9 @@ SOURCES += src/main.cpp \
     ../common/src/Comms.cpp \
     ../common/src/CRC.cpp \
     ../common/src/rfm22b/rfm22b.cpp \
-    ../common/src/rfm22b/rfm22b_spi.cpp
+    ../common/src/rfm22b/rfm22b_spi.cpp \
+    ../common/src/Storage.cpp \
+    src/tests.cpp
 
 HEADERS += \
     ../common/src/Comms.h \
@@ -47,7 +49,8 @@ HEADERS += \
     ../common/src/Data_Defs.h \
     ../common/src/rfm22b/rfm22b.h \
     ../common/src/rfm22b/rfm22b_enums.h \
-    ../common/src/rfm22b/rfm22b_spi.h
+    ../common/src/rfm22b/rfm22b_spi.h \
+    ../common/src/Storage.h
 
 DISTFILES +=
 

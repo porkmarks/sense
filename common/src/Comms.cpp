@@ -1,12 +1,22 @@
 #include "Comms.h"
 #include "CRC.h"
+#include <string.h>
 
 #ifdef RASPBERRY_PI
+
 #   include <thread>
 #   include <string.h>
 #   define delay(x) std::this_thread::sleep_for(std::chrono::milliseconds(x))
-#else
+
+#elif defined __AVR__
+
 #   include <Arduino.h>
+
+#else
+
+static void delay(int) {}
+static int millis() { return 0; }
+
 #endif
 
 Comms::Comms()
