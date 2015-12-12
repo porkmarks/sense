@@ -49,6 +49,7 @@ private:
         {
             uint8_t is_initialized : 1;
             uint8_t data_size : 7;
+            uint8_t skip_count;
         } m_header;
 
         uint8_t m_vcc = 0; //(vcc - 2) * 100
@@ -80,13 +81,12 @@ private:
 
     static constexpr uint8_t MAX_GROUP_COUNT = 30;
 
-    static_assert(sizeof(Group) == 37, "Storage::Group is broken");
+    static_assert(sizeof(Group) == 38, "Storage::Group is broken");
 
     Data m_last_data;
 
     Group m_groups[MAX_GROUP_COUNT];
     uint8_t m_first_group_idx = 0;
     uint8_t m_group_count = 0;
-    uint8_t m_first_group_skip_count = 0;
 };
 

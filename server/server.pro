@@ -41,7 +41,9 @@ SOURCES += src/main.cpp \
     ../common/src/rfm22b/rfm22b.cpp \
     ../common/src/rfm22b/rfm22b_spi.cpp \
     ../common/src/Storage.cpp \
-    src/tests.cpp
+    src/tests.cpp \
+    src/Scheduler.cpp \
+    src/Sensors.cpp
 
 HEADERS += \
     ../common/src/Comms.h \
@@ -50,7 +52,9 @@ HEADERS += \
     ../common/src/rfm22b/rfm22b.h \
     ../common/src/rfm22b/rfm22b_enums.h \
     ../common/src/rfm22b/rfm22b_spi.h \
-    ../common/src/Storage.h
+    ../common/src/Storage.h \
+    src/Scheduler.h \
+    src/Sensors.h
 
 DISTFILES +=
 

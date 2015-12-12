@@ -50,7 +50,7 @@ struct Item16
 static_assert(sizeof(Item8) == 1, "Item8 is broken");
 static_assert(sizeof(Item16) == 2, "Item16 is broken");
 
-static_assert(sizeof(Storage) < 37 * 30 + 18, "Storage is too big");
+static_assert(sizeof(Storage) <= 38 * 30 + 18, "Storage is too big");
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -210,10 +210,16 @@ Storage::Storage()
 
 bool Storage::unpack_next(iterator& it) const
 {
+    if (m_group_count == 0)
+    {
+        return false;
+    }
+
     if (it.group_idx < 0)
     {
+        const Group& g = get_first_group();
         //skip the popped elements in the beginning and warm up the data
-        for (uint8_t i = 0; i < m_first_group_skip_count; i++)
+        for (uint8_t i = 0; i < g.m_header.skip_count; i++)
         {
             bool ok = _unpack_next(it);
             assert(ok);
@@ -225,12 +231,13 @@ bool Storage::unpack_next(iterator& it) const
 
 bool Storage::_unpack_next(iterator& it) const
 {
+    if (m_group_count == 0)
+    {
+        return false;
+    }
+
     if (it.group_idx < 0)
     {
-        if (m_group_count == 0)
-        {
-            return false;
-        }
         it.group_idx = m_first_group_idx;
         it.offset = -1;
     }
@@ -305,18 +312,12 @@ bool Storage::pop_first_group()
         return false;
     }
     m_first_group_idx = (m_first_group_idx + 1) % MAX_GROUP_COUNT;
-    m_first_group_skip_count = 0;
     m_group_count--;
     return true;
 }
 
 bool Storage::add_group()
 {
-    if (m_group_count == 0)
-    {
-        m_first_group_skip_count = 0;
-    }
-
     if (m_group_count >= MAX_GROUP_COUNT)
     {
         return false;
@@ -332,7 +333,6 @@ void Storage::clear()
 {
     m_first_group_idx = 0;
     m_group_count = 0;
-    m_first_group_skip_count = 0;
 
     memset(m_groups, 0, sizeof(Group) * MAX_GROUP_COUNT);
 }
@@ -343,10 +343,10 @@ bool Storage::pop_front()
     {
         return false;
     }
-    m_first_group_skip_count++;
 
     Group& g = get_first_group();
-    if (m_first_group_skip_count >= g.get_data_count())
+    g.m_header.skip_count++;
+    if (g.m_header.skip_count >= g.get_data_count())
     {
         pop_first_group();
     }

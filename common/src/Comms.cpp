@@ -2,20 +2,15 @@
 #include "CRC.h"
 #include <string.h>
 
-#ifdef RASPBERRY_PI
-
-#   include <thread>
-#   include <string.h>
-#   define delay(x) std::this_thread::sleep_for(std::chrono::milliseconds(x))
-
-#elif defined __AVR__
+#ifdef __AVR__
 
 #   include <Arduino.h>
 
 #else
 
-static void delay(int) {}
-static int millis() { return 0; }
+#   include <thread>
+#   include <string.h>
+#   define delay(x) std::this_thread::sleep_for(std::chrono::milliseconds(x))
 
 #endif
 
@@ -203,11 +198,11 @@ void Comms::send_response(const Header& header)
 
 uint8_t Comms::receive_packet(uint32_t timeout)
 {
-#ifdef RASPBERRY_PI
-    auto start = std::chrono::high_resolution_clock::now();
+#ifdef __AVR__
+    uint32_t start = millis();
     uint32_t elapsed = 0;
 #else
-    uint32_t start = millis();
+    auto start = std::chrono::high_resolution_clock::now();
     uint32_t elapsed = 0;
 #endif
 
@@ -228,10 +223,10 @@ uint8_t Comms::receive_packet(uint32_t timeout)
             }
         }
 
-#ifdef RASPBERRY_PI
-        elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
-#else
+#ifdef __AVR__
         elapsed = millis() - start;
+#else
+        elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
 #endif
 
     } while (elapsed < timeout);
