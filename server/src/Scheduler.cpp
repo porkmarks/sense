@@ -3,9 +3,23 @@
 #include <algorithm>
 #include <iostream>
 
-void Scheduler::set_slot_duration(Clock::duration period)
+/*
+void Scheduler::set_slot_duration(Clock::duration duration)
 {
-    m_slot_duration = std::max(Clock::duration(std::chrono::seconds(1)), period);
+    m_slot_duration = std::max(Clock::duration(std::chrono::seconds(10)), duration);
+}
+Scheduler::Clock::duration Scheduler::get_slot_duration() const
+{
+    return m_slot_duration;
+}
+
+void Scheduler::set_measurement_period(Clock::duration period)
+{
+    m_measurement_period = std::max(Clock::duration(std::chrono::seconds(30)), period);
+}
+Scheduler::Clock::duration Scheduler::get_measurement_period(Clock::duration) const
+{
+    return m_measurement_period;
 }
 
 Scheduler::Slot_Id Scheduler::add_slot()
@@ -31,11 +45,11 @@ void Scheduler::remove_slot(Slot_Id id)
     m_slots.erase(it);
 }
 
-Scheduler::Clock::time_point Scheduler::get_next_time_point()
+Scheduler::Clock::time_point Scheduler::get_next_slot_time_point()
 {
     if (m_slots.empty())
     {
-        return Clock::now() + m_slot_duration;
+        return Clock::now() + m_measurement_period;
     }
 
     Clock::time_point max = Clock::time_point(Clock::duration::zero());
@@ -61,7 +75,8 @@ Scheduler::Clock::time_point Scheduler::schedule(Slot_Id id)
 
     if (it != m_slots.end())
     {
-        it->next_time_point = get_next_time_point();
+        Clock::time_point next = get_next_slot_time_point();
+        it->next_time_point = next;
         return it->next_time_point;
     }
 
@@ -73,3 +88,4 @@ Scheduler::Clock::time_point Scheduler::schedule(Slot_Id id)
 
 //}
 
+*/

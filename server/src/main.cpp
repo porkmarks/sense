@@ -25,8 +25,7 @@
 #define LOG_LN(x) std::cout << x << std::endl
 
 static Comms s_comms;
-static Scheduler s_scheduler;
-static Sensors s_sensors(s_scheduler);
+static Sensors s_sensors;
 
 typedef std::chrono::high_resolution_clock Clock;
 
@@ -266,8 +265,8 @@ int main()
                     {
                         data::Pair_Response packet;
                         packet.address = id;
-                        packet.server_timestamp = time(nullptr);
-                        std::cout << "Pair requested. Replying with address " << packet.address << " and timestamp " << packet.server_timestamp;
+                        packet.server_time_point = time(nullptr);
+                        std::cout << "Pair requested. Replying with address " << packet.address << " and time_point " << packet.server_time_point;
                         s_comms.begin_packet(data::Type::PAIR_RESPONSE);
                         s_comms.pack(packet);
                         s_comms.send_packet(3);
@@ -280,12 +279,33 @@ int main()
             }
             else if (type == data::Type::MEASUREMENT && size == sizeof(data::Measurement))
             {
+                Sensors::Measurement m;
                 const data::Measurement* ptr = reinterpret_cast<const data::Measurement*>(s_comms.get_packet_payload());
-                float vcc, t, h;
-                ptr->unpack(vcc, h, t);
-                //std::cout << s_comms.get_packet_source_address() << "::: " << date_time(ptr->timestamp) << " / " << current_date_time() << "\t" << int(ptr->index) << "\tVcc:" << vcc << "V\tH:" << h << "%\tT:" << t << "C" << "\n";
 
-                //s_last_address = std::max(s_comms.get_packet_source_address() + 1u, s_last_address);
+                //m.time_point = Clock::from_time_t(time_t(ptr->time_point));
+                m.flags = ptr->flags;
+                m.tx_rssi = 0;
+                m.rx_rssi = 0;
+                ptr->unpack(m.vcc, m.humidity, m.temperature);
+
+                Sensors::Sensor_Id id = s_comms.get_packet_source_address();
+                s_sensors.push_back_measurement(id, m);
+
+                const Sensors::Sensor* sensor = s_sensors.find_sensor_by_id(id);
+                if (sensor)
+                {
+                    //reschedule
+//                    Clock::time_point next = s_scheduler.schedule(sensor->slot_id);
+
+//                    data::Config packet;
+//                    packet.address = id;
+//                    packet.server_time_point = time(nullptr);
+//                    packet.scheduled_time_point = Clock::to_time_t(next);
+
+//                    s_comms.begin_packet(data::Type::CONFIG);
+//                    s_comms.pack(packet);
+//                    s_comms.send_packet(3);
+                }
             }
         }
         std::cout << std::flush;

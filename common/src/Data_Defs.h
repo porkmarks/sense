@@ -23,10 +23,10 @@ enum class Type : uint8_t
 
 struct Measurement
 {
-    enum Flag
+    enum class Flag : uint8_t
     {
-        FLAG_SENSOR_ERROR   = 1 << 0,
-        FLAG_COMMS_ERROR    = 1 << 1
+        SENSOR_ERROR   = 1 << 0,
+        COMMS_ERROR    = 1 << 1
     };
 
     void pack(float vcc, float humidity, float temperature)
@@ -45,8 +45,8 @@ struct Measurement
     }
 
 //packed data
-    uint32_t timestamp = 0;
     uint32_t index = 0;
+    uint32_t time_point = 0; //seconds, since 1970 epoch
     uint8_t flags = 0;
     uint8_t vcc = 0; //(vcc - 2) * 100
     uint8_t humidity = 0; //*2.55
@@ -58,8 +58,8 @@ struct Config_Request
 };
 struct Config
 {
-    uint32_t server_timestamp = 0;
-    uint32_t scheduled_timestamp = 0;
+    uint32_t server_time_point = 0;
+    uint32_t scheduled_time_point = 0;
 };
 
 struct Response
@@ -73,7 +73,7 @@ struct Pair_Request
 };
 struct Pair_Response
 {
-    uint32_t server_timestamp = 0;
+    uint32_t server_time_point = 0;
     uint16_t address = 0;
 };
 
