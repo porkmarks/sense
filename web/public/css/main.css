@@ -3,15 +3,35 @@ header {
     background-image: -ms-linear-gradient(bottom, white, #bdbdbd);
 	background-image: -webkit-linear-gradient(bottom, white, #bdbdbd);
 	background-image: -moz-linear-gradient(bottom, white, #bdbdbd);
-    text-align:left;
-    padding:5px; 
+    padding:3px; 
+    height: 100px;
     font-family: 'Open Sans', sans-serif;
-    font-size: 16px;
-    font-weight: 300px;
+    font-size: 14px;
     letter-spacing: 2px;
-    margin-left: 10px;
+    margin-left: 5px;
 
 }
+
+h1{
+	color: grey;
+	position: fixed; top:20px; left:30px;
+	font-size: 30px;
+	font-weight: 50px;
+}
+p{
+	color:grey;
+	font-size: 14;
+}
+ul.list{
+	position: fixed; top:1px; left:10px;
+}
+ul.list li{
+	text-decoration: none;
+	list-style-type:none; 
+	display:inline;
+	padding-right: 30px;
+}
+
 
 section {
     width:400px;
@@ -43,7 +63,7 @@ nav {
 	background-image: -ms-linear-gradient(bottom, white, #f5f5f5);
 	background-image: -webkit-linear-gradient(bottom, white, #f5f5f5);
 	background-image: -moz-linear-gradient(bottom, white, #f5f5f5);
-	margin-left: 10px;
+	margin-left: 5px;
     height:800px;
     width:120px;
     float:left;
@@ -64,7 +84,7 @@ nav a.current {
 
 #datePkr {
 	font-size: 14px;
-	position:fixed; top:75px; left: 150px;
+	position:fixed; top:100px; left: 150px;
 	width: 1000px;
 	height: 60px;
 	margin-left: 20px;
@@ -115,14 +135,14 @@ nav a.current {
     width: 500px;
     height:30px;
     margin-top: 20px;
-	margin-left: 60px;
+	margin-left: 20px;
 	margin-right: 20px;
 	font-size: 14px; 
 	letter-spacing: 1px;
 	color: grey;
 }
 #option{
-	position:fixed; top:100px; left: 150px;
+	position:fixed; top:140px; left: 150px;
 	width: 600px;
 	height: 30px;
 	margin-left: 20px;
@@ -130,3 +150,15 @@ nav a.current {
 	margin-top: 20px;
 	margin-bottom: 20px;
 }
+#container{
+	float: left;
+	margin-left: 20px;
+	margin-right: 20px;
+	margin-top: 20px;
+	margin-bottom: 20px;
+}
+.btn btn-link{
+	float: left;
+	margin-top: px;
+}
+

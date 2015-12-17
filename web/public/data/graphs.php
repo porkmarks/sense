@@ -3,22 +3,31 @@
 <head><title>GRAFICE</title>
 <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
 <link rel="stylesheet" href="//code.jquery.com/ui/1.11.4/themes/smoothness/jquery-ui.css">
-<link href= "main.css" rel="stylesheet" type ="text/css">
+<link href= "../css/main.css" rel="stylesheet" type ="text/css">
 <script src="//code.jquery.com/jquery-1.10.2.js"></script>
 <script src="//code.jquery.com/ui/1.11.4/jquery-ui.js"></script>
 <script src="scriptGraph.js"></script>
 
+
 <header>
-<h1><a href="http://localhost/sense/index.php" style="text-decoration: none">/ tempr /</a></h1>
+<ul class = "list">
+<li>
+<a href = "http://localhost/sense/data/index.php" style="text-decoration: none">Data</a>
+</li>
+<li>
+<a href = "http://localhost/sense/settings/details.html" style="text-decoration: none">Settings</a>
+</li>
+</ul>
+<h1><a href="http://localhost/sense/data/index.php" style="text-decoration: none">/ tempR /</a></h1>
 </header>
 <body>
 <nav>
-Data<br>
-<br>
-<a href="http://localhost/sense/index.php" style="text-decoration: none">Overview</a><br>
-<a href="http://localhost/sense/graphs.php" style="text-decoration: none">Graphs</a><br>
-<a href="http://localhost/sense/analytics.html" style="text-decoration: none">Analytics</a><br>
-<a href="http://localhost/sense/alarms.html" style="text-decoration: none">Alarms</a></nav>
+<p>Data</p><br>
+
+<a href="http://localhost/sense/data/index.php" style="text-decoration: none">Overview</a><br>
+<a href="http://localhost/sense/data/graphs.php" style="text-decoration: none">Graphs</a><br>
+<a href="http://localhost/sense/data/analytics.html" style="text-decoration: none">Analytics</a><br>
+<a href="http://localhost/sense/data/alarms.html" style="text-decoration: none">Alarms</a></nav>
 
 <div id="datePkr">
 Begin Date: <input type="text" id="beginDate">
@@ -66,11 +75,12 @@ $(function(){
   });
 });
 </script>
-
+<div class = "container">
 <div id = "checkboxes"> 
-    <label><input type="checkbox"  id = "temp" checked="true"  > Temperature</label>
+   <label><input type="checkbox"  id = "temp" checked="true"  > Temperature</label>
    <label><input type="checkbox"  id = "hum" checked="true"   > Humidity</label>
 </div>
+<button type="button" class="btn btn-link">Download csv</button>
 
 <script>
 
