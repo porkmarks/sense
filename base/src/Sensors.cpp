@@ -209,6 +209,7 @@ void Sensors::add_measurement(Clock::time_point time_point, Sensor_Id id, const 
 
 void Sensors::_add_measurement(Clock::time_point time_point, Sensor_Id id, const Measurement& measurement)
 {
+    //find the measurement that is older than time_point - period/2.
     Measurement_Entry new_entry;
     new_entry.time_point = time_point - m_measurement_period / 2;
     auto upper_it = std::upper_bound(m_measurements.begin(), m_measurements.end(), new_entry, [](const Measurement_Entry& e1, const Measurement_Entry& e2)
@@ -218,6 +219,8 @@ void Sensors::_add_measurement(Clock::time_point time_point, Sensor_Id id, const
 
     if (upper_it != m_measurements.end())
     {
+        //if we found one, check if it's within +- period/2 of the desired timepoint.
+        //For sure it has to be older than time_point - period/2 because this is what the upper_bound did
         Measurement_Entry& entry = *upper_it;
         //merge with the entry?
         if (std::abs(entry.time_point - time_point) < m_measurement_period / 2)
@@ -236,11 +239,12 @@ void Sensors::_add_measurement(Clock::time_point time_point, Sensor_Id id, const
         }
     }
 
+    //if no proper time slot was found, insert it in place
     Measurement_Entry entry;
     entry.time_point = time_point;
     entry.measurements.emplace(id, measurement);
 
-    m_measurements.insert(upper_it, entry);
+    m_measurements.emplace(upper_it, entry);
 }
 
 Sensors::Measurement Sensors::merge_measurements(const Sensors::Measurement& m1, const Sensors::Measurement& m2)
