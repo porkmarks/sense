@@ -10,7 +10,7 @@ public:
     Comms();
 
     static constexpr uint16_t BROADCAST_ADDRESS = 0;
-    static constexpr uint16_t SERVER_ADDRESS = 0xFFFF;
+    static constexpr uint16_t BASE_ADDRESS = 0xFFFF;
 
     static constexpr uint16_t PAIR_ADDRESS_BEGIN = BROADCAST_ADDRESS + 1;
     static constexpr uint16_t PAIR_ADDRESS_END = PAIR_ADDRESS_BEGIN + 1000;

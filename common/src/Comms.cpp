@@ -11,6 +11,8 @@
 #   include <thread>
 #   include <string.h>
 #   define delay(x) std::this_thread::sleep_for(std::chrono::milliseconds(x))
+#   define printf_P printf
+#   define PSTR
 
 #endif
 
@@ -45,15 +47,15 @@ bool Comms::init(uint8_t retries)
     m_rf22.set_gpio_function(RFM22B::GPIO::GPIO0, RFM22B::GPIO_Function::TX_STATE);
     m_rf22.set_gpio_function(RFM22B::GPIO::GPIO1, RFM22B::GPIO_Function::RX_STATE);
 
-    printf(("Frequency is %f\n"), m_rf22.get_carrier_frequency());
-    printf(("FH Step is %lu\n"), m_rf22.get_frequency_hopping_step_size());
-    printf(("Channel is %d\n"), (int)m_rf22.get_channel());
-    printf(("Frequency deviation is %lu\n"), m_rf22.get_frequency_deviation());
-    printf(("Data rate is %lu\n"), m_rf22.get_data_rate());
-    printf(("Modulation Type %d\n"), (int)m_rf22.get_modulation_type());
-    printf(("Modulation Data Source %d\n"), (int)m_rf22.get_modulation_data_source());
-    printf(("Data Clock Configuration %d\n"), (int)m_rf22.get_data_clock_configuration());
-    printf(("Transmission Power is %d\n"), (int)m_rf22.get_transmission_power());
+    printf_P(PSTR("Frequency is %f\n"), m_rf22.get_carrier_frequency());
+    printf_P(PSTR("FH Step is %lu\n"), m_rf22.get_frequency_hopping_step_size());
+    printf_P(PSTR("Channel is %d\n"), (int)m_rf22.get_channel());
+    printf_P(PSTR("Frequency deviation is %lu\n"), m_rf22.get_frequency_deviation());
+    printf_P(PSTR("Data rate is %lu\n"), m_rf22.get_data_rate());
+    printf_P(PSTR("Modulation Type %d\n"), (int)m_rf22.get_modulation_type());
+    printf_P(PSTR("Modulation Data Source %d\n"), (int)m_rf22.get_modulation_data_source());
+    printf_P(PSTR("Data Clock Configuration %d\n"), (int)m_rf22.get_data_clock_configuration());
+    printf_P(PSTR("Transmission Power is %d\n"), (int)m_rf22.get_transmission_power());
 
     m_rf22.stand_by_mode();
 
