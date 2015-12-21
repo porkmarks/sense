@@ -36,6 +36,7 @@ public:
     struct Measurement_Entry
     {
         Clock::time_point time_point;
+        uint32_t index = 0;
         std::map<Sensor_Id, Measurement> measurements;
     };
 
@@ -48,17 +49,20 @@ public:
     Sensors();
 
     //how much sensors can deviate from the measurement global clock. This is due to the unstable clock frequency of the sensor CPU
-    static const Sensors::Clock::duration MEASUREMENT_JITTER;
+    static const Clock::duration MEASUREMENT_JITTER;
     //how long does a communication burst take
-    static const Sensors::Clock::duration COMMS_DURATION;
+    static const Clock::duration COMMS_DURATION;
 
 
     //how often will the sensors do the measurement
     void set_measurement_period(Clock::duration period);
     Clock::duration get_measurement_period() const;
 
+    uint32_t compute_next_measurement_index();
+    uint32_t compute_last_confirmed_measurement_index(Sensor_Id id) const;
+
     Clock::time_point compute_next_measurement_time_point();
-    Clock::time_point compute_next_comms_time_point(Sensor_Id id);
+    Clock::time_point compute_next_comms_time_point(Sensor_Id id) const;
 
     //how often will the sensors talk to the base station
     void set_comms_period(Clock::duration period);
@@ -72,7 +76,7 @@ public:
 
     //measurement manipulation
     void push_back_measurement(Sensor_Id id, const Measurement& measurement);
-    void add_measurement(Clock::time_point time_point, Sensor_Id id, const Measurement& measurement);
+    void add_measurement(uint32_t index, Sensor_Id id, const Measurement& measurement);
     const Measurement* get_last_measurement(Sensor_Id id);
 
     //serialization and reporting
@@ -85,13 +89,15 @@ public:
 
 private:
     Measurement merge_measurements(const Measurement& m1, const Measurement& m2);
-    void _add_measurement(Clock::time_point time_point, Sensor_Id id, const Measurement& measurement);
+    void _add_measurement(uint32_t index, Sensor_Id id, const Measurement& measurement);
 
     Clock::duration m_measurement_period = std::chrono::minutes(5);
     Clock::duration m_comms_period = std::chrono::seconds(10);
 
-    Clock::time_point m_last_measurement_time_point;
-    Clock::time_point m_last_comms_time_point;
+    mutable Clock::time_point m_next_measurement_time_point;
+    mutable Clock::time_point m_next_comms_time_point;
+
+    mutable uint32_t m_next_measurement_index = 0;
 
     std::vector<Sensor> m_sensors;
 

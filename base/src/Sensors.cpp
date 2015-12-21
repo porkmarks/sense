@@ -57,15 +57,15 @@ std::string time_point_to_string(std::chrono::high_resolution_clock::time_point 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const Sensors::Clock::duration Sensors::MEASUREMENT_JITTER = std::chrono::seconds(60);
+const Sensors::Clock::duration Sensors::MEASUREMENT_JITTER = std::chrono::seconds(10);
 const Sensors::Clock::duration Sensors::COMMS_DURATION = std::chrono::seconds(10);
 
 
 Sensors::Sensors()
 {
     m_sensors.reserve(100);
-    m_last_measurement_time_point = Clock::now();
-    m_last_comms_time_point = Clock::now();
+    m_next_measurement_time_point = Clock::now();
+    m_next_comms_time_point = Clock::now();
 }
 
 
@@ -92,7 +92,7 @@ Sensors::Clock::duration Sensors::compute_comms_period() const
 
 void Sensors::set_measurement_period(Clock::duration period)
 {
-    m_measurement_period = std::max(Clock::duration(std::chrono::seconds(30)), period);
+    m_measurement_period = std::max(Clock::duration(std::chrono::seconds(5)), period);
 }
 Sensors::Clock::duration Sensors::get_measurement_period() const
 {
@@ -102,15 +102,54 @@ Sensors::Clock::duration Sensors::get_measurement_period() const
 Sensors::Clock::time_point Sensors::compute_next_measurement_time_point()
 {
     auto now = Clock::now();
-    while (m_last_measurement_time_point + m_measurement_period <= now)
+    while (m_next_measurement_time_point <= now)
     {
-        m_last_measurement_time_point += m_measurement_period;
+        Measurement_Entry entry;
+        entry.index = m_next_measurement_index;
+        entry.time_point = m_next_measurement_time_point;
+        m_measurements.emplace_back(entry);
+
+
+        m_next_measurement_time_point += m_measurement_period;
+        m_next_measurement_index++;
     }
 
-    return m_last_measurement_time_point + m_measurement_period;
+    return m_next_measurement_time_point;
 }
 
-Sensors::Clock::time_point Sensors::compute_next_comms_time_point(Sensor_Id id)
+uint32_t Sensors::compute_next_measurement_index()
+{
+    compute_next_measurement_time_point();
+    return m_next_measurement_index;
+}
+
+uint32_t Sensors::compute_last_confirmed_measurement_index(Sensor_Id id) const
+{
+    const Sensor* sensor = find_sensor_by_id(id);
+    if (!sensor)
+    {
+        std::cerr << "Cannot find sensor id " << id << "\n";
+        return 0;
+    }
+
+    for (auto it = m_measurements.rbegin(); it != m_measurements.rend(); ++it)
+    {
+        const Measurement_Entry& entry = *it;
+        auto mit = entry.measurements.find(id);
+        if (mit != entry.measurements.end())
+        {
+            std::cout << "Found index: " << entry.index << "\n";
+            return entry.index;
+        }
+        else
+        {
+            std::cout << "Not found in entry: " << entry.index << "\n";
+        }
+    }
+    return 0;
+}
+
+Sensors::Clock::time_point Sensors::compute_next_comms_time_point(Sensor_Id id) const
 {
     auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](const Sensor& sensor)
     {
@@ -122,13 +161,15 @@ Sensors::Clock::time_point Sensors::compute_next_comms_time_point(Sensor_Id id)
         return Clock::now() + std::chrono::hours(99999999);
     }
 
+    Clock::duration period = compute_comms_period();
+
     auto now = Clock::now();
-    while (m_last_comms_time_point + m_comms_period <= now)
+    while (m_next_comms_time_point <= now)
     {
-        m_last_comms_time_point += m_comms_period;
+        m_next_comms_time_point += period;
     }
 
-    Clock::time_point start = m_last_comms_time_point + m_comms_period;
+    Clock::time_point start = m_next_comms_time_point;
     return start + std::distance(m_sensors.begin(), it) * COMMS_DURATION;
 }
 
@@ -160,39 +201,39 @@ const Sensors::Sensor* Sensors::find_sensor_by_id(Sensor_Id id) const
     return &(*it);
 }
 
-void Sensors::push_back_measurement(Sensor_Id id, const Measurement& measurement)
-{
-    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](const Sensor& sensor)
-    {
-        return sensor.id == id;
-    });
-    if (it == m_sensors.end())
-    {
-        std::cerr << "Cannot find sensor id " << id << "\n";
-        return;
-    }
-
-    _add_measurement(Clock::now(), id, measurement);
-
-//    Sensor& sensor = *it;
-//    if (!sensor.measurements.empty() &&
-//        sensor.measurements.back().time_point > measurement.time_point)
+//void Sensors::push_back_measurement(Sensor_Id id, const Measurement& measurement)
+//{
+//    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](const Sensor& sensor)
 //    {
-//        std::cerr << "Measurement from the past. Last: " <<
-//                     time_point_to_string(sensor.measurements.back().time_point) <<
-//                     ", New: " << time_point_to_string(measurement.time_point) << ".\n";
+//        return sensor.id == id;
+//    });
+//    if (it == m_sensors.end())
+//    {
+//        std::cerr << "Cannot find sensor id " << id << "\n";
 //        return;
 //    }
 
-//    Clock::time_point begin = Clock::now() - m_history_duration;
-//    if (measurement.time_point >= begin)
-//    {
-//        sensor.measurements.push_back(measurement);
-//    }
-    clear_old_measurements();
-}
+//    _add_measurement(m_next_measurement_index, id, measurement);
 
-void Sensors::add_measurement(Clock::time_point time_point, Sensor_Id id, const Measurement& measurement)
+////    Sensor& sensor = *it;
+////    if (!sensor.measurements.empty() &&
+////        sensor.measurements.back().time_point > measurement.time_point)
+////    {
+////        std::cerr << "Measurement from the past. Last: " <<
+////                     time_point_to_string(sensor.measurements.back().time_point) <<
+////                     ", New: " << time_point_to_string(measurement.time_point) << ".\n";
+////        return;
+////    }
+
+////    Clock::time_point begin = Clock::now() - m_history_duration;
+////    if (measurement.time_point >= begin)
+////    {
+////        sensor.measurements.push_back(measurement);
+////    }
+//    clear_old_measurements();
+//}
+
+void Sensors::add_measurement(uint32_t index, Sensor_Id id, const Measurement& measurement)
 {
     auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](const Sensor& sensor)
     {
@@ -204,26 +245,65 @@ void Sensors::add_measurement(Clock::time_point time_point, Sensor_Id id, const 
       return;
     }
 
-    _add_measurement(time_point, id, measurement);
+    _add_measurement(index, id, measurement);
 }
 
-void Sensors::_add_measurement(Clock::time_point time_point, Sensor_Id id, const Measurement& measurement)
+void Sensors::_add_measurement(uint32_t index, Sensor_Id id, const Measurement& measurement)
 {
+//    //find the measurement that is older than time_point - period/2.
+//    Measurement_Entry new_entry;
+//    new_entry.time_point = time_point - m_measurement_period / 2;
+//    auto upper_it = std::upper_bound(m_measurements.begin(), m_measurements.end(), new_entry, [](const Measurement_Entry& e1, const Measurement_Entry& e2)
+//    {
+//        return e1.time_point < e2.time_point;
+//    });
+
+//    if (upper_it != m_measurements.end())
+//    {
+//        //if we found one, check if it's within +- period/2 of the desired timepoint.
+//        //For sure it has to be older than time_point - period/2 because this is what the upper_bound did
+//        Measurement_Entry& entry = *upper_it;
+//        //merge with the entry?
+//        if (std::abs(entry.time_point - time_point) < m_measurement_period / 2)
+//        {
+//            auto it = entry.measurements.find(id);
+//            if (it != entry.measurements.end())
+//            {
+//                Measurement merged = merge_measurements(it->second, measurement);
+//                entry.measurements.emplace(id, merged);
+//            }
+//            else
+//            {
+//                entry.measurements.emplace(id, measurement);
+//            }
+//            return;
+//        }
+//    }
+
+//    //if no proper time slot was found, insert it in place
+//    Measurement_Entry entry;
+//    entry.time_point = time_point;
+//    entry.measurements.emplace(id, measurement);
+
+//    m_measurements.emplace(upper_it, entry);
+
+
+    //first create missing indices
+    compute_next_measurement_time_point();
+
     //find the measurement that is older than time_point - period/2.
     Measurement_Entry new_entry;
-    new_entry.time_point = time_point - m_measurement_period / 2;
-    auto upper_it = std::upper_bound(m_measurements.begin(), m_measurements.end(), new_entry, [](const Measurement_Entry& e1, const Measurement_Entry& e2)
+    new_entry.index = index;
+    auto entry_it = std::lower_bound(m_measurements.begin(), m_measurements.end(), new_entry, [](const Measurement_Entry& e1, const Measurement_Entry& e2)
     {
-        return e1.time_point < e2.time_point;
+        return e1.index < e2.index;
     });
 
-    if (upper_it != m_measurements.end())
+    if (entry_it != m_measurements.end())
     {
-        //if we found one, check if it's within +- period/2 of the desired timepoint.
-        //For sure it has to be older than time_point - period/2 because this is what the upper_bound did
-        Measurement_Entry& entry = *upper_it;
+        Measurement_Entry& entry = *entry_it;
         //merge with the entry?
-        if (std::abs(entry.time_point - time_point) < m_measurement_period / 2)
+        if (entry.index == index)
         {
             auto it = entry.measurements.find(id);
             if (it != entry.measurements.end())
@@ -239,12 +319,8 @@ void Sensors::_add_measurement(Clock::time_point time_point, Sensor_Id id, const
         }
     }
 
-    //if no proper time slot was found, insert it in place
-    Measurement_Entry entry;
-    entry.time_point = time_point;
-    entry.measurements.emplace(id, measurement);
-
-    m_measurements.emplace(upper_it, entry);
+    std::cerr << "Index " << index << " not found for id " << id << "\n";
+    return;
 }
 
 Sensors::Measurement Sensors::merge_measurements(const Sensors::Measurement& m1, const Sensors::Measurement& m2)
@@ -333,6 +409,7 @@ void Sensors::load_sensors(const std::string& filename)
         ss >> sensor.id >> sensor.name;
         std::cout << "Loaded sensor " << sensor.name << " id " << sensor.id << "\n";
 
+        m_last_address = std::max(m_last_address, sensor.id);
         m_sensors.emplace_back(std::move(sensor));
     }
 }
@@ -373,29 +450,49 @@ void Sensors::save_sensor_measurements_tsv(const std::string& filename, Sensor_I
     }
 
     //header
-    stream << "temperature" << "\t"
+    stream << "index" << "\t"
+           << "flags" << "\t"
+           << "temperature" << "\t"
            << "humidity" << "\t"
            << "vcc" << "\t"
            << "tx_rssi" << "\t"
            << "rx_rssi" << "\n";
 
-//    for (const Measurement& measurement: sensor->measurements)
-//    {
-//        if (measurement.time_point < begin)
-//        {
-//            continue;
-//        }
-//        if (measurement.time_point > end)
-//        {
-//            break;
-//        }
-//        stream << time_point_to_string(measurement.time_point) << "\t"
-//               << measurement.temperature << "\t"
-//               << measurement.humidity << "\t"
-//               << measurement.vcc << "\t"
-//               << static_cast<float>(measurement.tx_rssi) << "\t"
-//               << static_cast<float>(measurement.rx_rssi) << "\n";
-//    }
+    for (const Measurement_Entry& entry: m_measurements)
+    {
+        if (entry.time_point < begin)
+        {
+            continue;
+        }
+        if (entry.time_point > end)
+        {
+            break;
+        }
+        auto mit = entry.measurements.find(id);
+        if (mit != entry.measurements.end())
+        {
+            const Measurement& measurement = mit->second;
+            stream << entry.index << "\t"
+                   << measurement.flags << "\t"
+                   << time_point_to_string(entry.time_point) << "\t"
+                   << measurement.temperature << "\t"
+                   << measurement.humidity << "\t"
+                   << measurement.vcc << "\t"
+                   << static_cast<float>(measurement.tx_rssi) << "\t"
+                   << static_cast<float>(measurement.rx_rssi) << "\n";
+        }
+        else
+        {
+            stream << entry.index << "\t"
+                   << "-\t"
+                   << "-\t"
+                   << "-\t"
+                   << "-\t"
+                   << "-\t"
+                   << "-\t"
+                   << "-\n";
+        }
+    }
 }
 
 

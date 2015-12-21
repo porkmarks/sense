@@ -1,4 +1,10 @@
 #include <Arduino.h>
+#include <avr/eeprom.h>
+#include <avr/interrupt.h>
+#include <avr/io.h>
+#include <avr/pgmspace.h>
+#include <avr/wdt.h>
+
 #include "SPI.h"
 #include "Low_Power.h"
 #include "DHT.h"
@@ -28,15 +34,23 @@ inline void* operator new(size_t size_, void *ptr_) { return ptr_; }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#define LOG_LN(x) Serial.println(x)
-#define LOG(x) Serial.print(x)
+template<typename... Args>
+void log(PGM_P fmt, Args... args)
+{
+    printf_P(fmt, args...);
+}
+
+#define LOG log
+//#define LOG(...)
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum class State
 {
     PAIR,
-    READ_DATA
+    FIRST_CONFIG,
+    MAIN_LOOP
 };
 State s_state = State::PAIR;
 
@@ -48,35 +62,87 @@ DHT s_dht(DHT_DATA_PIN1, DHT22);
 
 Comms s_comms;
 
-constexpr uint8_t MAX_MEASUREMENTS = 32;
-std::deque<data::Measurement> s_measurements;
-uint32_t s_measurement_index = 0;
-uint64_t s_timestamp = 0;
-uint32_t s_sleep_duration = 10000;
+FILE s_uart_output;
+
+//constexpr uint8_t MAX_MEASUREMENTS = 2;
+//std::deque<data::Measurement> s_measurements;
+uint32_t s_next_measurement_index = 0;
+uint32_t s_first_measurement_index = 0;
+
+uint64_t s_time_point = 0;
+
+uint32_t s_next_measurement_time_point_s = 0;
+uint32_t s_measurement_period_s = 0;
+
+uint32_t s_next_comms_time_point_s = 0;
+uint32_t s_comms_period_s = 0;
 
 Storage s_storage;
 
+//////////////////////////////////////////////////////////////////////////////////////////
+
+ISR(BADISR_vect)
+{
+    digitalWrite(GREEN_LED_PIN, LOW);
+    while (true)
+    {
+        digitalWrite(RED_LED_PIN, HIGH);
+        delay(5);
+        digitalWrite(RED_LED_PIN, LOW);
+        delay(95);
+    }
+}
+
+void soft_reset()
+{
+    LOG(PSTR("resetting..."));
+    //cli();
+    //wdt_enable(WDTO_15MS);
+    //while(1);
+    void (*resetptr)( void ) = 0x0000;
+    resetptr();
+}
+
+void wdt_init(void) __attribute__((naked)) __attribute__((section(".init3")));
+
+void wdt_init(void)
+{
+    wdt_disable();
+    return;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
 
 void setup()
 {
+    int mcusr_value = MCUSR;
+    MCUSR = 0;
+
+    Serial.begin(1200);
+    delay(500);
+
+    fdev_setup_stream(&s_uart_output, uart_putchar, NULL, _FDEV_SETUP_WRITE);
+    stdout = &s_uart_output;
+
+
     pinMode(RED_LED_PIN, OUTPUT);
     digitalWrite(RED_LED_PIN, LOW);
     pinMode(GREEN_LED_PIN, OUTPUT);
     digitalWrite(GREEN_LED_PIN, LOW);
+
+    blink_leds(GREEN_LED, 2, 100);
 
     pinMode(static_cast<uint8_t>(Button::BUTTON1), INPUT);
     digitalWrite(static_cast<uint8_t>(Button::BUTTON1), HIGH);
 
     //s_measurements.reserve(MAX_MEASUREMENTS);
 
-    // put your setup code here, to run once:
-    Serial.begin(2400);
-    delay(500);
 
-    FILE uart_output;
-    fdev_setup_stream(&uart_output, uart_putchar, NULL, _FDEV_SETUP_WRITE);
-    stdout = &uart_output;
-    
+    if (mcusr_value & (1<<PORF )) LOG(PSTR("Power-on reset.\n"));
+    if (mcusr_value & (1<<EXTRF)) LOG(PSTR("External reset!\n"));
+    if (mcusr_value & (1<<BORF )) LOG(PSTR("Brownout reset!\n"));
+    if (mcusr_value & (1<<WDRF )) LOG(PSTR("Watchdog reset!\n"));
+
     s_dht.begin();
     delay(500);
 
@@ -88,17 +154,9 @@ void setup()
         float s = vcc + t + h;
         uint32_t seed = reinterpret_cast<uint32_t&>(s);
         srandom(seed);
-        LOG(F("Random seed: "));
-        LOG_LN(seed);
+        LOG(PSTR("Random seed: %lu\n"), seed);
     }
 
-    //  pinMode(SS, OUTPUT);
-    //  SPI.begin();
-    //  delay(100);
-    
-    //  SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
-    //  delay(100);
-    
     pinMode(SS, OUTPUT);
     digitalWrite(SS, HIGH);
     delay(100);
@@ -107,26 +165,87 @@ void setup()
     SPI.setClockDivider(SPI_CLOCK_DIV2);
     SPI.begin();
     
-    LOG_LN(F("Starting rfm22b setup..."));
+    LOG(PSTR("Starting rfm22b setup..."));
     
     while (!s_comms.init(5))
     {
-        LOG_LN(F("init failed"));
+        LOG(PSTR("failed\n"));
         blink_leds(RED_LED, 3, 100);
         Low_Power::power_down(5000);
     }
+    LOG(PSTR("done\n"));
     
     blink_leds(GREEN_LED, 5, 50);
     Low_Power::power_down(1000);
+}
+
+bool apply_config(const data::Config& config)
+{
+    if (config.measurement_period_s == 0 ||
+            config.comms_period_s == 0 ||
+            config.next_comms_time_point_s <= config.base_time_point_s ||
+            config.next_measurement_time_point_s <= config.base_time_point_s)
+    {
+        LOG(PSTR("Bag config received!!!\n"));
+        return false;
+    }
+
+    s_time_point = config.base_time_point_s * 1000ULL;
+
+    s_next_comms_time_point_s = config.next_comms_time_point_s;
+    s_comms_period_s = config.comms_period_s;
+
+    s_next_measurement_time_point_s = config.next_measurement_time_point_s;
+    s_measurement_period_s = config.measurement_period_s;
+
+    s_next_measurement_index = config.next_measurement_index;
+
+    //remove confirmed measurements
+    while (s_first_measurement_index < config.last_confirmed_measurement_index)
+    {
+        if (s_storage.pop_front())
+        {
+            LOG(PSTR("Failed to pop storage data. Left: %lu\n"), config.last_confirmed_measurement_index - s_first_measurement_index);
+        }
+        s_first_measurement_index++;
+    };
+
+    LOG(PSTR("base time: %lu\n"), config.base_time_point_s);
+    LOG(PSTR("next comms: %lu\n"), config.next_comms_time_point_s);
+    LOG(PSTR("comms period: %lu\n"), config.comms_period_s);
+    LOG(PSTR("next measurement: %lu\n"), config.next_measurement_time_point_s);
+    LOG(PSTR("measurement period: %lu\n"), config.measurement_period_s);
+    LOG(PSTR("last confirmed index: %lu\n"), config.last_confirmed_measurement_index);
+    LOG(PSTR("first index: %lu\n"), s_first_measurement_index);
+    LOG(PSTR("next index: %lu\n"), s_next_measurement_index);
+
+    return true;
+}
+
+bool request_config()
+{
+    s_comms.begin_packet(data::Type::CONFIG_REQUEST);
+    s_comms.pack(data::Config_Request());
+    if (s_comms.send_packet(5))
+    {
+        uint8_t size = s_comms.receive_packet(500);
+        data::Type type = s_comms.get_packet_type();
+        if (type == data::Type::CONFIG && size == sizeof(data::Config))
+        {
+            const data::Config* ptr = reinterpret_cast<const data::Config*>(s_comms.get_packet_payload());
+            return apply_config(*ptr);
+        }
+    }
+    return false;
 }
 
 void pair()
 {
     uint32_t addr = Comms::PAIR_ADDRESS_BEGIN + random() % (Comms::PAIR_ADDRESS_END - Comms::PAIR_ADDRESS_BEGIN);
     s_comms.set_address(addr);
-    s_comms.set_destination_address(Comms::SERVER_ADDRESS);
+    s_comms.set_destination_address(Comms::BASE_ADDRESS);
 
-    LOG_LN(F("Starting pairing"));
+    LOG(PSTR("Starting pairing\n"));
 
     wait_for_release(Button::BUTTON1);
     bool done = false;
@@ -144,48 +263,42 @@ void pair()
                 //wait for the user to release the button
                 wait_for_release(Button::BUTTON1);
 
-                LOG_LN(F("Sending request..."));
+                LOG(PSTR("Sending request..."));
 
                 s_comms.begin_packet(data::Type::PAIR_REQUEST);
                 s_comms.pack(data::Pair_Request());
                 if (s_comms.send_packet(5))
                 {
-                    LOG_LN(F("Request sent. Waiting for response..."));
+                    LOG(PSTR("done.\nWaiting for response..."));
 
                     set_leds(GREEN_LED);
 
                     uint8_t size = s_comms.receive_packet(1000);
-                    if (size > 0)
-                    {
-                        LOG(F("Received packet of "));
-                        LOG(size);
-                        LOG(F(" bytes. Type: "));
-                        LOG_LN((int)s_comms.get_packet_type());
-                    }
+//                    if (size > 0)
+//                    {
+//                        LOG(F("Received packet of "));
+//                        LOG(size);
+//                        LOG(F(" bytes. Type: "));
+//                        LOG_LN((int)s_comms.get_packet_type());
+//                    }
 
                     if (size == sizeof(data::Pair_Response) && s_comms.get_packet_type() == data::Type::PAIR_RESPONSE)
                     {
                         const data::Pair_Response* response_ptr = reinterpret_cast<const data::Pair_Response*>(s_comms.get_packet_payload());
                         s_comms.set_address(response_ptr->address);
-                        //s_clock.set_timestamp(response.timestamp);
-                        s_timestamp = response_ptr->server_timestamp * 1000ULL;
-
-                        LOG(F("Response received: addr: "));
-                        LOG(response_ptr->address);
-                        LOG(F(" timestamp: "));
-                        LOG_LN(response_ptr->server_timestamp);
+                        LOG(PSTR("done. Addr: %d\n"), response_ptr->address);
 
                         done = true;
                         break;
                     }
                     else
                     {
-                        LOG_LN(F("Timeout"));
+                        LOG(PSTR("timeout\n"));
                     }
                 }
                 else
                 {
-                    LOG_LN(F("Request failed."));
+                    LOG(PSTR("failed.\n"));
                 }
                 blink_leds(RED_LED, 3, 500);
             }
@@ -196,14 +309,14 @@ void pair()
 
         if (!done)
         {
-            LOG_LN(F("Going to sleep."));
+            LOG(PSTR("Going to sleep..."));
 
             fade_out_leds(YELLOW_LED, 1000);
 
             //the user didn't press it - sleep for a loooong time
             Low_Power::power_down_int(1000ULL * 3600 * 24 * 30);
 
-            LOG_LN(F("Wake up."));
+            LOG(PSTR("woke up.\n"));
 
             fade_in_leds(YELLOW_LED, 1000);
 
@@ -217,53 +330,133 @@ void pair()
     //wait for the user to release the button
     wait_for_release(Button::BUTTON1);
 
-    s_state = State::READ_DATA;
+    s_state = State::FIRST_CONFIG;
 
     //sleep a bit
     Low_Power::power_down(1000 * 1);
 }
 
-void listen(uint32_t timeout)
+void do_measurement()
 {
-    uint8_t size = s_comms.receive_packet(timeout);
-    if (size == 0)
+    s_next_measurement_index++;
+
+    Storage::Data data;
+
+    // Reading temperature or humidity takes about 250 milliseconds!
+    // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
+    constexpr int8_t max_tries = 10;
+    uint8_t tries = 0;
+    do
     {
+        LOG(PSTR("Measuring %d..."), tries);
+        bool ok = s_dht.read(data.temperature, data.humidity);
+        if (!ok)
+        {
+            LOG(PSTR("failed: DHT sensor!\n"));
+        }
+        else
+        {
+            LOG(PSTR("done\n"));
+            break;
+        }
+    } while (++tries < max_tries);
+
+    if (tries >= max_tries)
+    {
+        //the way to indicate error!
+        data.humidity = 0;
+    }
+
+    data.vcc = read_vcc();
+
+    //push back and make room if it fails
+    LOG(PSTR("Storing..."));
+    while (s_storage.push_back(data) == false)
+    {
+        LOG(PSTR("*"));
+        s_storage.pop_front();
+        s_first_measurement_index++;
+    }
+    LOG(PSTR("done\n"));
+}
+
+void do_comms()
+{
+    size_t count = s_storage.get_data_count();
+    if (count == 0)
+    {
+        LOG(PSTR("No data to send!!!!\n"));
         return;
     }
 
-    data::Type type = s_comms.get_packet_type();
-    if (type == data::Type::CONFIG && size == sizeof(data::Config))
+    LOG(PSTR("%d items to send\n"), count);
+
+    s_comms.idle_mode();
+
+    constexpr uint32_t COMMS_SLOT_DURATION = 3000;
+    uint32_t start_tp = millis();
+    uint32_t now = millis();
+    uint32_t measurement_index = s_first_measurement_index;
+    Storage::iterator it;
+    do
     {
-        const data::Config* ptr = reinterpret_cast<const data::Config*>(s_comms.get_packet_payload());
-        s_timestamp = ptr->server_timestamp * 1000ULL;
-        if (ptr->scheduled_timestamp > ptr->server_timestamp)
+        if (s_storage.unpack_next(it) == false)
         {
-            s_sleep_duration = ptr->scheduled_timestamp - ptr->server_timestamp;
+            break;
         }
-    }
+
+        data::Measurement item;
+
+        uint32_t time_point_s = (s_next_measurement_time_point_s / 1000ULL) + 1;
+
+        //item.time_point = time_point_s - (s_next_measurement_index - s_first_measurement_index) * s_measurement_period_s;
+        item.index = measurement_index++;
+        item.flags = (it.data.humidity == 0) ? static_cast<uint8_t>(data::Measurement::Flag::SENSOR_ERROR) : 0;
+        item.pack(it.data.vcc, it.data.humidity, it.data.temperature);
+
+        s_comms.begin_packet(data::Type::MEASUREMENT);
+        s_comms.pack(item);
+        LOG(PSTR("Sending measurement..."));
+        if (s_comms.send_packet(3) == true)
+        {
+            LOG(PSTR("done.\n"));
+        }
+        else
+        {
+            LOG(PSTR("failed: comms\n"));
+            break;
+        }
+
+        now = millis();
+    } while (now >= start_tp && now - start_tp < COMMS_SLOT_DURATION);
+
+    request_config();
+
+    s_comms.stand_by_mode();
 }
 
-void request_config()
+void first_config()
 {
-    s_comms.begin_packet(data::Type::CONFIG_REQUEST);
-    s_comms.pack(data::Config_Request());
-    if (s_comms.send_packet(5))
+    while (true)
     {
-        uint8_t size = s_comms.receive_packet(500);
-        data::Type type = s_comms.get_packet_type();
-        if (type == data::Type::CONFIG && size == sizeof(data::Config))
+        if (is_pressed(Button::BUTTON1))
         {
-            const data::Config* ptr = reinterpret_cast<const data::Config*>(s_comms.get_packet_payload());
-            s_timestamp = ptr->server_timestamp * 1000ULL;
-            if (ptr->scheduled_timestamp > ptr->server_timestamp)
-            {
-                s_sleep_duration = ptr->scheduled_timestamp - ptr->server_timestamp;
-            }
+            s_state = State::PAIR;
+            break;
         }
+
+        if (request_config())
+        {
+            LOG(PSTR("Received config:\ntime_point: %lu\n"), uint32_t(s_time_point / 1000ULL));
+            s_state = State::MAIN_LOOP;
+            break;
+        }
+
+        Low_Power::power_down_int(2000);
     }
 }
 
-void read_data()
+void main_loop()
 {
     while (true)
     {
@@ -272,105 +465,59 @@ void read_data()
 
         if (is_pressed(Button::BUTTON1))
         {
-            s_state = State::PAIR;
-            return;
-        }
-
-        uint8_t flags = 0;
-        s_measurement_index++;
-
-        set_leds(GREEN_LED);
-
-        LOG(F("Awake for..."));
-        uint32_t lastTP = millis();
-
-        // Reading temperature or humidity takes about 250 milliseconds!
-        // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
-        float t, h;
-        if (!s_dht.read(t, h))
-        {
-            flags |= data::Measurement::FLAG_SENSOR_ERROR;
-            LOG_LN(F("Failed to read from DHT sensor!"));
-        }
-
-        float vcc = read_vcc();
-
-        uint32_t readingD = millis() - lastTP;
-        lastTP = millis();
-
-        s_comms.idle_mode();
-        data::Measurement item;
-
-        item.timestamp = s_timestamp / 1000ULL;
-        item.index = s_measurement_index;
-        item.flags = flags;
-        item.pack(vcc, h, t);
-
-        //add it to the ring. IF needed, pop old elements
-        if (s_measurements.size() + 1 > MAX_MEASUREMENTS)
-        {
-            s_measurements.pop_front();
-        }
-        s_measurements.push_back(item);
-
-        for (uint8_t i = 0; i < s_measurements.size();)
-        {
-            data::Measurement& item = s_measurements[i];
-            s_comms.begin_packet(data::Type::MEASUREMENT);
-            s_comms.pack(item);
-            if (s_comms.send_packet(3))
+            uint32_t start_tp = millis();
+            while (is_pressed(Button::BUTTON1))
             {
-                s_measurements.erase(s_measurements.begin() + i);
-            }
-            else
-            {
-                item.flags |= data::Measurement::FLAG_COMMS_ERROR;
-                i++;
+                if (millis() - start_tp > 3000)
+                {
+                    soft_reset();
+                }
             }
         }
 
-        set_leds(0);
+        uint32_t time_point_s = (s_time_point / 1000ULL) + 1;
 
-        request_config();
-        //listen(500);
-
-        uint32_t sendingD = millis() - lastTP;
-        lastTP = millis();
-
-        //LOG_LN(F("Waiting for reply..."));
+        if (time_point_s >= s_next_measurement_time_point_s)
         {
-//            uint8_t buf[RFM22B::MAX_PACKET_LENGTH];
-//            int8_t len = rf22.receive(buf, RFM22B::MAX_PACKET_LENGTH, 100);
-//            if (len > 0)
-//            {
-//                LOG(F("got reply: "));
-//                LOG_LN((char*)buf);
-//            }
-//            else
-//            {
-//                //LOG_LN(F("nothing.."));
-//            }
+            s_next_measurement_time_point_s += s_measurement_period_s;
+
+            set_leds(GREEN_LED);
+            do_measurement();
+            set_leds(0);
         }
 
-        uint32_t listeningD = millis() - lastTP;
+        if (time_point_s >= s_next_comms_time_point_s)
+        {
+            s_next_comms_time_point_s += s_comms_period_s;
+
+            set_leds(YELLOW_LED);
+            do_comms();
+            set_leds(0);
+        }
+
+        uint32_t now = millis();
+        uint32_t delta = (now >= start_tp) ? now - start_tp : 0;
+        s_time_point += delta;
 
 
-        LOG(readingD);
-        LOG(F("ms, "));
-        LOG(sendingD);
-        LOG(F("ms, "));
-        LOG(listeningD);
-        LOG_LN(F("ms"));
+        uint64_t next_time_point = uint64_t(std::min(s_next_measurement_time_point_s, s_next_comms_time_point_s)) * 1000ULL;
+        uint32_t sleep_duration = 1000;
 
-        s_comms.stand_by_mode();
+        if (next_time_point > s_time_point)
+        {
+            sleep_duration = next_time_point - s_time_point;
+        }
+        else
+        {
+            LOG(PSTR("Timing error!\n"));
+        }
 
-        //delay(600);
+        //LOG(PSTR("tp: %lu, nm: %lu, nc: %lu\n"), uint32_t(s_time_point / 1000ULL), s_next_measurement_time_point_s, s_next_comms_time_point_s);
+        LOG(PSTR("Sleeping for %lus"), sleep_duration / 1000);
 
+        Low_Power::power_down_int(sleep_duration);
 
-        s_timestamp += millis() - start_tp;
-
-        Low_Power::power_down_int(s_sleep_duration);
-        s_timestamp += Low_Power::s_sleep_time - start_sleep_tp;
+        s_time_point += Low_Power::s_sleep_time - start_sleep_tp;
     }
 }
 
@@ -385,9 +532,13 @@ int main()
         {
             pair();
         }
-        else if (s_state == State::READ_DATA)
+        else if (s_state == State::FIRST_CONFIG)
         {
-            read_data();
+            first_config();
+        }
+        else if (s_state == State::MAIN_LOOP)
+        {
+            main_loop();
         }
         else
         {

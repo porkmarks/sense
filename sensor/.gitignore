@@ -82,3 +82,4 @@ Thumbs.db
 /sensor.sym
 /.projectile
 /sensor.creator.user.d9b4df1
+*.tsv

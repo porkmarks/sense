@@ -29,9 +29,6 @@ static Sensors s_sensors;
 
 typedef std::chrono::high_resolution_clock Clock;
 
-
-static Clock::duration s_measurement_period = std::chrono::minutes(5);
-
 struct Add_Sensor
 {
     std::string name;
@@ -47,7 +44,7 @@ extern std::string time_point_to_string(std::chrono::high_resolution_clock::time
 
 ////////////////////////////////////////////////////////////////////////
 
-std::string s_fifo_name = "server_cmd";
+std::string s_fifo_name = "base_cmd";
 int s_fifo = -1;
 std::string s_fifo_buffer;
 
@@ -196,8 +193,21 @@ static void process_command(const std::string& command)
             return;
         }
         minutes = std::max(minutes, 1u);
-        s_measurement_period = std::chrono::minutes(minutes);
-        std::cout << "Measurement period is now " << minutes << "\n";
+        s_sensors.set_measurement_period(std::chrono::minutes(minutes));
+        std::cout << "Measurement period is now " << std::chrono::duration_cast<std::chrono::minutes>(s_sensors.get_measurement_period()).count() << " minutes\n";
+    }
+    else if (cmd == "mps") //measurement period seconds
+    {
+        uint32_t seconds;
+        if (!(ss >> seconds))
+        {
+            std::cerr << "Invalid command '" << cmd << "'!\n";
+            std::cerr << "Syntax: mp seconds\n";
+            return;
+        }
+        seconds = std::max(seconds, 10u);
+        s_sensors.set_measurement_period(std::chrono::seconds(seconds));
+        std::cout << "Measurement period is now " << std::chrono::duration_cast<std::chrono::seconds>(s_sensors.get_measurement_period()).count() << " seconds\n";
     }
     else if (cmd == "x")
     {
@@ -221,22 +231,22 @@ int main()
 
     run_tests();
 
-    s_sensors.load_sensors("sensors.config");
+    //s_sensors.load_sensors("sensors.config");
 
-//    while (!s_comms.init(5))
-//    {
-//      std::cout << "init failed \n";
-//      return -1;
-//    }
+    while (!s_comms.init(5))
+    {
+      std::cout << "init failed \n";
+      return -1;
+    }
 
-    s_comms.set_address(Comms::SERVER_ADDRESS);
+    s_comms.set_address(Comms::BASE_ADDRESS);
 
     while (true)
     {
         std::string cmd = read_fifo();
         process_command(cmd);
 
-        //std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
         uint8_t size = s_comms.receive_packet(1000);
         if (size > 0)
@@ -265,46 +275,89 @@ int main()
                     {
                         data::Pair_Response packet;
                         packet.address = id;
-                        packet.server_time_point = time(nullptr);
-                        std::cout << "Pair requested. Replying with address " << packet.address << " and time_point " << packet.server_time_point;
                         s_comms.begin_packet(data::Type::PAIR_RESPONSE);
                         s_comms.pack(packet);
-                        s_comms.send_packet(3);
+                        if (s_comms.send_packet(3))
+                        {
+                            s_add_sensor.name.clear();
+                            std::cout << "Pair successful\n";
+                        }
+                        else
+                        {
+                            std::cerr << "Pair failed\n";
+                            s_sensors.remove_sensor(id);
+                        }
                     }
 
                     s_sensors.save_sensors("sensors.config");
                 }
-
-                s_add_sensor.name.clear();
             }
             else if (type == data::Type::MEASUREMENT && size == sizeof(data::Measurement))
             {
-                Sensors::Measurement m;
-                const data::Measurement* ptr = reinterpret_cast<const data::Measurement*>(s_comms.get_packet_payload());
-
-                //m.time_point = Clock::from_time_t(time_t(ptr->time_point));
-                m.flags = ptr->flags;
-                m.tx_rssi = 0;
-                m.rx_rssi = 0;
-                ptr->unpack(m.vcc, m.humidity, m.temperature);
-
                 Sensors::Sensor_Id id = s_comms.get_packet_source_address();
-                s_sensors.push_back_measurement(id, m);
-
+                std::cout << "Measurement reported by " << id << "\n";
                 const Sensors::Sensor* sensor = s_sensors.find_sensor_by_id(id);
                 if (sensor)
                 {
-                    //reschedule
-//                    Clock::time_point next = s_scheduler.schedule(sensor->slot_id);
+                    Sensors::Measurement m;
+                    const data::Measurement* ptr = reinterpret_cast<const data::Measurement*>(s_comms.get_packet_payload());
 
-//                    data::Config packet;
-//                    packet.address = id;
-//                    packet.server_time_point = time(nullptr);
-//                    packet.scheduled_time_point = Clock::to_time_t(next);
+                    //m.time_point = Clock::from_time_t(time_t(ptr->time_point));
+                    m.flags = ptr->flags;
+                    m.tx_rssi = 0;
+                    m.rx_rssi = 0;
+                    ptr->unpack(m.vcc, m.humidity, m.temperature);
+//                    m.index = ptr->index;
 
-//                    s_comms.begin_packet(data::Type::CONFIG);
-//                    s_comms.pack(packet);
-//                    s_comms.send_packet(3);
+                    //Clock::time_point tp = Clock::from_time_t(ptr->time_point);
+
+                    s_sensors.add_measurement(ptr->index, id, m);
+                }
+                else
+                {
+                    std::cerr << "\tSensor not found!\n";
+                }
+            }
+            else if (type == data::Type::CONFIG_REQUEST && size == sizeof(data::Config_Request))
+            {
+                Sensors::Sensor_Id id = s_comms.get_packet_source_address();
+                std::cout << "Config requested by " << id << "\n";
+                const Sensors::Sensor* sensor = s_sensors.find_sensor_by_id(id);
+                if (sensor)
+                {
+                    data::Config packet;
+
+                    packet.base_time_point_s = Clock::to_time_t(Clock::now());
+                    packet.measurement_period_s = std::chrono::duration_cast<std::chrono::seconds>(s_sensors.get_measurement_period()).count();
+                    packet.next_measurement_time_point_s = Clock::to_time_t(s_sensors.compute_next_measurement_time_point());
+                    packet.comms_period_s = std::chrono::duration_cast<std::chrono::seconds>(s_sensors.compute_comms_period()).count();
+                    packet.next_comms_time_point_s = Clock::to_time_t(s_sensors.compute_next_comms_time_point(id));
+                    packet.last_confirmed_measurement_index = s_sensors.compute_last_confirmed_measurement_index(id);
+                    packet.next_measurement_index = s_sensors.compute_next_measurement_index();
+
+                    std::cout << "Config requested for id: " << id
+                                                            << "\n\tbase time point: " << packet.base_time_point_s
+                                                            << "\n\tmeasurement period: " << packet.measurement_period_s
+                                                            << "\n\tnext measurement time point: " << packet.next_measurement_time_point_s
+                                                            << "\n\tcomms period: " << packet.comms_period_s
+                                                            << "\n\tnext comms time point: " << packet.next_comms_time_point_s
+                                                            << "\n\tlast confirmed measurement index: " << packet.last_confirmed_measurement_index
+                                                            << "\n\tnext measurement index: " << packet.next_measurement_index << "\n";
+
+                    s_comms.begin_packet(data::Type::CONFIG);
+                    s_comms.pack(packet);
+                    if (s_comms.send_packet(3))
+                    {
+                        std::cout << "\tSchedule successful\n";
+                    }
+                    else
+                    {
+                        std::cerr << "\tSchedule failed\n";
+                    }
+                }
+                else
+                {
+                    std::cerr << "\tSensor not found!\n";
                 }
             }
         }
