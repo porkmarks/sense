@@ -11,11 +11,11 @@
 
 // Setup debug printing macros.
 #ifdef DHT_DEBUG
-#define DEBUG_PRINT(...) { DEBUG_PRINTER.print(__VA_ARGS__); }
-#define DEBUG_PRINTLN(...) { DEBUG_PRINTER.println(__VA_ARGS__); }
+#define DEBUG_PRINT(...) DEBUG_PRINTER.print(__VA_ARGS__);
+#define DEBUG_PRINTLN(...) DEBUG_PRINTER.println(__VA_ARGS__);
 #else
-#define DEBUG_PRINT(...) {}
-#define DEBUG_PRINTLN(...) {}
+#define DEBUG_PRINT(...)
+#define DEBUG_PRINTLN(...)
 #endif
 
 // Define types of sensors.
@@ -35,12 +35,11 @@ private:
     bool read_sensor(void);
 
     uint8_t m_data[6];
-    uint8_t m_pin, m_type, m_bit, m_port;
-    uint32_t m_lastreadtime, m_maxcycles;
-    bool m_firstreading;
-    bool m_lastresult;
+    uint8_t m_pin = 0, m_type = 0, m_bit = 0, m_port = 0;
+    uint32_t m_lastreadtime = 0;
+    uint16_t m_maxcycles = 0;
 
-    uint32_t expect_pulse(bool level);
+    uint16_t expect_pulse(uint8_t bit);
 };
 
 class Interrupt_Lock
