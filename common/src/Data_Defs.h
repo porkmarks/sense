@@ -46,7 +46,7 @@ struct Measurement
 
 //packed data
     uint32_t index = 0;
-    uint32_t time_point = 0; //seconds, since 1970 epoch
+    //uint32_t time_point = 0; //seconds, since 1970 epoch
     uint8_t flags = 0;
     uint8_t vcc = 0; //(vcc - 2) * 100
     uint8_t humidity = 0; //*2.55
@@ -58,8 +58,15 @@ struct Config_Request
 };
 struct Config
 {
-    uint32_t server_time_point = 0;
-    uint32_t scheduled_time_point = 0;
+    //all are in seconds
+    uint32_t base_time_point_s = 0;
+    uint32_t next_comms_time_point_s = 0;
+    uint32_t comms_period_s = 0;
+    uint32_t next_measurement_time_point_s = 0;
+    uint32_t measurement_period_s = 0;
+
+    uint32_t next_measurement_index = 0;
+    uint32_t last_confirmed_measurement_index = 0;
 };
 
 struct Response
@@ -73,7 +80,6 @@ struct Pair_Request
 };
 struct Pair_Response
 {
-    uint32_t server_time_point = 0;
     uint16_t address = 0;
 };
 
