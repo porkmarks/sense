@@ -35,12 +35,13 @@
 #   include "rfm22b_spi.h"
 #endif
 
-class RFM22B {
+class RFM22B
+{
 public:
 #include "rfm22b_enums.h"
 
     // Constructor requires SPI device path, passes this is SPI class
-    RFM22B() {}
+    RFM22B() = default;
 
     bool init();
 

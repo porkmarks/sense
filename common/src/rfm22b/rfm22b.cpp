@@ -71,11 +71,15 @@ bool RFM22B::set_carrier_frequency(float centre, float afcPullInRange)
     uint8_t fbsel = (uint8_t)Frequency_Band_Select::SBSEL;
     uint8_t afclimiter;
     if (centre < 240.0 || centre > 960.0) // 930.0 for early silicon
+    {
         return false;
+    }
     if (centre >= 480.0)
     {
         if (afcPullInRange < 0.0 || afcPullInRange > 0.318750)
+        {
             return false;
+        }
         centre /= 2;
         fbsel |= (uint8_t)Frequency_Band_Select::HBSEL;
         afclimiter = afcPullInRange * 1000000.0 / 1250.0;
@@ -83,7 +87,9 @@ bool RFM22B::set_carrier_frequency(float centre, float afcPullInRange)
     else
     {
         if (afcPullInRange < 0.0 || afcPullInRange > 0.159375)
+        {
             return false;
+        }
         afclimiter = afcPullInRange * 1000000.0 / 625.0;
     }
     centre /= 10.0;

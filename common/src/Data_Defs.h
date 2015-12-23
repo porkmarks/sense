@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <math.h>
+#include "Chrono.h"
 
 namespace data
 {
@@ -59,11 +60,11 @@ struct Config_Request
 struct Config
 {
     //all are in seconds
-    uint32_t base_time_point_s = 0;
-    uint32_t next_comms_time_point_s = 0;
-    uint32_t comms_period_s = 0;
-    uint32_t next_measurement_time_point_s = 0;
-    uint32_t measurement_period_s = 0;
+    chrono::time_s base_time_point;
+    chrono::time_s next_comms_time_point;
+    chrono::seconds comms_period;
+    chrono::time_s next_measurement_time_point;
+    chrono::seconds measurement_period;
 
     uint32_t next_measurement_index = 0;
     uint32_t last_confirmed_measurement_index = 0;

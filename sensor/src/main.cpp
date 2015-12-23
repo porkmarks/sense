@@ -32,7 +32,7 @@ inline void operator delete[](void* p) { free(p); }
 inline void* operator new(size_t size_, void *ptr_) { return ptr_; }
 
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////
 
 template<typename... Args>
 void log(PGM_P fmt, Args... args)
@@ -43,8 +43,11 @@ void log(PGM_P fmt, Args... args)
 #define LOG log
 //#define LOG(...)
 
+//////////////////////////////////////////////////////////////////////////////////////////
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+//////////////////////////////////////////////////////////////////////////////////////////
 
 enum class State
 {
@@ -69,13 +72,16 @@ FILE s_uart_output;
 uint32_t s_next_measurement_index = 0;
 uint32_t s_first_measurement_index = 0;
 
-uint64_t s_time_point = 0;
+namespace chrono
+{
+    time_ms s_time_point;
+}
 
-uint32_t s_next_measurement_time_point_s = 0;
-uint32_t s_measurement_period_s = 0;
+chrono::time_s s_next_measurement_time_point;
+chrono::seconds s_measurement_period;
 
-uint32_t s_next_comms_time_point_s = 0;
-uint32_t s_comms_period_s = 0;
+chrono::time_s s_next_comms_time_point;
+chrono::seconds s_comms_period;
 
 Storage s_storage;
 
@@ -118,34 +124,39 @@ void setup()
     int mcusr_value = MCUSR;
     MCUSR = 0;
 
-    Serial.begin(1200);
-    delay(500);
-
-    fdev_setup_stream(&s_uart_output, uart_putchar, NULL, _FDEV_SETUP_WRITE);
-    stdout = &s_uart_output;
-
-
+    //setup the led pins
     pinMode(RED_LED_PIN, OUTPUT);
     digitalWrite(RED_LED_PIN, LOW);
     pinMode(GREEN_LED_PIN, OUTPUT);
     digitalWrite(GREEN_LED_PIN, LOW);
 
-    blink_leds(GREEN_LED, 2, 100);
+    //setup serial. 1.2Khz seems to be the best for 8Mhz
+    Serial.begin(1200);
+    delay(200);
 
-    pinMode(static_cast<uint8_t>(Button::BUTTON1), INPUT);
-    digitalWrite(static_cast<uint8_t>(Button::BUTTON1), HIGH);
-
-    //s_measurements.reserve(MAX_MEASUREMENTS);
-
+    fdev_setup_stream(&s_uart_output, uart_putchar, NULL, _FDEV_SETUP_WRITE);
+    stdout = &s_uart_output;
 
     if (mcusr_value & (1<<PORF )) LOG(PSTR("Power-on reset.\n"));
     if (mcusr_value & (1<<EXTRF)) LOG(PSTR("External reset!\n"));
     if (mcusr_value & (1<<BORF )) LOG(PSTR("Brownout reset!\n"));
     if (mcusr_value & (1<<WDRF )) LOG(PSTR("Watchdog reset!\n"));
 
-    s_dht.begin();
-    delay(500);
+    ///////////////////////////////////////////////
+    //notify about startup
+    blink_leds(GREEN_LED, 2, chrono::millis(100));
 
+    ///////////////////////////////////////////////
+    //setup buttons
+    pinMode(static_cast<uint8_t>(Button::BUTTON1), INPUT);
+    digitalWrite(static_cast<uint8_t>(Button::BUTTON1), HIGH);
+
+    ///////////////////////////////////////////////
+    //initialize the sensor
+    s_dht.begin();
+    delay(200);
+
+    ///////////////////////////////////////////////
     //seed the RNG
     {
         float t, h;
@@ -157,6 +168,8 @@ void setup()
         LOG(PSTR("Random seed: %lu\n"), seed);
     }
 
+    ///////////////////////////////////////////////
+    //setup SPI
     pinMode(SS, OUTPUT);
     digitalWrite(SS, HIGH);
     delay(100);
@@ -164,63 +177,73 @@ void setup()
     SPI.setDataMode(SPI_MODE0);
     SPI.setClockDivider(SPI_CLOCK_DIV2);
     SPI.begin();
-    
+
+    ///////////////////////////////////////////////
+
     LOG(PSTR("Starting rfm22b setup..."));
     
     while (!s_comms.init(5))
     {
         LOG(PSTR("failed\n"));
-        blink_leds(RED_LED, 3, 100);
-        Low_Power::power_down(5000);
+        blink_leds(RED_LED, 3, chrono::millis(100));
+        Low_Power::power_down(chrono::millis(5000));
     }
     LOG(PSTR("done\n"));
-    
-    blink_leds(GREEN_LED, 5, 50);
-    Low_Power::power_down(1000);
+
+    ///////////////////////////////////////////////
+    //done
+    blink_leds(GREEN_LED, 5, chrono::millis(50));
+
+    //sleep a bit
+    Low_Power::power_down(chrono::millis(1000));
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////
 
 bool apply_config(const data::Config& config)
 {
-    if (config.measurement_period_s == 0 ||
-            config.comms_period_s == 0 ||
-            config.next_comms_time_point_s <= config.base_time_point_s ||
-            config.next_measurement_time_point_s <= config.base_time_point_s)
+    if (config.measurement_period.count == 0 ||
+            config.comms_period.count == 0 ||
+            config.next_comms_time_point <= config.base_time_point ||
+            config.next_measurement_time_point <= config.base_time_point)
     {
         LOG(PSTR("Bag config received!!!\n"));
         return false;
     }
 
-    s_time_point = config.base_time_point_s * 1000ULL;
+    chrono::s_time_point = chrono::time_ms(config.base_time_point.ticks * 1000ULL);
 
-    s_next_comms_time_point_s = config.next_comms_time_point_s;
-    s_comms_period_s = config.comms_period_s;
+    s_next_comms_time_point = config.next_comms_time_point;
+    s_comms_period = config.comms_period;
 
-    s_next_measurement_time_point_s = config.next_measurement_time_point_s;
-    s_measurement_period_s = config.measurement_period_s;
+    s_next_measurement_time_point = config.next_measurement_time_point;
+    s_measurement_period = config.measurement_period;
 
     s_next_measurement_index = config.next_measurement_index;
 
     //remove confirmed measurements
     while (s_first_measurement_index < config.last_confirmed_measurement_index)
     {
-        if (s_storage.pop_front())
+        if (!s_storage.pop_front())
         {
             LOG(PSTR("Failed to pop storage data. Left: %lu\n"), config.last_confirmed_measurement_index - s_first_measurement_index);
         }
         s_first_measurement_index++;
     };
 
-    LOG(PSTR("base time: %lu\n"), config.base_time_point_s);
-    LOG(PSTR("next comms: %lu\n"), config.next_comms_time_point_s);
-    LOG(PSTR("comms period: %lu\n"), config.comms_period_s);
-    LOG(PSTR("next measurement: %lu\n"), config.next_measurement_time_point_s);
-    LOG(PSTR("measurement period: %lu\n"), config.measurement_period_s);
+    LOG(PSTR("base time: %lu\n"), config.base_time_point.ticks);
+    LOG(PSTR("next comms: %lu\n"), config.next_comms_time_point.ticks);
+    LOG(PSTR("comms period: %lu\n"), config.comms_period.count);
+    LOG(PSTR("next measurement: %lu\n"), config.next_measurement_time_point.ticks);
+    LOG(PSTR("measurement period: %lu\n"), config.measurement_period.count);
     LOG(PSTR("last confirmed index: %lu\n"), config.last_confirmed_measurement_index);
     LOG(PSTR("first index: %lu\n"), s_first_measurement_index);
     LOG(PSTR("next index: %lu\n"), s_next_measurement_index);
 
     return true;
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////
 
 bool request_config()
 {
@@ -238,6 +261,8 @@ bool request_config()
     }
     return false;
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////
 
 void pair()
 {
@@ -300,32 +325,32 @@ void pair()
                 {
                     LOG(PSTR("failed.\n"));
                 }
-                blink_leds(RED_LED, 3, 500);
+                blink_leds(RED_LED, 3, chrono::millis(500));
             }
 
-            blink_leds(YELLOW_LED, 3, 100);
-            Low_Power::power_down_int(2000);
+            blink_leds(YELLOW_LED, 3, chrono::millis(100));
+            Low_Power::power_down_int(chrono::millis(2000));
         }
 
         if (!done)
         {
             LOG(PSTR("Going to sleep..."));
 
-            fade_out_leds(YELLOW_LED, 1000);
+            fade_out_leds(YELLOW_LED, chrono::millis(1000));
 
             //the user didn't press it - sleep for a loooong time
-            Low_Power::power_down_int(1000ULL * 3600 * 24 * 30);
+            Low_Power::power_down_int(chrono::millis(1000ULL * 3600 * 24));
 
             LOG(PSTR("woke up.\n"));
 
-            fade_in_leds(YELLOW_LED, 1000);
+            fade_in_leds(YELLOW_LED, chrono::millis(1000));
 
             //we probably woken up because the user pressed the button - wait for him to release it
             wait_for_release(Button::BUTTON1);
         }
     }
 
-    blink_leds(GREEN_LED, 3, 500);
+    blink_leds(GREEN_LED, 3, chrono::millis(500));
 
     //wait for the user to release the button
     wait_for_release(Button::BUTTON1);
@@ -333,8 +358,10 @@ void pair()
     s_state = State::FIRST_CONFIG;
 
     //sleep a bit
-    Low_Power::power_down(1000 * 1);
+    Low_Power::power_down(chrono::millis(1000 * 1));
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////
 
 void do_measurement()
 {
@@ -380,6 +407,8 @@ void do_measurement()
     LOG(PSTR("done\n"));
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////
+
 void do_comms()
 {
     size_t count = s_storage.get_data_count();
@@ -393,9 +422,9 @@ void do_comms()
 
     s_comms.idle_mode();
 
-    constexpr uint32_t COMMS_SLOT_DURATION = 3000;
-    uint32_t start_tp = millis();
-    uint32_t now = millis();
+    const chrono::millis COMMS_SLOT_DURATION = chrono::millis(3000);
+    chrono::time_ms start_tp = chrono::now();
+    chrono::time_ms now = chrono::now();
     uint32_t measurement_index = s_first_measurement_index;
     Storage::iterator it;
     do
@@ -407,7 +436,7 @@ void do_comms()
 
         data::Measurement item;
 
-        uint32_t time_point_s = (s_next_measurement_time_point_s / 1000ULL) + 1;
+        //uint32_t time_point_s = (s_next_measurement_time_point_s / 1000ULL) + 1;
 
         //item.time_point = time_point_s - (s_next_measurement_index - s_first_measurement_index) * s_measurement_period_s;
         item.index = measurement_index++;
@@ -427,13 +456,15 @@ void do_comms()
             break;
         }
 
-        now = millis();
+        now = chrono::now();
     } while (now >= start_tp && now - start_tp < COMMS_SLOT_DURATION);
 
     request_config();
 
     s_comms.stand_by_mode();
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////
 
 void first_config()
 {
@@ -447,65 +478,60 @@ void first_config()
 
         if (request_config())
         {
-            LOG(PSTR("Received config:\ntime_point: %lu\n"), uint32_t(s_time_point / 1000ULL));
+            LOG(PSTR("Received config:\ntime_point: %lu\n"), uint32_t(chrono::now().ticks / 1000ULL));
             s_state = State::MAIN_LOOP;
             break;
         }
 
-        Low_Power::power_down_int(2000);
+        Low_Power::power_down_int(chrono::millis(2000));
     }
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////
 
 void main_loop()
 {
     while (true)
     {
-        uint32_t start_tp = millis();
-        uint64_t start_sleep_tp = Low_Power::s_sleep_time;
-
         if (is_pressed(Button::BUTTON1))
         {
-            uint32_t start_tp = millis();
+            chrono::time_ms start_tp = chrono::now();
             while (is_pressed(Button::BUTTON1))
             {
-                if (millis() - start_tp > 3000)
+                if (chrono::now() - start_tp > chrono::millis(10000))
                 {
                     soft_reset();
                 }
             }
         }
 
-        uint32_t time_point_s = (s_time_point / 1000ULL) + 1;
+        chrono::time_s time_point = chrono::time_s((chrono::now().ticks / 1000ULL) + 1);
 
-        if (time_point_s >= s_next_measurement_time_point_s)
+        if (time_point >= s_next_measurement_time_point)
         {
-            s_next_measurement_time_point_s += s_measurement_period_s;
+            s_next_measurement_time_point += s_measurement_period;
 
             set_leds(GREEN_LED);
             do_measurement();
             set_leds(0);
         }
 
-        if (time_point_s >= s_next_comms_time_point_s)
+        if (time_point >= s_next_comms_time_point)
         {
-            s_next_comms_time_point_s += s_comms_period_s;
+            s_next_comms_time_point += s_comms_period;
 
             set_leds(YELLOW_LED);
             do_comms();
             set_leds(0);
         }
 
-        uint32_t now = millis();
-        uint32_t delta = (now >= start_tp) ? now - start_tp : 0;
-        s_time_point += delta;
+        chrono::time_ms next_time_point = chrono::time_ms(std::min(s_next_measurement_time_point, s_next_comms_time_point).ticks * 1000ULL);
+        chrono::millis sleep_duration(1000);
 
-
-        uint64_t next_time_point = uint64_t(std::min(s_next_measurement_time_point_s, s_next_comms_time_point_s)) * 1000ULL;
-        uint32_t sleep_duration = 1000;
-
-        if (next_time_point > s_time_point)
+        chrono::time_ms now = chrono::now();
+        if (next_time_point > now)
         {
-            sleep_duration = next_time_point - s_time_point;
+            sleep_duration = next_time_point - now;
         }
         else
         {
@@ -513,13 +539,13 @@ void main_loop()
         }
 
         //LOG(PSTR("tp: %lu, nm: %lu, nc: %lu\n"), uint32_t(s_time_point / 1000ULL), s_next_measurement_time_point_s, s_next_comms_time_point_s);
-        LOG(PSTR("Sleeping for %lus"), sleep_duration / 1000);
+        LOG(PSTR("Sleeping for %lu ms"), sleep_duration.count);
 
         Low_Power::power_down_int(sleep_duration);
-
-        s_time_point += Low_Power::s_sleep_time - start_sleep_tp;
     }
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////
 
 int main()
 {
@@ -542,8 +568,8 @@ int main()
         }
         else
         {
-            blink_leds(RED_LED, 2, 50);
-            Low_Power::power_down_int(1000);
+            blink_leds(RED_LED, 2, chrono::millis(50));
+            Low_Power::power_down_int(chrono::millis(1000));
         }
     }
 }

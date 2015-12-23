@@ -327,20 +327,20 @@ int main()
                 {
                     data::Config packet;
 
-                    packet.base_time_point_s = Clock::to_time_t(Clock::now());
-                    packet.measurement_period_s = std::chrono::duration_cast<std::chrono::seconds>(s_sensors.get_measurement_period()).count();
-                    packet.next_measurement_time_point_s = Clock::to_time_t(s_sensors.compute_next_measurement_time_point());
-                    packet.comms_period_s = std::chrono::duration_cast<std::chrono::seconds>(s_sensors.compute_comms_period()).count();
-                    packet.next_comms_time_point_s = Clock::to_time_t(s_sensors.compute_next_comms_time_point(id));
+                    packet.base_time_point = chrono::time_s(Clock::to_time_t(Clock::now()));
+                    packet.measurement_period = chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(s_sensors.get_measurement_period()).count());
+                    packet.next_measurement_time_point = chrono::time_s(Clock::to_time_t(s_sensors.compute_next_measurement_time_point()));
+                    packet.comms_period = chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(s_sensors.compute_comms_period()).count());
+                    packet.next_comms_time_point = chrono::time_s(Clock::to_time_t(s_sensors.compute_next_comms_time_point(id)));
                     packet.last_confirmed_measurement_index = s_sensors.compute_last_confirmed_measurement_index(id);
                     packet.next_measurement_index = s_sensors.compute_next_measurement_index();
 
                     std::cout << "Config requested for id: " << id
-                                                            << "\n\tbase time point: " << packet.base_time_point_s
-                                                            << "\n\tmeasurement period: " << packet.measurement_period_s
-                                                            << "\n\tnext measurement time point: " << packet.next_measurement_time_point_s
-                                                            << "\n\tcomms period: " << packet.comms_period_s
-                                                            << "\n\tnext comms time point: " << packet.next_comms_time_point_s
+                                                            << "\n\tbase time point: " << packet.base_time_point.ticks
+                                                            << "\n\tmeasurement period: " << packet.measurement_period.count
+                                                            << "\n\tnext measurement time point: " << packet.next_measurement_time_point.ticks
+                                                            << "\n\tcomms period: " << packet.comms_period.count
+                                                            << "\n\tnext comms time point: " << packet.next_comms_time_point.ticks
                                                             << "\n\tlast confirmed measurement index: " << packet.last_confirmed_measurement_index
                                                             << "\n\tnext measurement index: " << packet.next_measurement_index << "\n";
 

@@ -15,13 +15,13 @@ inline void wait_for_press(Button b)
 {
     while (!is_pressed(b))
     {
-        Low_Power::power_down_int(120);
+        Low_Power::power_down_int(chrono::millis(120));
     }
 }
 inline void wait_for_release(Button b)
 {
     while (is_pressed(b))
     {
-        Low_Power::power_down_int(120);
+        Low_Power::power_down_int(chrono::millis(120));
     }
 }
