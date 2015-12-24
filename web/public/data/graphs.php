@@ -112,7 +112,7 @@ $('#endDate')
 
 var graphData = {}; //will be filled later
 
-var colors = ["#FF33AA", "#08B37F", "#22ADFF", "#FF4136", "#FF9900", "#3D0000", , "#854144b", "#FF3399", "#AAAAAA", ];
+var colors = ["#FF33AA", "#08B37F", "#22ADFF", "#FF4136", "#FF9900", "#3D0000", "#854144b", "#FF3399", "#AAAAAA", ];
 var sensorFiles = ["living.tsv", "hall.tsv", "bedroom.tsv", "bathroom.tsv", "kitchen.tsv" ];
 
 var selectedPlots = [];
