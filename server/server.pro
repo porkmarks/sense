@@ -35,8 +35,15 @@ DESTDIR = ../../bin/$${DEST_FOLDER}
 INCLUDEPATH += ../common/src
 
 
-SOURCES += src/main.cpp
+SOURCES += src/main.cpp \
+    src/Client.cpp \
+    src/Server.cpp
 
-HEADERS +=
+HEADERS += \
+    src/Client.h \
+    src/Server.h
 
 DISTFILES +=
+
+LIBS += -lboost_thread -lboost_system -lpthread
+

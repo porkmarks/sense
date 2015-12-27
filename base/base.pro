@@ -43,7 +43,8 @@ SOURCES += src/main.cpp \
     ../common/src/Storage.cpp \
     src/tests.cpp \
     src/Scheduler.cpp \
-    src/Sensors.cpp
+    src/Sensors.cpp \
+    src/Client.cpp
 
 HEADERS += \
     ../common/src/Comms.h \
@@ -54,6 +55,9 @@ HEADERS += \
     ../common/src/rfm22b/rfm22b_spi.h \
     ../common/src/Storage.h \
     src/Scheduler.h \
-    src/Sensors.h
+    src/Sensors.h \
+    src/Client.h
 
 DISTFILES +=
+
+LIBS += -lboost_thread -lboost_system -lpthread
