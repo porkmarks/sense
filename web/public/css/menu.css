@@ -1,0 +1,24 @@
+@import url(//fonts.googleapis.com/css?family=Open+Sans);
+
+nav ul {
+	margin:0;
+	padding:0;
+}
+nav ul li {
+	list-style-type: none;
+	float:left;
+	display:block;
+	width:150px;
+	height:60px;
+	text-align: center;
+	line-height: 55px;
+	font-family: 'Open Sans', sans-serif;
+	font-size: 17px;
+}
+nav ul li a {
+	text-decoration: none;
+	color: #625D5D;
+}
+nav ul li:hover {
+
+}

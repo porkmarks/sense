@@ -1,40 +1,113 @@
 @import url(//fonts.googleapis.com/css?family=Open+Sans);
-header {
-    background-image: -ms-linear-gradient(bottom, white, #bdbdbd);
-	background-image: -webkit-linear-gradient(bottom, white, #bdbdbd);
-	background-image: -moz-linear-gradient(bottom, white, #bdbdbd);
-    padding:3px; 
-    height: 100px;
-    font-family: 'Open Sans', sans-serif;
-    font-size: 14px;
-    letter-spacing: 2px;
-    margin-left: 5px;
-
+body{
+  font-family: 'Open Sans', sans-serif; 
+  margin: 0;
+  min-width: 1200px;
+  -webkit-text-size-adjust: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+#Holder{
+  width:auto;
+  height:auto;
+  margin-left:auto;
+  margin-right:auto;
+  margin-top:10px;
+  margin-bottom:10px;
+}
+#TopHeader{ 
+  height: 30px;
+  min-width: 1200px;
+  font-family: 'Open Sans', sans-serif;
+}
+#TopHeader nav ol li {
+  margin: 0;
+  line-height: 30px;
+  margin: 0 5px 0 5px;
+  padding: 0 5px 0 5px;
+  text-decoration: none;
+  list-style-type:none; 
+  display: inline-block;
+  padding-right: 10px;
+  float: right;
+}
+#LogoDiv{
+  height:140px;
+  width:140px;
+  background-image:url(../assets/logo1.png);
+  background-repeat: no-repeat;
+  margin-bottom: 5px;
+  float: left;
+}
+#NavBar{
+  height:140px;
+  min-width:1200px;
+  background-image:-webkit-linear-gradient(left, white , #f5f5f5);
 }
 
+#MainNav{
+  padding-right: 10px;
+}
+#MainNav ul li{
+  text-decoration: none;
+  list-style-type:none; 
+  display: inline-block;
+  padding-right: 20px;
+  margin-left: 50px;
+  line-height: 45px;
+}
+
+#Content{
+  height:auto;
+  clear:both;
+  overflow:auto;
+}
+#Footer{
+  height:100px;
+}
+#ContentLeft{
+  width:280px;
+  float:left;
+}
+#PageHeading{
+  height:auto;
+  padding:11px;
+}
+#ContentLeft{
+  width:280px;
+  float: left;
+  padding-top: 11px;
+  padding-left: 11px;
+} 
+#ContentRight{
+  width:680px;
+  float:right;
+  border:none;
+}
 h1{
-	color: grey;
-	position: fixed; top:20px; left:30px;
-	font-size: 30px;
-	font-weight: 50px;
+  margin:0;
+  font-family: 'Open Sans', sans-serif;
+  color:#666;
 }
 h2{
-	color: #08B37F;
-	font-size: 18px;
+  margin:0;
+  font-family: 'Open Sans', sans-serif;
+  color:#999;
+  font-weight: lighter;
 }
+h3{
+  margin:0;
+  font-family: 'Open Sans', sans-serif;
+  color:#444;
+  font-size:12px;
+  font-weight: lighter;
+}
+
 p{
 	color:grey;
 	font-size: 14;
 }
-ul.list{
-	position: fixed; top:1px; left:10px;
-}
-ul.list li{
-	text-decoration: none;
-	list-style-type:none; 
-	display:inline;
-	padding-right: 30px;
-}
+
 input {
    -webkit-appearance: none;
 }
@@ -100,18 +173,6 @@ a.button {
   cursor: pointer;
 }
 
-section {
-    width:1200px;
-    float:left;
-    padding:10px; 
-    font-family: 'Open Sans', sans-serif;
-}
-body { 
-	font-family: 'Open Sans', sans-serif;
-	width: 100%; 
-	margin: 0 auto;
-}
-
 path {
     stroke-width: 1.5;
     fill: none;
@@ -124,29 +185,33 @@ path {
     stroke-width: 1.2;
     shape-rendering: crispEdges;
 }
-nav {
-    line-height:30px;
+
+
+.SideMenu {
+  background-image: -webkit-linear-gradient(bottom, white, #bdbdbd);
+  float:left;
+  line-height:30px;
 	min-height: 400px;
 	background-image: -ms-linear-gradient(bottom, white, #f5f5f5);
 	background-image: -webkit-linear-gradient(bottom, white, #f5f5f5);
 	background-image: -moz-linear-gradient(bottom, white, #f5f5f5);
 	margin-left: 5px;
-    height:800px;
-    width:120px;
-    float:left;
-    padding:8px; 
-    font-family: 'Open Sans', sans-serif;
+  height:800px;
+  width:120px;
+  float:left;
+  padding:8px; 
+  font-family: 'Open Sans', sans-serif;
 }
 a:link {
-    color: tomato;
+    color: #837E7C;
 }
 
 a:visited {
-    color: tomato;
+    color: #837E7C;
 }
 nav a.current {
   
-  color:#08B37F;
+  color:#306EFF;
 }
 
 #datePkr {
@@ -247,74 +312,5 @@ p.subtle{
 .row > div + div {
   text-align: left;
   margin: 0 0 0 10px;
-}
-
-/* Tables. */
-
-th {
-  text-align: left;
-}
-
-tr.status.hidden {
-  display: table-row;
-  opacity: 0.5;
-}
-
-tr.expands:hover {
-  cursor: pointer;
-}
-
-tr.expands:nth-child(4n-1) {
-  background-color: rgb(245, 245, 245);
-}
-
-tr.expands + tr {
-  display: none;
-}
-
-td pre {
-  line-height: normal;
-  font-size: 0.9em;
-}
-
-
-/* Data overview (common data source section). */
-section.data-source {
-  position: relative;
-  float: left;
-  width: 460px;
-  margin: 0 0 20px 0;
-}
-
-section.data-source figure {
-  width: 50px;
-  height: 50px;
-}
-
-section.data-source h5 {
-  margin: 0;
-}
-
-section.data-source div {
-  position: absolute;
-  top: 0;
-  left: 80px;
-  width: 360px;
-}
-
-section.data-source time,
-ol.tools li,
-ol.tools li a {
-  font-size: 12px;
-  color: #999;
-}
-
-section.data-source p.value {
-  position: absolute;
-  top: 0;
-  right: 80px;
-  margin: 0;
-  font-size: 25px;
-  line-height: 30px;
 }
 
