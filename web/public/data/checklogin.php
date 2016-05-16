@@ -2,9 +2,9 @@
 
 session_start();
 
-if ($_SESSION['loggedIn'] != "true") {
-
-    header("Location: http://localhost/sense/data/login.php");
-
+if (isset($_SESSION['name']) == false)
+{
+    header("Location:login.php?error=Please login");
 }
+
 ?>

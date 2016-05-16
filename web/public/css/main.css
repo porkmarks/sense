@@ -74,14 +74,15 @@ body{
   padding:11px;
 }
 #ContentLeft{
-  width:280px;
+  width:180px;
   float: left;
   padding-top: 11px;
   padding-left: 11px;
 } 
 #ContentRight{
-  width:680px;
-  float:right;
+  width:auto;
+  height:auto;
+  float:left;
   border:none;
 }
 h1{
@@ -211,7 +212,7 @@ a:visited {
 }
 nav a.current {
   
-  color:#306EFF;
+  color:#007acc;
 }
 
 #datePkr {
@@ -312,5 +313,9 @@ p.subtle{
 .row > div + div {
   text-align: left;
   margin: 0 0 0 10px;
+}
+p.subtler{
+  color: darkgrey;
+  font-size: 12;
 }
 

@@ -1,0 +1,28 @@
+@import url(//fonts.googleapis.com/css?family=Open+Sans);
+
+#form {
+	margin:0;
+	padding:0;
+}
+
+h4{
+    font-size: 17;
+    color: #007acc;
+    font-weight: lighter
+}
+.mydetails tr{
+    line-height: 20px;
+}
+label{
+    color:#4E4E4E;
+    font-size: 15;
+    font-weight: lighter;
+}
+p.moreSubtle{
+    font-size: 16;
+    font-weight: normal;
+}
+input.submit{
+    font-size: 16;
+    color: #007acc;
+}

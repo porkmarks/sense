@@ -1,0 +1,11 @@
+div.alert.warning {
+  background-color: #fcf8e3;
+  border-color: #fbeed5;
+  background-image: url("../assets/alert-warning.svg");
+  background-size: 10px 16px;
+}
+
+div.alert.warning p,
+div.alert.warning p a {
+  color: #c09853;
+}

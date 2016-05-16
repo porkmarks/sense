@@ -17,8 +17,8 @@
 <div id="NavBar">
 	<nav>
 		<ul>
-			<li><a href="http://localhost/sense/data/login.php">Login</a></li>
-			<li><a href="http://localhost/sense/data/register.php">Register</a></li>
+			<li><a href="login.php">Login</a></li>
+			<li><a href="register.php">Register</a></li>
 			<li><a href="#">Forgot Password</a></li>
 		</ul>
 
