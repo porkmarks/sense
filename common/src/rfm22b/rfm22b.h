@@ -25,8 +25,7 @@
  *	frequencies (High or Low bands 24-47, See Table 12 of the datasheet).
  */
 
-#ifndef rfm22b_h
-#define rfm22b_h
+#pragma once
 
 #include <stdint.h>
 #include <stdio.h>
@@ -44,6 +43,9 @@ public:
     RFM22B() = default;
 
     bool init();
+
+    void set_preamble_length(uint8_t nibbles);
+    void set_sync_words(uint8_t const* ptr, uint8_t size);
 
     // Set or get the carrier frequency (in Hz);
     bool set_carrier_frequency(float center, float afcPullInRange = 0.05);
@@ -175,4 +177,3 @@ private:
 #endif
 
 };
-#endif

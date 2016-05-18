@@ -298,14 +298,11 @@ void pair()
 
                     set_leds(GREEN_LED);
 
-                    uint8_t size = s_comms.receive_packet(1000);
-//                    if (size > 0)
-//                    {
-//                        LOG(F("Received packet of "));
-//                        LOG(size);
-//                        LOG(F(" bytes. Type: "));
-//                        LOG_LN((int)s_comms.get_packet_type());
-//                    }
+                    uint8_t size = s_comms.receive_packet(10000);
+                    if (size > 0)
+                    {
+                        LOG(PSTR("Received packet of %d bytes. Type %s\n"), (int)size, (int)s_comms.get_packet_type());
+                    }
 
                     if (size == sizeof(data::Pair_Response) && s_comms.get_packet_type() == data::Type::PAIR_RESPONSE)
                     {

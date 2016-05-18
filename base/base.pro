@@ -33,31 +33,32 @@ UI_DIR = ./.ui/$${DEST_FOLDER}
 DESTDIR = ../../bin/$${DEST_FOLDER}
 
 INCLUDEPATH += ../common/src
+INCLUDEPATH += ../common/src/rfm22b
 
 
 SOURCES += src/main.cpp \
     ../common/src/Comms.cpp \
     ../common/src/CRC.cpp \
-    ../common/src/rfm22b/rfm22b.cpp \
-    ../common/src/rfm22b/rfm22b_spi.cpp \
     ../common/src/Storage.cpp \
     src/tests.cpp \
     src/Scheduler.cpp \
     src/Sensors.cpp \
-    src/Client.cpp
+    src/DB.cpp \
+    ../common/src/rfm22b/rfm22b.cpp \
+    ../common/src/rfm22b/rfm22b_spi.cpp
 
 HEADERS += \
     ../common/src/Comms.h \
     ../common/src/CRC.h \
     ../common/src/Data_Defs.h \
-    ../common/src/rfm22b/rfm22b.h \
-    ../common/src/rfm22b/rfm22b_enums.h \
-    ../common/src/rfm22b/rfm22b_spi.h \
     ../common/src/Storage.h \
     src/Scheduler.h \
     src/Sensors.h \
-    src/Client.h
+    src/DB.h \
+    ../common/src/rfm22b/rfm22b.h \
+    ../common/src/rfm22b/rfm22b_enums.h \
+    ../common/src/rfm22b/rfm22b_spi.h
 
 DISTFILES +=
 
-LIBS += -lboost_thread -lboost_system -lpthread
+LIBS += -lboost_thread -lboost_system -lpthread -lmysqlpp -lmysqlclient -lpigpio

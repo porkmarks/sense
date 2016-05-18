@@ -12,15 +12,17 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
-#include <boost/asio.hpp>
 #include <boost/thread.hpp>
+#include <pigpio.h>
 
 #include "CRC.h"
-#include "Client.h"
+#include "DB.h"
 #include "Comms.h"
 #include "Storage.h"
 #include "Sensors.h"
 #include "Scheduler.h"
+
+#include "DB.h"
 
 #include "rfm22b/rfm22b.h"
 
@@ -28,22 +30,11 @@
 #define LOG(x) std::cout << x
 #define LOG_LN(x) std::cout << x << std::endl
 
-boost::asio::io_service s_io_service;
-boost::asio::ip::tcp::endpoint s_server_endpoint;
-
-static Client s_client(s_io_service);
 static Comms s_comms;
-static Sensors s_sensors;
+static DB s_db;
+static Sensors s_sensors(s_db);
 
 typedef std::chrono::high_resolution_clock Clock;
-
-struct Add_Sensor
-{
-    std::string name;
-    Clock::duration timeout;
-    Clock::time_point start;
-} s_add_sensor;
-
 
 extern void run_tests();
 extern std::chrono::high_resolution_clock::time_point string_to_time_point(const std::string& str);
@@ -58,26 +49,31 @@ int main(int, const char**)
 
     srand(time(nullptr));
 
-    boost::shared_ptr<boost::asio::io_service::work> work(new boost::asio::io_service::work(s_io_service));
-    boost::thread_group worker_threads;
-    for(int x = 0; x < 1; ++x)
-    {
-      worker_threads.create_thread(boost::bind(&boost::asio::io_service::run, &s_io_service));
-    }
-
-    s_server_endpoint = boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string("127.0.0.1"), 50000);
-
     size_t tries = 0;
-    while (!s_client.init(s_server_endpoint))
-    {
-        tries++;
-        std::cerr << "client init failed. Trying again: " << tries << "\n";
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-    }
+
+    gpioInitialise();
 
 //    run_tests();
 
     //s_sensors.load_sensors("sensors.config");
+
+    static const std::string db_server = "192.168.1.44";
+    static const std::string db_db = "sensor-test";
+    static const std::string db_username = "admin";
+    static const std::string db_password = "admin";
+    static const uint16_t port = 0;
+
+    if (!s_db.init(db_server, db_db, db_username, db_password, port))
+    {
+        std::cerr << "DB init failed\n";
+        return -1;
+    }
+
+    if (!s_sensors.init())
+    {
+        std::cerr << "Sensors init failed\n";
+        return -1;
+    }
 
     tries = 0;
     while (!s_comms.init(1))
@@ -88,6 +84,10 @@ int main(int, const char**)
     }
 
     s_comms.set_address(Comms::BASE_ADDRESS);
+
+
+    boost::optional<std::vector<Sensors::Sensor>> sensors = s_db.get_sensors();
+
 
     while (true)
     {
@@ -104,54 +104,51 @@ int main(int, const char**)
             //LOG_LN("Received packed of " << (int)size << " bytes. Type: "<< (int)type);
             if (type == data::Type::PAIR_REQUEST && size == sizeof(data::Pair_Request))
             {
-                if (s_add_sensor.name.empty())
+                boost::optional<DB::Expected_Sensor> expected_sensor = s_db.get_expected_sensor();
+                if (!expected_sensor)
                 {
                     std::cerr << "Pair request but not expecting any sensor!\n";
                 }
-                else if (Clock::now() > s_add_sensor.start + s_add_sensor.timeout)
-                {
-                    std::cerr << "Pair requested for sensor '" << s_add_sensor.name << "' but it timed out!\n";
-                }
                 else
                 {
-                    Sensors::Sensor_Id id = s_sensors.add_sensor(s_add_sensor.name);
-                    const Sensors::Sensor* sensor = s_sensors.find_sensor_by_id(id);
-                    if (!sensor)
+                    Sensors::Sensor const* sensor = s_sensors.add_expected_sensor();
+                    if (sensor)
                     {
-                        std::cerr << "Failed to add sensor '" << s_add_sensor.name << "'!\n";
-                    }
-                    else
-                    {
+                        std::cout << "Adding sensor " << sensor->name << ", id " << sensor->id << ", address " << sensor->address << "\n";
+
                         data::Pair_Response packet;
-                        packet.address = id;
+                        packet.address = sensor->address;
+                        s_comms.set_destination_address(s_comms.get_packet_source_address());
                         s_comms.begin_packet(data::Type::PAIR_RESPONSE);
                         s_comms.pack(packet);
-                        if (s_comms.send_packet(3))
+                        if (s_comms.send_packet(10))
                         {
-                            s_add_sensor.name.clear();
                             std::cout << "Pair successful\n";
                         }
                         else
                         {
-                            std::cerr << "Pair failed\n";
-                            s_sensors.remove_sensor(id);
+                            s_sensors.remove_sensor(sensor->id);
+                            std::cerr << "Pair failed (comms)\n";
                         }
                     }
-
-                    s_sensors.save_sensors("sensors.config");
+                    else
+                    {
+                        std::cerr << "Pairing failed (db)\n";
+                    }
                 }
             }
             else if (type == data::Type::MEASUREMENT && size == sizeof(data::Measurement))
             {
-                Sensors::Sensor_Id id = s_comms.get_packet_source_address();
-                std::cout << "Measurement reported by " << id << "\n";
-                const Sensors::Sensor* sensor = s_sensors.find_sensor_by_id(id);
+                Sensors::Sensor_Address address = s_comms.get_packet_source_address();
+                std::cout << "Measurement reported by " << address << "\n";
+                const Sensors::Sensor* sensor = s_sensors.find_sensor_by_address(address);
                 if (sensor)
                 {
                     Sensors::Measurement m;
                     const data::Measurement* ptr = reinterpret_cast<const data::Measurement*>(s_comms.get_packet_payload());
 
                     //m.time_point = Clock::from_time_t(time_t(ptr->time_point));
+                    m.index = ptr->index;
                     m.flags = ptr->flags;
                     m.tx_rssi = 0;
                     m.rx_rssi = 0;
@@ -160,7 +157,7 @@ int main(int, const char**)
 
                     //Clock::time_point tp = Clock::from_time_t(ptr->time_point);
 
-                    s_sensors.add_measurement(ptr->index, id, m);
+                    s_sensors.add_measurement(sensor->id, m);
                 }
                 else
                 {
@@ -169,9 +166,9 @@ int main(int, const char**)
             }
             else if (type == data::Type::CONFIG_REQUEST && size == sizeof(data::Config_Request))
             {
-                Sensors::Sensor_Id id = s_comms.get_packet_source_address();
-                std::cout << "Config requested by " << id << "\n";
-                const Sensors::Sensor* sensor = s_sensors.find_sensor_by_id(id);
+                Sensors::Sensor_Address address = s_comms.get_packet_source_address();
+                std::cout << "Config requested by " << address << "\n";
+                const Sensors::Sensor* sensor = s_sensors.find_sensor_by_address(address);
                 if (sensor)
                 {
                     data::Config packet;
@@ -180,11 +177,11 @@ int main(int, const char**)
                     packet.measurement_period = chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(s_sensors.get_measurement_period()).count());
                     packet.next_measurement_time_point = chrono::time_s(Clock::to_time_t(s_sensors.compute_next_measurement_time_point()));
                     packet.comms_period = chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(s_sensors.compute_comms_period()).count());
-                    packet.next_comms_time_point = chrono::time_s(Clock::to_time_t(s_sensors.compute_next_comms_time_point(id)));
-                    packet.last_confirmed_measurement_index = s_sensors.compute_last_confirmed_measurement_index(id);
+                    packet.next_comms_time_point = chrono::time_s(Clock::to_time_t(s_sensors.compute_next_comms_time_point(sensor->id)));
+                    packet.last_confirmed_measurement_index = s_sensors.compute_last_confirmed_measurement_index(sensor->id);
                     packet.next_measurement_index = s_sensors.compute_next_measurement_index();
 
-                    std::cout << "Config requested for id: " << id
+                    std::cout << "Config requested for id: " << sensor->id
                                                             << "\n\tbase time point: " << packet.base_time_point.ticks
                                                             << "\n\tmeasurement period: " << packet.measurement_period.count
                                                             << "\n\tnext measurement time point: " << packet.next_measurement_time_point.ticks
@@ -193,6 +190,7 @@ int main(int, const char**)
                                                             << "\n\tlast confirmed measurement index: " << packet.last_confirmed_measurement_index
                                                             << "\n\tnext measurement index: " << packet.next_measurement_index << "\n";
 
+                    s_comms.set_destination_address(s_comms.get_packet_source_address());
                     s_comms.begin_packet(data::Type::CONFIG);
                     s_comms.pack(packet);
                     if (s_comms.send_packet(3))

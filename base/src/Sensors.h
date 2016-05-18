@@ -6,56 +6,31 @@
 #include <string>
 
 #include "Comms.h"
+#include "DB.h"
 
 
 class Sensors
 {
 public:
-    typedef std::chrono::high_resolution_clock Clock;
-    typedef uint32_t Sensor_Id;
+    typedef DB::Clock Clock;
+    typedef DB::Sensor_Id Sensor_Id;
+    typedef DB::Sensor_Address Sensor_Address;
 
-    struct Measurement
-    {
-        struct Flag
-        {
-            enum type : uint8_t
-            {
-                SENSOR_ERROR   = 1 << 0,
-                COMMS_ERROR    = 1 << 1
-            };
-        };
 
-        float temperature = 0.f;
-        float humidity = 0;
-        float vcc = 0.f;
-        int8_t tx_rssi = 0;
-        int8_t rx_rssi = 0;
-        uint8_t flags = 0;
-    };
+    typedef DB::Measurement Measurement;
+    typedef DB::Sensor Sensor;
 
-    struct Measurement_Entry
-    {
-        Clock::time_point time_point;
-        uint32_t index = 0;
-        std::map<Sensor_Id, Measurement> measurements;
-    };
-
-    struct Sensor
-    {
-        Sensor_Id id = 0;
-        std::string name;
-    };
-
-    Sensors();
+    Sensors(DB& db);
 
     //how much sensors can deviate from the measurement global clock. This is due to the unstable clock frequency of the sensor CPU
     static const Clock::duration MEASUREMENT_JITTER;
     //how long does a communication burst take
     static const Clock::duration COMMS_DURATION;
 
+    bool init();
 
     //how often will the sensors do the measurement
-    void set_measurement_period(Clock::duration period);
+    bool set_measurement_period(Clock::duration period);
     Clock::duration get_measurement_period() const;
 
     uint32_t compute_next_measurement_index();
@@ -65,48 +40,38 @@ public:
     Clock::time_point compute_next_comms_time_point(Sensor_Id id) const;
 
     //how often will the sensors talk to the base station
-    void set_comms_period(Clock::duration period);
+    bool set_comms_period(Clock::duration period);
     Clock::duration compute_comms_period() const;
 
     //sensor manipulation
-    Sensor_Id add_sensor(const std::string& name);
+    Sensor const* add_expected_sensor();
+    Sensor const* add_sensor(std::string const& name);
     void remove_sensor(Sensor_Id id);
+    void remove_all_sensors();
 
-    const Sensor* find_sensor_by_id(Sensor_Id id) const;
+    Sensor const* find_sensor_by_id(Sensor_Id id) const;
+    Sensor const* find_sensor_by_address(Sensor_Address address) const;
 
     //measurement manipulation
-    void push_back_measurement(Sensor_Id id, const Measurement& measurement);
-    void add_measurement(uint32_t index, Sensor_Id id, const Measurement& measurement);
-    const Measurement* get_last_measurement(Sensor_Id id);
-
-    //serialization and reporting
-    void load_sensors(const std::string& filename);
-    void save_sensors(const std::string& filename);
-
-    void save_sensor_measurements_tsv(const std::string& filename, Sensor_Id id, Clock::time_point begin, Clock::time_point end);
-
-    void set_measurement_history_duration(Clock::duration duration);
+    void add_measurement(Sensor_Id id, Measurement const& measurement);
 
 private:
-    Measurement merge_measurements(const Measurement& m1, const Measurement& m2);
-    void _add_measurement(uint32_t index, Sensor_Id id, const Measurement& measurement);
+    Measurement merge_measurements(Measurement const& m1, Measurement const& m2);
+    void _add_measurement(Sensor_Id id, Measurement const& measurement);
 
-    Clock::duration m_measurement_period = std::chrono::minutes(5);
-    Clock::duration m_comms_period = std::chrono::seconds(10);
+    DB::Config m_config;
 
     mutable Clock::time_point m_next_measurement_time_point;
     mutable Clock::time_point m_next_comms_time_point;
 
     mutable uint32_t m_next_measurement_index = 0;
 
-    std::vector<Sensor> m_sensors;
+    std::vector<Sensor> m_sensor_cache;
 
-    uint32_t m_last_address = Comms::SLAVE_ADDRESS_BEGIN;
+    uint16_t m_last_address = Comms::SLAVE_ADDRESS_BEGIN;
     Clock::duration m_history_duration = std::chrono::hours(24) * 30 * 3; //approx 3 months
 
-    std::vector<Measurement_Entry> m_measurements;
-
-    void clear_old_measurements();
+    DB& m_db;
 };
 
 namespace std

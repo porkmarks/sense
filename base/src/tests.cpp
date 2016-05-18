@@ -221,8 +221,23 @@ void test_sensor_operations()
 {
     //---------------------
 
+    DB test_db;
+
+    static const std::string db_server = "192.168.1.44";
+    static const std::string db_db = "sensor-test";
+    static const std::string db_username = "admin";
+    static const std::string db_password = "admin";
+    static const uint16_t port = 0;
+
+    if (!test_db.init(db_server, db_db, db_username, db_password, port))
     {
-        Sensors sensors;
+        std::cerr << "DB init failed\n";
+        return;
+    }
+
+
+    {
+        Sensors sensors(test_db);
         sensors.set_measurement_period(std::chrono::minutes(1));
         CHECK(sensors.get_measurement_period() == std::chrono::minutes(1));
 
@@ -233,7 +248,7 @@ void test_sensor_operations()
     //---------------------
 
     {
-        Sensors sensors;
+        Sensors sensors(test_db);
         sensors.set_measurement_period(std::chrono::minutes(10));
         sensors.set_comms_period(std::chrono::minutes(10));
         CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(10), Sensors::MEASUREMENT_JITTER));
@@ -262,7 +277,7 @@ void test_sensor_operations()
     {
         std::cout << "Sensor count: " << sensor_count << "\n";
 
-        Sensors sensors;
+        Sensors sensors(test_db);
         for (size_t i = 0; i < sensor_count; i++)
         {
             sensors.add_sensor("s");
@@ -295,12 +310,14 @@ void test_sensor_operations()
     //---------------------
 
     {
-        Sensors sensors;
+        Sensors sensors(test_db);
 
         const Sensors::Sensor* sensor = sensors.find_sensor_by_id(Sensors::Sensor_Id(7));
         CHECK(sensor == nullptr);
+        Sensors::Sensor_Id id = sensor->id;
 
-        Sensors::Sensor_Id id = sensors.add_sensor("s1");
+        sensor = sensors.add_sensor("s1");
+        CHECK(sensor);
         sensor = sensors.find_sensor_by_id(id);
         CHECK(sensor != nullptr);
         CHECK(sensor->name == "s1");
@@ -313,9 +330,15 @@ void test_sensor_operations()
     //---------------------
 
     {
-        Sensors sensors;
-        Sensors::Sensor_Id id1 = sensors.add_sensor("s1");
-        Sensors::Sensor_Id id2 = sensors.add_sensor("s2");
+        Sensors sensors(test_db);
+
+        Sensors::Sensor const* sensor = sensors.add_sensor("s1");
+        CHECK(sensor);
+        Sensors::Sensor_Id id1 = sensor->id;
+        sensor = sensors.add_sensor("s2");
+        CHECK(sensor);
+        Sensors::Sensor_Id id2 = sensor->id;
+
         const Sensors::Sensor* sensor1 = sensors.find_sensor_by_id(id1);
         CHECK(sensor1 != nullptr);
         CHECK(sensor1->name == "s1");
@@ -341,9 +364,15 @@ void test_sensor_operations()
     //---------------------
 
     {
-        Sensors sensors;
-        Sensors::Sensor_Id id1 = sensors.add_sensor("s1");
-        Sensors::Sensor_Id id2 = sensors.add_sensor("s2");
+        Sensors sensors(test_db);
+
+        Sensors::Sensor const* sensor = sensors.add_sensor("s1");
+        CHECK(sensor);
+        Sensors::Sensor_Id id1 = sensor->id;
+        sensor = sensors.add_sensor("s2");
+        CHECK(sensor);
+        Sensors::Sensor_Id id2 = sensor->id;
+
         const Sensors::Sensor* sensor1 = sensors.find_sensor_by_id(id1);
         CHECK(sensor1 != nullptr);
         CHECK(sensor1->name == "s1");

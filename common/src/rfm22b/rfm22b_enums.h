@@ -1,5 +1,4 @@
-#ifndef rfm22b_enums_h
-#define rfm22b_enums_h
+#pragma once
 
 enum class Register : uint8_t  
 {
@@ -157,9 +156,9 @@ enum class Modulation_Data_Source : uint8_t
 
 enum class CRC_Mode : uint8_t 
 {
-		CRC_DISABLED,
-		CRC_DATA_ONLY,
-		CRC_NORMAL,
+    CRC_DISABLED,
+    CRC_DATA_ONLY,
+    CRC_NORMAL,
 };
 
 enum class CRC_Polynomial : uint8_t 
@@ -285,4 +284,3 @@ enum class Frequency_Band_Select : uint8_t
 	FB                                 = 0x1f,
 };
 
-#endif

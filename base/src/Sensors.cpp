@@ -4,8 +4,9 @@
 #include <fstream>
 #include <sstream>
 #include <cstring>
+#include <cassert>
 
-std::chrono::high_resolution_clock::time_point string_to_time_point(const std::string& str)
+std::chrono::high_resolution_clock::time_point string_to_time_point(std::string const& str)
 {
     using namespace std;
     using namespace std::chrono;
@@ -61,42 +62,125 @@ const Sensors::Clock::duration Sensors::MEASUREMENT_JITTER = std::chrono::second
 const Sensors::Clock::duration Sensors::COMMS_DURATION = std::chrono::seconds(10);
 
 
-Sensors::Sensors()
+Sensors::Sensors(DB& db)
+    : m_db(db)
 {
-    m_sensors.reserve(100);
-    m_next_measurement_time_point = Clock::now();
-    m_next_comms_time_point = Clock::now();
+    m_sensor_cache.reserve(100);
 }
 
-
-Sensors::Sensor_Id Sensors::add_sensor(const std::string& name)
+bool Sensors::init()
 {
-    Sensor_Id id = ++m_last_address;
+    boost::optional<DB::Config> config = m_db.get_config();
+    if (!config)
+    {
+        m_config.measurement_period = std::chrono::seconds(10);
+        m_config.comms_period = m_config.measurement_period * 3;
+        m_config.baseline_time_point = Clock::now();
+        if (!m_db.set_config(m_config))
+        {
+            std::cerr << "Cannot set config\n";
+            return false;
+        }
+    }
+    else
+    {
+        m_config = *config;
+    }
+
+    m_next_measurement_time_point = m_config.baseline_time_point;
+    m_next_comms_time_point = m_config.baseline_time_point;
+
+    boost::optional<std::vector<DB::Sensor>> sensors = m_db.get_sensors();
+    if (!sensors)
+    {
+        std::cerr << "Cannot load sensors\n";
+        return false;
+    }
+
+    for (DB::Sensor const& s: *sensors)
+    {
+        m_sensor_cache.emplace_back(s);
+//        if (m_sensor_cache.back().max_index == 0)
+//        {
+//            m_sensor_cache.back().max_index = compute_next_measurement_index();
+//        }
+    }
+
+    return true;
+}
+
+Sensors::Sensor const* Sensors::add_expected_sensor()
+{
+    boost::optional<DB::Expected_Sensor> expected_sensor = m_db.get_expected_sensor();
+    if (!expected_sensor)
+    {
+        std::cerr << "Not expecting any sensor!\n";
+        return nullptr;
+    }
+
+    Sensor const* sensor = add_sensor(expected_sensor->name);
+    return sensor;
+}
+
+Sensors::Sensor const* Sensors::add_sensor(std::string const& name)
+{
+    uint16_t address = ++m_last_address;
+
+    boost::optional<Sensors::Sensor_Id> opt_id = m_db.add_sensor(name, address);
+    if (!opt_id)
+    {
+        std::cerr << "Failed to add sensor in the DB\n";
+        return nullptr;
+    }
+
+    assert(address >= Comms::SLAVE_ADDRESS_BEGIN && address < Comms::SLAVE_ADDRESS_END);
     Sensor sensor;
-    sensor.id = id;
+    sensor.id = *opt_id;
     sensor.name = name;
-    m_sensors.emplace_back(std::move(sensor));
-    return id;
+    sensor.address = address;
+//    sensor.max_index = compute_next_measurement_index();
+    m_sensor_cache.emplace_back(std::move(sensor));
+
+    return &m_sensor_cache.back();
 }
 
-void Sensors::set_comms_period(Clock::duration period)
+void Sensors::remove_all_sensors()
 {
-    m_comms_period = std::max(Clock::duration(std::chrono::seconds(10)), period);
 }
+
+bool Sensors::set_comms_period(Clock::duration period)
+{
+    DB::Config config = m_config;
+    config.comms_period = period;
+    if (m_db.set_config(config))
+    {
+        m_config = config;
+        return true;
+    }
+    return false;
+}
+
 Sensors::Clock::duration Sensors::compute_comms_period() const
 {
-    Clock::duration max_period = m_sensors.size() * COMMS_DURATION;
-    Clock::duration period = std::max(m_comms_period, max_period);
-    return std::max(period, m_measurement_period + MEASUREMENT_JITTER);
+    Clock::duration max_period = m_sensor_cache.size() * COMMS_DURATION;
+    Clock::duration period = std::max(m_config.comms_period, max_period);
+    return std::max(period, m_config.measurement_period + MEASUREMENT_JITTER);
 }
 
-void Sensors::set_measurement_period(Clock::duration period)
+bool Sensors::set_measurement_period(Clock::duration period)
 {
-    m_measurement_period = std::max(Clock::duration(std::chrono::seconds(5)), period);
+    DB::Config config = m_config;
+    config.measurement_period = period;
+    if (m_db.set_config(config))
+    {
+        m_config = config;
+        return true;
+    }
+    return false;
 }
 Sensors::Clock::duration Sensors::get_measurement_period() const
 {
-    return m_measurement_period;
+    return m_config.measurement_period;
 }
 
 Sensors::Clock::time_point Sensors::compute_next_measurement_time_point()
@@ -104,13 +188,7 @@ Sensors::Clock::time_point Sensors::compute_next_measurement_time_point()
     auto now = Clock::now();
     while (m_next_measurement_time_point <= now)
     {
-        Measurement_Entry entry;
-        entry.index = m_next_measurement_index;
-        entry.time_point = m_next_measurement_time_point;
-        m_measurements.emplace_back(entry);
-
-
-        m_next_measurement_time_point += m_measurement_period;
+        m_next_measurement_time_point += m_config.measurement_period;
         m_next_measurement_index++;
     }
 
@@ -125,37 +203,23 @@ uint32_t Sensors::compute_next_measurement_index()
 
 uint32_t Sensors::compute_last_confirmed_measurement_index(Sensor_Id id) const
 {
-    const Sensor* sensor = find_sensor_by_id(id);
+    Sensor const* sensor = find_sensor_by_id(id);
     if (!sensor)
     {
         std::cerr << "Cannot find sensor id " << id << "\n";
         return 0;
     }
 
-    for (auto it = m_measurements.rbegin(); it != m_measurements.rend(); ++it)
-    {
-        const Measurement_Entry& entry = *it;
-        auto mit = entry.measurements.find(id);
-        if (mit != entry.measurements.end())
-        {
-            std::cout << "Found index: " << entry.index << "\n";
-            return entry.index;
-        }
-        else
-        {
-            std::cout << "Not found in entry: " << entry.index << "\n";
-        }
-    }
-    return 0;
+    return sensor->max_index;
 }
 
 Sensors::Clock::time_point Sensors::compute_next_comms_time_point(Sensor_Id id) const
 {
-    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](const Sensor& sensor)
+    auto it = std::find_if(m_sensor_cache.begin(), m_sensor_cache.end(), [id](Sensor const& sensor)
     {
         return sensor.id == id;
     });
-    if (it == m_sensors.end())
+    if (it == m_sensor_cache.end())
     {
         std::cerr << "Cannot find sensor id " << id << "\n";
         return Clock::now() + std::chrono::hours(99999999);
@@ -170,40 +234,53 @@ Sensors::Clock::time_point Sensors::compute_next_comms_time_point(Sensor_Id id) 
     }
 
     Clock::time_point start = m_next_comms_time_point;
-    return start + std::distance(m_sensors.begin(), it) * COMMS_DURATION;
+    return start + std::distance(m_sensor_cache.begin(), it) * COMMS_DURATION;
 }
 
 void Sensors::remove_sensor(Sensor_Id id)
 {
-    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](const Sensor& sensor)
+    auto it = std::find_if(m_sensor_cache.begin(), m_sensor_cache.end(), [id](Sensor const& sensor)
     {
         return sensor.id == id;
     });
-    if (it == m_sensors.end())
+    if (it == m_sensor_cache.end())
     {
         std::cerr << "Cannot find sensor id " << id << "\n";
         return;
     }
 
-    m_sensors.erase(it);
+    m_sensor_cache.erase(it);
 }
 
-const Sensors::Sensor* Sensors::find_sensor_by_id(Sensor_Id id) const
+Sensors::Sensor const* Sensors::find_sensor_by_id(Sensor_Id id) const
 {
-    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](const Sensor& sensor)
+    auto it = std::find_if(m_sensor_cache.begin(), m_sensor_cache.end(), [id](Sensor const& sensor)
     {
         return sensor.id == id;
     });
-    if (it == m_sensors.end())
+    if (it == m_sensor_cache.end())
     {
         return nullptr;
     }
     return &(*it);
 }
 
-//void Sensors::push_back_measurement(Sensor_Id id, const Measurement& measurement)
+Sensors::Sensor const* Sensors::find_sensor_by_address(Sensor_Address address) const
+{
+    auto it = std::find_if(m_sensor_cache.begin(), m_sensor_cache.end(), [address](Sensor const& sensor)
+    {
+        return sensor.address == address;
+    });
+    if (it == m_sensor_cache.end())
+    {
+        return nullptr;
+    }
+    return &(*it);
+}
+
+//void Sensors::push_back_measurement(Sensor_Id id, Measurement const& measurement)
 //{
-//    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](const Sensor& sensor)
+//    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](Sensor const& sensor)
 //    {
 //        return sensor.id == id;
 //    });
@@ -233,27 +310,40 @@ const Sensors::Sensor* Sensors::find_sensor_by_id(Sensor_Id id) const
 //    clear_old_measurements();
 //}
 
-void Sensors::add_measurement(uint32_t index, Sensor_Id id, const Measurement& measurement)
+void Sensors::add_measurement(Sensor_Id id, Measurement const& measurement)
 {
-    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](const Sensor& sensor)
+    auto it = std::find_if(m_sensor_cache.begin(), m_sensor_cache.end(), [id](Sensor const& sensor)
     {
-      return sensor.id == id;
+        return sensor.id == id;
     });
-    if (it == m_sensors.end())
+    if (it == m_sensor_cache.end())
     {
-      std::cerr << "Cannot find sensor id " << id << "\n";
-      return;
+        std::cerr << "Cannot find sensor id " << id << "\n";
+        return;
     }
 
-    _add_measurement(index, id, measurement);
+    Sensor& sensor = *it;
+
+    if (measurement.index > sensor.max_index)
+    {
+        Clock::time_point time_point = m_config.baseline_time_point + m_config.measurement_period * measurement.index;
+        if (m_db.add_measurement(id, time_point, measurement))
+        {
+            if (measurement.index == sensor.max_index + 1)
+            {
+                sensor.max_index++;
+            }
+        }
+    }
 }
 
-void Sensors::_add_measurement(uint32_t index, Sensor_Id id, const Measurement& measurement)
+void Sensors::_add_measurement(Sensor_Id id, Measurement const& measurement)
 {
+
 //    //find the measurement that is older than time_point - period/2.
 //    Measurement_Entry new_entry;
 //    new_entry.time_point = time_point - m_measurement_period / 2;
-//    auto upper_it = std::upper_bound(m_measurements.begin(), m_measurements.end(), new_entry, [](const Measurement_Entry& e1, const Measurement_Entry& e2)
+//    auto upper_it = std::upper_bound(m_measurements.begin(), m_measurements.end(), new_entry, [](Measurement_Entry const& e1, Measurement_Entry const& e2)
 //    {
 //        return e1.time_point < e2.time_point;
 //    });
@@ -288,42 +378,45 @@ void Sensors::_add_measurement(uint32_t index, Sensor_Id id, const Measurement& 
 //    m_measurements.emplace(upper_it, entry);
 
 
-    //first create missing indices
-    compute_next_measurement_time_point();
+//    //first create missing indices
+//    compute_next_measurement_time_point();
 
-    //find the measurement that is older than time_point - period/2.
-    Measurement_Entry new_entry;
-    new_entry.index = index;
-    auto entry_it = std::lower_bound(m_measurements.begin(), m_measurements.end(), new_entry, [](const Measurement_Entry& e1, const Measurement_Entry& e2)
-    {
-        return e1.index < e2.index;
-    });
+//    //find the measurement that is older than time_point - period/2.
+//    Measurement_Entry new_entry;
+//    new_entry.index = index;
+//    auto entry_it = std::lower_bound(m_measurements.begin(), m_measurements.end(), new_entry, [](Measurement_Entry const& e1, Measurement_Entry const& e2)
+//    {
+//        return e1.index < e2.index;
+//    });
 
-    if (entry_it != m_measurements.end())
-    {
-        Measurement_Entry& entry = *entry_it;
-        //merge with the entry?
-        if (entry.index == index)
-        {
-            auto it = entry.measurements.find(id);
-            if (it != entry.measurements.end())
-            {
-                Measurement merged = merge_measurements(it->second, measurement);
-                entry.measurements.emplace(id, merged);
-            }
-            else
-            {
-                entry.measurements.emplace(id, measurement);
-            }
-            return;
-        }
-    }
+//    if (entry_it != m_measurements.end())
+//    {
+//        Measurement_Entry& entry = *entry_it;
+//        //merge with the entry?
+//        if (entry.index == index)
+//        {
+//            auto it = entry.measurements.find(id);
+//            if (it != entry.measurements.end())
+//            {
+//                Measurement merged = merge_measurements(it->second, measurement);
+//                entry.measurements.emplace(id, merged);
+//            }
+//            else
+//            {
+//                entry.measurements.emplace(id, measurement);
+//            }
+//            return;
+//        }
+//    }
 
-    std::cerr << "Index " << index << " not found for id " << id << "\n";
+//    std::cerr << "Index " << index << " not found for id " << id << "\n";
+
+
+
     return;
 }
 
-Sensors::Measurement Sensors::merge_measurements(const Sensors::Measurement& m1, const Sensors::Measurement& m2)
+Sensors::Measurement Sensors::merge_measurements(Sensors::Measurement const& m1, Sensors::Measurement const& m2)
 {
     Measurement merged;
     if (m1.flags & Measurement::Flag::SENSOR_ERROR)
@@ -351,149 +444,4 @@ Sensors::Measurement Sensors::merge_measurements(const Sensors::Measurement& m1,
     merged.tx_rssi = (m1.tx_rssi + m2.tx_rssi) / 2;
     return merged;
 }
-
-const Sensors::Measurement* Sensors::get_last_measurement(Sensor_Id id)
-{
-    for (auto mit = m_measurements.rbegin(); mit != m_measurements.rend(); ++mit)
-    {
-       Measurement_Entry& entry = *mit;
-       auto it = entry.measurements.find(id);
-       if (it != entry.measurements.end())
-       {
-            return &it->second;
-       }
-    }
-    return nullptr;
-}
-void Sensors::set_measurement_history_duration(Clock::duration duration)
-{
-    m_history_duration = duration;
-    clear_old_measurements();
-}
-
-void Sensors::clear_old_measurements()
-{
-    Clock::time_point begin = Clock::now() - m_history_duration;
-
-    while (!m_measurements.empty() &&
-    m_measurements.front().time_point < begin)
-    {
-        m_measurements.erase(m_measurements.begin());
-    }
-}
-
-void Sensors::load_sensors(const std::string& filename)
-{
-    while (!m_sensors.empty())
-    {
-        remove_sensor(m_sensors.back().id);
-    }
-
-    std::ifstream stream(filename);
-    if (!stream)
-    {
-        std::cerr << "Cannot open file " << filename << "\n";
-        return;
-    }
-
-    std::string line;
-    //skip header
-    std::getline(stream, line);
-
-    while (std::getline(stream, line))
-    {
-        std::istringstream ss(line);
-
-        Sensor sensor;
-
-        ss >> sensor.id >> sensor.name;
-        std::cout << "Loaded sensor " << sensor.name << " id " << sensor.id << "\n";
-
-        m_last_address = std::max(m_last_address, sensor.id);
-        m_sensors.emplace_back(std::move(sensor));
-    }
-}
-
-void Sensors::save_sensors(const std::string& filename)
-{
-    std::ofstream stream(filename);
-    if (!stream)
-    {
-        std::cerr << "Cannot open file " << filename << "\n";
-        return;
-    }
-
-    //header
-    stream << "id" << "\t"
-           << "name" << "\n";
-
-    for (const Sensor& sensor: m_sensors)
-    {
-        stream << sensor.id << "\t" << sensor.name << "\n";
-    }
-}
-
-void Sensors::save_sensor_measurements_tsv(const std::string& filename, Sensor_Id id, Clock::time_point begin, Clock::time_point end)
-{
-    const Sensor* sensor = find_sensor_by_id(id);
-    if (!sensor)
-    {
-        std::cerr << "Cannot find sensor id " << id << "\n";
-        return;
-    }
-
-    std::ofstream stream(filename);
-    if (!stream)
-    {
-        std::cerr << "Cannot open file " << filename << "\n";
-        return;
-    }
-
-    //header
-    stream << "index" << "\t"
-           << "flags" << "\t"
-           << "temperature" << "\t"
-           << "humidity" << "\t"
-           << "vcc" << "\t"
-           << "tx_rssi" << "\t"
-           << "rx_rssi" << "\n";
-
-    for (const Measurement_Entry& entry: m_measurements)
-    {
-        if (entry.time_point < begin)
-        {
-            continue;
-        }
-        if (entry.time_point > end)
-        {
-            break;
-        }
-        auto mit = entry.measurements.find(id);
-        if (mit != entry.measurements.end())
-        {
-            const Measurement& measurement = mit->second;
-            stream << entry.index << "\t"
-                   << measurement.flags << "\t"
-                   << time_point_to_string(entry.time_point) << "\t"
-                   << measurement.temperature << "\t"
-                   << measurement.humidity << "\t"
-                   << measurement.vcc << "\t"
-                   << static_cast<float>(measurement.tx_rssi) << "\t"
-                   << static_cast<float>(measurement.rx_rssi) << "\n";
-        }
-        else
-        {
-            stream << entry.index << "\t"
-                   << "-\t"
-                   << "-\t"
-                   << "-\t"
-                   << "-\t"
-                   << "-\t"
-                   << "-\t"
-                   << "-\n";
-        }
-    }
-}
-
-
 

@@ -43,9 +43,13 @@ bool Comms::init(uint8_t retries)
     m_rf22.set_modulation_type(RFM22B::Modulation_Type::GFSK);
     m_rf22.set_modulation_data_source(RFM22B::Modulation_Data_Source::FIFO);
     m_rf22.set_data_clock_configuration(RFM22B::Data_Clock_Configuration::NONE);
-    m_rf22.set_transmission_power(20);
+    m_rf22.set_transmission_power(0);
     m_rf22.set_gpio_function(RFM22B::GPIO::GPIO0, RFM22B::GPIO_Function::TX_STATE);
     m_rf22.set_gpio_function(RFM22B::GPIO::GPIO1, RFM22B::GPIO_Function::RX_STATE);
+    m_rf22.set_preamble_length(8);
+
+    uint8_t syncwords[] = { 0x2d, 0xd4 };
+    m_rf22.set_sync_words(syncwords, sizeof(syncwords));
 
     printf_P(PSTR("Frequency is %f\n"), m_rf22.get_carrier_frequency());
     printf_P(PSTR("FH Step is %lu\n"), m_rf22.get_frequency_hopping_step_size());
@@ -143,12 +147,14 @@ bool Comms::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload
 {
     if (!data || size <= sizeof(Header))
     {
+        printf_P(PSTR("null or wrong size"));
         return false;
     }
 
     //insufficient data?
-    if (desired_payload_size != 0 && size != sizeof(Header) + desired_payload_size)
+    if (size < sizeof(Header) + desired_payload_size)
     {
+        printf_P(PSTR("insuficient data"));
         return false;
     }
 
@@ -162,12 +168,14 @@ bool Comms::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload
     uint32_t computed_crc = crc32(reinterpret_cast<const uint8_t*>(data), size);
     if (crc != computed_crc)
     {
+        printf_P(PSTR("bad crc"));
         return false;
     }
 
     //not addressed to me?
     if (header_ptr->destination_address != m_address && header_ptr->destination_address != BROADCAST_ADDRESS)
     {
+        printf_P(PSTR("not for me"));
         return false;
     }
 
