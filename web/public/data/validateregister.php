@@ -34,7 +34,7 @@ if(isset($_POST["submit"]))
 		if($query)
 		{
 			$msg = "Thank You! you are now registered.";
-			header('Location: index.php');
+			header('Location: overview.php');
 		}
 	}
 
