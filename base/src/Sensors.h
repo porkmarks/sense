@@ -18,7 +18,16 @@ public:
 
 
     typedef DB::Measurement Measurement;
-    typedef DB::Sensor Sensor;
+
+    struct Sensor : public DB::Sensor
+    {
+        Sensor() = default;
+        Sensor(Sensor const&) = default;
+        Sensor(DB::Sensor const& other) : DB::Sensor(other) {}
+
+        uint32_t first_recorded_measurement_index = 0;
+        uint32_t recorded_measurement_count = 0;
+    };
 
     Sensors(DB& db);
 
@@ -51,6 +60,8 @@ public:
 
     Sensor const* find_sensor_by_id(Sensor_Id id) const;
     Sensor const* find_sensor_by_address(Sensor_Address address) const;
+
+    void set_sensor_measurement_range(Sensor_Id id, uint32_t first_measurement_index, uint32_t  last_measurement_index);
 
     //measurement manipulation
     void add_measurement(Sensor_Id id, Measurement const& measurement);

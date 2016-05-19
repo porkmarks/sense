@@ -1,7 +1,6 @@
 #include "DB.h"
 #include <iostream>
 #include <mysql++/ssqls.h>
-#include "Sensors.h"
 
 sql_create_3(Sensor_Row, 3, 0,
     mysqlpp::sql_int_unsigned, id,
@@ -132,7 +131,7 @@ boost::optional<DB::Expected_Sensor> DB::get_expected_sensor()
     return data;
 }
 
-boost::optional<Sensors::Sensor_Id> DB::add_sensor(std::string const& name, Sensors::Sensor_Address address)
+boost::optional<DB::Sensor_Id> DB::add_sensor(std::string const& name, Sensor_Address address)
 {
     try
     {
@@ -164,7 +163,7 @@ boost::optional<Sensors::Sensor_Id> DB::add_sensor(std::string const& name, Sens
     }
 }
 
-boost::optional<std::vector<Sensors::Sensor>> DB::get_sensors()
+boost::optional<std::vector<DB::Sensor>> DB::get_sensors()
 {
     if (!m_connection)
     {
@@ -194,7 +193,7 @@ boost::optional<std::vector<Sensors::Sensor>> DB::get_sensors()
             sensor.name = row["name"].c_str();
             sensor.address = row["address"];
             mysqlpp::String max_index = row["max_index"];
-            sensor.max_index = max_index.is_null() ? 0 : (uint32_t)max_index;
+            sensor.max_confirmed_measurement_index = max_index.is_null() ? 0 : (uint32_t)max_index;
             sensors.push_back(sensor);
         }
 

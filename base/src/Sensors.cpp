@@ -100,10 +100,6 @@ bool Sensors::init()
     for (DB::Sensor const& s: *sensors)
     {
         m_sensor_cache.emplace_back(s);
-//        if (m_sensor_cache.back().max_index == 0)
-//        {
-//            m_sensor_cache.back().max_index = compute_next_measurement_index();
-//        }
     }
 
     return true;
@@ -120,6 +116,25 @@ Sensors::Sensor const* Sensors::add_expected_sensor()
 
     Sensor const* sensor = add_sensor(expected_sensor->name);
     return sensor;
+}
+
+void Sensors::set_sensor_measurement_range(Sensor_Id id, uint32_t first_measurement_index, uint32_t measurement_count)
+{
+    auto it = std::find_if(m_sensor_cache.begin(), m_sensor_cache.end(), [id](Sensor const& sensor)
+    {
+        return sensor.id == id;
+    });
+    if (it == m_sensor_cache.end())
+    {
+        std::cerr << "Cannot find sensor id " << id << "\n";
+        return;
+    }
+
+    Sensor& sensor = (*it);
+    sensor.first_recorded_measurement_index = first_measurement_index;
+    sensor.recorded_measurement_count = measurement_count;
+
+    sensor.max_confirmed_measurement_index = std::max(sensor.max_confirmed_measurement_index, sensor.first_recorded_measurement_index);
 }
 
 Sensors::Sensor const* Sensors::add_sensor(std::string const& name)
@@ -210,7 +225,7 @@ uint32_t Sensors::compute_last_confirmed_measurement_index(Sensor_Id id) const
         return 0;
     }
 
-    return sensor->max_index;
+    return sensor->max_confirmed_measurement_index;
 }
 
 Sensors::Clock::time_point Sensors::compute_next_comms_time_point(Sensor_Id id) const
@@ -324,96 +339,17 @@ void Sensors::add_measurement(Sensor_Id id, Measurement const& measurement)
 
     Sensor& sensor = *it;
 
-    if (measurement.index > sensor.max_index)
+    if (measurement.index > sensor.max_confirmed_measurement_index)
     {
         Clock::time_point time_point = m_config.baseline_time_point + m_config.measurement_period * measurement.index;
         if (m_db.add_measurement(id, time_point, measurement))
         {
-            if (measurement.index == sensor.max_index + 1)
+            if (measurement.index == sensor.max_confirmed_measurement_index + 1)
             {
-                sensor.max_index++;
+                sensor.max_confirmed_measurement_index++;
             }
         }
     }
-}
-
-void Sensors::_add_measurement(Sensor_Id id, Measurement const& measurement)
-{
-
-//    //find the measurement that is older than time_point - period/2.
-//    Measurement_Entry new_entry;
-//    new_entry.time_point = time_point - m_measurement_period / 2;
-//    auto upper_it = std::upper_bound(m_measurements.begin(), m_measurements.end(), new_entry, [](Measurement_Entry const& e1, Measurement_Entry const& e2)
-//    {
-//        return e1.time_point < e2.time_point;
-//    });
-
-//    if (upper_it != m_measurements.end())
-//    {
-//        //if we found one, check if it's within +- period/2 of the desired timepoint.
-//        //For sure it has to be older than time_point - period/2 because this is what the upper_bound did
-//        Measurement_Entry& entry = *upper_it;
-//        //merge with the entry?
-//        if (std::abs(entry.time_point - time_point) < m_measurement_period / 2)
-//        {
-//            auto it = entry.measurements.find(id);
-//            if (it != entry.measurements.end())
-//            {
-//                Measurement merged = merge_measurements(it->second, measurement);
-//                entry.measurements.emplace(id, merged);
-//            }
-//            else
-//            {
-//                entry.measurements.emplace(id, measurement);
-//            }
-//            return;
-//        }
-//    }
-
-//    //if no proper time slot was found, insert it in place
-//    Measurement_Entry entry;
-//    entry.time_point = time_point;
-//    entry.measurements.emplace(id, measurement);
-
-//    m_measurements.emplace(upper_it, entry);
-
-
-//    //first create missing indices
-//    compute_next_measurement_time_point();
-
-//    //find the measurement that is older than time_point - period/2.
-//    Measurement_Entry new_entry;
-//    new_entry.index = index;
-//    auto entry_it = std::lower_bound(m_measurements.begin(), m_measurements.end(), new_entry, [](Measurement_Entry const& e1, Measurement_Entry const& e2)
-//    {
-//        return e1.index < e2.index;
-//    });
-
-//    if (entry_it != m_measurements.end())
-//    {
-//        Measurement_Entry& entry = *entry_it;
-//        //merge with the entry?
-//        if (entry.index == index)
-//        {
-//            auto it = entry.measurements.find(id);
-//            if (it != entry.measurements.end())
-//            {
-//                Measurement merged = merge_measurements(it->second, measurement);
-//                entry.measurements.emplace(id, merged);
-//            }
-//            else
-//            {
-//                entry.measurements.emplace(id, measurement);
-//            }
-//            return;
-//        }
-//    }
-
-//    std::cerr << "Index " << index << " not found for id " << id << "\n";
-
-
-
-    return;
 }
 
 Sensors::Measurement Sensors::merge_measurements(Sensors::Measurement const& m1, Sensors::Measurement const& m2)

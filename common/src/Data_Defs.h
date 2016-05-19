@@ -15,6 +15,8 @@ enum class Type : uint8_t
     PAIR_RESPONSE,
     CONFIG_REQUEST,
     CONFIG,
+    FIRST_CONFIG_REQUEST,
+    FIRST_CONFIG,
 };
 
 
@@ -56,6 +58,8 @@ struct Measurement
 
 struct Config_Request
 {
+    uint32_t first_measurement_index = 0;
+    uint32_t measurement_count = 0;
 };
 struct Config
 {
@@ -65,9 +69,16 @@ struct Config
     chrono::seconds comms_period;
     chrono::time_s next_measurement_time_point;
     chrono::seconds measurement_period;
-
-    uint32_t next_measurement_index = 0;
     uint32_t last_confirmed_measurement_index = 0;
+};
+
+struct First_Config_Request
+{
+};
+struct First_Config
+{
+    Config config;
+    uint32_t first_measurement_index = 0;
 };
 
 struct Response

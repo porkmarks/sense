@@ -26,7 +26,8 @@ public:
         Sensor_Id id = 0;
         Sensor_Address address = 0;
         std::string name;
-        uint32_t max_index = 0;
+
+        uint32_t max_confirmed_measurement_index = 0;
     };
 
     boost::optional<Expected_Sensor> get_expected_sensor();

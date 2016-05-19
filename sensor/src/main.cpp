@@ -69,7 +69,6 @@ FILE s_uart_output;
 
 //constexpr uint8_t MAX_MEASUREMENTS = 2;
 //std::deque<data::Measurement> s_measurements;
-uint32_t s_next_measurement_index = 0;
 uint32_t s_first_measurement_index = 0;
 
 namespace chrono
@@ -219,17 +218,19 @@ bool apply_config(const data::Config& config)
     s_next_measurement_time_point = config.next_measurement_time_point;
     s_measurement_period = config.measurement_period;
 
-    s_next_measurement_index = config.next_measurement_index;
-
     //remove confirmed measurements
-    while (s_first_measurement_index < config.last_confirmed_measurement_index)
+    while (s_first_measurement_index <= config.last_confirmed_measurement_index)
     {
         if (!s_storage.pop_front())
         {
             LOG(PSTR("Failed to pop storage data. Left: %lu\n"), config.last_confirmed_measurement_index - s_first_measurement_index);
+            s_first_measurement_index = config.last_confirmed_measurement_index + 1;
+            break;
         }
         s_first_measurement_index++;
     };
+
+    uint32_t measurement_count = s_storage.get_data_count();
 
     LOG(PSTR("base time: %lu\n"), config.base_time_point.ticks);
     LOG(PSTR("next comms: %lu\n"), config.next_comms_time_point.ticks);
@@ -238,7 +239,7 @@ bool apply_config(const data::Config& config)
     LOG(PSTR("measurement period: %lu\n"), config.measurement_period.count);
     LOG(PSTR("last confirmed index: %lu\n"), config.last_confirmed_measurement_index);
     LOG(PSTR("first index: %lu\n"), s_first_measurement_index);
-    LOG(PSTR("next index: %lu\n"), s_next_measurement_index);
+    LOG(PSTR("count: %lu\n"), measurement_count);
 
     return true;
 }
@@ -248,7 +249,10 @@ bool apply_config(const data::Config& config)
 bool request_config()
 {
     s_comms.begin_packet(data::Type::CONFIG_REQUEST);
-    s_comms.pack(data::Config_Request());
+    data::Config_Request req;
+    req.first_measurement_index = s_first_measurement_index;
+    req.measurement_count = s_storage.get_data_count();
+    s_comms.pack(req);
     if (s_comms.send_packet(5))
     {
         uint8_t size = s_comms.receive_packet(500);
@@ -257,6 +261,42 @@ bool request_config()
         {
             const data::Config* ptr = reinterpret_cast<const data::Config*>(s_comms.get_packet_payload());
             return apply_config(*ptr);
+        }
+    }
+    return false;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+bool apply_first_config(const data::First_Config& first_config)
+{
+    if (!apply_config(first_config.config))
+    {
+        return false;
+    }
+
+    s_first_measurement_index = first_config.first_measurement_index;
+    s_storage.clear();
+
+    LOG(PSTR("first index: %lu\n"), s_first_measurement_index);
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+bool request_first_config()
+{
+    s_comms.begin_packet(data::Type::FIRST_CONFIG_REQUEST);
+    s_comms.pack(data::First_Config_Request());
+    if (s_comms.send_packet(5))
+    {
+        uint8_t size = s_comms.receive_packet(500);
+        data::Type type = s_comms.get_packet_type();
+        if (type == data::Type::FIRST_CONFIG && size == sizeof(data::First_Config))
+        {
+            const data::First_Config* ptr = reinterpret_cast<const data::First_Config*>(s_comms.get_packet_payload());
+            return apply_first_config(*ptr);
         }
     }
     return false;
@@ -362,8 +402,6 @@ void pair()
 
 void do_measurement()
 {
-    s_next_measurement_index++;
-
     Storage::Data data;
 
     // Reading temperature or humidity takes about 250 milliseconds!
@@ -473,7 +511,7 @@ void first_config()
             break;
         }
 
-        if (request_config())
+        if (request_first_config())
         {
             LOG(PSTR("Received config:\ntime_point: %lu\n"), uint32_t(chrono::now().ticks / 1000ULL));
             s_state = State::MAIN_LOOP;

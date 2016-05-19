@@ -719,10 +719,10 @@ bool RFM22B::send(uint8_t *data, uint8_t length, uint32_t timeout)
     if (elapsed >= timeout)
     {
 #ifdef RASPBERRY_PI
-        std::cerr << "Timeout while sending (" << count << ")\n";
+        //std::cerr << "Timeout while sending (" << count << ")\n";
 #else
-        Serial.print("Timeout while sending - ");
-        Serial.print(count);
+        //Serial.print("Timeout while sending - ");
+        //Serial.print(count);
 #endif
         //reset();
         idle_mode();
@@ -730,10 +730,10 @@ bool RFM22B::send(uint8_t *data, uint8_t length, uint32_t timeout)
     }
 
 #ifdef RASPBERRY_PI
-    std::cout << "Done sending (" << count << ")\n";
+    //std::cout << "Done sending (" << count << ")\n";
 #else
-    Serial.print("Done sending - ");
-    Serial.print(count);
+    //Serial.print("Done sending - ");
+    //Serial.print(count);
 #endif
 
     return true;
@@ -791,19 +791,19 @@ int8_t RFM22B::receive(uint8_t *data, uint8_t length, uint32_t timeout)
     if (elapsed >= timeout)
     {
 #ifdef RASPBERRY_PI
-        std::cerr << "Timeout while receiving (" << count << ")\n";
+        //std::cerr << "Timeout while receiving (" << count << ")\n";
 #else
-        Serial.print("Timeout while receiving - ");
-        Serial.print(count);
+        //Serial.print("Timeout while receiving - ");
+        //Serial.print(count);
 #endif
         idle_mode();
         return -1;
     }
 #ifdef RASPBERRY_PI
-    std::cout << "Done receiving (" << count << ")\n";
+    //std::cout << "Done receiving (" << count << ")\n";
 #else
-    Serial.print("Done receiving - ");
-    Serial.print(count);
+    //Serial.print("Done receiving - ");
+    //Serial.print(count);
 #endif
 
     // Get length of packet received
