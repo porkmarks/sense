@@ -19,6 +19,7 @@
  */
 
 #include "rfm22b.h"
+#include <math.h>
 
 #ifdef RASPBERRY_PI
 #   include "rfm22b_spi.h"
@@ -27,8 +28,14 @@
 #	include <stdio.h>
 #	include <stdlib.h>
 #	include <math.h>
-#else
+#   include <iostream>
+#elif defined __AVR__
 #   include <SPI.h>
+#else
+
+static void delay(int) {}
+static int millis() { return 0; }
+
 #endif
 
 
@@ -55,6 +62,30 @@ bool RFM22B::init()
     return true;
 }
 
+// REVISIT: top bit is in Header Control 2 0x33
+void RFM22B::set_preamble_length(uint8_t nibbles)
+{
+    set_register(Register::PREAMBLE_LENGTH, nibbles);
+}
+
+void RFM22B::set_sync_words(uint8_t const* ptr, uint8_t size)
+{
+    if (size > 4)
+    {
+        size = 4;
+    }
+
+    uint8_t buffer[5] = { 0 };
+
+    buffer[0] = uint8_t(uint8_t(Register::SYNC_WORD_3) | (1 << 7));
+    for (uint8_t i = 0; i < size; i++)
+    {
+        buffer[i + 1] = ptr[i];
+    }
+
+    transfer(buffer, size + 1);
+}
+
 // Set the frequency of the carrier wave
 //	This function calculates the values of the registers 0x75-0x77 to achieve the 
 //	desired carrier wave frequency (without any hopping set)
@@ -64,11 +95,15 @@ bool RFM22B::set_carrier_frequency(float centre, float afcPullInRange)
     uint8_t fbsel = (uint8_t)Frequency_Band_Select::SBSEL;
     uint8_t afclimiter;
     if (centre < 240.0 || centre > 960.0) // 930.0 for early silicon
+    {
         return false;
+    }
     if (centre >= 480.0)
     {
         if (afcPullInRange < 0.0 || afcPullInRange > 0.318750)
+        {
             return false;
+        }
         centre /= 2;
         fbsel |= (uint8_t)Frequency_Band_Select::HBSEL;
         afclimiter = afcPullInRange * 1000000.0 / 1250.0;
@@ -76,7 +111,9 @@ bool RFM22B::set_carrier_frequency(float centre, float afcPullInRange)
     else
     {
         if (afcPullInRange < 0.0 || afcPullInRange > 0.159375)
+        {
             return false;
+        }
         afclimiter = afcPullInRange * 1000000.0 / 625.0;
     }
     centre /= 10.0;
@@ -622,8 +659,10 @@ void RFM22B::clear_tx_fifo()
 }
 
 // Send data
-void RFM22B::send(uint8_t *data, uint8_t length)
+bool RFM22B::send(uint8_t *data, uint8_t length, uint32_t timeout)
 {
+    //idle_mode();
+
     // Clear TX FIFO
     clear_tx_fifo();
 
@@ -640,57 +679,34 @@ void RFM22B::send(uint8_t *data, uint8_t length)
     }
 
     // Copy data from input array to tx array
-    for (uint8_t i = 1; i <= length; i++)
+    for (uint8_t i = 0; i < length; i++)
     {
-        tx[i] = data[i-1];
+        tx[i + 1] = data[i];
     }
+
+    // Make the transfer
+    transfer(tx, length + 1);
 
     // Set the packet length
     set_transmit_packet_length(length);
 
-    // Make the transfer
-    transfer(tx, length+1);
-
     // Enter TX mode
     tx_mode();
-
-    // Loop until packet has been sent (device has left TX mode)
-    while (((get_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_1)>>3) & 1))
-    {}
-
-    return;
-};
-
-// Receive data (blocking with timeout). Returns number of bytes received
-int8_t RFM22B::receive(uint8_t *data, uint8_t length, uint32_t timeout)
-{
-    // Make sure RX FIFO is empty, ready for new data
-    clear_rx_fifo();
-
-    // Enter RX mode
-    rx_mode();
-
-    // Initialise rx and tx arrays
-    uint8_t buffer[MAX_PACKET_LENGTH+1] = { 0 };
-
-    // Set FIFO register address
-    buffer[0] = (uint8_t)Register::FIFO_ACCESS;
 
     // Timing for the interrupt loop timeout
 #ifdef RASPBERRY_PI
     auto start = std::chrono::high_resolution_clock::now();
-    uint32_t elapsed = 0;
 #else
     uint32_t start = millis();
-    uint32_t elapsed = 0;
 #endif
 
-    // Loop endlessly on interrupt or timeout
-    //	Don't use interrupt registers here as these don't seem to behave consistently
-    //	Watch the operating mode register for the device leaving RX mode. This is indicitive
-    //	of a valid packet being received
-    while (((get_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_1)>>2) & 1) && elapsed < timeout)
+    uint32_t elapsed = 0;
+    uint32_t count = 0;
+
+    // Loop until packet has been sent (device has left TX mode)
+    while (((get_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_1)>>3) & 1) && elapsed < timeout)
     {
+        count++;
         // Determine elapsed time
 #ifdef RASPBERRY_PI
         elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
@@ -702,8 +718,93 @@ int8_t RFM22B::receive(uint8_t *data, uint8_t length, uint32_t timeout)
     // If timeout occured, return -1
     if (elapsed >= timeout)
     {
+#ifdef RASPBERRY_PI
+        //std::cerr << "Timeout while sending (" << count << ")\n";
+#else
+        //Serial.print("Timeout while sending - ");
+        //Serial.print(count);
+#endif
+        //reset();
+        idle_mode();
+        return false;
+    }
+
+#ifdef RASPBERRY_PI
+    //std::cout << "Done sending (" << count << ")\n";
+#else
+    //Serial.print("Done sending - ");
+    //Serial.print(count);
+#endif
+
+    return true;
+};
+
+// Receive data (blocking with timeout). Returns number of bytes received
+int8_t RFM22B::receive(uint8_t *data, uint8_t length, uint32_t timeout)
+{
+   //idle_mode();
+
+    // Make sure RX FIFO is empty, ready for new data
+    clear_rx_fifo();
+
+    // Enter RX mode
+    rx_mode();
+//    if (((get_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_1)>>2) & 1) == 0)
+//    {
+//#ifdef RASPBERRY_PI
+//        std::cerr << "Cannot enter RX Mode\n";
+//        return -1;
+//#endif
+//    }
+
+    // Initialise rx and tx arrays
+    uint8_t buffer[MAX_PACKET_LENGTH+1] = { 0 };
+
+    // Set FIFO register address
+    buffer[0] = (uint8_t)Register::FIFO_ACCESS;
+
+    // Timing for the interrupt loop timeout
+#ifdef RASPBERRY_PI
+    auto start = std::chrono::high_resolution_clock::now();
+#else
+    uint32_t start = millis();
+#endif
+    uint32_t elapsed = 0;
+    uint32_t count = 0;
+
+    // Loop endlessly on interrupt or timeout
+    //	Don't use interrupt registers here as these don't seem to behave consistently
+    //	Watch the operating mode register for the device leaving RX mode. This is indicitive
+    //	of a valid packet being received
+    while (((get_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_1)>>2) & 1) && elapsed < timeout)
+    {
+        count++;
+        // Determine elapsed time
+#ifdef RASPBERRY_PI
+        elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+#else
+        elapsed = millis() - start;
+#endif
+    }
+
+    // If timeout occured, return -1
+    if (elapsed >= timeout)
+    {
+#ifdef RASPBERRY_PI
+        //std::cerr << "Timeout while receiving (" << count << ")\n";
+#else
+        //Serial.print("Timeout while receiving - ");
+        //Serial.print(count);
+#endif
+        idle_mode();
         return -1;
     }
+#ifdef RASPBERRY_PI
+    //std::cout << "Done receiving (" << count << ")\n";
+#else
+    //Serial.print("Done receiving - ");
+    //Serial.print(count);
+#endif
 
     // Get length of packet received
     uint8_t rxLength = get_received_packet_length();
@@ -779,9 +880,10 @@ void RFM22B::transfer(uint8_t* data, size_t size)
 {
 #ifdef RASPBERRY_PI
     m_spi.transfer(data, data, size);
-#else
+#elif defined __AVR__
     digitalWrite(SS, LOW);
     SPI.transfer(data, size);
     digitalWrite(SS, HIGH);
+#else
 #endif
 }

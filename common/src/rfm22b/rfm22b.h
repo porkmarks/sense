@@ -25,8 +25,7 @@
  *	frequencies (High or Low bands 24-47, See Table 12 of the datasheet).
  */
 
-#ifndef rfm22b_h
-#define rfm22b_h
+#pragma once
 
 #include <stdint.h>
 #include <stdio.h>
@@ -35,14 +34,18 @@
 #   include "rfm22b_spi.h"
 #endif
 
-class RFM22B {
+class RFM22B
+{
 public:
 #include "rfm22b_enums.h"
 
     // Constructor requires SPI device path, passes this is SPI class
-    RFM22B() {}
+    RFM22B() = default;
 
     bool init();
+
+    void set_preamble_length(uint8_t nibbles);
+    void set_sync_words(uint8_t const* ptr, uint8_t size);
 
     // Set or get the carrier frequency (in Hz);
     bool set_carrier_frequency(float center, float afcPullInRange = 0.05);
@@ -149,10 +152,10 @@ public:
     void clear_tx_fifo();
 
     // Send data
-    void send(uint8_t *data, uint8_t length);
+    bool send(uint8_t *data, uint8_t length, uint32_t timeout = 200);
 
     // Receive data (blocking with timeout). Returns number of bytes received
-    int8_t receive(uint8_t *data, uint8_t length, uint32_t timeout=30000);
+    int8_t receive(uint8_t *data, uint8_t length, uint32_t timeout = 30000);
 
     // Helper functions for getting and getting individual registers
     uint8_t get_register(Register reg);
@@ -174,4 +177,3 @@ private:
 #endif
 
 };
-#endif

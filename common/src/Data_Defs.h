@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <math.h>
+#include "Chrono.h"
 
 namespace data
 {
@@ -14,30 +15,24 @@ enum class Type : uint8_t
     PAIR_RESPONSE,
     CONFIG_REQUEST,
     CONFIG,
+    FIRST_CONFIG_REQUEST,
+    FIRST_CONFIG,
 };
 
 
-#pragma pack(push, 1) // exact fit - no padding
+#ifndef __AVR__
+#   pragma pack(push, 1) // exact fit - no padding
+#endif
 
 struct Measurement
 {
-    enum Flag
+    enum class Flag : uint8_t
     {
-        FLAG_SENSOR_ERROR   = 1 << 0,
-        FLAG_COMMS_FAILED   = 1 << 1
+        SENSOR_ERROR   = 1 << 0,
+        COMMS_ERROR    = 1 << 1
     };
 
-    Measurement() = default;
-
-    Measurement(uint32_t timestamp,
-              uint32_t index,
-              uint8_t flags,
-              float vcc,
-              float humidity,
-              float temperature)
-        : timestamp(timestamp)
-        , index(index)
-        , flags(flags)
+    void pack(float vcc, float humidity, float temperature)
     {
         vcc -= 2.f;
         this->vcc = static_cast<uint8_t>(fmin(fmax(vcc, 0.f), 2.55f) * 100.f);
@@ -53,8 +48,8 @@ struct Measurement
     }
 
 //packed data
-    uint32_t timestamp = 0;
     uint32_t index = 0;
+    //uint32_t time_point = 0; //seconds, since 1970 epoch
     uint8_t flags = 0;
     uint8_t vcc = 0; //(vcc - 2) * 100
     uint8_t humidity = 0; //*2.55
@@ -63,11 +58,27 @@ struct Measurement
 
 struct Config_Request
 {
+    uint32_t first_measurement_index = 0;
+    uint32_t measurement_count = 0;
 };
 struct Config
 {
-    uint32_t server_timestamp = 0;
-    uint32_t scheduled_timestamp = 0;
+    //all are in seconds
+    chrono::time_s base_time_point;
+    chrono::time_s next_comms_time_point;
+    chrono::seconds comms_period;
+    chrono::time_s next_measurement_time_point;
+    chrono::seconds measurement_period;
+    uint32_t last_confirmed_measurement_index = 0;
+};
+
+struct First_Config_Request
+{
+};
+struct First_Config
+{
+    Config config;
+    uint32_t first_measurement_index = 0;
 };
 
 struct Response
@@ -81,10 +92,11 @@ struct Pair_Request
 };
 struct Pair_Response
 {
-    uint32_t server_timestamp = 0;
     uint16_t address = 0;
 };
 
-#pragma pack(pop)
+#ifndef __AVR__
+#   pragma pack(pop)
+#endif
 
 }

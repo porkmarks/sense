@@ -1,4 +1,5 @@
 #include <iostream>
+#include <sstream>
 #include <thread>
 #include <chrono>
 #include <cstring>
@@ -7,147 +8,51 @@
 #include <map>
 #include <set>
 #include <stdio.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <time.h>
+#include <boost/thread.hpp>
 #include "CRC.h"
-#include "Comms.h"
+#include "Client.h"
+#include "Server.h"
 
-#include "rfm22b/rfm22b.h"
 
-static Comms s_comms;
+#define LOG(x) std::cout << x
+#define LOG_LN(x) std::cout << x << std::endl
 
-uint32_t s_last_address = Comms::SLAVE_ADDRESS_BEGIN;
+boost::asio::io_service s_io_service;
+
+static Server s_server(s_io_service);
 
 typedef std::chrono::high_resolution_clock Clock;
 
 
-struct Measurement
-{
-    float humidity = 0;
-    float temperature = 0.f;
-    float vcc = 0.f;
-    float rssi = 0.f;
-};
-
-struct Sensor
-{
-    uint32_t address = 0;
-    std::string name;
-    uint32_t time_slot = 0;
-    Clock::time_point next_comm_tp = Clock::now();
-
-    std::vector<Measurement> measurements;
-};
-
-static Clock::duration s_measurement_period = std::chrono::minutes(5);
-static Clock::duration s_comms_period = std::chrono::minutes(20);
-static Clock::duration s_time_slot_duration = std::chrono::seconds(10);
-
-static std::vector<Sensor> s_sensors;
-static std::set<uint32_t> s_time_slots;
-
-static bool is_slot_taken(uint32_t slot)
-{
-    for (const Sensor& sensor: s_sensors)
-    {
-        if (sensor.time_slot == slot)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
-static uint32_t get_max_slot_count()
-{
-    return static_cast<uint32_t>(s_comms_period / s_time_slot_duration);
-}
-
-static int32_t find_free_slot()
-{
-    uint32_t count = get_max_slot_count();
-    for (uint32_t i = 0; i < count; i++)
-    {
-        if (!is_slot_taken(i))
-        {
-            return static_cast<int32_t>(i);
-        }
-    }
-    return -1;
-}
-
-std::unique_ptr<Sensor> new_sensor()
-{
-    int32_t slot = find_free_slot();
-    if (slot < 0)
-    {
-        uint32_t count = get_max_slot_count();
-        std::cout << "No more empty slots. There is a max number of slots supported: " << count << "\n";
-        return nullptr;
-    }
-
-    std::unique_ptr<Sensor> sensor(new Sensor);
-    sensor->time_slot = slot;
-    return sensor;
-}
+extern std::chrono::high_resolution_clock::time_point string_to_time_point(const std::string& str);
+extern std::string time_point_to_string(std::chrono::high_resolution_clock::time_point tp);
 
 
-// Get current date/time, format is YYYY-MM-DD HH:mm:ss
-std::string date_time(time_t tp)
-{
-    struct tm  tstruct;
-    char       buf[80];
-    tstruct = *localtime(&tp);
-    // Visit http://en.cppreference.com/w/cpp/chrono/c/strftime
-    // for more information about date/time format
-    strftime(buf, sizeof(buf), "%Y-%m-%d %X", &tstruct);
-    return buf;
-}
-std::string current_date_time()
-{
-    return date_time(time(nullptr));
-}
+////////////////////////////////////////////////////////////////////////
 
 int main()
 {
     std::cout << "Starting...\n";
 
-    while (!s_comms.init(5))
+    srand(time(nullptr));
+
+    boost::shared_ptr<boost::asio::io_service::work> work(new boost::asio::io_service::work(s_io_service));
+    boost::thread_group worker_threads;
+    for(int x = 0; x < 8; ++x)
     {
-      std::cout << "init failed \n";
-      return -1;
+      worker_threads.create_thread(boost::bind(&boost::asio::io_service::run, &s_io_service));
     }
 
-    s_comms.set_address(Comms::SERVER_ADDRESS);
+    s_server.start();
 
-    size_t i = 0;
     while (true)
     {
-        uint8_t size = s_comms.receive_packet(1000);
-        if (size > 0)
-        {
-            data::Type type = s_comms.get_packet_type();
-            if (type == data::Type::PAIR_REQUEST && size == sizeof(data::Pair_Request))
-            {
-                data::Pair_Response packet;
-                packet.address = s_last_address++;
-                packet.server_timestamp = time(nullptr);
-                s_comms.begin_packet(data::Type::PAIR_RESPONSE);
-                s_comms.pack(packet);
-                s_comms.send_packet(3);
-            }
-            else if (type == data::Type::MEASUREMENT && size == sizeof(data::Measurement))
-            {
-                const data::Measurement* ptr = reinterpret_cast<const data::Measurement*>(s_comms.get_packet_payload());
-                uint32_t timestamp;
-                uint8_t index;
-                float vcc, t, h;
-                ptr->unpack(vcc, h, t);
-                std::cout << date_time(ptr->timestamp) << " / " << current_date_time() << "\t" << int(ptr->index) << "\tVcc:" << vcc << "V\tH:" << h << "%\tT:" << t << "C" << "\n";
-            }
-        }
-        std::cout << std::flush;
+        s_server.process();
     }
-
 
     return 0;
 }

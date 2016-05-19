@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "Chrono.h"
 
 enum Period_t
 {
@@ -130,14 +131,12 @@ public:
     static void	adc_noise_reduction(Period_t period, ADC_t adc, Timer2_t timer2);
 
     static void	power_down(Period_t period, ADC_t adc = ADC_OFF, BOD_t bod = BOD_OFF);
-    static uint32_t power_down(uint32_t millis, ADC_t adc = ADC_OFF, BOD_t bod = BOD_OFF);
-    static uint32_t power_down_int(uint32_t millis, ADC_t adc = ADC_OFF, BOD_t bod = BOD_OFF);
+    static chrono::millis power_down(chrono::millis duration, ADC_t adc = ADC_OFF, BOD_t bod = BOD_OFF);
+    static chrono::millis power_down_int(chrono::millis duration, ADC_t adc = ADC_OFF, BOD_t bod = BOD_OFF);
 
     static void	power_save(Period_t period, ADC_t adc = ADC_OFF, BOD_t bod = BOD_OFF, Timer2_t timer2 = TIMER2_OFF);
     static void	power_standby(Period_t period, ADC_t adc = ADC_OFF, BOD_t bod = BOD_OFF);
     static void	power_ext_standby(Period_t period, ADC_t adc = ADC_OFF, BOD_t bod = BOD_OFF, Timer2_t timer2 = TIMER2_OFF);
-
-    static uint64_t s_sleep_time;
 
     static bool s_interrupt_fired;
 };

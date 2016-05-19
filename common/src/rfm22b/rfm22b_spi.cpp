@@ -26,7 +26,7 @@ SPI::SPI() {
     }
     set_mode(0);
     set_bits_per_word(8);
-    set_speed(100000);
+    set_speed(1000000);
     set_delay(0);
 }
 

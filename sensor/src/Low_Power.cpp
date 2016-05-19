@@ -94,7 +94,6 @@
 #endif
 
 bool Low_Power::s_interrupt_fired = false;
-uint64_t Low_Power::s_sleep_time = 0;
 
 /*******************************************************************************
 * Name: idle
@@ -844,75 +843,70 @@ void	Low_Power::power_ext_standby(Period_t period, ADC_t adc, BOD_t bod,
 #endif
 }
 
-uint32_t Low_Power::power_down(uint32_t millis, ADC_t adc, BOD_t bod)
+chrono::millis Low_Power::power_down(chrono::millis millis, ADC_t adc, BOD_t bod)
 {
     Serial.flush();
 
-    while (millis >= 15 && s_interrupt_fired == false)
+    while (millis >= chrono::millis(15) && s_interrupt_fired == false)
     {
         Period_t period = SLEEP_15MS;
-        if (millis >= 8000)
+        chrono::millis sleep_duration;
+        if (millis >= chrono::millis(8000))
         {
             period = SLEEP_8S;
-            millis -= 8000;
-            s_sleep_time += 8000;
+            sleep_duration = chrono::millis(8000);
         }
-        else if (millis >= 4000)
+        else if (millis >= chrono::millis(4000))
         {
             period = SLEEP_4S;
-            millis -= 4000;
-            s_sleep_time += 4000;
+            sleep_duration = chrono::millis(4000);
         }
-        else if (millis >= 2000)
+        else if (millis >= chrono::millis(2000))
         {
             period = SLEEP_2S;
-            millis -= 2000;
-            s_sleep_time += 2000;
+            sleep_duration = chrono::millis(2000);
         }
-        else if (millis >= 1000)
+        else if (millis >= chrono::millis(1000))
         {
             period = SLEEP_1S;
-            millis -= 1000;
-            s_sleep_time += 1000;
+            sleep_duration = chrono::millis(1000);
         }
-        else if (millis >= 500)
+        else if (millis >= chrono::millis(500))
         {
             period = SLEEP_500MS;
-            millis -= 500;
-            s_sleep_time += 500;
+            sleep_duration = chrono::millis(500);
         }
-        else if (millis >= 250)
+        else if (millis >= chrono::millis(250))
         {
             period = SLEEP_250MS;
-            millis -= 250;
-            s_sleep_time += 250;
+            sleep_duration = chrono::millis(250);
         }
-        else if (millis >= 120)
+        else if (millis >= chrono::millis(120))
         {
             period = SLEEP_120MS;
-            millis -= 120;
-            s_sleep_time += 120;
+            sleep_duration = chrono::millis(120);
         }
-        else if (millis >= 60)
+        else if (millis >= chrono::millis(60))
         {
             period = SLEEP_60MS;
-            millis -= 60;
-            s_sleep_time += 60;
+            sleep_duration = chrono::millis(60);
         }
-        else if (millis >= 30)
+        else if (millis >= chrono::millis(30))
         {
             period = SLEEP_30MS;
-            millis -= 30;
-            s_sleep_time += 30;
+            sleep_duration = chrono::millis(30);
         }
-        else if (millis >= 15)
+        else if (millis >= chrono::millis(15))
         {
             period = SLEEP_15MS;
-            millis -= 15;
-            s_sleep_time += 15;
+            sleep_duration = chrono::millis(15);
         }
 
+        millis -= sleep_duration;
+
         power_down(period, adc, bod);
+
+        chrono::s_time_point += sleep_duration;
     }
 
     return millis;
@@ -924,7 +918,7 @@ static void pinInterrupt(void)
     Low_Power::s_interrupt_fired = true;
 }
 
-uint32_t Low_Power::power_down_int(uint32_t millis, ADC_t adc, BOD_t bod)
+chrono::millis Low_Power::power_down_int(chrono::millis millis, ADC_t adc, BOD_t bod)
 {
     s_interrupt_fired = false;
 
@@ -936,7 +930,7 @@ uint32_t Low_Power::power_down_int(uint32_t millis, ADC_t adc, BOD_t bod)
         return millis;
     }
 
-    uint32_t remaining = power_down(millis, adc, bod);
+    chrono::millis remaining = power_down(millis, adc, bod);
 
     detachInterrupt(0);
     s_interrupt_fired = false;

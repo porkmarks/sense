@@ -1,12 +1,19 @@
 #include "Comms.h"
 #include "CRC.h"
+#include <string.h>
 
-#ifdef RASPBERRY_PI
+#ifdef __AVR__
+
+#   include <Arduino.h>
+
+#else
+
 #   include <thread>
 #   include <string.h>
 #   define delay(x) std::this_thread::sleep_for(std::chrono::milliseconds(x))
-#else
-#   include <Arduino.h>
+#   define printf_P printf
+#   define PSTR
+
 #endif
 
 Comms::Comms()
@@ -36,19 +43,23 @@ bool Comms::init(uint8_t retries)
     m_rf22.set_modulation_type(RFM22B::Modulation_Type::GFSK);
     m_rf22.set_modulation_data_source(RFM22B::Modulation_Data_Source::FIFO);
     m_rf22.set_data_clock_configuration(RFM22B::Data_Clock_Configuration::NONE);
-    m_rf22.set_transmission_power(20);
+    m_rf22.set_transmission_power(0);
     m_rf22.set_gpio_function(RFM22B::GPIO::GPIO0, RFM22B::GPIO_Function::TX_STATE);
     m_rf22.set_gpio_function(RFM22B::GPIO::GPIO1, RFM22B::GPIO_Function::RX_STATE);
+    m_rf22.set_preamble_length(8);
 
-    printf(("Frequency is %f\n"), m_rf22.get_carrier_frequency());
-    printf(("FH Step is %lu\n"), m_rf22.get_frequency_hopping_step_size());
-    printf(("Channel is %d\n"), (int)m_rf22.get_channel());
-    printf(("Frequency deviation is %lu\n"), m_rf22.get_frequency_deviation());
-    printf(("Data rate is %lu\n"), m_rf22.get_data_rate());
-    printf(("Modulation Type %d\n"), (int)m_rf22.get_modulation_type());
-    printf(("Modulation Data Source %d\n"), (int)m_rf22.get_modulation_data_source());
-    printf(("Data Clock Configuration %d\n"), (int)m_rf22.get_data_clock_configuration());
-    printf(("Transmission Power is %d\n"), (int)m_rf22.get_transmission_power());
+    uint8_t syncwords[] = { 0x2d, 0xd4 };
+    m_rf22.set_sync_words(syncwords, sizeof(syncwords));
+
+    printf_P(PSTR("Frequency is %f\n"), m_rf22.get_carrier_frequency());
+    printf_P(PSTR("FH Step is %lu\n"), m_rf22.get_frequency_hopping_step_size());
+    printf_P(PSTR("Channel is %d\n"), (int)m_rf22.get_channel());
+    printf_P(PSTR("Frequency deviation is %lu\n"), m_rf22.get_frequency_deviation());
+    printf_P(PSTR("Data rate is %lu\n"), m_rf22.get_data_rate());
+    printf_P(PSTR("Modulation Type %d\n"), (int)m_rf22.get_modulation_type());
+    printf_P(PSTR("Modulation Data Source %d\n"), (int)m_rf22.get_modulation_data_source());
+    printf_P(PSTR("Data Clock Configuration %d\n"), (int)m_rf22.get_data_clock_configuration());
+    printf_P(PSTR("Transmission Power is %d\n"), (int)m_rf22.get_transmission_power());
 
     m_rf22.stand_by_mode();
 
@@ -112,7 +123,7 @@ bool Comms::send_packet(uint8_t retries)
     uint8_t i = 0;
     for (i = 0; i < retries; i++)
     {
-        m_rf22.send(m_buffer, sizeof(Header) + m_offset);
+        m_rf22.send(m_buffer, sizeof(Header) + m_offset, 100);
         int8_t size = m_rf22.receive(response_buffer, sizeof(response_buffer), 100);
         if (size > 0)
         {
@@ -136,12 +147,14 @@ bool Comms::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload
 {
     if (!data || size <= sizeof(Header))
     {
+        printf_P(PSTR("null or wrong size"));
         return false;
     }
 
     //insufficient data?
-    if (desired_payload_size != 0 && size != sizeof(Header) + desired_payload_size)
+    if (size < sizeof(Header) + desired_payload_size)
     {
+        printf_P(PSTR("insuficient data"));
         return false;
     }
 
@@ -155,12 +168,14 @@ bool Comms::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload
     uint32_t computed_crc = crc32(reinterpret_cast<const uint8_t*>(data), size);
     if (crc != computed_crc)
     {
+        printf_P(PSTR("bad crc"));
         return false;
     }
 
     //not addressed to me?
     if (header_ptr->destination_address != m_address && header_ptr->destination_address != BROADCAST_ADDRESS)
     {
+        printf_P(PSTR("not for me"));
         return false;
     }
 
@@ -193,17 +208,39 @@ void Comms::send_response(const Header& header)
 
 uint8_t Comms::receive_packet(uint32_t timeout)
 {
-    int8_t size = m_rf22.receive(m_buffer, RFM22B::MAX_PACKET_LENGTH, timeout);
-    if (size > 0 && static_cast<uint8_t>(size) > sizeof(Header))
-    {
-        if (validate_packet(m_buffer, size, 0))
-        {
-            Header* header_ptr = reinterpret_cast<Header*>(m_buffer);
-            send_response(*header_ptr);
+#ifdef __AVR__
+    uint32_t start = millis();
+    uint32_t elapsed = 0;
+#else
+    auto start = std::chrono::high_resolution_clock::now();
+    uint32_t elapsed = 0;
+#endif
 
-            return size - sizeof(Header);
+    do
+    {
+        int8_t size = m_rf22.receive(m_buffer, RFM22B::MAX_PACKET_LENGTH, timeout - elapsed);
+        if (size > 0 && static_cast<uint8_t>(size) > sizeof(Header))
+        {
+            if (validate_packet(m_buffer, size, 0))
+            {
+                if (get_packet_type() != data::Type::RESPONSE) //ignore protocol packets
+                {
+                    Header* header_ptr = reinterpret_cast<Header*>(m_buffer);
+                    send_response(*header_ptr);
+
+                    return size - sizeof(Header);
+                }
+            }
         }
-    }
+
+#ifdef __AVR__
+        elapsed = millis() - start;
+#else
+        elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+#endif
+
+    } while (elapsed < timeout);
+
     return 0;
 }
 

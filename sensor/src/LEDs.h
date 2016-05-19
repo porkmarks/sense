@@ -13,38 +13,38 @@ inline void set_leds(uint8_t leds)
     digitalWrite(RED_LED_PIN, (leds & RED_LED) ? HIGH : LOW);
 }
 
-inline void blink_leds(uint8_t leds, uint8_t times, uint16_t period)
+inline void blink_leds(uint8_t leds, uint8_t times, chrono::millis period)
 {
     for (uint8_t i = 0; i < times; i++)
     {
         set_leds(leds);
-        uint32_t r = Low_Power::power_down_int(period >> 1);
-        delay(r);
+        chrono::millis r = Low_Power::power_down_int(chrono::millis(period.count >> 1));
+        chrono::delay(r);
         set_leds(0);
-        r = Low_Power::power_down_int(period >> 1);
-        delay(r);
+        r = Low_Power::power_down_int(chrono::millis(period.count >> 1));
+        chrono::delay(r);
     }
     set_leds(0);
 }
 
-inline void fade_in_leds(uint8_t leds, uint16_t duration)
+inline void fade_in_leds(uint8_t leds, chrono::millis duration)
 {
-    if (duration == 0)
+    if (duration.count == 0)
     {
         set_leds(leds);
         return;
     }
 
-    uint32_t start = millis();
+    chrono::time_ms start = chrono::now();
     do
     {
-        uint32_t elapsed = millis() - start;
+        chrono::millis elapsed = chrono::now() - start;
         if (elapsed > duration)
         {
             break;
         }
 
-        uint32_t duty_cycle = 1024ULL * elapsed / duration;
+        uint32_t duty_cycle = 1024ULL * elapsed.count / duration.count;
         set_leds(leds);
         delayMicroseconds(duty_cycle);
         set_leds(0);
@@ -54,24 +54,24 @@ inline void fade_in_leds(uint8_t leds, uint16_t duration)
     set_leds(leds);
 }
 
-inline void fade_out_leds(uint8_t leds, uint16_t duration)
+inline void fade_out_leds(uint8_t leds, chrono::millis duration)
 {
-    if (duration == 0)
+    if (duration.count == 0)
     {
         set_leds(0);
         return;
     }
 
-    uint32_t start = millis();
+    chrono::time_ms start = chrono::now();
     do
     {
-        uint32_t elapsed = millis() - start;
+        chrono::millis elapsed = chrono::now() - start;
         if (elapsed > duration)
         {
             break;
         }
 
-        uint32_t duty_cycle = 1024ULL * elapsed / duration;
+        uint32_t duty_cycle = 1024ULL * elapsed.count / duration.count;
         set_leds(0);
         delayMicroseconds(duty_cycle);
         set_leds(leds);

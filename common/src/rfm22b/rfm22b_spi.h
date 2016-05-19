@@ -1,5 +1,4 @@
-#ifndef spi_h
-#define spi_h
+#pragma once
 
 #ifdef RASPBERRY_PI
 
@@ -20,7 +19,7 @@ public:
     uint8_t get_bits_per_word();
 	
 	// Set or get the SPI clock speed
-    void set_speed(uint32_t m_speed);
+    void set_speed(uint32_t speed);
     uint32_t get_speed();
 	
 	// Set or get the SPI delay
@@ -45,7 +44,5 @@ private:
     uint32_t m_speed = 0;
     uint16_t m_delay = 0;
 };
-
-#endif
 
 #endif

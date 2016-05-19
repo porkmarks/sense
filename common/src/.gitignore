@@ -1,3 +1,7 @@
 *.d
 *.lst
 *.o
+/Comms.lst
+/Comms.o
+/CRC.lst
+/CRC.o
