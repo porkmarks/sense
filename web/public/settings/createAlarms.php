@@ -17,7 +17,7 @@
 
 <div id="Content">
     <?php
-      include('../data/sideBarSettings.php');
+      include('sideBarSettings.php');
     ?>
     <div id="ContentRight">
       <h2>Alarms</h2>
@@ -83,7 +83,7 @@
         
     <div class='alert info'>
       <p>These are your alarms.
-      <a href='https://my.sensorist.com/data/alarms'>Click here</a> to view their notification history.
+      <a href='data/alarms.php'>Click here</a> to view their notification history.
       </p>
     </div>
 

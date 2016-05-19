@@ -2,7 +2,7 @@
 	<nav id = "LeftNav">
 	<ol>
 		<li>
-			<h3><a href="logout.php" style="text-decoration: none">Logout</a></h3>
+			<h3><a href="../data/logout.php" style="text-decoration: none">Logout</a></h3>
 		</li>
 
 		<li>
@@ -22,7 +22,7 @@
 <div id="NavBar">
 	<nav id="MainNav">
 		<ul>
-			<li><a href = "overview.php" style="text-decoration: none">Data</a></li>
+			<li><a href = "../data/overview.php" style="text-decoration: none">Data</a></li>
 			<li><a href = "../settings/details.php" style="text-decoration: none">Settings</a></li>
 		</ul>
 		<script>

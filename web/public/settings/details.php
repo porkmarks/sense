@@ -19,7 +19,7 @@
 
 <div id="Content">
 		<?php
-			include('../data/sideBarSettings.php');
+			include('sideBarSettings.php');
 		?>
 		<div id="ContentRight">
 			<div class="right">
@@ -64,7 +64,7 @@
 				<label for='email' class='mandatory'>Email</label>
 			</td>
 			<td valign="top">
-				<input type='email' id='email' name='email' value=$_SESSION["email"] class='mandatory' />
+				<input type='email' id='email' name='email' value="<?php echo $_SESSION["email"] ?>" class='mandatory' />
 			</td>
 		</tr>
       

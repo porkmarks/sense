@@ -17,7 +17,7 @@
 
 <div id="Content">
 		<?php
-			include('../data/sideBarSettings.php');
+			include('sideBarSettings.php');
 		?>
 		<div id="ContentRight">
 			DETALII!!!!!

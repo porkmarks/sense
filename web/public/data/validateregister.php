@@ -4,7 +4,7 @@ include ("db.php");
 
 if(isset($_POST["submit"]))
 {
-	$db = mysqli_connect(DB_SERVER,DB_USERNAME,DB_PASSWORD,DB_DATABASE);
+	$db = $_SESSION["mainDb"];
 
 	if (mysqli_connect_errno())
 	{

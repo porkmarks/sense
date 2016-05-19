@@ -3,12 +3,9 @@
 include("db.php");
 if(isset($_POST["submit"]))
 {
-	$db = mysqli_connect(DB_SERVER,DB_USERNAME,DB_PASSWORD,DB_DATABASE);
+	$db = $_SESSION["mainDb"];
 
-	if (mysqli_connect_errno())
-	{
-		echo "Failed to connect to MySQL: " . mysqli_connect_error();
-	}
+	
 	$email = $_POST["email"];
 	$password = md5($_POST["password"]);
 	
@@ -16,13 +13,23 @@ if(isset($_POST["submit"]))
 	$sql="SELECT * FROM Users WHERE email='$email' AND password = '$password' ";
 	$result=mysqli_query($db,$sql);
 	$row=mysqli_fetch_array($result,MYSQLI_ASSOC);
+
 	
 	if(mysqli_num_rows($result) == 1)
 	{
 		session_start();
 		$_SESSION["name"] = $row["name"];
-		$_SESSION["email"] = $email;
-		header("Location: overview.php");
+		$_SESSION["email"] = $row["email"];
+
+
+		$_SESSION["sensorsDb"] = mysqli_connect(DB_SERVER, DB_USERNAME, DB_PASSWORD, $row["sensors_database"]);
+		if (mysqli_connect_errno())
+		{
+			echo "Failed to connect to MySQL: " . mysqli_connect_error();
+		}
+
+
+		//header("Location: overview.php");
 	}
 	else
 	{
@@ -30,9 +37,7 @@ if(isset($_POST["submit"]))
 		header('Location: login.php?error=Sorry...Password/user combination not good..."');
 		
 		
-	}
-
-	
+	}	
 }
 
 ?>
