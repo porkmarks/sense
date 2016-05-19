@@ -29,7 +29,7 @@ if(isset($_POST["submit"]))
 		}
 
 
-		//header("Location: overview.php");
+		header("Location: overview.php");
 	}
 	else
 	{
