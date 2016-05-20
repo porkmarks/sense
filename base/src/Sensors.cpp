@@ -100,6 +100,7 @@ bool Sensors::init()
     for (DB::Sensor const& s: *sensors)
     {
         m_sensor_cache.emplace_back(s);
+        m_last_address = std::max<uint32_t>(m_last_address, s.address);
     }
 
     return true;

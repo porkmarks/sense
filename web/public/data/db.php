@@ -3,9 +3,9 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-define('DB_SERVER', 'localhost');
-define('DB_USERNAME', 'root');
-define('DB_PASSWORD', 'kkpork1237');
+define('DB_SERVER', '192.168.1.36');
+define('DB_USERNAME', 'sense');
+define('DB_PASSWORD', 'nHP3cNx4WTwpGaFP');
 define('DB_DATABASE', 'TempR');
 
 if (!isset($_SESSION["mainDb"]))

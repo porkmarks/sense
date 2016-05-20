@@ -3,9 +3,9 @@
 		<p>Settings</p><br>
 
 		<a href="details.php" style="text-decoration: none">My details<br>
-		<a href="devicelist.php" style="text-decoration: none">Device list</a><br>
-		<a href="sensorsettings.php" style="text-decoration: none">Sensor settings</a><br>
-		<a href="addgateway.php" style="text-decoration: none">Add gateway</a><br>
+		<a href="deviceList.php" style="text-decoration: none">Device list</a><br>
+		<a href="sensorSettings.php" style="text-decoration: none">Sensor settings</a><br>
+		<a href="addGateway.php" style="text-decoration: none">Add gateway</a><br>
 		<a href="createAlarms.php" style="text-decoration: none">Create alarms</a>
 		<!--highlight the current section of the navigation bar-->
 	<script>
