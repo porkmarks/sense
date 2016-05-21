@@ -48,7 +48,7 @@ bool RFM22B::init()
 
     // Get the device type and check it
     // This also tests whether we are really connected to a device
-    uint8_t deviceType = get_register(Register::DEVICE_TYPE);
+    uint8_t deviceType = get_register(Register::DEVICE_TYPE_00);
     if (deviceType != (uint8_t)Device_Type::RX_TRX
             && deviceType != (uint8_t)Device_Type::TX)
     {
@@ -62,10 +62,50 @@ bool RFM22B::init()
     return true;
 }
 
+void RFM22B::set_modem_configuration(uint8_t data[28])
+{
+    uint8_t const* ptr = data;
+    set_register(Register::IF_FILTER_BANDWIDTH_1C, *ptr++);
+    set_register(Register::AFC_LOOP_GEARSHIFT_OVERRIDE_1D, *ptr++);
+
+    set_register(Register::CLOCK_RECOVERY_OVERSAMPLING_RATIO_20, *ptr++);
+    set_register(Register::CLOCK_RECOVERY_OFFSET_2_21, *ptr++);
+    set_register(Register::CLOCK_RECOVERY_OFFSET_1_22, *ptr++);
+    set_register(Register::CLOCK_RECOVERY_OFFSET_0_23, *ptr++);
+
+    set_register(Register::CLOCK_RECOVERT_TIMING_LOOP_GAIN_1_24, *ptr++);
+    set_register(Register::CLOCK_RECOVERT_TIMING_LOOP_GAIN_0_25, *ptr++);
+
+    set_register(Register::AFC_LIMITER_2A, *ptr++);
+    set_register(Register::OOK_COUNTER_VALUE_1_2C, *ptr++);
+    set_register(Register::OOK_COUNTER_VALUE_2_2D, *ptr++);
+    set_register(Register::SLICER_PEAK_HOLD_2E, *ptr++);
+
+    set_register(Register::DATA_ACCESS_CONTROL_30, *ptr++);
+    set_register(Register::HEADER_CONTROL_2_33, *ptr++);
+    set_register(Register::PREAMBLE_LENGTH_34, *ptr++);
+    set_register(Register::PREAMBLE_DETECTION_CONTROL_35, *ptr++);
+    set_register(Register::SYNC_WORD_3_36, *ptr++);
+    set_register(Register::SYNC_WORD_2_37, *ptr++);
+    set_register(Register::SYNC_WORD_1_38, *ptr++);
+    set_register(Register::SYNC_WORD_0_39, *ptr++);
+
+    set_register(Register::TX_DATA_RATE_1_6E, *ptr++);
+    set_register(Register::TX_DATA_RATE_0_6F, *ptr++);
+
+    set_register(Register::MODULATION_MODE_CONTROL_1_70, *ptr++);
+    set_register(Register::MODULATION_MODE_CONTROL_2_71, *ptr++);
+    set_register(Register::FREQUENCY_DEVIATION_72, *ptr++);
+
+    set_register(Register::FREQUENCY_BAND_SELECT_75, *ptr++);
+    set_register(Register::NOMINAL_CARRIER_FREQUENCY_1_76, *ptr++);
+    set_register(Register::NOMINAL_CARRIER_FREQUENCY_0_77, *ptr++);
+}
+
 // REVISIT: top bit is in Header Control 2 0x33
 void RFM22B::set_preamble_length(uint8_t nibbles)
 {
-    set_register(Register::PREAMBLE_LENGTH, nibbles);
+    set_register(Register::PREAMBLE_LENGTH_34, nibbles);
 }
 
 void RFM22B::set_sync_words(uint8_t const* ptr, uint8_t size)
@@ -77,7 +117,7 @@ void RFM22B::set_sync_words(uint8_t const* ptr, uint8_t size)
 
     uint8_t buffer[5] = { 0 };
 
-    buffer[0] = uint8_t(uint8_t(Register::SYNC_WORD_3) | (1 << 7));
+    buffer[0] = uint8_t(uint8_t(Register::SYNC_WORD_3_36) | (1 << 7));
     for (uint8_t i = 0; i < size; i++)
     {
         buffer[i + 1] = ptr[i];
@@ -123,13 +163,13 @@ bool RFM22B::set_carrier_frequency(float centre, float afcPullInRange)
     uint8_t fb = (uint8_t)integerPart - 24; // Range 0 to 23
     fbsel |= fb;
     uint16_t fc = fractionalPart * 64000;
-    set_register(Register::FREQUENCY_OFFSET_1, 0);  // REVISIT
-    set_register(Register::FREQUENCY_OFFSET_2, 0);
-    set_register(Register::FREQUENCY_BAND_SELECT, fbsel);
-    set_register(Register::NOMINAL_CARRIER_FREQUENCY_1, fc >> 8);
-    set_register(Register::NOMINAL_CARRIER_FREQUENCY_0, fc & 0xff);
-    set_register(Register::AFC_LIMITER, afclimiter);
-    return !(get_register(Register::DEVICE_STATUS) & (uint8_t)Device_Status::FREQERR);
+    set_register(Register::FREQUENCY_OFFSET_1_73, 0);  // REVISIT
+    set_register(Register::FREQUENCY_OFFSET_2_74, 0);
+    set_register(Register::FREQUENCY_BAND_SELECT_75, fbsel);
+    set_register(Register::NOMINAL_CARRIER_FREQUENCY_1_76, fc >> 8);
+    set_register(Register::NOMINAL_CARRIER_FREQUENCY_0_77, fc & 0xff);
+    set_register(Register::AFC_LIMITER_2A, afclimiter);
+    return !(get_register(Register::DEVICE_STATUS_02) & (uint8_t)Device_Status::FREQERR);
 }
 
 // Get the frequency of the carrier wave in integer Hertz
@@ -137,9 +177,9 @@ bool RFM22B::set_carrier_frequency(float centre, float afcPullInRange)
 float RFM22B::get_carrier_frequency()
 {
     // Read the register values
-    uint8_t fbs = get_register(Register::FREQUENCY_BAND_SELECT);
-    uint8_t ncf1 = get_register(Register::NOMINAL_CARRIER_FREQUENCY_1);
-    uint8_t ncf0 = get_register(Register::NOMINAL_CARRIER_FREQUENCY_0);
+    uint8_t fbs = get_register(Register::FREQUENCY_BAND_SELECT_75);
+    uint8_t ncf1 = get_register(Register::NOMINAL_CARRIER_FREQUENCY_1_76);
+    uint8_t ncf0 = get_register(Register::NOMINAL_CARRIER_FREQUENCY_0_77);
 
     // The following calculations ceom from Section 3.5.1 of the datasheet
 
@@ -164,21 +204,21 @@ void RFM22B::set_frequency_hopping_step_size(uint32_t step)
     {
         step = uint32_t(2550000);
     }
-    set_register(Register::FREQUENCY_HOPPING_STEP_SIZE, step/10000);
+    set_register(Register::FREQUENCY_HOPPING_STEP_SIZE_7A, step/10000);
 }
 uint32_t RFM22B::get_frequency_hopping_step_size()
 {
-    return get_register(Register::FREQUENCY_HOPPING_STEP_SIZE)*uint32_t(10000);
+    return get_register(Register::FREQUENCY_HOPPING_STEP_SIZE_7A)*uint32_t(10000);
 }
 
 // Get and set the frequency hopping channel
 void RFM22B::set_channel(uint8_t channel)
 {
-    set_register(Register::FREQUENCY_HOPPING_CHANNEL_SELECT, channel);
+    set_register(Register::FREQUENCY_HOPPING_CHANNEL_SELECT_79, channel);
 }
 uint8_t RFM22B::get_channel()
 {
-    return get_register(Register::FREQUENCY_HOPPING_CHANNEL_SELECT);
+    return get_register(Register::FREQUENCY_HOPPING_CHANNEL_SELECT_79);
 }
 
 // Set or get the frequency deviation (in Hz, but floored to the nearest 625Hz)
@@ -188,18 +228,18 @@ void RFM22B::set_frequency_deviation(uint32_t deviation)
     {
         deviation = uint32_t(320000);
     }
-    set_register(Register::FREQUENCY_DEVIATION, deviation/625);
+    set_register(Register::FREQUENCY_DEVIATION_72, deviation/625);
 }
 uint32_t RFM22B::get_frequency_deviation()
 {
-    return get_register(Register::FREQUENCY_DEVIATION)*625;
+    return uint32_t(get_register(Register::FREQUENCY_DEVIATION_72))*625ULL;
 }
 
 // Set or get the data rate (bps)
 void RFM22B::set_data_rate(uint32_t rate)
 {
     // Get the Modulation Mode Control 1 register (for scaling bit)
-    uint8_t mmc1 = get_register(Register::MODULATION_MODE_CONTROL_1);
+    uint8_t mmc1 = get_register(Register::MODULATION_MODE_CONTROL_1_70);
 
     uint16_t txdr;
     // Set the scale bit (5th bit of 0x70) high if data rate is below 30kbps
@@ -207,37 +247,43 @@ void RFM22B::set_data_rate(uint32_t rate)
     if (rate < uint32_t(30000))
     {
         mmc1 |= (1<<5);
-        txdr = rate * ((uint32_t(1) << (16 + 5)) / uint32_t(1E6));
+        uint64_t scale = 1LL << (16 + 5);
+        uint64_t xrate = rate * scale;
+        txdr = xrate / 1000000LL;
     }
     else
     {
         mmc1 &= ~(1<<5);
-        txdr = rate * ((uint32_t(1) << (16)) / uint32_t(1E6));
+        uint64_t scale = 1LL << (16);
+        uint64_t xrate = rate * scale;
+        txdr = xrate / 1000000LL;
     }
 
     // Set the data rate bytes
-    set_register16(Register::TX_DATA_RATE_1, txdr);
+    set_register16(Register::TX_DATA_RATE_1_6E, txdr);
 
     // Set the scaling byte
-    set_register(Register::MODULATION_MODE_CONTROL_1, mmc1);
+    set_register(Register::MODULATION_MODE_CONTROL_1_70, mmc1);
 }
 uint32_t RFM22B::get_data_rate()
 {
     // Get the data rate scaling value (5th bit of 0x70)
-    uint8_t txdtrtscale = (get_register(Register::MODULATION_MODE_CONTROL_1) >> 5) & 1;
+    uint8_t txdtrtscale = (get_register(Register::MODULATION_MODE_CONTROL_1_70) >> 5) & 1;
 
     // Get the data rate registers
-    uint16_t txdr = get_register16(Register::TX_DATA_RATE_1);
+    uint64_t txdr = get_register16(Register::TX_DATA_RATE_1_6E);
 
     // Return the data rate (in bps, hence extra 1E3)
-    return ((uint32_t) txdr * uint32_t(1E6)) / (uint32_t(1) << (16 + 5 * txdtrtscale));
+    uint64_t rate = txdr * 1000000LL;
+    uint64_t scale = 1LL << (16 + 5 * txdtrtscale);
+    return rate / scale;
 }
 
 // Set or get the modulation type
 void RFM22B::set_modulation_type(Modulation_Type modulation)
 {
     // Get the Modulation Mode Control 2 register
-    uint8_t mmc2 = get_register(Register::MODULATION_MODE_CONTROL_2);
+    uint8_t mmc2 = get_register(Register::MODULATION_MODE_CONTROL_2_71);
 
     // Clear the modtyp bits
     mmc2 &= ~0x03;
@@ -246,12 +292,12 @@ void RFM22B::set_modulation_type(Modulation_Type modulation)
     mmc2 |= (uint8_t)modulation;
 
     // Set the register
-    set_register(Register::MODULATION_MODE_CONTROL_2, mmc2);
+    set_register(Register::MODULATION_MODE_CONTROL_2_71, mmc2);
 }
 RFM22B::Modulation_Type RFM22B::get_modulation_type()
 {
     // Get the Modulation Mode Control 2 register
-    uint8_t mmc2 = get_register(Register::MODULATION_MODE_CONTROL_2);
+    uint8_t mmc2 = get_register(Register::MODULATION_MODE_CONTROL_2_71);
 
     // Determine modtyp bits
     uint8_t modtyp = mmc2 & 0x03;
@@ -274,7 +320,7 @@ RFM22B::Modulation_Type RFM22B::get_modulation_type()
 void RFM22B::set_modulation_data_source(Modulation_Data_Source source)
 {
     // Get the Modulation Mode Control 2 register
-    uint8_t mmc2 = get_register(Register::MODULATION_MODE_CONTROL_2);
+    uint8_t mmc2 = get_register(Register::MODULATION_MODE_CONTROL_2_71);
 
     // Clear the dtmod bits
     mmc2 &= ~(0x03<<4);
@@ -283,12 +329,12 @@ void RFM22B::set_modulation_data_source(Modulation_Data_Source source)
     mmc2 |= (uint8_t)source << 4;
 
     // Set the register
-    set_register(Register::MODULATION_MODE_CONTROL_2, mmc2);
+    set_register(Register::MODULATION_MODE_CONTROL_2_71, mmc2);
 }
 RFM22B::Modulation_Data_Source RFM22B::get_modulation_data_source()
 {
     // Get the Modulation Mode Control 2 register
-    uint8_t mmc2 = get_register(Register::MODULATION_MODE_CONTROL_2);
+    uint8_t mmc2 = get_register(Register::MODULATION_MODE_CONTROL_2_71);
 
     // Determine modtyp bits
     uint8_t dtmod = (mmc2 >> 4) & 0x03;
@@ -311,7 +357,7 @@ RFM22B::Modulation_Data_Source RFM22B::get_modulation_data_source()
 void RFM22B::set_data_clock_configuration(Data_Clock_Configuration clock)
 {
     // Get the Modulation Mode Control 2 register
-    uint8_t mmc2 = get_register(Register::MODULATION_MODE_CONTROL_2);
+    uint8_t mmc2 = get_register(Register::MODULATION_MODE_CONTROL_2_71);
 
     // Clear the trclk bits
     mmc2 &= ~(0x03<<6);
@@ -320,12 +366,12 @@ void RFM22B::set_data_clock_configuration(Data_Clock_Configuration clock)
     mmc2 |= (uint8_t)clock << 6;
 
     // Set the register
-    set_register(Register::MODULATION_MODE_CONTROL_2, mmc2);
+    set_register(Register::MODULATION_MODE_CONTROL_2_71, mmc2);
 }
 RFM22B::Data_Clock_Configuration RFM22B::get_data_clock_configuration()
 {
     // Get the Modulation Mode Control 2 register
-    uint8_t mmc2 = get_register(Register::MODULATION_MODE_CONTROL_2);
+    uint8_t mmc2 = get_register(Register::MODULATION_MODE_CONTROL_2_71);
 
     // Determine modtyp bits
     uint8_t dtmod = (mmc2 >> 6) & 0x03;
@@ -355,7 +401,7 @@ void RFM22B::set_transmission_power(uint8_t power)
     }
 
     // Get the TX power register
-    uint8_t txp = get_register(Register::TX_POWER);
+    uint8_t txp = get_register(Register::TX_POWER_6D);
 
     // Clear txpow bits
     txp &= ~(0x07);
@@ -367,12 +413,12 @@ void RFM22B::set_transmission_power(uint8_t power)
     txp |= txpow;
 
     // Set the register
-    set_register(Register::TX_POWER, txp);
+    set_register(Register::TX_POWER_6D, txp);
 }
 uint8_t RFM22B::get_transmission_power()
 {
     // Get the TX power register
-    uint8_t txp = get_register(Register::TX_POWER);
+    uint8_t txp = get_register(Register::TX_POWER_6D);
 
     // Get the txpow bits
     uint8_t txpow = txp & 0x07;
@@ -418,7 +464,7 @@ uint8_t RFM22B::get_gpio_function(GPIO gpio)
 void RFM22B::set_interrupt_enable(Interrupt interrupt, bool enable)
 {
     // Get the (16 bit) register value
-    uint16_t intEnable = get_register16(Register::INTERRUPT_ENABLE_1);
+    uint16_t intEnable = get_register16(Register::INTERRUPT_ENABLE_1_05);
 
     // Either enable or disable the interrupt
     if (enable)
@@ -431,14 +477,14 @@ void RFM22B::set_interrupt_enable(Interrupt interrupt, bool enable)
     }
 
     // Set the (16 bit) register value
-    set_register16(Register::INTERRUPT_ENABLE_1, intEnable);
+    set_register16(Register::INTERRUPT_ENABLE_1_05, intEnable);
 }
 
 // Get the status of an interrupt
 bool RFM22B::get_interrupt_status(Interrupt interrupt)
 {
     // Get the (16 bit) register value
-    uint16_t intStatus = get_register16(Register::INTERRUPT_STATUS_1);
+    uint16_t intStatus = get_register16(Register::INTERRUPT_STATUS_1_03);
 
     // Determine if interrupt bit is set and return
     if ((intStatus & (uint8_t)interrupt) > 0)
@@ -456,13 +502,13 @@ bool RFM22B::get_interrupt_status(Interrupt interrupt)
 //	It expects a bitwise-ORed combination of the modes you want set
 void RFM22B::set_operating_mode(uint16_t mode)
 {
-    set_register16(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_1, mode);
+    set_register16(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_1_07, mode);
 }
 
 // Get operating mode (bitwise-ORed)
 uint16_t RFM22B::get_operating_moed()
 {
-    return get_register16(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_1);
+    return get_register16(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_1_07);
 }
 
 // Manuall enter RX or TX mode
@@ -498,35 +544,35 @@ void RFM22B::sleep_mode()
 
 void RFM22B::stand_by_mode()
 {
-    get_register(Register::INTERRUPT_STATUS_1);
-    get_register(Register::INTERRUPT_STATUS_2);
+    get_register(Register::INTERRUPT_STATUS_1_03);
+    get_register(Register::INTERRUPT_STATUS_2_04);
     set_operating_mode(0);
 }
 
 // Set or get the trasmit header
 void RFM22B::set_transmit_header(uint32_t header)
 {
-    set_register32(Register::TRANSMIT_HEADER_3, header);
+    set_register32(Register::TRANSMIT_HEADER_3_3A, header);
 }
 uint32_t RFM22B::get_transmit_header()
 {
-    return get_register32(Register::TRANSMIT_HEADER_3);
+    return get_register32(Register::TRANSMIT_HEADER_3_3A);
 }
 
 // Set or get the check header
 void RFM22B::set_check_header(uint32_t header)
 {
-    set_register32(Register::CHECK_HEADER_3, header);
+    set_register32(Register::CHECK_HEADER_3_3F, header);
 }
 uint32_t RFM22B::get_check_header()
 {
-    return get_register32(Register::CHECK_HEADER_3);
+    return get_register32(Register::CHECK_HEADER_3_3F);
 }
 
 // Set or get the CRC mode
 void RFM22B::set_crc_mode(CRC_Mode mode)
 {
-    uint8_t dac = get_register(Register::DATA_ACCESS_CONTROL);
+    uint8_t dac = get_register(Register::DATA_ACCESS_CONTROL_30);
 
     dac &= ~0x24;
 
@@ -543,11 +589,11 @@ void RFM22B::set_crc_mode(CRC_Mode mode)
         break;
     }
 
-    set_register(Register::DATA_ACCESS_CONTROL, dac);
+    set_register(Register::DATA_ACCESS_CONTROL_30, dac);
 }
 RFM22B::CRC_Mode RFM22B::get_crc_mode()
 {
-    uint8_t dac = get_register(Register::DATA_ACCESS_CONTROL);
+    uint8_t dac = get_register(Register::DATA_ACCESS_CONTROL_30);
 
     if (! (dac & 0x04))
     {
@@ -563,17 +609,17 @@ RFM22B::CRC_Mode RFM22B::get_crc_mode()
 // Set or get the CRC polynomial
 void RFM22B::set_crc_polynomial(CRC_Polynomial poly)
 {
-    uint8_t dac = get_register(Register::DATA_ACCESS_CONTROL);
+    uint8_t dac = get_register(Register::DATA_ACCESS_CONTROL_30);
 
     dac &= ~0x03;
 
     dac |= (uint8_t)poly;
 
-    set_register(Register::DATA_ACCESS_CONTROL, dac);
+    set_register(Register::DATA_ACCESS_CONTROL_30, dac);
 }
 RFM22B::CRC_Polynomial RFM22B::get_crc_polynomial()
 {
-    uint8_t dac = get_register(Register::DATA_ACCESS_CONTROL);
+    uint8_t dac = get_register(Register::DATA_ACCESS_CONTROL_30);
 
     switch (dac & 0x03)
     {
@@ -592,27 +638,27 @@ RFM22B::CRC_Polynomial RFM22B::get_crc_polynomial()
 // Get and set all the FIFO threshold
 void RFM22B::set_tx_fifo_almost_full_threshold(uint8_t thresh)
 {
-    set_fifo_threshold(Register::TX_FIFO_CONTROL_1, thresh);
+    set_fifo_threshold(Register::TX_FIFO_CONTROL_1_7C, thresh);
 }
 void RFM22B::set_tx_fifo_almost_empty_threshold(uint8_t thresh)
 {
-    set_fifo_threshold(Register::TX_FIFO_CONTROL_2, thresh);
+    set_fifo_threshold(Register::TX_FIFO_CONTROL_2_7D, thresh);
 }
 void RFM22B::set_rx_fifo_almost_full_threshold(uint8_t thresh)
 {
-    set_fifo_threshold(Register::RX_FIFO_CONTROL, thresh);
+    set_fifo_threshold(Register::RX_FIFO_CONTROL_7E, thresh);
 }
 uint8_t RFM22B::get_tx_fifo_almost_full_threshold()
 {
-    return get_register(Register::TX_FIFO_CONTROL_1);
+    return get_register(Register::TX_FIFO_CONTROL_1_7C);
 }
 uint8_t RFM22B::get_tx_fifo_almost_empty_threshold()
 {
-    return get_register(Register::TX_FIFO_CONTROL_2);
+    return get_register(Register::TX_FIFO_CONTROL_2_7D);
 }
 uint8_t RFM22B::get_rx_fifo_almost_full_threshold()
 {
-    return get_register(Register::RX_FIFO_CONTROL);
+    return get_register(Register::RX_FIFO_CONTROL_7E);
 }
 void RFM22B::set_fifo_threshold(Register reg, uint8_t thresh)
 {
@@ -623,11 +669,11 @@ void RFM22B::set_fifo_threshold(Register reg, uint8_t thresh)
 // Get RSSI value
 uint8_t RFM22B::get_rssi()
 {
-    return get_register(Register::RECEIVED_SIGNAL_STRENGTH_INDICATOR);
+    return get_register(Register::RECEIVED_SIGNAL_STRENGTH_INDICATOR_26);
 }
 // Get input power (in dBm)
 //	Coefficients approximated from the graph in Section 8.10 of the datasheet
-int8_t RFM22B::get_input_power()
+int8_t RFM22B::get_input_dBm()
 {
     return 0.56*get_rssi()-128.8;
 }
@@ -635,27 +681,27 @@ int8_t RFM22B::get_input_power()
 // Get length of last received packet
 uint8_t RFM22B::get_received_packet_length()
 {
-    return get_register(Register::RECEIVED_PACKET_LENGTH);
+    return get_register(Register::RECEIVED_PACKET_LENGTH_4B);
 }
 
 // Set length of packet to be transmitted
 void RFM22B::set_transmit_packet_length(uint8_t length)
 {
-    return set_register(Register::TRANSMIT_PACKET_LENGTH, length);
+    return set_register(Register::TRANSMIT_PACKET_LENGTH_3E, length);
 }
 
 void RFM22B::clear_rx_fifo()
 {
     //Toggle ffclrrx bit high and low to clear RX FIFO
-    set_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_2, 2);
-    set_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_2, 0);
+    set_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_2_08, 2);
+    set_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_2_08, 0);
 }
 
 void RFM22B::clear_tx_fifo()
 {
     //Toggle ffclrtx bit high and low to clear TX FIFO
-    set_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_2, 1);
-    set_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_2, 0);
+    set_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_2_08, 1);
+    set_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_2_08, 0);
 }
 
 // Send data
@@ -670,7 +716,7 @@ bool RFM22B::send(uint8_t *data, uint8_t length, uint32_t timeout)
     uint8_t tx[MAX_PACKET_LENGTH+1] = { 0 };
 
     // Set FIFO register address (with write flag)
-    tx[0] = (uint8_t)Register::FIFO_ACCESS | (1<<7);
+    tx[0] = (uint8_t)Register::FIFO_ACCESS_7F | (1<<7);
 
     // Truncate data if its too long
     if (length > MAX_PACKET_LENGTH)
@@ -704,7 +750,7 @@ bool RFM22B::send(uint8_t *data, uint8_t length, uint32_t timeout)
     uint32_t count = 0;
 
     // Loop until packet has been sent (device has left TX mode)
-    while (((get_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_1)>>3) & 1) && elapsed < timeout)
+    while (((get_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_1_07)>>3) & 1) && elapsed < timeout)
     {
         count++;
         // Determine elapsed time
@@ -761,7 +807,7 @@ int8_t RFM22B::receive(uint8_t *data, uint8_t length, uint32_t timeout)
     uint8_t buffer[MAX_PACKET_LENGTH+1] = { 0 };
 
     // Set FIFO register address
-    buffer[0] = (uint8_t)Register::FIFO_ACCESS;
+    buffer[0] = (uint8_t)Register::FIFO_ACCESS_7F;
 
     // Timing for the interrupt loop timeout
 #ifdef RASPBERRY_PI
@@ -776,11 +822,12 @@ int8_t RFM22B::receive(uint8_t *data, uint8_t length, uint32_t timeout)
     //	Don't use interrupt registers here as these don't seem to behave consistently
     //	Watch the operating mode register for the device leaving RX mode. This is indicitive
     //	of a valid packet being received
-    while (((get_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_1)>>2) & 1) && elapsed < timeout)
+    while (((get_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_1_07)>>2) & 1) && elapsed < timeout)
     {
         count++;
         // Determine elapsed time
 #ifdef RASPBERRY_PI
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
         elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
 #else
         elapsed = millis() - start;

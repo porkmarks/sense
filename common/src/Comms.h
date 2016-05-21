@@ -35,6 +35,7 @@ public:
 
     uint8_t receive_packet(uint32_t timeout);
     uint16_t get_packet_source_address() const;
+    int8_t get_input_dBm();
     data::Type get_packet_type() const;
     const void* get_packet_payload() const;
 

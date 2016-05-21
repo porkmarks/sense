@@ -80,6 +80,7 @@ Item8::Data Item8::unpack(const Data& last_data) const
     data.temperature = last_data.temperature + dt;
     float dh = static_cast<float>(m_humidity_delta) / HUMIDITY_SCALE - MAX_HUMIDITY_DELTA;
     data.humidity = last_data.humidity + dh;
+    data.vcc = last_data.vcc;
     return data;
 }
 bool Item16::pack(const Data& last_data, const Data& data)
@@ -104,6 +105,7 @@ Item16::Data Item16::unpack(const Data& last_data) const
     float dt = static_cast<float>(m_temperature_delta) / TEMPERATURE_SCALE - MAX_TEMPERATURE_DELTA;
     data.temperature = last_data.temperature + dt;
     data.humidity = static_cast<float>(m_humidity) / HUMIDITY_SCALE;
+    data.vcc = last_data.vcc;
     return data;
 }
 

@@ -33,6 +33,7 @@ public:
     boost::optional<Expected_Sensor> get_expected_sensor();
 
     boost::optional<Sensor_Id> add_sensor(std::string const& name, Sensor_Address address);
+    bool remove_sensor(Sensor_Id);
     boost::optional<std::vector<Sensor>> get_sensors();
 
     struct Config
@@ -61,8 +62,8 @@ public:
         float temperature = 0.f;
         float humidity = 0;
         float vcc = 0.f;
-        int8_t tx_rssi = 0;
-        int8_t rx_rssi = 0;
+        int8_t b2s_input_dBm = 0;
+        int8_t s2b_input_dBm = 0;
         uint8_t flags = 0;
     };
 

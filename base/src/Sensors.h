@@ -4,6 +4,8 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <boost/thread.hpp>
+#include <mutex>
 
 #include "Comms.h"
 #include "DB.h"
@@ -25,18 +27,20 @@ public:
         Sensor(Sensor const&) = default;
         Sensor(DB::Sensor const& other) : DB::Sensor(other) {}
 
+        int8_t b2s_input_dBm = 0;
         uint32_t first_recorded_measurement_index = 0;
         uint32_t recorded_measurement_count = 0;
     };
 
-    Sensors(DB& db);
+    Sensors();
+    ~Sensors();
 
     //how much sensors can deviate from the measurement global clock. This is due to the unstable clock frequency of the sensor CPU
     static const Clock::duration MEASUREMENT_JITTER;
     //how long does a communication burst take
     static const Clock::duration COMMS_DURATION;
 
-    bool init();
+    bool init(std::string const& server, std::string const& db, std::string const& username, std::string const& password, uint16_t port);
 
     //how often will the sensors do the measurement
     bool set_measurement_period(Clock::duration period);
@@ -55,22 +59,24 @@ public:
     //sensor manipulation
     Sensor const* add_expected_sensor();
     Sensor const* add_sensor(std::string const& name);
-    void remove_sensor(Sensor_Id id);
-    void remove_all_sensors();
+    bool remove_sensor(Sensor_Id id);
 
     Sensor const* find_sensor_by_id(Sensor_Id id) const;
     Sensor const* find_sensor_by_address(Sensor_Address address) const;
 
     void set_sensor_measurement_range(Sensor_Id id, uint32_t first_measurement_index, uint32_t  last_measurement_index);
+    void set_sensor_b2s_input_dBm(Sensor_Id id, int8_t dBm);
 
     //measurement manipulation
     void add_measurement(Sensor_Id id, Measurement const& measurement);
 
 private:
-    Measurement merge_measurements(Measurement const& m1, Measurement const& m2);
-    void _add_measurement(Sensor_Id id, Measurement const& measurement);
+    Sensor* _find_sensor_by_id(Sensor_Id id);
+
 
     DB::Config m_config;
+
+    mutable std::recursive_mutex m_mutex;
 
     mutable Clock::time_point m_next_measurement_time_point;
     mutable Clock::time_point m_next_comms_time_point;
@@ -80,9 +86,33 @@ private:
     std::vector<Sensor> m_sensor_cache;
 
     uint16_t m_last_address = Comms::SLAVE_ADDRESS_BEGIN;
-    Clock::duration m_history_duration = std::chrono::hours(24) * 30 * 3; //approx 3 months
 
-    DB& m_db;
+    std::unique_ptr<DB> m_main_db;
+
+    struct Worker
+    {
+        std::unique_ptr<DB> db;
+
+        Clock::time_point last_config_refresh_time_point = Clock::now();
+
+        boost::thread thread;
+        bool stop_request = false;
+
+        struct Item
+        {
+            Sensor_Id id;
+            Clock::time_point time_point;
+            Measurement measurement;
+        };
+
+        mutable std::recursive_mutex items_mutex;
+        std::vector<Item> items;
+    };
+
+    Worker m_worker;
+
+    void process_worker_thread();
+    void refresh_config();
 };
 
 namespace std

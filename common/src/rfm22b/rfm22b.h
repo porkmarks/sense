@@ -82,6 +82,45 @@ public:
     void set_data_clock_configuration(Data_Clock_Configuration clock);
     Data_Clock_Configuration get_data_clock_configuration();
 
+    //sets the whole modem block with settings obtained from
+    //  http://www.hoperf.com/upload/rf/RF22B%2023B%2031B%2042B%2043B%20Register%20Settings_RevB1-v5.xls
+/*
+    1C - IF_FILTER_BANDWIDTH
+    1D - AFC_LOOP_GEARSHIFT_OVERRIDE
+
+    20 - CLOCK_RECOVERY_OVERSAMPLING_RATIO
+    21 - CLOCK_RECOVERY_OFFSET_2
+    22 - CLOCK_RECOVERY_OFFSET_1
+    23 - CLOCK_RECOVERY_OFFSET_0
+    24 - CLOCK_RECOVERT_TIMING_LOOP_GAIN_1
+    25 - CLOCK_RECOVERT_TIMING_LOOP_GAIN_0
+    2A - AFC_LIMITER
+    2C - OOK_COUNTER_VALUE_1
+    2D - OOK_COUNTER_VALUE_2
+    2E - SLICER_PEAK_HOLD
+
+    30 - DATA_ACCESS_CONTROL
+    33 - HEADER_CONTROL_2
+    34 - PREAMBLE_LENGTH
+    35 - PREAMBLE_DETECTION_CONTROL
+    36 - SYNC_WORD_3
+    37 - SYNC_WORD_2
+    38 - SYNC_WORD_1
+    39 - SYNC_WORD_0
+
+    6E - TX_DATA_RATE_1
+    6F - TX_DATA_RATE_0
+
+    70 - MODULATION_MODE_CONTROL_1
+    71 - MODULATION_MODE_CONTROL_2
+    72 - FREQUENCY_DEVIATION
+
+    75 - FREQUENCY_BAND_SELECT
+    76 - NOMINAL_CARRIER_FREQUENCY_1
+    77 - NOMINAL_CARRIER_FREQUENCY_0
+*/
+    void set_modem_configuration(uint8_t data[28]);
+
     // Set or get the transmission power
     void set_transmission_power(uint8_t power);
     uint8_t get_transmission_power();
@@ -139,7 +178,7 @@ public:
 
     // Get RSSI value or input dBm
     uint8_t get_rssi();
-    int8_t get_input_power();
+    int8_t get_input_dBm();
 
     // Get length of last received packet
     uint8_t get_received_packet_length();

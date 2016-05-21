@@ -10,7 +10,7 @@ namespace data
 enum class Type : uint8_t
 {
     RESPONSE,
-    MEASUREMENT,
+    MEASUREMENT_BATCH,
     PAIR_REQUEST,
     PAIR_RESPONSE,
     CONFIG_REQUEST,
@@ -49,17 +49,24 @@ struct Measurement
 
 //packed data
     uint32_t index = 0;
-    //uint32_t time_point = 0; //seconds, since 1970 epoch
     uint8_t flags = 0;
     uint8_t vcc = 0; //(vcc - 2) * 100
     uint8_t humidity = 0; //*2.55
     int16_t temperature = 0; //*100
 };
 
+struct Measurement_Batch
+{
+    uint8_t count = 0;
+    enum { MAX_COUNT = 5 };
+    Measurement measurements[MAX_COUNT];
+};
+
 struct Config_Request
 {
     uint32_t first_measurement_index = 0;
     uint32_t measurement_count = 0;
+    int8_t b2s_input_dBm = 0;
 };
 struct Config
 {

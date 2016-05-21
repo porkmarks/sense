@@ -7,15 +7,16 @@ sql_create_3(Sensor_Row, 3, 0,
     mysqlpp::sql_varchar, name,
     mysqlpp::sql_int_unsigned, address);
 
-sql_create_8(Measurement_Row, 8, 0,
+sql_create_9(Measurement_Row, 9, 0,
              mysqlpp::sql_int_unsigned, sensor_id,
              mysqlpp::sql_int_unsigned, measurement_index,
              mysqlpp::sql_datetime, timestamp,
              mysqlpp::sql_float, temperature,
              mysqlpp::sql_float, humidity,
              mysqlpp::sql_float, vcc,
-             mysqlpp::sql_tinyint_unsigned, tx_rssi,
-             mysqlpp::sql_tinyint_unsigned, rx_rssi);
+             mysqlpp::sql_tinyint_unsigned, flags,
+             mysqlpp::sql_tinyint, b2s_input_dBm,
+             mysqlpp::sql_tinyint, s2b_input_dBm);
 
 sql_create_3(Config_Row, 3, 0,
     mysqlpp::sql_int_unsigned, measurement_period,
@@ -163,6 +164,38 @@ boost::optional<DB::Sensor_Id> DB::add_sensor(std::string const& name, Sensor_Ad
     }
 }
 
+bool DB::remove_sensor(Sensor_Id id)
+{
+    try
+    {
+        mysqlpp::Query query = m_connection.query();
+
+        query << "DELETE FROM sensors WHERE id=" << id << ";";
+        query.execute();
+
+        return true;
+    }
+    catch (const mysqlpp::BadQuery& er)
+    {
+        std::cerr << "Query error: " << er.what() << std::endl;
+        return false;
+    }
+    catch (const mysqlpp::BadConversion& er)
+    {
+        // Handle bad conversions
+        std::cerr << "Conversion error: " << er.what() << std::endl <<
+                "\tretrieved data size: " << er.retrieved <<
+                ", actual size: " << er.actual_size << std::endl;
+        return false;
+    }
+    catch (const mysqlpp::Exception& er)
+    {
+        // Catch-all for any other MySQL++ exceptions
+        std::cerr << "Error: " << er.what() << std::endl;
+        return false;
+    }
+}
+
 boost::optional<std::vector<DB::Sensor>> DB::get_sensors()
 {
     if (!m_connection)
@@ -233,8 +266,9 @@ bool DB::add_measurement(Sensor_Id sensor_id, Clock::time_point time_point, Meas
         row.temperature = measurement.temperature;
         row.humidity = measurement.humidity;
         row.vcc = measurement.vcc;
-        row.rx_rssi = measurement.rx_rssi;
-        row.tx_rssi = measurement.tx_rssi;
+        row.flags = measurement.flags;
+        row.b2s_input_dBm = measurement.b2s_input_dBm;
+        row.s2b_input_dBm = measurement.s2b_input_dBm;
 
         query.insert(row);
         query.execute();

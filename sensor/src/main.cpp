@@ -129,8 +129,8 @@ void setup()
     pinMode(GREEN_LED_PIN, OUTPUT);
     digitalWrite(GREEN_LED_PIN, LOW);
 
-    //setup serial. 1.2Khz seems to be the best for 8Mhz
-    Serial.begin(1200);
+    //setup serial.
+    Serial.begin(38400);
     delay(200);
 
     fdev_setup_stream(&s_uart_output, uart_putchar, NULL, _FDEV_SETUP_WRITE);
@@ -252,6 +252,7 @@ bool request_config()
     data::Config_Request req;
     req.first_measurement_index = s_first_measurement_index;
     req.measurement_count = s_storage.get_data_count();
+    req.b2s_input_dBm = s_comms.get_input_dBm();
     s_comms.pack(req);
     if (s_comms.send_packet(5))
     {
@@ -400,6 +401,8 @@ void pair()
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
+static constexpr float MIN_VALID_HUMIDITY = 5.f;
+
 void do_measurement()
 {
     Storage::Data data;
@@ -427,6 +430,11 @@ void do_measurement()
     {
         //the way to indicate error!
         data.humidity = 0;
+        data.temperature = 0;
+    }
+    else
+    {
+        data.humidity = std::max(data.humidity, MIN_VALID_HUMIDITY);
     }
 
     data.vcc = read_vcc();
@@ -457,42 +465,72 @@ void do_comms()
 
     s_comms.idle_mode();
 
-    const chrono::millis COMMS_SLOT_DURATION = chrono::millis(3000);
+    const chrono::millis COMMS_SLOT_DURATION = chrono::millis(5000);
     chrono::time_ms start_tp = chrono::now();
     chrono::time_ms now = chrono::now();
     uint32_t measurement_index = s_first_measurement_index;
+
+    data::Measurement_Batch batch;
+
+    bool done = false;
     Storage::iterator it;
     do
     {
+        bool send = false;
+
         if (s_storage.unpack_next(it) == false)
         {
-            break;
-        }
-
-        data::Measurement item;
-
-        //uint32_t time_point_s = (s_next_measurement_time_point_s / 1000ULL) + 1;
-
-        //item.time_point = time_point_s - (s_next_measurement_index - s_first_measurement_index) * s_measurement_period_s;
-        item.index = measurement_index++;
-        item.flags = (it.data.humidity == 0) ? static_cast<uint8_t>(data::Measurement::Flag::SENSOR_ERROR) : 0;
-        item.pack(it.data.vcc, it.data.humidity, it.data.temperature);
-
-        s_comms.begin_packet(data::Type::MEASUREMENT);
-        s_comms.pack(item);
-        LOG(PSTR("Sending measurement..."));
-        if (s_comms.send_packet(3) == true)
-        {
-            LOG(PSTR("done.\n"));
+            done = true;
+            send = true;
         }
         else
         {
-            LOG(PSTR("failed: comms\n"));
-            break;
+            data::Measurement& item = batch.measurements[batch.count++];
+
+            item.index = measurement_index++;
+            if (it.data.humidity < MIN_VALID_HUMIDITY)
+            {
+                item.flags = static_cast<uint8_t>(data::Measurement::Flag::SENSOR_ERROR);
+                item.pack(it.data.vcc, 0.f, 0.f);
+            }
+            else
+            {
+                item.flags = 0;
+                item.pack(it.data.vcc, it.data.humidity, it.data.temperature);
+            }
+        }
+
+        if (batch.count >= data::Measurement_Batch::MAX_COUNT)
+        {
+            send = true;
+        }
+
+
+        if (send)
+        {
+            s_comms.begin_packet(data::Type::MEASUREMENT_BATCH);
+            s_comms.pack(batch);
+            LOG(PSTR("Sending measurement..."));
+            if (s_comms.send_packet(3) == true)
+            {
+                LOG(PSTR("done.\n"));
+            }
+            else
+            {
+                LOG(PSTR("failed: comms\n"));
+                break;
+            }
+
+            batch.count = 0;
         }
 
         now = chrono::now();
-    } while (now >= start_tp && now - start_tp < COMMS_SLOT_DURATION);
+        if (now < start_tp || now - start_tp >= COMMS_SLOT_DURATION)
+        {
+            done = true;
+        }
+
+    } while (!done);
 
     request_config();
 
