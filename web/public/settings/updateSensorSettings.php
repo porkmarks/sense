@@ -15,19 +15,28 @@ if(isset($_POST["submit"]))
 	$mesP = $_POST["mesp"];
 	$mesC = $_POST["mesc"];
 
-	$mesP = mysqli_real_escape_string($db, $mesP);
-	$mesC = mysqli_real_escape_string($db, $mesC);
-	$location = "Location: sensorSettings.php";
+	if ( (int)$mesP == $mesP && (int)$mesP > 0 && (int)$mesP == $mesP && (int)$mesP > 0 )
+	{
+		$mesP = mysqli_real_escape_string($db, $mesP);
+		$mesC = mysqli_real_escape_string($db, $mesC);
+		$location = "Location: ../settings/sensorSettings.php";
 
-	$query = "INSERT INTO configs (measurement_period, comms_period) VALUES ($mesP, $mesC);";
-	echo $query;
+		$query = "INSERT INTO configs (measurement_period, comms_period) VALUES ($mesP, $mesC);";
+		echo $query;
 
-	mysqli_query($db, $query);
+		mysqli_query($db, $query);
 
-	mysqli_close($db);
-    unset($db);
+		mysqli_close($db);
+	    unset($db);
 
-	//header($location);
+		header($location);
+
+	}	
+	else 
+	{
+		echo "Please enter a positive number " . mysqli_connect_error();
+
+	}
 }
 
 
