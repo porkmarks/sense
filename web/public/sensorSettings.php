@@ -3,8 +3,8 @@
 	ini_set('display_startup_errors', 1);
 	error_reporting(E_ALL);
 
-	include('../data/checklogin.php');
-	include('../data/db.php');
+	include('checklogin.php');
+	include('db.php');
 
 	$db = mysqli_connect(DB_SERVER,DB_USERNAME,DB_PASSWORD, $_SESSION["sensorDB"]);
 	if (mysqli_connect_errno())
@@ -29,19 +29,19 @@
 <head><title>Sensor settings</title></head>
 <?php
 	
-	include('../data/includes.php');
+	include('includes.php');
 ?>
 
 <body>
 	<header>
 		<?php
-			include('../data/topBar.php');
+			include('topBar.php');
 		?>
     </header>
 
 <div id="Content">
 		<?php
-			include('../settings/sideBarSettings.php');
+			include('sideBarSettings.php');
 			
 			
 		?>

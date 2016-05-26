@@ -1,19 +1,19 @@
 <?php
 	session_start();
-	include('../data/checklogin.php');
+	include('checklogin.php');
 ?>
 <!DOCTYPE html>
 <head><title>My Details</title></head>
-<link href= "../css/details.css" rel="stylesheet" type ="text/css"/>
+<link href= "css/details.css" rel="stylesheet" type ="text/css"/>
 <?php
 	
-	include('../data/includes.php');
+	include('includes.php');
 ?>
 
 <body>
 	<header>
 		<?php
-			include('../data/topBar.php');
+			include('topBar.php');
 		?>
     </header>
 

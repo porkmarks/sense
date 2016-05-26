@@ -2,8 +2,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<link href ="../css/layout_register.css" rel="stylesheet" type = "text/css" />
-<link href ="../css/menu.css" rel="stylesheet" type = "text/css" />
+<link href ="css/layout_register.css" rel="stylesheet" type = "text/css" />
+<link href ="css/menu.css" rel="stylesheet" type = "text/css" />
 
 	<meta http-equiv="content-type" content="text/html; charset=utf-8">
 

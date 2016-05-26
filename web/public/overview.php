@@ -8,7 +8,7 @@
 <?php
 	include('includes.php');
 ?>
-<link href= "../css/overview.css" rel="stylesheet" type ="text/css"/>
+<link href= "css/overview.css" rel="stylesheet" type ="text/css"/>
 
 
 
