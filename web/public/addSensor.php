@@ -12,16 +12,16 @@
 <body>
 	<header>
 		<?php
-			include('topBar.php');
+			include('mainTopBar.php');
 		?>
     </header>
 
 <div id="Content">
 		<?php
-			include('sideBarSettings.php');
+			include('settingsSideBar.php');
 		?>
 		<div id="ContentRight">
-			DETALII!!!!!
+			Add Sensor!!!!!
 		</div>
 	</div>
 

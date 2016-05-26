@@ -46,7 +46,7 @@
 
 	</div>
 	<div id="ContentRight">
-		<form action ="validatelogin.php" method="post" id="LoginForm">
+		<form action ="validateLogin.php" method="post" id="LoginForm">
 		<fieldset>
 			<table width="400" border="0" cellpadding="10" cellspacing="10">
 		

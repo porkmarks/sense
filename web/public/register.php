@@ -40,7 +40,7 @@
 		</h2>
 	</div>
 	<div id="ContentRight">
-		<form action ="validateregister.php" method="post" id="RegisterForm">
+		<form action ="validateRegister.php" method="post" id="RegisterForm">
 		<fieldset>
 			<table width="400" border="0" cellpadding="10" cellspacing="10">
 			<tr>

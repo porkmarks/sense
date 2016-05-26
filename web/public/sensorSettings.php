@@ -19,9 +19,8 @@
 	
 	if (mysqli_num_rows($result) > 0)
 	{
-		$cp = $row["comms_period"];
-		$mp = $row["measurement_period"];
-		
+		$cp = $row["comms_period"] / 60.0; //convert seconds to minutes
+		$mp = $row["measurement_period"] / 60.0; //convert seconds to minutes
 	} 
 
 ?>
@@ -35,13 +34,13 @@
 <body>
 	<header>
 		<?php
-			include('topBar.php');
+			include('mainTopBar.php');
 		?>
     </header>
 
 <div id="Content">
 		<?php
-			include('sideBarSettings.php');
+			include('settingsSideBar.php');
 			
 			
 		?>
@@ -50,11 +49,11 @@
 			<form action ="updateSensorSettings.php" method="post" id="SensorSettingsForm">
 			<table width="400" border="0" cellpadding="10" cellspacing="10">
 			<tr>
-				<td style="font-weight: bold"><div align="right"><label for="mesp">Measurement period</label><p> the frequency of the measurements</p></div></td>
+				<td style="font-weight: bold"><div align="right"><label for="mesp">Measurement period</label><p> the frequency of the measurements in minutes</p></div></td>
 				<td><input name="mesp" type="text" value ="<?php echo $mp; ?>" class="StyleTxtField" size="25" required /></td>
 			</tr>
 			<tr>
-				<td style="font-weight: bold"><div align="right"><label for="mesc">Measurement comms</label><p>the frequency of measurement reporting</p></div></td>
+				<td style="font-weight: bold"><div align="right"><label for="mesc">Measurement comms</label><p>the frequency of measurement reporting in minutes</p></div></td>
 				<td><input name="mesc" type="text" value ="<?php echo $cp; ?>" class="StyleTxtField" size="25" required /></td>
 			</tr>
 			<tr>

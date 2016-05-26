@@ -14,13 +14,13 @@
 
 	<div id="Holder">
 		<?php
-			include('topBar.php');
+			include('mainTopBar.php');
 		?>
 	</div>
 
 	<div id="Content">
 		<?php
-			include('sideBar.php');
+			include('mainSideBar.php');
 		?>
 		<div id="ContentRight">
 			alarms!!!!!

@@ -12,13 +12,13 @@ if(isset($_POST["submit"]))
 		echo "Failed to connect to MySQL: " . mysqli_connect_error();
 	}
 
-	$mesP = $_POST["mesp"];
-	$mesC = $_POST["mesc"];
+	$mesP = floor($_POST["mesp"] * 60.0); //convert minutes to seconds
+	$mesC = floor($_POST["mesc"] * 60.0); //convert minutes to seconds
 
 	$mesP = mysqli_real_escape_string($db, $mesP);
 	$mesC = mysqli_real_escape_string($db, $mesC);
 	
-	$query = "INSERT INTO configs (measurement_period, comms_period) VALUES ($mesP, $mesC);";
+	$query = "UPDATE configs SET measurement_period=$mesP, comms_period=$mesC;";
 
 	mysqli_query($db, $query);
 

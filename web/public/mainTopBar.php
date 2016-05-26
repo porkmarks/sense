@@ -23,7 +23,7 @@
 	<nav id="MainNav">
 		<ul>
 			<li><a href = "overview.php" style="text-decoration: none">Data</a></li>
-			<li><a href = "details.php" style="text-decoration: none">Settings</a></li>
+			<li><a href = "settings.php" style="text-decoration: none">Settings</a></li>
 		</ul>
 		<script>
 		$(function(){
