@@ -1,23 +1,23 @@
 <?php
   session_start();
-  include('../data/checklogin.php');
+  include('checklogin.php');
 ?>
 <!DOCTYPE html><head><title>My Details</title></head>
 <?php
   
-  include('../data/includes.php');
+  include('includes.php');
 ?>
 
 <body>
   <header>
     <?php
-      include('../data/topBar.php');
+      include('mainTopBar.php');
     ?>
     </header>
 
 <div id="Content">
     <?php
-      include('sideBarSettings.php');
+      include('settingsSideBar.php');
     ?>
     <div id="ContentRight">
       <h2>Alarms</h2>

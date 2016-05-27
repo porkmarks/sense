@@ -2,30 +2,29 @@
 	session_start();
 	include('checklogin.php');
 ?>
-
 <!DOCTYPE html>
 <head><title>Alarms</title></head>
 <?php
+	
 	include('includes.php');
 ?>
 
-
 <body>
-
-	<div id="Holder">
+	<header>
 		<?php
-			include('topBar.php');
+			include('mainTopBar.php');
 		?>
-	</div>
+    </header>
 
-	<div id="Content">
+<div id="Content">
 		<?php
-			include('sideBar.php');
+			include('settingsSideBar.php');
 		?>
 		<div id="ContentRight">
-			alarms!!!!!
+			Alarms!!!!!
 		</div>
 	</div>
+
 
 </body>
 </html>
