@@ -1,5 +1,9 @@
 
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 include("db.php");
 
 if (isset($_POST["submit"]))
@@ -21,8 +25,10 @@ if (isset($_POST["submit"]))
 	if (mysqli_num_rows($result) == 1)
 	{
 		session_start();
-		$_SESSION["name"] = $row["name"];
+		$_SESSION["fname"] = $row["first_name"];
+		$_SESSION["lname"] = $row["last_name"];
 		$_SESSION["email"] = $row["email"];
+		$_SESSION["company"] = $row["company"];
 		$_SESSION["sensorDB"] = $row["sensor_database"];
 
         $location = "Location: overview.php";

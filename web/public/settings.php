@@ -34,7 +34,7 @@
 				<label for='fname' class='mandatory'>First name</label>
 			</td>
 			<td valign="top">
-				<input type='text' id='fname' name='fname' value='<?php echo $_SESSION["name"] ?>' class='mandatory' />
+				<input type='text' id='fname' name='fname' value='<?php echo $_SESSION["fname"] ?>' class='mandatory' />
 			</td>
 		</tr>
 
@@ -44,7 +44,7 @@
 				<label for='lname' class='mandatory'>Last name</label>
 			</td>
 			<td valign="top">
-				<input type='text' id='fname' name='lname' value='Ilinca' class='mandatory' />
+				<input type='text' id='lname' name='lname' value='<?php echo $_SESSION["lname"] ?>' class='mandatory' />
 			</td>
 		</tr>
 
@@ -53,7 +53,7 @@
 				<label for='company' class='mandatory'>Company</label>
 			</td>
 			<td valign="top">
-				<input type='text' id='company' name='lname' value='Metrocert'/>
+				<input type='text' id='company' name='company' value='<?php echo $_SESSION["company"] ?>'/>
 			</td>
 		</tr>
 
@@ -98,7 +98,7 @@
     
      <h4>Units</h4>
  
-     <p class="moreBubtle">Measurement units.</p>
+     <p class="moreSubtle">Measurement units.</p>
      <table>
      <tr>
 		<td valign="top">
@@ -108,31 +108,11 @@
 		<div>
 			<select id='temp_unit_id' name='temp_unit_id' class='mandatory'>
 				<option value='1' selected='selected'>Celsius (°C)</option>
-				<option value='5'>Fahrenheit (°F)</option>
+				<option value='2'>Fahrenheit (°F)</option>
 			</select>
 		</div>
 	</table> 	
 
-    <h4>Notifications</h4>
-    <p class="moreSubtle">Channels for receiving notification messages (e.g. alarms).</p>
-    <table>
-    <tr>
-	    <td valign="top">
-	    	<label for='notification_channel-1'>Email</label>
-	    </td>
-	    <td valign="top">	
-	    	<input type='checkbox' id='notification_channel-1' name='notification_channel[1]' value='1' checked='checked'>
-	    </td>
-    </tr>
-    <tr>
-	    <td valign="top">
-	    	<label for='notification_channel-2'>App push notification</label>
-	    </td>
-	    <td valign="top">	
-	    	<input type='checkbox' id='notification_channel-2' name='notification_channel[2]' value='1' checked='checked'>
-	    </td>
-    </tr>
-    </table>
     	
      
     <h4>Password</h4>
@@ -148,7 +128,7 @@
     </tr>
     <tr>
 	    <td valign="top">
-	    	<label for='re_password'>Password again</label>
+	    	<label for='re_password'>Repeat password</label>
 	    </td>
 	    <td valign="top">	
 	    	<input type='password' id='re_password' name='re_password' value='' />

@@ -8,7 +8,7 @@
 		<li>
 			<h3>
 				<?php 
-					echo"Hello, " . $_SESSION["name"] . ", nice to see you!";
+					echo"Hello, " . $_SESSION["fname"] . ", nice to see you!";
 				?>
 			</h3>
 		</li>

@@ -1,6 +1,5 @@
-<div id="ContentLeft">
+<div id="MainSideBar">
 	<nav class ="SideMenu">
-		<p>Data</p><br>
 
 		<a href="overview.php" style="text-decoration: none">Overview</a><br>
 		<a href="graphs.php" style="text-decoration: none">Graphs</a><br>

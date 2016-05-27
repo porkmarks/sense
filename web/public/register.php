@@ -42,18 +42,30 @@
 	<div id="ContentRight">
 		<form action ="validateRegister.php" method="post" id="RegisterForm">
 		<fieldset>
-			<table width="400" border="0" cellpadding="10" cellspacing="10">
+			<table width="400" border="0" cellpadding="8" cellspacing="8">
 			<tr>
-				<td style="font-weight: bold"><div align="right"><label for="name">Name</label></div></td>
-				<td><input name="name" type="text" class="StyleTxtField" size="25" required /></td>
+				<td style="font-weight: lighter"><div align="right"><label for="name">First Name</label></div></td>
+				<td><input name="fname" type="text" class="StyleTxtField" size="25" required /></td>
+			</tr>
+						<tr>
+				<td style="font-weight: lighter"><div align="right"><label for="lname">Last Name</label></div></td>
+				<td><input name="lname" type="text" class="StyleTxtField" size="25" required /></td>
 			</tr>
 			<tr>
-				<td style="font-weight: bold"><div align="right"><label for="email">Email</label></div></td>
+				<td style="font-weight: lighter"><div align="right"><label for="fname">Company</label></div></td>
+				<td><input name="company" type="text" class="StyleTxtField" size="25" required /></td>
+			</tr>
+			<tr>
+				<td style="font-weight: lighter"><div align="right"><label for="email">Email</label></div></td>
 				<td><input name="email" type="email" class="StyleTxtField" size="25" required /></td>
 			</tr>
 			<tr>
-				<td height="23" style="font-weight: bold"><div align="right"><label for="password">Password</label></div></td>
+				<td height="23" style="font-weight: lighter"><div align="right"><label for="password">Password</label></div></td>
 				<td><input name="password" type="password" class="StyleTxtField" size="25" required /></td>
+			</tr>
+			<tr>
+				<td height="23" style="font-weight: lighter"><div align="right"><label for="repassword">Repeat Password</label></div></td>
+				<td><input name="repassword" type="password" class="StyleTxtField" size="25" required /></td>
 			</tr>
 			<tr>
 				<td height="23" <div align="right"></td>
@@ -67,9 +79,6 @@
 </div>
 <div id="Footer"></div>
 </div>
-
-
-
 
 </body>
 
