@@ -127,9 +127,116 @@ bool DB::set_config(Config const& config)
 
 boost::optional<DB::Expected_Sensor> DB::get_expected_sensor()
 {
-    Expected_Sensor data;
-    data.name = "caca";
-    return data;
+    if (!m_connection)
+    {
+        std::cerr << "Not connected to the database\n";
+        return boost::none;
+    }
+
+    try
+    {
+        mysqlpp::Query query = m_connection.query(
+                    "SELECT s.id AS id, s.name AS name "
+                    "FROM sensors s "
+                    "WHERE s.is_valid = 0 "
+                    "ORDER BY s.creation_timestamp DESC;");
+        mysqlpp::StoreQueryResult res = query.store();
+
+        for (mysqlpp::StoreQueryResult::const_iterator it = res.begin(); it != res.end(); ++it)
+        {
+            Expected_Sensor sensor;
+            mysqlpp::Row const& row = *it;
+            sensor.id = row["id"];
+            sensor.name = row["name"].c_str();
+            return sensor;
+        }
+
+        return boost::none;
+    }
+    catch (const mysqlpp::BadQuery& er)
+    {
+        std::cerr << "Query error: " << er.what() << std::endl;
+        return boost::none;
+    }
+    catch (const mysqlpp::BadConversion& er)
+    {
+        // Handle bad conversions
+        std::cerr << "Conversion error: " << er.what() << std::endl <<
+                "\tretrieved data size: " << er.retrieved <<
+                ", actual size: " << er.actual_size << std::endl;
+        return boost::none;
+    }
+    catch (const mysqlpp::Exception& er)
+    {
+        // Catch-all for any other MySQL++ exceptions
+        std::cerr << "Error: " << er.what() << std::endl;
+        return boost::none;
+    }
+}
+
+bool DB::add_expected_sensor(Sensor_Id id, Sensor_Address address)
+{
+    try
+    {
+        mysqlpp::Query query = m_connection.query();
+
+        query << "UPDATE sensors SET address=" << address << ", is_valid=1 WHERE id=" << id << ";";
+        query.execute();
+
+        return true;
+    }
+    catch (const mysqlpp::BadQuery& er)
+    {
+        std::cerr << "Query error: " << er.what() << std::endl;
+        return false;
+    }
+    catch (const mysqlpp::BadConversion& er)
+    {
+        // Handle bad conversions
+        std::cerr << "Conversion error: " << er.what() << std::endl <<
+                "\tretrieved data size: " << er.retrieved <<
+                ", actual size: " << er.actual_size << std::endl;
+        return false;
+    }
+    catch (const mysqlpp::Exception& er)
+    {
+        // Catch-all for any other MySQL++ exceptions
+        std::cerr << "Error: " << er.what() << std::endl;
+        return false;
+    }
+}
+
+
+bool DB::revert_to_expected_sensor(Sensor_Id id)
+{
+    try
+    {
+        mysqlpp::Query query = m_connection.query();
+
+        query << "UPDATE sensors SET is_valid=0 WHERE id=" << id << ";";
+        query.execute();
+
+        return true;
+    }
+    catch (const mysqlpp::BadQuery& er)
+    {
+        std::cerr << "Query error: " << er.what() << std::endl;
+        return false;
+    }
+    catch (const mysqlpp::BadConversion& er)
+    {
+        // Handle bad conversions
+        std::cerr << "Conversion error: " << er.what() << std::endl <<
+                "\tretrieved data size: " << er.retrieved <<
+                ", actual size: " << er.actual_size << std::endl;
+        return false;
+    }
+    catch (const mysqlpp::Exception& er)
+    {
+        // Catch-all for any other MySQL++ exceptions
+        std::cerr << "Error: " << er.what() << std::endl;
+        return false;
+    }
 }
 
 boost::optional<DB::Sensor_Id> DB::add_sensor(std::string const& name, Sensor_Address address)
@@ -196,7 +303,7 @@ bool DB::remove_sensor(Sensor_Id id)
     }
 }
 
-boost::optional<std::vector<DB::Sensor>> DB::get_sensors()
+boost::optional<std::vector<DB::Sensor>> DB::get_valid_sensors()
 {
     if (!m_connection)
     {
@@ -207,13 +314,9 @@ boost::optional<std::vector<DB::Sensor>> DB::get_sensors()
     try
     {
         mysqlpp::Query query = m_connection.query(
-                    "SELECT s.id AS id, s.name AS name, s.address AS address, m.max_index as max_index "
-                    "FROM sensors s "
-                    "LEFT JOIN ( "
-                    "   SELECT sensor_id, max(measurement_index) AS max_index "
-                    "   FROM measurements "
-                    "   GROUP BY sensor_id "
-                    ") m ON s.id = m.sensor_id;");
+                    "SELECT id, name, address "
+                    "FROM sensors "
+                    "WHERE is_valid != 0;");
         mysqlpp::StoreQueryResult res = query.store();
 
         std::vector<Sensor> sensors;
@@ -225,8 +328,6 @@ boost::optional<std::vector<DB::Sensor>> DB::get_sensors()
             sensor.id = row["id"];
             sensor.name = row["name"].c_str();
             sensor.address = row["address"];
-            mysqlpp::String max_index = row["max_index"];
-            sensor.max_confirmed_measurement_index = max_index.is_null() ? 0 : (uint32_t)max_index;
             sensors.push_back(sensor);
         }
 
@@ -293,5 +394,54 @@ bool DB::add_measurement(Sensor_Id sensor_id, Clock::time_point time_point, Meas
         // Catch-all for any other MySQL++ exceptions
         std::cerr << "Error: " << er.what() << std::endl;
         return false;
+    }
+}
+
+boost::optional<std::map<DB::Sensor_Id, DB::Measurement_Indices>> DB::get_all_measurement_indices()
+{
+    if (!m_connection)
+    {
+        std::cerr << "Not connected to the database\n";
+        return boost::none;
+    }
+
+    try
+    {
+        mysqlpp::Query query = m_connection.query(
+                    "SELECT sensor_id, measurement_index "
+                    "FROM measurements "
+                    "ORDER BY sensor_id ASC;");
+        mysqlpp::StoreQueryResult res = query.store();
+
+        std::map<Sensor_Id, Measurement_Indices> indices;
+
+        for (mysqlpp::StoreQueryResult::const_iterator it = res.begin(); it != res.end(); ++it)
+        {
+            mysqlpp::Row const& row = *it;
+            Sensor_Id sensor_id = row["sensor_id"];
+            uint32_t index = row["measurement_index"];
+            indices[sensor_id].indices.insert(index);
+        }
+
+        return indices;
+    }
+    catch (const mysqlpp::BadQuery& er)
+    {
+        std::cerr << "Query error: " << er.what() << std::endl;
+        return boost::none;
+    }
+    catch (const mysqlpp::BadConversion& er)
+    {
+        // Handle bad conversions
+        std::cerr << "Conversion error: " << er.what() << std::endl <<
+                "\tretrieved data size: " << er.retrieved <<
+                ", actual size: " << er.actual_size << std::endl;
+        return boost::none;
+    }
+    catch (const mysqlpp::Exception& er)
+    {
+        // Catch-all for any other MySQL++ exceptions
+        std::cerr << "Error: " << er.what() << std::endl;
+        return boost::none;
     }
 }

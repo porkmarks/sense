@@ -12,29 +12,37 @@ public:
 
     bool init(std::string const& server, std::string const& db, std::string const& username, std::string const& password, uint16_t port);
 
-    struct Expected_Sensor
-    {
-        std::string name;
-    };
-
     typedef std::chrono::high_resolution_clock Clock;
     typedef uint32_t Sensor_Id;
     typedef uint16_t Sensor_Address;
+
+    struct Expected_Sensor
+    {
+        Sensor_Id id = 0;
+        std::string name;
+    };
 
     struct Sensor
     {
         Sensor_Id id = 0;
         Sensor_Address address = 0;
         std::string name;
-
-        uint32_t max_confirmed_measurement_index = 0;
     };
 
     boost::optional<Expected_Sensor> get_expected_sensor();
 
+    bool add_expected_sensor(Sensor_Id id, Sensor_Address address);
+    bool revert_to_expected_sensor(Sensor_Id id);
     boost::optional<Sensor_Id> add_sensor(std::string const& name, Sensor_Address address);
     bool remove_sensor(Sensor_Id);
-    boost::optional<std::vector<Sensor>> get_sensors();
+    boost::optional<std::vector<Sensor>> get_valid_sensors();
+
+    struct Measurement_Indices
+    {
+        std::set<uint32_t> indices;
+    };
+
+    boost::optional<std::map<Sensor_Id, Measurement_Indices>> get_all_measurement_indices();
 
     struct Config
     {

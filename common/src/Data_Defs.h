@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stddef.h>
 #include <math.h>
 #include "Chrono.h"
 
@@ -48,7 +49,6 @@ struct Measurement
     }
 
 //packed data
-    uint32_t index = 0;
     uint8_t flags = 0;
     uint8_t vcc = 0; //(vcc - 2) * 100
     uint8_t humidity = 0; //*2.55
@@ -57,10 +57,15 @@ struct Measurement
 
 struct Measurement_Batch
 {
+    uint32_t index = 0;
     uint8_t count = 0;
-    enum { MAX_COUNT = 5 };
+    enum { MAX_COUNT = 9 };
+
     Measurement measurements[MAX_COUNT];
 };
+static constexpr size_t MEASUREMENT_BATCH_PACKET_MIN_SIZE = sizeof(Measurement_Batch) - sizeof(Measurement) * (Measurement_Batch::MAX_COUNT);//min size with no measurements
+static constexpr size_t MEASUREMENT_BATCH_PACKET_MAX_SIZE = sizeof(Measurement_Batch); //max size with all measurements
+
 
 struct Config_Request
 {

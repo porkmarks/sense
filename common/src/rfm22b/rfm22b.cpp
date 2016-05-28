@@ -1,4 +1,4 @@
-/* Copyright (c) 2013 Owen McAree
+/* Copyright (c) 2013 Owen McAre
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -62,7 +62,7 @@ bool RFM22B::init()
     return true;
 }
 
-void RFM22B::set_modem_configuration(uint8_t data[28])
+void RFM22B::set_modem_configuration_packet(uint8_t data[42])
 {
     uint8_t const* ptr = data;
     set_register(Register::IF_FILTER_BANDWIDTH_1C, *ptr++);
@@ -82,6 +82,7 @@ void RFM22B::set_modem_configuration(uint8_t data[28])
     set_register(Register::SLICER_PEAK_HOLD_2E, *ptr++);
 
     set_register(Register::DATA_ACCESS_CONTROL_30, *ptr++);
+    set_register(Register::HEADER_CONTROL_1_32, *ptr++);
     set_register(Register::HEADER_CONTROL_2_33, *ptr++);
     set_register(Register::PREAMBLE_LENGTH_34, *ptr++);
     set_register(Register::PREAMBLE_DETECTION_CONTROL_35, *ptr++);
@@ -89,6 +90,20 @@ void RFM22B::set_modem_configuration(uint8_t data[28])
     set_register(Register::SYNC_WORD_2_37, *ptr++);
     set_register(Register::SYNC_WORD_1_38, *ptr++);
     set_register(Register::SYNC_WORD_0_39, *ptr++);
+
+    set_register(Register::TRANSMIT_HEADER_3_3A, *ptr++);
+    set_register(Register::TRANSMIT_HEADER_2_3B, *ptr++);
+    set_register(Register::TRANSMIT_HEADER_1_3C, *ptr++);
+    set_register(Register::TRANSMIT_HEADER_0_3D, *ptr++);
+    set_register(Register::TRANSMIT_PACKET_LENGTH_3E, *ptr++);
+    set_register(Register::CHECK_HEADER_3_3F, *ptr++);
+    set_register(Register::CHECK_HEADER_2_40, *ptr++);
+    set_register(Register::CHECK_HEADER_1_41, *ptr++);
+    set_register(Register::CHECK_HEADER_0_42, *ptr++);
+    set_register(Register::HEADER_ENABLE_3_43, *ptr++);
+    set_register(Register::HEADER_ENABLE_2_44, *ptr++);
+    set_register(Register::HEADER_ENABLE_1_45, *ptr++);
+    set_register(Register::HEADER_ENABLE_0_46, *ptr++);
 
     set_register(Register::TX_DATA_RATE_1_6E, *ptr++);
     set_register(Register::TX_DATA_RATE_0_6F, *ptr++);
@@ -100,6 +115,46 @@ void RFM22B::set_modem_configuration(uint8_t data[28])
     set_register(Register::FREQUENCY_BAND_SELECT_75, *ptr++);
     set_register(Register::NOMINAL_CARRIER_FREQUENCY_1_76, *ptr++);
     set_register(Register::NOMINAL_CARRIER_FREQUENCY_0_77, *ptr++);
+}
+
+void RFM22B::set_modem_configuration_no_packet(uint8_t data[28])
+{
+    uint8_t const* ptr = data;
+    set_register(Register::IF_FILTER_BANDWIDTH_1C, *ptr++);
+    set_register(Register::AFC_LOOP_GEARSHIFT_OVERRIDE_1D, *ptr++);
+
+    set_register(Register::CLOCK_RECOVERY_OVERSAMPLING_RATIO_20, *ptr++);
+    set_register(Register::CLOCK_RECOVERY_OFFSET_2_21, *ptr++);
+    set_register(Register::CLOCK_RECOVERY_OFFSET_1_22, *ptr++);
+    set_register(Register::CLOCK_RECOVERY_OFFSET_0_23, *ptr++);
+
+    set_register(Register::CLOCK_RECOVERT_TIMING_LOOP_GAIN_1_24, *ptr++);
+    set_register(Register::CLOCK_RECOVERT_TIMING_LOOP_GAIN_0_25, *ptr++);
+
+    set_register(Register::AFC_LIMITER_2A, *ptr++);//*
+    set_register(Register::OOK_COUNTER_VALUE_1_2C, *ptr++);
+    set_register(Register::OOK_COUNTER_VALUE_2_2D, *ptr++);
+    set_register(Register::SLICER_PEAK_HOLD_2E, *ptr++);
+
+    set_register(Register::DATA_ACCESS_CONTROL_30, *ptr++);//*
+    set_register(Register::HEADER_CONTROL_2_33, *ptr++);//*
+    set_register(Register::PREAMBLE_LENGTH_34, *ptr++);//*
+    set_register(Register::PREAMBLE_DETECTION_CONTROL_35, *ptr++);//*
+    set_register(Register::SYNC_WORD_3_36, *ptr++);//*
+    set_register(Register::SYNC_WORD_2_37, *ptr++);//*
+    set_register(Register::SYNC_WORD_1_38, *ptr++);//*
+    set_register(Register::SYNC_WORD_0_39, *ptr++);//*
+
+    set_register(Register::TX_DATA_RATE_1_6E, *ptr++);
+    set_register(Register::TX_DATA_RATE_0_6F, *ptr++);
+
+    set_register(Register::MODULATION_MODE_CONTROL_1_70, *ptr++);
+    set_register(Register::MODULATION_MODE_CONTROL_2_71, *ptr++);
+    set_register(Register::FREQUENCY_DEVIATION_72, *ptr++);
+
+    set_register(Register::FREQUENCY_BAND_SELECT_75, *ptr++);//*
+    set_register(Register::NOMINAL_CARRIER_FREQUENCY_1_76, *ptr++);//*
+    set_register(Register::NOMINAL_CARRIER_FREQUENCY_0_77, *ptr++);//*
 }
 
 // REVISIT: top bit is in Header Control 2 0x33
@@ -705,7 +760,7 @@ void RFM22B::clear_tx_fifo()
 }
 
 // Send data
-bool RFM22B::send(uint8_t *data, uint8_t length, uint32_t timeout)
+bool RFM22B::send(uint8_t const* data, uint8_t length, uint32_t timeout)
 {
     //idle_mode();
 
@@ -761,6 +816,9 @@ bool RFM22B::send(uint8_t *data, uint8_t length, uint32_t timeout)
 #endif
     }
 
+    clear_tx_fifo();
+    idle_mode();
+
     // If timeout occured, return -1
     if (elapsed >= timeout)
     {
@@ -770,8 +828,6 @@ bool RFM22B::send(uint8_t *data, uint8_t length, uint32_t timeout)
         //Serial.print("Timeout while sending - ");
         //Serial.print(count);
 #endif
-        //reset();
-        idle_mode();
         return false;
     }
 

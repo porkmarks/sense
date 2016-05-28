@@ -44,49 +44,98 @@ bool Comms::init(uint8_t retries)
 
 //    uint8_t modem_config[28] =
 //    {
-//        0x0B,
+//        0x2B,
 //        0x40,
-//        0x64,
-//        0x01,
-//        0x47,
-//        0x9F,
-//        0x02,
-//        0x0E,
+//        0x41,
+//        0x60,
+//        0x27,
+//        0x52,
+//        0x00,
+//        0x31,
+//        0x1D,
 //        0x2C,
-//        0x28,
-//        0x1F,
-//        0x29,
-//        0x61,
-//        0x0A,
-//        0x04,
-//        0x22,
+//        0x11,
+//        0x2A,
+//        0x01,
+//        0x02,
+//        0x00,
+//        0x02,
 //        0x2D,
 //        0xD4,
 //        0x00,
 //        0x00,
-//        0x0A,
-//        0x3D,
-//        0x04,
-//        0x22,
-//        0x50,
+//        0x09,
+//        0xD5,
+//        0x24,
+//        0x2A,
+//        0x03,
 //        0x53,
 //        0x64,
 //        0x00,
 //    };
 
-//    m_rf22.set_modem_configuration(modem_config);
+//    m_rf22.set_modem_configuration_no_packet(modem_config);
 
-    m_rf22.set_carrier_frequency(433.f);
-    m_rf22.set_frequency_deviation(50000);
-    m_rf22.set_modulation_type(RFM22B::Modulation_Type::FSK);
-    m_rf22.set_modulation_data_source(RFM22B::Modulation_Data_Source::FIFO);
-    m_rf22.set_data_clock_configuration(RFM22B::Data_Clock_Configuration::NONE);
+    uint8_t modem_config[42] =
+    {
+        0x2B,
+        0x40,
+        0x68,
+        0x01,
+        0x3A,
+        0x93,
+        0x04,
+        0xBC,
+        0x1D,
+        0x28,
+        0x82,
+        0x29,
+        0xCD,
+        0x00,
+        0x02,
+        0x08,
+        0x2A,
+        0x2D,
+        0xD4,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x01,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,
+        0x4E,
+        0xA5,
+        0x2C,
+        0x23,
+        0x08,
+        0x53,
+        0x64,
+        0x00,
+    };
+
+    m_rf22.set_modem_configuration_packet(modem_config);
+
+//    m_rf22.set_carrier_frequency(434.f);
+//    m_rf22.set_frequency_deviation(50000);
+//    m_rf22.set_modulation_type(RFM22B::Modulation_Type::FSK);
+//    m_rf22.set_modulation_data_source(RFM22B::Modulation_Data_Source::FIFO);
+//    m_rf22.set_data_clock_configuration(RFM22B::Data_Clock_Configuration::NONE);
+//    m_rf22.set_preamble_length(8);
+//    //m_rf22.set_data_rate(39400);
+
+//    uint8_t syncwords[] = { 0x2d, 0xd4 };
+//    m_rf22.set_sync_words(syncwords, sizeof(syncwords));
+
     m_rf22.set_transmission_power(0);
-    m_rf22.set_preamble_length(8);
-    //m_rf22.set_data_rate(39993);
-
-    uint8_t syncwords[] = { 0x2d, 0xd4 };
-    m_rf22.set_sync_words(syncwords, sizeof(syncwords));
 
     printf_P(PSTR("Frequency is %f\n"), m_rf22.get_carrier_frequency());
     printf_P(PSTR("FH Step is %lu\n"), m_rf22.get_frequency_hopping_step_size());
@@ -99,6 +148,34 @@ bool Comms::init(uint8_t retries)
     printf_P(PSTR("Transmission Power is %d\n"), (int)m_rf22.get_transmission_power());
 
     m_rf22.stand_by_mode();
+
+//#ifndef __AVR__
+//    while (1)
+//    {
+//        int8_t size = m_rf22.receive(m_buffer, RFM22B::MAX_PACKET_LENGTH, 1000);
+//        if (size > 0)
+//        {
+//            printf_P("Received %d bytes\n", int(size));
+//        }
+//    }
+//#else
+//    while (1)
+//    {
+//        char buffer[32];
+//        static int i = 0;
+//        sprintf(buffer, "caca%d", i++);
+//        bool res = m_rf22.send((uint8_t const*)buffer, strlen(buffer));
+//        printf_P(PSTR("Sent %s\n"), res ? "true" : "false");
+//    }
+//#endif
+    {
+        char buffer[32];
+        static int i = 0;
+        sprintf(buffer, "caca%d", i++);
+        bool res = m_rf22.send((uint8_t const*)buffer, strlen(buffer));
+        printf_P(PSTR("Sent %s\n"), res ? "true" : "false");
+    }
+
 
     return true;
 }
@@ -117,17 +194,16 @@ void Comms::set_address(uint16_t address)
 {
     m_address = address;
 }
-void Comms::set_destination_address(uint16_t address)
+void Comms::set_check_address(uint16_t address)
 {
-    m_destination_address = address;
+    m_check_address = address;
 }
 
 uint8_t Comms::begin_packet(data::Type type)
 {
     Header* header_ptr = reinterpret_cast<Header*>(m_buffer);
     header_ptr->type = type;
-    header_ptr->source_address = m_address;
-    header_ptr->destination_address = m_destination_address;
+    header_ptr->address = m_address;
     header_ptr->req_id = ++m_last_req_id;
     header_ptr->crc = 0;
 
@@ -149,7 +225,7 @@ uint8_t Comms::pack(const void* data, uint8_t size)
 
 bool Comms::send_packet(uint8_t retries)
 {
-    uint32_t crc = crc32(m_buffer, sizeof(Header) + m_offset);
+    uint16_t crc = crc16(m_buffer, sizeof(Header) + m_offset);
 
     Header* header_ptr = reinterpret_cast<Header*>(m_buffer);
     header_ptr->crc = crc;
@@ -160,8 +236,8 @@ bool Comms::send_packet(uint8_t retries)
     uint8_t i = 0;
     for (i = 0; i < retries; i++)
     {
-        m_rf22.send(m_buffer, sizeof(Header) + m_offset, 100);
-        int8_t size = m_rf22.receive(response_buffer, sizeof(response_buffer), 100);
+        m_rf22.send(m_buffer, sizeof(Header) + m_offset, 200);
+        int8_t size = m_rf22.receive(response_buffer, sizeof(response_buffer), 200);
         if (size > 0)
         {
             if (validate_packet(response_buffer, size, sizeof(data::Response)))
@@ -196,13 +272,13 @@ bool Comms::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload
     }
 
     Header* header_ptr = reinterpret_cast<Header*>(data);
-    uint32_t crc = header_ptr->crc;
+    uint16_t crc = header_ptr->crc;
 
     //zero the crc
     header_ptr->crc = 0;
 
     //corrupted?
-    uint32_t computed_crc = crc32(reinterpret_cast<const uint8_t*>(data), size);
+    uint16_t computed_crc = crc16(reinterpret_cast<const uint8_t*>(data), size);
     if (crc != computed_crc)
     {
         printf_P(PSTR("bad crc"));
@@ -210,7 +286,9 @@ bool Comms::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload
     }
 
     //not addressed to me?
-    if (header_ptr->destination_address != m_address && header_ptr->destination_address != BROADCAST_ADDRESS)
+    if (m_check_address != BROADCAST_ADDRESS &&  //accepts any address
+            header_ptr->address != m_check_address && //or is it addressed to me
+            header_ptr->address != BROADCAST_ADDRESS) //or it's a broadcast
     {
         printf_P(PSTR("not for me"));
         return false;
@@ -223,8 +301,7 @@ void Comms::send_response(const Header& header)
 {
     uint8_t response_buffer[RESPONSE_BUFFER_SIZE];
     Header* header_ptr = reinterpret_cast<Header*>(response_buffer);
-    header_ptr->source_address = m_address;
-    header_ptr->destination_address = header.source_address;
+    header_ptr->address = m_address;
     header_ptr->type = data::Type::RESPONSE;
     header_ptr->req_id = ++m_last_req_id;
     header_ptr->crc = 0;
@@ -233,12 +310,12 @@ void Comms::send_response(const Header& header)
     response_ptr->ack = 1;
     response_ptr->req_id = header.req_id;
 
-    uint32_t crc = crc32(response_buffer, RESPONSE_BUFFER_SIZE);
+    uint16_t crc = crc16(response_buffer, RESPONSE_BUFFER_SIZE);
     header_ptr->crc = crc;
 
     for (uint8_t i = 0; i < 3; i++)
     {
-        m_rf22.send(response_buffer, RESPONSE_BUFFER_SIZE);
+        m_rf22.send(response_buffer, RESPONSE_BUFFER_SIZE, 200);
         delay(2);
     }
 }
@@ -291,10 +368,10 @@ const void* Comms::get_packet_payload() const
     return m_buffer + sizeof(Header);
 }
 
-uint16_t Comms::get_packet_source_address() const
+uint16_t Comms::get_packet_address() const
 {
     const Header* header_ptr = reinterpret_cast<const Header*>(m_buffer);
-    return header_ptr->source_address;
+    return header_ptr->address;
 }
 
 int8_t Comms::get_input_dBm()

@@ -307,9 +307,8 @@ bool request_first_config()
 
 void pair()
 {
-    uint32_t addr = Comms::PAIR_ADDRESS_BEGIN + random() % (Comms::PAIR_ADDRESS_END - Comms::PAIR_ADDRESS_BEGIN);
-    s_comms.set_address(addr);
-    s_comms.set_destination_address(Comms::BASE_ADDRESS);
+    s_comms.set_address(Comms::BASE_ADDRESS);
+    s_comms.set_check_address(Comms::BASE_ADDRESS);
 
     LOG(PSTR("Starting pairing\n"));
 
@@ -349,6 +348,7 @@ void pair()
                     {
                         const data::Pair_Response* response_ptr = reinterpret_cast<const data::Pair_Response*>(s_comms.get_packet_payload());
                         s_comms.set_address(response_ptr->address);
+                        s_comms.set_check_address(response_ptr->address);
                         LOG(PSTR("done. Addr: %d\n"), response_ptr->address);
 
                         done = true;
@@ -468,9 +468,11 @@ void do_comms()
     const chrono::millis COMMS_SLOT_DURATION = chrono::millis(5000);
     chrono::time_ms start_tp = chrono::now();
     chrono::time_ms now = chrono::now();
-    uint32_t measurement_index = s_first_measurement_index;
 
     data::Measurement_Batch batch;
+
+    uint32_t measurement_index = s_first_measurement_index;
+    batch.index = measurement_index;
 
     bool done = false;
     Storage::iterator it;
@@ -485,9 +487,9 @@ void do_comms()
         }
         else
         {
+            measurement_index++;
             data::Measurement& item = batch.measurements[batch.count++];
 
-            item.index = measurement_index++;
             if (it.data.humidity < MIN_VALID_HUMIDITY)
             {
                 item.flags = static_cast<uint8_t>(data::Measurement::Flag::SENSOR_ERROR);
@@ -509,7 +511,7 @@ void do_comms()
         if (send)
         {
             s_comms.begin_packet(data::Type::MEASUREMENT_BATCH);
-            s_comms.pack(batch);
+            s_comms.pack(&batch, data::MEASUREMENT_BATCH_PACKET_MIN_SIZE + batch.count * sizeof(data::Measurement));
             LOG(PSTR("Sending measurement..."));
             if (s_comms.send_packet(3) == true)
             {
@@ -521,6 +523,7 @@ void do_comms()
                 break;
             }
 
+            batch.index = measurement_index;
             batch.count = 0;
         }
 

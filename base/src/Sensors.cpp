@@ -70,7 +70,7 @@ Sensors::Sensors()
 {
     m_worker.db.reset(new DB());
 
-    m_sensor_cache.reserve(100);
+    m_sensors.reserve(100);
 }
 
 Sensors::~Sensors()
@@ -98,6 +98,8 @@ bool Sensors::init(std::string const& server, std::string const& db, std::string
         return false;
     }
 
+    //////////////////////////////////////////////////////////////////////////////////////////////////
+    //get the config
     boost::optional<DB::Config> config = m_main_db->get_config();
     if (!config)
     {
@@ -119,7 +121,10 @@ bool Sensors::init(std::string const& server, std::string const& db, std::string
     m_next_measurement_time_point = m_config.baseline_time_point;
     m_next_comms_time_point = m_config.baseline_time_point;
 
-    boost::optional<std::vector<DB::Sensor>> sensors = m_main_db->get_sensors();
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////
+    //create the sensors
+    boost::optional<std::vector<DB::Sensor>> sensors = m_main_db->get_valid_sensors();
     if (!sensors)
     {
         std::cerr << "Cannot load sensors\n";
@@ -128,16 +133,78 @@ bool Sensors::init(std::string const& server, std::string const& db, std::string
 
     for (DB::Sensor const& s: *sensors)
     {
-        m_sensor_cache.emplace_back(s);
+        Sensor_Data sensor_data;
+        sensor_data.sensor = s;
+        m_sensors.emplace_back(sensor_data);
+        std::cout << "Adding sensor " << s.id << ", address " << s.address << " name " << s.name << "\n";
         m_last_address = std::max<uint32_t>(m_last_address, s.address);
     }
 
+    //////////////////////////////////////////////////////////////////////////////////////////////////
+    // Download the indices and sompute the last confirmed one
+    boost::optional<std::map<Sensor_Id, DB::Measurement_Indices>> indices = m_main_db->get_all_measurement_indices();
+    if (!indices)
+    {
+        std::cerr << "Cannot load indices\n";
+        return false;
+    }
+
+    for (auto& pair: *indices)
+    {
+        Sensor_Id id = pair.first;
+        DB::Measurement_Indices& indices = pair.second;
+        Sensor_Data* sensor_data = _find_sensor_data_by_id(id);
+        if (!sensor_data)
+        {
+            continue;
+        }
+        sensor_data->measurement_indices = std::move(indices.indices);
+        size_t db_index_count = sensor_data->measurement_indices.size();
+        sensor_data->max_confirmed_measurement_index = remove_unused_measurement_indices(*sensor_data);
+        size_t crt_index_count = sensor_data->measurement_indices.size();
+
+        std::cout << "Sensor " << id << " has " << db_index_count << " indices in DB, " << (db_index_count - crt_index_count) << " unconfirmed. Last confirmed one is " << sensor_data->max_confirmed_measurement_index << "\n";
+    }
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////
+    //start the worker thread
     m_worker.thread = boost::thread([this]()
     {
         process_worker_thread();
     });
 
     return true;
+}
+
+
+uint32_t Sensors::remove_unused_measurement_indices(Sensor_Data& sensor_data)
+{
+    if (sensor_data.measurement_indices.empty())
+    {
+        return 0;
+    }
+
+    uint32_t last_index = 0;
+    while (!sensor_data.measurement_indices.empty())
+    {
+        uint32_t index = *sensor_data.measurement_indices.begin();
+        if (last_index != 0 && last_index + 1 != index)
+        {
+            break;
+        }
+        last_index = index;
+        sensor_data.measurement_indices.erase(sensor_data.measurement_indices.begin());
+    }
+
+    return last_index;
+}
+
+void Sensors::remove_confirmed_indices(Sensor_Data& sensor_data, uint32_t max_confirmed)
+{
+    while (!sensor_data.measurement_indices.empty() && *sensor_data.measurement_indices.begin() <= max_confirmed)
+    {
+        sensor_data.measurement_indices.erase(sensor_data.measurement_indices.begin());
+    }
 }
 
 Sensors::Sensor const* Sensors::add_expected_sensor()
@@ -151,39 +218,57 @@ Sensors::Sensor const* Sensors::add_expected_sensor()
         return nullptr;
     }
 
-    Sensor const* sensor = add_sensor(expected_sensor->name);
-    return sensor;
+    uint16_t address = ++m_last_address;
+    assert(address >= Comms::SLAVE_ADDRESS_BEGIN && address < Comms::SLAVE_ADDRESS_END);
+
+    bool res = m_main_db->add_expected_sensor(expected_sensor->id, address);
+    if (!res)
+    {
+        std::cerr << "Failed to add expected sensor " << expected_sensor->name << " in the DB\n";
+        return nullptr;
+    }
+
+    Sensor_Data sensor_data;
+    sensor_data.sensor.id = expected_sensor->id;
+    sensor_data.sensor.name = expected_sensor->name;
+    sensor_data.sensor.address = address;
+    m_sensors.emplace_back(sensor_data);
+
+    return &m_sensors.back().sensor;
 }
 
 void Sensors::set_sensor_measurement_range(Sensor_Id id, uint32_t first_measurement_index, uint32_t measurement_count)
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    Sensor* sensor = _find_sensor_by_id(id);
-    if (!sensor)
+    Sensor_Data* sensor_data = _find_sensor_data_by_id(id);
+    if (!sensor_data)
     {
         std::cerr << "Cannot find sensor id " << id << "\n";
         return;
     }
 
-    sensor->first_recorded_measurement_index = first_measurement_index;
-    sensor->recorded_measurement_count = measurement_count;
+    sensor_data->first_recorded_measurement_index = first_measurement_index;
+    sensor_data->recorded_measurement_count = measurement_count;
 
-    sensor->max_confirmed_measurement_index = std::max(sensor->max_confirmed_measurement_index, sensor->first_recorded_measurement_index);
+    sensor_data->max_confirmed_measurement_index = std::max(sensor_data->max_confirmed_measurement_index, sensor_data->first_recorded_measurement_index);
+
+    //remove already confirmed indices
+    remove_confirmed_indices(*sensor_data, sensor_data->max_confirmed_measurement_index);
 }
 
 void Sensors::set_sensor_b2s_input_dBm(Sensor_Id id, int8_t dBm)
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    Sensor* sensor = _find_sensor_by_id(id);
-    if (!sensor)
+    Sensor_Data* sensor_data = _find_sensor_data_by_id(id);
+    if (!sensor_data)
     {
         std::cerr << "Cannot find sensor id " << id << "\n";
         return;
     }
 
-    sensor->b2s_input_dBm = dBm;
+    sensor_data->b2s_input_dBm = dBm;
 }
 
 Sensors::Sensor const* Sensors::add_sensor(std::string const& name)
@@ -191,6 +276,7 @@ Sensors::Sensor const* Sensors::add_sensor(std::string const& name)
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
     uint16_t address = ++m_last_address;
+    assert(address >= Comms::SLAVE_ADDRESS_BEGIN && address < Comms::SLAVE_ADDRESS_END);
 
     boost::optional<Sensors::Sensor_Id> opt_id = m_main_db->add_sensor(name, address);
     if (!opt_id)
@@ -199,14 +285,13 @@ Sensors::Sensor const* Sensors::add_sensor(std::string const& name)
         return nullptr;
     }
 
-    assert(address >= Comms::SLAVE_ADDRESS_BEGIN && address < Comms::SLAVE_ADDRESS_END);
-    Sensor sensor;
-    sensor.id = *opt_id;
-    sensor.name = name;
-    sensor.address = address;
-    m_sensor_cache.emplace_back(std::move(sensor));
+    Sensor_Data sensor_data;
+    sensor_data.sensor.id = *opt_id;
+    sensor_data.sensor.name = name;
+    sensor_data.sensor.address = address;
+    m_sensors.emplace_back(sensor_data);
 
-    return &m_sensor_cache.back();
+    return &m_sensors.back().sensor;
 }
 
 bool Sensors::set_comms_period(Clock::duration period)
@@ -227,7 +312,7 @@ Sensors::Clock::duration Sensors::compute_comms_period() const
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    Clock::duration max_period = m_sensor_cache.size() * COMMS_DURATION;
+    Clock::duration max_period = m_sensors.size() * COMMS_DURATION;
     Clock::duration period = std::max(m_config.comms_period, max_period);
     return std::max(period, m_config.measurement_period + MEASUREMENT_JITTER);
 }
@@ -277,25 +362,25 @@ uint32_t Sensors::compute_last_confirmed_measurement_index(Sensor_Id id) const
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    Sensor const* sensor = find_sensor_by_id(id);
-    if (!sensor)
+    Sensor_Data const* sensor_data = _find_sensor_data_by_id(id);
+    if (!sensor_data)
     {
         std::cerr << "Cannot find sensor id " << id << "\n";
         return 0;
     }
 
-    return sensor->max_confirmed_measurement_index;
+    return sensor_data->max_confirmed_measurement_index;
 }
 
 Sensors::Clock::time_point Sensors::compute_next_comms_time_point(Sensor_Id id) const
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    auto it = std::find_if(m_sensor_cache.begin(), m_sensor_cache.end(), [id](Sensor const& sensor)
+    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](Sensor_Data const& sensor_data)
     {
-        return sensor.id == id;
+        return sensor_data.sensor.id == id;
     });
-    if (it == m_sensor_cache.end())
+    if (it == m_sensors.end())
     {
         std::cerr << "Cannot find sensor id " << id << "\n";
         return Clock::now() + std::chrono::hours(99999999);
@@ -310,18 +395,18 @@ Sensors::Clock::time_point Sensors::compute_next_comms_time_point(Sensor_Id id) 
     }
 
     Clock::time_point start = m_next_comms_time_point;
-    return start + std::distance(m_sensor_cache.begin(), it) * COMMS_DURATION;
+    return start + std::distance(m_sensors.begin(), it) * COMMS_DURATION;
 }
 
 bool Sensors::remove_sensor(Sensor_Id id)
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    auto it = std::find_if(m_sensor_cache.begin(), m_sensor_cache.end(), [id](Sensor const& sensor)
+    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](Sensor_Data const& sensor_data)
     {
-        return sensor.id == id;
+        return sensor_data.sensor.id == id;
     });
-    if (it == m_sensor_cache.end())
+    if (it == m_sensors.end())
     {
         std::cerr << "Cannot find sensor id " << id << "\n";
         return false;
@@ -333,7 +418,31 @@ bool Sensors::remove_sensor(Sensor_Id id)
         return false;
     }
 
-    m_sensor_cache.erase(it);
+    m_sensors.erase(it);
+    return true;
+}
+
+bool Sensors::revert_to_expected_sensor(Sensor_Id id)
+{
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
+    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](Sensor_Data const& sensor_data)
+    {
+        return sensor_data.sensor.id == id;
+    });
+    if (it == m_sensors.end())
+    {
+        std::cerr << "Cannot find sensor id " << id << "\n";
+        return false;
+    }
+
+    if (!m_main_db->revert_to_expected_sensor(id))
+    {
+        std::cerr << "Failed to revert to expected sensor from the DB\n";
+        return false;
+    }
+
+    m_sensors.erase(it);
     return true;
 }
 
@@ -341,26 +450,41 @@ Sensors::Sensor const* Sensors::find_sensor_by_id(Sensor_Id id) const
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    auto it = std::find_if(m_sensor_cache.begin(), m_sensor_cache.end(), [id](Sensor const& sensor)
+    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](Sensor_Data const& sensor_data)
     {
-        return sensor.id == id;
+        return sensor_data.sensor.id == id;
     });
-    if (it == m_sensor_cache.end())
+    if (it == m_sensors.end())
+    {
+        return nullptr;
+    }
+    return &(it->sensor);
+}
+
+Sensors::Sensor_Data* Sensors::_find_sensor_data_by_id(Sensor_Id id)
+{
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
+    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](Sensor_Data const& sensor_data)
+    {
+        return sensor_data.sensor.id == id;
+    });
+    if (it == m_sensors.end())
     {
         return nullptr;
     }
     return &(*it);
 }
 
-Sensors::Sensor* Sensors::_find_sensor_by_id(Sensor_Id id)
+Sensors::Sensor_Data const* Sensors::_find_sensor_data_by_id(Sensor_Id id) const
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    auto it = std::find_if(m_sensor_cache.begin(), m_sensor_cache.end(), [id](Sensor const& sensor)
+    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](Sensor_Data const& sensor_data)
     {
-        return sensor.id == id;
+        return sensor_data.sensor.id == id;
     });
-    if (it == m_sensor_cache.end())
+    if (it == m_sensors.end())
     {
         return nullptr;
     }
@@ -371,15 +495,15 @@ Sensors::Sensor const* Sensors::find_sensor_by_address(Sensor_Address address) c
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    auto it = std::find_if(m_sensor_cache.begin(), m_sensor_cache.end(), [address](Sensor const& sensor)
+    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [address](Sensor_Data const& sensor_data)
     {
-        return sensor.address == address;
+        return sensor_data.sensor.address == address;
     });
-    if (it == m_sensor_cache.end())
+    if (it == m_sensors.end())
     {
         return nullptr;
     }
-    return &(*it);
+    return &(it->sensor);
 }
 
 void Sensors::add_measurement(Sensor_Id id, Measurement const& measurement)
@@ -389,18 +513,20 @@ void Sensors::add_measurement(Sensor_Id id, Measurement const& measurement)
     {
         std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-        Sensor* sensor = _find_sensor_by_id(id);
-        if (!sensor)
+        Sensor_Data* sensor_data = _find_sensor_data_by_id(id);
+        if (!sensor_data)
         {
             std::cerr << "Cannot find sensor id " << id << "\n";
             return;
         }
 
-        if (measurement.index > sensor->max_confirmed_measurement_index)
+
+        if (sensor_data->measurement_indices.find(measurement.index) == sensor_data->measurement_indices.end())
         {
             item = Worker::Item();
-            item->id = id;
+            item->sensor_id = id;
             item->measurement = measurement;
+            item->measurement.b2s_input_dBm = sensor_data->b2s_input_dBm;
             item->time_point = m_config.baseline_time_point + m_config.measurement_period * measurement.index;
         }
         else
@@ -441,27 +567,36 @@ void Sensors::process_worker_thread()
             m_worker.items.clear();
         }
 
+        //sort them in index order
+        std::sort(items.begin(), items.end(), [](Worker::Item const& a, Worker::Item const& b)
+        {
+            return a.measurement.index < b.measurement.index;
+        });
+
         //send them all to the db
         if (!items.empty())
         {
             auto start = Clock::now();
             for (Worker::Item const& item: items)
             {
-                if (m_worker.db->add_measurement(item.id, item.time_point, item.measurement))
+                if (m_worker.db->add_measurement(item.sensor_id, item.time_point, item.measurement))
                 {
                     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-                    Sensor* sensor = _find_sensor_by_id(item.id);
-                    if (!sensor)
+                    Sensor_Data* sensor_data = _find_sensor_data_by_id(item.sensor_id);
+                    if (!sensor_data)
                     {
-                        std::cerr << "Cannot find sensor id " << item.id << "\n";
+                        std::cerr << "Cannot find sensor id " << item.sensor_id << "\n";
                         continue;
                     }
 
-                    if (item.measurement.index == sensor->max_confirmed_measurement_index + 1)
+                    sensor_data->measurement_indices.insert(item.measurement.index);
+                    if (item.measurement.index == sensor_data->max_confirmed_measurement_index + 1)
                     {
-                        sensor->max_confirmed_measurement_index++;
+                        sensor_data->max_confirmed_measurement_index = item.measurement.index;
                     }
+
+                    remove_confirmed_indices(*sensor_data, sensor_data->max_confirmed_measurement_index);
                 }
             }
             std::cout << "Sent " << items.size() << " measurements in " << std::chrono::duration<float>(Clock::now() - start).count() << " seconds\n";

@@ -77,7 +77,7 @@ int main(int, const char**)
 
     //s_sensors.load_sensors("sensors.config");
 
-    static const std::string db_server = "192.168.1.35";
+    static const std::string db_server = "192.168.1.205";
     static const std::string db_db = "sensor-test";
     static const std::string db_username = "admin";
     static const std::string db_password = "admin";
@@ -97,8 +97,7 @@ int main(int, const char**)
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
-    s_comms.set_address(Comms::BASE_ADDRESS);
-
+    s_comms.set_check_address(Comms::BROADCAST_ADDRESS);
 
     while (true)
     {
@@ -122,7 +121,7 @@ int main(int, const char**)
 
                     data::Pair_Response packet;
                     packet.address = sensor->address;
-                    s_comms.set_destination_address(s_comms.get_packet_source_address());
+                    s_comms.set_address(Comms::BASE_ADDRESS);
                     s_comms.begin_packet(data::Type::PAIR_RESPONSE);
                     s_comms.pack(packet);
                     if (s_comms.send_packet(10))
@@ -131,37 +130,47 @@ int main(int, const char**)
                     }
                     else
                     {
-                        s_sensors.remove_sensor(sensor->id);
+                        s_sensors.revert_to_expected_sensor(sensor->id);
                         std::cerr << "Pair failed (comms)\n";
                     }
+                    std::cout << "\n";
                 }
                 else
                 {
                     std::cerr << "Pairing failed (db)\n";
                 }
             }
-            else if (type == data::Type::MEASUREMENT_BATCH && size == sizeof(data::Measurement_Batch))
+            else if (type == data::Type::MEASUREMENT_BATCH && size >= data::MEASUREMENT_BATCH_PACKET_MIN_SIZE)
             {
-                Sensors::Sensor_Address address = s_comms.get_packet_source_address();
+                Sensors::Sensor_Address address = s_comms.get_packet_address();
                 const Sensors::Sensor* sensor = s_sensors.find_sensor_by_address(address);
                 if (sensor)
                 {
                     std::cout << "Measurement batch reported by " << sensor->id << "\n";
 
-                    data::Measurement_Batch const& batch = *reinterpret_cast<data::Measurement_Batch const*>(s_comms.get_packet_payload());
-
-                    Sensors::Measurement m;
-                    size_t count = std::min<size_t>(batch.count, data::Measurement_Batch::MAX_COUNT);
-                    for (size_t i = 0; i < count; i++)
+                    data::Measurement_Batch batch;
+                    memcpy(&batch, s_comms.get_packet_payload(), size);
+                    if (size == data::MEASUREMENT_BATCH_PACKET_MIN_SIZE + batch.count * sizeof(data::Measurement))
                     {
-                        m.index = batch.measurements[i].index;
-                        m.flags = batch.measurements[i].flags;
-                        m.b2s_input_dBm = sensor->b2s_input_dBm;
-                        m.s2b_input_dBm = s_comms.get_input_dBm();
-                        batch.measurements[i].unpack(m.vcc, m.humidity, m.temperature);
+                        std::cout << "\tIndices: " << batch.index << " - " << batch.index + batch.count << "\n";
 
-                        s_sensors.add_measurement(sensor->id, m);
+                        Sensors::Measurement m;
+                        size_t count = std::min<size_t>(batch.count, data::Measurement_Batch::MAX_COUNT);
+                        for (size_t i = 0; i < count; i++)
+                        {
+                            m.index = batch.index + i;
+                            m.flags = batch.measurements[i].flags;
+                            m.s2b_input_dBm = s_comms.get_input_dBm();
+                            batch.measurements[i].unpack(m.vcc, m.humidity, m.temperature);
+
+                            s_sensors.add_measurement(sensor->id, m);
+                        }
                     }
+                    else
+                    {
+                        std::cerr << "\tMalformed measurement batch data!\n";
+                    }
+                    std::cout << "\n";
                 }
                 else
                 {
@@ -170,7 +179,7 @@ int main(int, const char**)
             }
             else if (type == data::Type::FIRST_CONFIG_REQUEST && size == sizeof(data::First_Config_Request))
             {
-                Sensors::Sensor_Address address = s_comms.get_packet_source_address();
+                Sensors::Sensor_Address address = s_comms.get_packet_address();
                 const Sensors::Sensor* sensor = s_sensors.find_sensor_by_address(address);
                 if (sensor)
                 {
@@ -181,7 +190,7 @@ int main(int, const char**)
                     s_sensors.set_sensor_measurement_range(sensor->id, packet.first_measurement_index, 0);
                     fill_config_packet(packet.config, *sensor);
 
-                    s_comms.set_destination_address(s_comms.get_packet_source_address());
+                    s_comms.set_address(address);
                     s_comms.begin_packet(data::Type::FIRST_CONFIG);
                     s_comms.pack(packet);
                     if (s_comms.send_packet(3))
@@ -192,6 +201,7 @@ int main(int, const char**)
                     {
                         std::cerr << "\tFirst Config failed\n";
                     }
+                    std::cout << "\n";
                 }
                 else
                 {
@@ -202,12 +212,12 @@ int main(int, const char**)
             {
                 data::Config_Request const& config_request = *reinterpret_cast<data::Config_Request const*>(s_comms.get_packet_payload());
 
-                Sensors::Sensor_Address address = s_comms.get_packet_source_address();
+                Sensors::Sensor_Address address = s_comms.get_packet_address();
                 const Sensors::Sensor* sensor = s_sensors.find_sensor_by_address(address);
                 if (sensor)
                 {
                     std::cout << "Config requested by " << sensor->id << "\n";
-                    std::cout << "\nStored range: " << config_request.first_measurement_index << " to " << config_request.first_measurement_index + config_request.measurement_count << " (" << config_request.measurement_count << " measurements) \n";
+                    std::cout << "\tStored range: " << config_request.first_measurement_index << " to " << config_request.first_measurement_index + config_request.measurement_count << " (" << config_request.measurement_count << " measurements) \n";
 
                     s_sensors.set_sensor_measurement_range(sensor->id, config_request.first_measurement_index, config_request.measurement_count);
                     s_sensors.set_sensor_b2s_input_dBm(sensor->id, config_request.b2s_input_dBm);
@@ -215,10 +225,10 @@ int main(int, const char**)
                     data::Config packet;
                     fill_config_packet(packet, *sensor);
 
-                    s_comms.set_destination_address(s_comms.get_packet_source_address());
+                    s_comms.set_address(address);
                     s_comms.begin_packet(data::Type::CONFIG);
                     s_comms.pack(packet);
-                    if (s_comms.send_packet(3))
+                    if (s_comms.send_packet(5))
                     {
                         std::cout << "\tSchedule successful\n";
                     }
@@ -226,6 +236,7 @@ int main(int, const char**)
                     {
                         std::cerr << "\tSchedule failed\n";
                     }
+                    std::cout << "\n";
                 }
                 else
                 {

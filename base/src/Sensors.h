@@ -17,20 +17,8 @@ public:
     typedef DB::Clock Clock;
     typedef DB::Sensor_Id Sensor_Id;
     typedef DB::Sensor_Address Sensor_Address;
-
-
     typedef DB::Measurement Measurement;
-
-    struct Sensor : public DB::Sensor
-    {
-        Sensor() = default;
-        Sensor(Sensor const&) = default;
-        Sensor(DB::Sensor const& other) : DB::Sensor(other) {}
-
-        int8_t b2s_input_dBm = 0;
-        uint32_t first_recorded_measurement_index = 0;
-        uint32_t recorded_measurement_count = 0;
-    };
+    typedef DB::Sensor Sensor;
 
     Sensors();
     ~Sensors();
@@ -60,6 +48,7 @@ public:
     Sensor const* add_expected_sensor();
     Sensor const* add_sensor(std::string const& name);
     bool remove_sensor(Sensor_Id id);
+    bool revert_to_expected_sensor(Sensor_Id id);
 
     Sensor const* find_sensor_by_id(Sensor_Id id) const;
     Sensor const* find_sensor_by_address(Sensor_Address address) const;
@@ -71,9 +60,6 @@ public:
     void add_measurement(Sensor_Id id, Measurement const& measurement);
 
 private:
-    Sensor* _find_sensor_by_id(Sensor_Id id);
-
-
     DB::Config m_config;
 
     mutable std::recursive_mutex m_mutex;
@@ -83,7 +69,22 @@ private:
 
     mutable uint32_t m_next_measurement_index = 0;
 
-    std::vector<Sensor> m_sensor_cache;
+    struct Sensor_Data
+    {
+        Sensor sensor;
+        std::set<uint32_t> measurement_indices;
+        int8_t b2s_input_dBm = 0;
+        uint32_t first_recorded_measurement_index = 0;
+        uint32_t recorded_measurement_count = 0;
+        uint32_t max_confirmed_measurement_index = 0;
+    };
+
+    std::vector<Sensor_Data> m_sensors;
+
+    Sensor_Data* _find_sensor_data_by_id(Sensor_Id id);
+    Sensor_Data const* _find_sensor_data_by_id(Sensor_Id id) const;
+    uint32_t remove_unused_measurement_indices(Sensor_Data& sensor_data);
+    void remove_confirmed_indices(Sensor_Data& sensor_data, uint32_t max);
 
     uint16_t m_last_address = Comms::SLAVE_ADDRESS_BEGIN;
 
@@ -100,7 +101,7 @@ private:
 
         struct Item
         {
-            Sensor_Id id;
+            Sensor_Id sensor_id;
             Clock::time_point time_point;
             Measurement measurement;
         };

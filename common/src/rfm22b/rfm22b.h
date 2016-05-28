@@ -119,7 +119,58 @@ public:
     76 - NOMINAL_CARRIER_FREQUENCY_1
     77 - NOMINAL_CARRIER_FREQUENCY_0
 */
-    void set_modem_configuration(uint8_t data[28]);
+    void set_modem_configuration_no_packet(uint8_t data[28]);
+
+/*
+    1C
+    1D
+
+    20
+    21
+    22
+    23
+    24
+    25
+    2A
+    2C
+    2D
+    2E
+
+    30
+    32
+    33
+    34
+    35
+    36
+    37
+    38
+    39
+    3A
+    3B
+    3C
+    3D
+    3E
+    3F
+    40
+    41
+    42
+    43
+    44
+    45
+    46
+
+    6E
+    6F
+
+    70
+    71
+    72
+
+    75
+    76
+    77
+*/
+    void set_modem_configuration_packet(uint8_t data[42]);
 
     // Set or get the transmission power
     void set_transmission_power(uint8_t power);
@@ -191,7 +242,7 @@ public:
     void clear_tx_fifo();
 
     // Send data
-    bool send(uint8_t *data, uint8_t length, uint32_t timeout = 200);
+    bool send(uint8_t const*data, uint8_t length, uint32_t timeout = 200);
 
     // Receive data (blocking with timeout). Returns number of bytes received
     int8_t receive(uint8_t *data, uint8_t length, uint32_t timeout = 30000);
