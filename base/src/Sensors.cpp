@@ -160,10 +160,13 @@ bool Sensors::init(std::string const& server, std::string const& db, std::string
         }
         sensor_data->measurement_indices = std::move(indices.indices);
         size_t db_index_count = sensor_data->measurement_indices.size();
-        sensor_data->max_confirmed_measurement_index = remove_unused_measurement_indices(*sensor_data);
+
+        sensor_data->measurement_indices_base = 0;
+        optimize_measurement_indices(*sensor_data);
+
         size_t crt_index_count = sensor_data->measurement_indices.size();
 
-        std::cout << "Sensor " << id << " has " << db_index_count << " indices in DB, " << (db_index_count - crt_index_count) << " unconfirmed. Last confirmed one is " << sensor_data->max_confirmed_measurement_index << "\n";
+        std::cout << "Sensor " << id << " has " << db_index_count << " indices in DB, " << (db_index_count - crt_index_count) << " confirmed. Last confirmed one is " << sensor_data->measurement_indices_base << "\n";
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -177,29 +180,36 @@ bool Sensors::init(std::string const& server, std::string const& db, std::string
 }
 
 
-uint32_t Sensors::remove_unused_measurement_indices(Sensor_Data& sensor_data)
+void Sensors::optimize_measurement_indices(Sensor_Data& sensor_data)
 {
     if (sensor_data.measurement_indices.empty())
     {
-        return 0;
+        return;
     }
 
-    uint32_t last_index = 0;
+    remove_old_indices(sensor_data, sensor_data.measurement_indices_base);
+
+    uint32_t start_base = sensor_data.measurement_indices_base;
+
     while (!sensor_data.measurement_indices.empty())
     {
         uint32_t index = *sensor_data.measurement_indices.begin();
-        if (last_index != 0 && last_index + 1 != index)
+        if (sensor_data.measurement_indices_base + 1 != index)
         {
             break;
         }
-        last_index = index;
+        sensor_data.measurement_indices_base = index;
         sensor_data.measurement_indices.erase(sensor_data.measurement_indices.begin());
     }
 
-    return last_index;
+    uint32_t end_base = sensor_data.measurement_indices_base;
+    if (end_base > start_base)
+    {
+        std::cout << "Indices base for sensor " << sensor_data.sensor.id << " increased by " << end_base - start_base << " from " << start_base << " to " << end_base << "\n";
+    }
 }
 
-void Sensors::remove_confirmed_indices(Sensor_Data& sensor_data, uint32_t max_confirmed)
+void Sensors::remove_old_indices(Sensor_Data& sensor_data, uint32_t max_confirmed)
 {
     while (!sensor_data.measurement_indices.empty() && *sensor_data.measurement_indices.begin() <= max_confirmed)
     {
@@ -251,10 +261,10 @@ void Sensors::set_sensor_measurement_range(Sensor_Id id, uint32_t first_measurem
     sensor_data->first_recorded_measurement_index = first_measurement_index;
     sensor_data->recorded_measurement_count = measurement_count;
 
-    sensor_data->max_confirmed_measurement_index = std::max(sensor_data->max_confirmed_measurement_index, sensor_data->first_recorded_measurement_index);
+    //since the sensor doesn't store indices older than first_measurement_index, no need to keep track of older ones
+    sensor_data->measurement_indices_base = std::max(sensor_data->measurement_indices_base, sensor_data->first_recorded_measurement_index);
 
-    //remove already confirmed indices
-    remove_confirmed_indices(*sensor_data, sensor_data->max_confirmed_measurement_index);
+    remove_old_indices(*sensor_data, sensor_data->measurement_indices_base);
 }
 
 void Sensors::set_sensor_b2s_input_dBm(Sensor_Id id, int8_t dBm)
@@ -358,18 +368,19 @@ uint32_t Sensors::compute_next_measurement_index()
     return m_next_measurement_index;
 }
 
-uint32_t Sensors::compute_last_confirmed_measurement_index(Sensor_Id id) const
+uint32_t Sensors::compute_last_confirmed_measurement_index(Sensor_Id id)
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    Sensor_Data const* sensor_data = _find_sensor_data_by_id(id);
+    Sensor_Data* sensor_data = _find_sensor_data_by_id(id);
     if (!sensor_data)
     {
         std::cerr << "Cannot find sensor id " << id << "\n";
         return 0;
     }
 
-    return sensor_data->max_confirmed_measurement_index;
+    optimize_measurement_indices(*sensor_data);
+    return sensor_data->measurement_indices_base;
 }
 
 Sensors::Clock::time_point Sensors::compute_next_comms_time_point(Sensor_Id id) const
@@ -521,7 +532,8 @@ void Sensors::add_measurement(Sensor_Id id, Measurement const& measurement)
         }
 
 
-        if (sensor_data->measurement_indices.find(measurement.index) == sensor_data->measurement_indices.end())
+        if (measurement.index > sensor_data->measurement_indices_base &&
+            sensor_data->measurement_indices.find(measurement.index) == sensor_data->measurement_indices.end())
         {
             item = Worker::Item();
             item->sensor_id = id;
@@ -591,19 +603,14 @@ void Sensors::process_worker_thread()
                     }
 
                     sensor_data->measurement_indices.insert(item.measurement.index);
-                    if (item.measurement.index == sensor_data->max_confirmed_measurement_index + 1)
-                    {
-                        sensor_data->max_confirmed_measurement_index = item.measurement.index;
-                    }
-
-                    remove_confirmed_indices(*sensor_data, sensor_data->max_confirmed_measurement_index);
+                    optimize_measurement_indices(*sensor_data);
                 }
             }
             std::cout << "Sent " << items.size() << " measurements in " << std::chrono::duration<float>(Clock::now() - start).count() << " seconds\n";
         }
         else
         {
-            boost::this_thread::sleep_for(boost::chrono::milliseconds(1000));
+            boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
         }
 
         if (Clock::now() - m_worker.last_config_refresh_time_point > CONFIG_REFRESH_PERIOD)

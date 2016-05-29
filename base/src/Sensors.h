@@ -35,7 +35,7 @@ public:
     Clock::duration get_measurement_period() const;
 
     uint32_t compute_next_measurement_index();
-    uint32_t compute_last_confirmed_measurement_index(Sensor_Id id) const;
+    uint32_t compute_last_confirmed_measurement_index(Sensor_Id id);
 
     Clock::time_point compute_next_measurement_time_point();
     Clock::time_point compute_next_comms_time_point(Sensor_Id id) const;
@@ -73,18 +73,20 @@ private:
     {
         Sensor sensor;
         std::set<uint32_t> measurement_indices;
+        uint32_t measurement_indices_base = 0;
+
         int8_t b2s_input_dBm = 0;
         uint32_t first_recorded_measurement_index = 0;
         uint32_t recorded_measurement_count = 0;
-        uint32_t max_confirmed_measurement_index = 0;
     };
 
     std::vector<Sensor_Data> m_sensors;
 
     Sensor_Data* _find_sensor_data_by_id(Sensor_Id id);
     Sensor_Data const* _find_sensor_data_by_id(Sensor_Id id) const;
-    uint32_t remove_unused_measurement_indices(Sensor_Data& sensor_data);
-    void remove_confirmed_indices(Sensor_Data& sensor_data, uint32_t max);
+    void optimize_measurement_indices(Sensor_Data& sensor_data);
+    void remove_confirmed_indices(Sensor_Data& sensor_data);
+    void remove_old_indices(Sensor_Data& sensor_data, uint32_t max);
 
     uint16_t m_last_address = Comms::SLAVE_ADDRESS_BEGIN;
 

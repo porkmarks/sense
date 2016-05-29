@@ -13,7 +13,6 @@
 #include <fcntl.h>
 #include <time.h>
 #include <boost/thread.hpp>
-#include <pigpio.h>
 
 #include "CRC.h"
 #include "DB.h"
@@ -71,11 +70,7 @@ int main(int, const char**)
 
     size_t tries = 0;
 
-    gpioInitialise();
-
 //    run_tests();
-
-    //s_sensors.load_sensors("sensors.config");
 
     static const std::string db_server = "192.168.1.205";
     static const std::string db_db = "sensor-test";
@@ -97,7 +92,8 @@ int main(int, const char**)
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
-    s_comms.set_check_address(Comms::BROADCAST_ADDRESS);
+    s_comms.set_source_address(Comms::BASE_ADDRESS);
+    s_comms.set_destination_address(Comms::BROADCAST_ADDRESS);
 
     while (true)
     {
@@ -121,10 +117,10 @@ int main(int, const char**)
 
                     data::Pair_Response packet;
                     packet.address = sensor->address;
-                    s_comms.set_address(Comms::BASE_ADDRESS);
+                    s_comms.set_destination_address(Comms::BROADCAST_ADDRESS);
                     s_comms.begin_packet(data::Type::PAIR_RESPONSE);
                     s_comms.pack(packet);
-                    if (s_comms.send_packet(10))
+                    if (s_comms.send_packet(1))
                     {
                         std::cout << "Pair successful\n";
                     }
@@ -142,7 +138,7 @@ int main(int, const char**)
             }
             else if (type == data::Type::MEASUREMENT_BATCH && size >= data::MEASUREMENT_BATCH_PACKET_MIN_SIZE)
             {
-                Sensors::Sensor_Address address = s_comms.get_packet_address();
+                Sensors::Sensor_Address address = s_comms.get_packet_source_address();
                 const Sensors::Sensor* sensor = s_sensors.find_sensor_by_address(address);
                 if (sensor)
                 {
@@ -152,7 +148,7 @@ int main(int, const char**)
                     memcpy(&batch, s_comms.get_packet_payload(), size);
                     if (size == data::MEASUREMENT_BATCH_PACKET_MIN_SIZE + batch.count * sizeof(data::Measurement))
                     {
-                        std::cout << "\tIndices: " << batch.index << " - " << batch.index + batch.count << "\n";
+                        std::cout << "\tIndices: " << batch.index << " - " << batch.index + batch.count - 1 << "\n";
 
                         Sensors::Measurement m;
                         size_t count = std::min<size_t>(batch.count, data::Measurement_Batch::MAX_COUNT);
@@ -179,7 +175,7 @@ int main(int, const char**)
             }
             else if (type == data::Type::FIRST_CONFIG_REQUEST && size == sizeof(data::First_Config_Request))
             {
-                Sensors::Sensor_Address address = s_comms.get_packet_address();
+                Sensors::Sensor_Address address = s_comms.get_packet_source_address();
                 const Sensors::Sensor* sensor = s_sensors.find_sensor_by_address(address);
                 if (sensor)
                 {
@@ -190,10 +186,10 @@ int main(int, const char**)
                     s_sensors.set_sensor_measurement_range(sensor->id, packet.first_measurement_index, 0);
                     fill_config_packet(packet.config, *sensor);
 
-                    s_comms.set_address(address);
+                    s_comms.set_destination_address(address);
                     s_comms.begin_packet(data::Type::FIRST_CONFIG);
                     s_comms.pack(packet);
-                    if (s_comms.send_packet(3))
+                    if (s_comms.send_packet(1))
                     {
                         std::cout << "\tFirst Config successful\n";
                     }
@@ -212,7 +208,7 @@ int main(int, const char**)
             {
                 data::Config_Request const& config_request = *reinterpret_cast<data::Config_Request const*>(s_comms.get_packet_payload());
 
-                Sensors::Sensor_Address address = s_comms.get_packet_address();
+                Sensors::Sensor_Address address = s_comms.get_packet_source_address();
                 const Sensors::Sensor* sensor = s_sensors.find_sensor_by_address(address);
                 if (sensor)
                 {
@@ -225,10 +221,10 @@ int main(int, const char**)
                     data::Config packet;
                     fill_config_packet(packet, *sensor);
 
-                    s_comms.set_address(address);
+                    s_comms.set_destination_address(address);
                     s_comms.begin_packet(data::Type::CONFIG);
                     s_comms.pack(packet);
-                    if (s_comms.send_packet(5))
+                    if (s_comms.send_packet(1))
                     {
                         std::cout << "\tSchedule successful\n";
                     }

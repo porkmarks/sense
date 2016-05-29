@@ -94,7 +94,7 @@ bool Comms::init(uint8_t retries)
         0x00,
         0x02,
         0x08,
-        0x2A,
+        0x22,
         0x2D,
         0xD4,
         0x00,
@@ -190,20 +190,21 @@ void Comms::stand_by_mode()
     m_rf22.stand_by_mode();
 }
 
-void Comms::set_address(uint16_t address)
+void Comms::set_source_address(uint16_t address)
 {
-    m_address = address;
+    m_source_address = address;
 }
-void Comms::set_check_address(uint16_t address)
+void Comms::set_destination_address(uint16_t address)
 {
-    m_check_address = address;
+    m_destination_address = address;
 }
 
 uint8_t Comms::begin_packet(data::Type type)
 {
     Header* header_ptr = reinterpret_cast<Header*>(m_buffer);
     header_ptr->type = type;
-    header_ptr->address = m_address;
+    header_ptr->source_address = m_source_address;
+    header_ptr->destination_address = m_destination_address;
     header_ptr->req_id = ++m_last_req_id;
     header_ptr->crc = 0;
 
@@ -233,8 +234,7 @@ bool Comms::send_packet(uint8_t retries)
     uint8_t response_buffer[RESPONSE_BUFFER_SIZE];
 
     retries++;
-    uint8_t i = 0;
-    for (i = 0; i < retries; i++)
+    for (uint8_t i = 0; i < retries; i++)
     {
         m_rf22.send(m_buffer, sizeof(Header) + m_offset, 200);
         int8_t size = m_rf22.receive(response_buffer, sizeof(response_buffer), 200);
@@ -250,7 +250,10 @@ bool Comms::send_packet(uint8_t retries)
                 }
             }
         }
-        delay(10 + (random() % 5) * 10);
+        if (i + 1 < retries)
+        {
+            delay(10 + (random() % 5) * 10);
+        }
     }
 
     return false;
@@ -277,8 +280,16 @@ bool Comms::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload
     //zero the crc
     header_ptr->crc = 0;
 
+    bool rf_crc = m_rf22.is_crc_ok();
+
     //corrupted?
     uint16_t computed_crc = crc16(reinterpret_cast<const uint8_t*>(data), size);
+
+    if (rf_crc != (crc == computed_crc))
+    {
+        printf_P(PSTR("rf crc mismatch!!!"));
+    }
+
     if (crc != computed_crc)
     {
         printf_P(PSTR("bad crc"));
@@ -286,9 +297,8 @@ bool Comms::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload
     }
 
     //not addressed to me?
-    if (m_check_address != BROADCAST_ADDRESS &&  //accepts any address
-            header_ptr->address != m_check_address && //or is it addressed to me
-            header_ptr->address != BROADCAST_ADDRESS) //or it's a broadcast
+    if (header_ptr->destination_address != m_source_address && //or is it addressed to me
+        header_ptr->destination_address != BROADCAST_ADDRESS) //or it's a broadcast
     {
         printf_P(PSTR("not for me"));
         return false;
@@ -301,7 +311,8 @@ void Comms::send_response(const Header& header)
 {
     uint8_t response_buffer[RESPONSE_BUFFER_SIZE];
     Header* header_ptr = reinterpret_cast<Header*>(response_buffer);
-    header_ptr->address = m_address;
+    header_ptr->source_address = m_source_address;
+    header_ptr->destination_address = header.source_address;
     header_ptr->type = data::Type::RESPONSE;
     header_ptr->req_id = ++m_last_req_id;
     header_ptr->crc = 0;
@@ -313,11 +324,7 @@ void Comms::send_response(const Header& header)
     uint16_t crc = crc16(response_buffer, RESPONSE_BUFFER_SIZE);
     header_ptr->crc = crc;
 
-    for (uint8_t i = 0; i < 3; i++)
-    {
-        m_rf22.send(response_buffer, RESPONSE_BUFFER_SIZE, 200);
-        delay(2);
-    }
+    m_rf22.send(response_buffer, RESPONSE_BUFFER_SIZE, 200);
 }
 
 uint8_t Comms::receive_packet(uint32_t timeout)
@@ -368,10 +375,16 @@ const void* Comms::get_packet_payload() const
     return m_buffer + sizeof(Header);
 }
 
-uint16_t Comms::get_packet_address() const
+uint16_t Comms::get_packet_source_address() const
 {
     const Header* header_ptr = reinterpret_cast<const Header*>(m_buffer);
-    return header_ptr->address;
+    return header_ptr->source_address;
+}
+
+uint16_t Comms::get_packet_destination_address() const
+{
+    const Header* header_ptr = reinterpret_cast<const Header*>(m_buffer);
+    return header_ptr->destination_address;
 }
 
 int8_t Comms::get_input_dBm()

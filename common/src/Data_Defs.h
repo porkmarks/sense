@@ -59,7 +59,7 @@ struct Measurement_Batch
 {
     uint32_t index = 0;
     uint8_t count = 0;
-    enum { MAX_COUNT = 9 };
+    enum { MAX_COUNT = 8 };
 
     Measurement measurements[MAX_COUNT];
 };

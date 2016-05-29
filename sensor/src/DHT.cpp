@@ -19,7 +19,7 @@ DHT::DHT(uint8_t pin, uint8_t type)
     m_bit = digitalPinToBitMask(pin);
     m_port = digitalPinToPort(pin);
     m_maxcycles = microsecondsToClockCycles(1000);  // 1 millisecond timeout for
-    m_lastreadtime = millis();
+    m_lastreadtime = chrono::now();
     // reading pulses from DHT sensor.
     // Note that count is now ignored as the DHT reading algorithm adjusts itself
     // basd on the speed of the processor.
@@ -28,9 +28,9 @@ DHT::DHT(uint8_t pin, uint8_t type)
 void DHT::begin()
 {
     // set up the pins!
-    pinMode(m_pin, INPUT);
+    pinMode(m_pin, INPUT_PULLUP);
     digitalWrite(m_pin, HIGH);
-    m_lastreadtime = 0;
+    m_lastreadtime = chrono::now();
     DEBUG_PRINT("Max clock cycles: "); DEBUG_PRINTLN(m_maxcycles, DEC);
 }
 
@@ -70,19 +70,14 @@ bool DHT::read(float& t, float& h)
 
 bool DHT::read_sensor(void) 
 {
-    // Check if sensor was read less than two seconds ago and return early
-    // to use last reading.
-    uint32_t currenttime = millis();
-    if (currenttime < m_lastreadtime)
-    {
-        // ie there was a rollover
-        m_lastreadtime = 0;
-    }
-    if ((currenttime - m_lastreadtime) < 2000)
-    {
-        return false;
-    }
-    m_lastreadtime = millis();
+//    // Check if sensor was read less than two seconds ago and return early
+//    // to use last reading.
+//    chrono::time_ms currenttime = chrono::now();
+//    if (currenttime - m_lastreadtime < chrono::millis(2000))
+//    {
+//        return false;
+//    }
+//    m_lastreadtime = chrono::now();
 
     // Reset 40 bits of received data to zero.
     m_data[0] = m_data[1] = m_data[2] = m_data[3] = m_data[4] = 0;
@@ -92,13 +87,14 @@ bool DHT::read_sensor(void)
 
     // Go into high impedence state to let pull-up raise data line level and
     // start the reading process.
+    pinMode(m_pin, INPUT_PULLUP);
     digitalWrite(m_pin, HIGH);
-    delay(250);
+    delay(500);
 
     // First set data line low for 20 milliseconds.
     pinMode(m_pin, OUTPUT);
     digitalWrite(m_pin, LOW);
-    delay(20);
+    delay(10);
 
     {
         // Turn off interrupts temporarily because the next sections are timing critical
@@ -106,12 +102,12 @@ bool DHT::read_sensor(void)
         Interrupt_Lock lock;
 
         // End the start signal by setting data line high for 40 microseconds.
+        pinMode(m_pin, INPUT_PULLUP);
         digitalWrite(m_pin, HIGH);
         delayMicroseconds(40);
 
         // Now start reading the data line to get the value from the DHT sensor.
-        pinMode(m_pin, INPUT);
-        delayMicroseconds(10);  // Delay a bit to let sensor pull data line low.
+        //delayMicroseconds(10);  // Delay a bit to let sensor pull data line low.
 
         // First expect a low signal for ~80 microseconds followed by a high signal
         // for ~80 microseconds again.

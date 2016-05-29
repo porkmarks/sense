@@ -51,7 +51,7 @@ enum class Register : uint8_t
     SLICER_PEAK_HOLD_2E							= 0x2E,
 //	RESERVED_2F 								= 0x2F,
     DATA_ACCESS_CONTROL_30						= 0x30,
-    EXMAC_STATUS_31								= 0x31,
+    EZMAC_STATUS_31								= 0x31,
     HEADER_CONTROL_1_32							= 0x32,
     HEADER_CONTROL_2_33							= 0x33,
     PREAMBLE_LENGTH_34							= 0x34,
@@ -282,5 +282,18 @@ enum class Frequency_Band_Select : uint8_t
 	SBSEL                              = 0x40,
 	HBSEL                              = 0x20,
 	FB                                 = 0x1f,
+};
+
+
+// RH_RF22_REG_75_FREQUENCY_BAND_SELECT            0x75
+enum class EZMAC_Status : uint8_t
+{
+    PKSENT          = (1 << 0),
+    PKTX            = (1 << 1),
+    CRCERROR        = (1 << 2),
+    PKVALID         = (1 << 3),
+    PKRX            = (1 << 4),
+    PKSRCH          = (1 << 5),
+    PKCRC1          = (1 << 6),
 };
 

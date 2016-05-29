@@ -231,6 +231,8 @@ public:
     uint8_t get_rssi();
     int8_t get_input_dBm();
 
+    bool is_crc_ok();
+
     // Get length of last received packet
     uint8_t get_received_packet_length();
 

@@ -254,7 +254,7 @@ bool request_config()
     req.measurement_count = s_storage.get_data_count();
     req.b2s_input_dBm = s_comms.get_input_dBm();
     s_comms.pack(req);
-    if (s_comms.send_packet(5))
+    if (s_comms.send_packet(1))
     {
         uint8_t size = s_comms.receive_packet(500);
         data::Type type = s_comms.get_packet_type();
@@ -290,7 +290,7 @@ bool request_first_config()
 {
     s_comms.begin_packet(data::Type::FIRST_CONFIG_REQUEST);
     s_comms.pack(data::First_Config_Request());
-    if (s_comms.send_packet(5))
+    if (s_comms.send_packet(1))
     {
         uint8_t size = s_comms.receive_packet(500);
         data::Type type = s_comms.get_packet_type();
@@ -307,8 +307,8 @@ bool request_first_config()
 
 void pair()
 {
-    s_comms.set_address(Comms::BASE_ADDRESS);
-    s_comms.set_check_address(Comms::BASE_ADDRESS);
+    s_comms.set_source_address(Comms::BROADCAST_ADDRESS);
+    s_comms.set_destination_address(Comms::BASE_ADDRESS);
 
     LOG(PSTR("Starting pairing\n"));
 
@@ -332,7 +332,7 @@ void pair()
 
                 s_comms.begin_packet(data::Type::PAIR_REQUEST);
                 s_comms.pack(data::Pair_Request());
-                if (s_comms.send_packet(5))
+                if (s_comms.send_packet(1))
                 {
                     LOG(PSTR("done.\nWaiting for response..."));
 
@@ -347,8 +347,7 @@ void pair()
                     if (size == sizeof(data::Pair_Response) && s_comms.get_packet_type() == data::Type::PAIR_RESPONSE)
                     {
                         const data::Pair_Response* response_ptr = reinterpret_cast<const data::Pair_Response*>(s_comms.get_packet_payload());
-                        s_comms.set_address(response_ptr->address);
-                        s_comms.set_check_address(response_ptr->address);
+                        s_comms.set_source_address(response_ptr->address);
                         LOG(PSTR("done. Addr: %d\n"), response_ptr->address);
 
                         done = true;
@@ -513,14 +512,13 @@ void do_comms()
             s_comms.begin_packet(data::Type::MEASUREMENT_BATCH);
             s_comms.pack(&batch, data::MEASUREMENT_BATCH_PACKET_MIN_SIZE + batch.count * sizeof(data::Measurement));
             LOG(PSTR("Sending measurement..."));
-            if (s_comms.send_packet(3) == true)
+            if (s_comms.send_packet(1) == true)
             {
                 LOG(PSTR("done.\n"));
             }
             else
             {
                 LOG(PSTR("failed: comms\n"));
-                break;
             }
 
             batch.index = measurement_index;

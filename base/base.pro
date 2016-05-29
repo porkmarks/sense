@@ -61,4 +61,4 @@ HEADERS += \
 
 DISTFILES +=
 
-LIBS += -lboost_thread -lboost_system -lpthread -lmysqlpp -lmysqlclient -lpigpio
+LIBS += -lboost_thread -lboost_system -lpthread -lmysqlpp -lmysqlclient

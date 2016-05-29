@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Arduino.h"
-
+#include "Chrono.h"
 
 // Uncomment to enable printing out nice debug messages.
 //#define DHT_DEBUG
@@ -36,7 +36,7 @@ private:
 
     uint8_t m_data[6];
     uint8_t m_pin = 0, m_type = 0, m_bit = 0, m_port = 0;
-    uint32_t m_lastreadtime = 0;
+    chrono::time_ms m_lastreadtime;
     uint16_t m_maxcycles = 0;
 
     uint16_t expect_pulse(uint8_t bit);

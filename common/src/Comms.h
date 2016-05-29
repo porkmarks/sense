@@ -17,8 +17,8 @@ public:
 
     bool init(uint8_t retries);
 
-    void set_address(uint16_t address);
-    void set_check_address(uint16_t address);
+    void set_source_address(uint16_t address);
+    void set_destination_address(uint16_t address);
 
     void idle_mode();
     void stand_by_mode();
@@ -31,16 +31,18 @@ public:
     bool send_packet(uint8_t retries);
 
     uint8_t receive_packet(uint32_t timeout);
-    uint16_t get_packet_address() const;
-    int8_t get_input_dBm();
+    uint16_t get_packet_source_address() const;
+    uint16_t get_packet_destination_address() const;
     data::Type get_packet_type() const;
     const void* get_packet_payload() const;
+
+    int8_t get_input_dBm();
 
 private:
     RFM22B m_rf22;
 
-    uint16_t m_address = BROADCAST_ADDRESS;
-    uint16_t m_check_address = BROADCAST_ADDRESS;
+    uint16_t m_source_address = BROADCAST_ADDRESS;
+    uint16_t m_destination_address = BROADCAST_ADDRESS;
     uint16_t m_last_req_id = 0;
 
 #ifndef __AVR__
@@ -49,7 +51,8 @@ private:
     struct Header
     {
         uint16_t crc;
-        uint16_t address = BROADCAST_ADDRESS;
+        uint16_t source_address = BROADCAST_ADDRESS;
+        uint16_t destination_address = BROADCAST_ADDRESS;
         uint16_t req_id : 15;
         data::Type type;
     };

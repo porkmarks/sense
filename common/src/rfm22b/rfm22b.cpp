@@ -733,6 +733,12 @@ int8_t RFM22B::get_input_dBm()
     return 0.56*get_rssi()-128.8;
 }
 
+bool RFM22B::is_crc_ok()
+{
+    uint8_t reg = get_register(Register::EZMAC_STATUS_31);
+    return (reg & static_cast<uint8_t>(EZMAC_Status::CRCERROR)) == 0;
+}
+
 // Get length of last received packet
 uint8_t RFM22B::get_received_packet_length()
 {
