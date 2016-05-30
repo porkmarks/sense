@@ -236,10 +236,10 @@ void test_sensor_operations()
             return;
         }
 
-        sensors.set_measurement_period(std::chrono::minutes(1));
+//        sensors.set_measurement_period(std::chrono::minutes(1));
         CHECK(sensors.get_measurement_period() == std::chrono::minutes(1));
 
-        sensors.set_measurement_period(std::chrono::minutes(10));
+//        sensors.set_measurement_period(std::chrono::minutes(10));
         CHECK(sensors.get_measurement_period() == std::chrono::minutes(10));
     }
 
@@ -253,25 +253,25 @@ void test_sensor_operations()
             return;
         }
 
-        sensors.set_measurement_period(std::chrono::minutes(10));
-        sensors.set_comms_period(std::chrono::minutes(10));
+//        sensors.set_measurement_period(std::chrono::minutes(10));
+//        sensors.set_comms_period(std::chrono::minutes(10));
         CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(10), Sensors::MEASUREMENT_JITTER));
 
-        sensors.set_comms_period(std::chrono::minutes(1));
+//        sensors.set_comms_period(std::chrono::minutes(1));
         CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(10), Sensors::MEASUREMENT_JITTER));
 
-        sensors.set_measurement_period(std::chrono::minutes(20));
-        sensors.set_comms_period(std::chrono::minutes(10));
+//        sensors.set_measurement_period(std::chrono::minutes(20));
+//        sensors.set_comms_period(std::chrono::minutes(10));
         CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(20), Sensors::MEASUREMENT_JITTER));
 
-        sensors.set_comms_period(std::chrono::minutes(1));
+//        sensors.set_comms_period(std::chrono::minutes(1));
         CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(20), Sensors::MEASUREMENT_JITTER));
 
-        sensors.set_measurement_period(std::chrono::minutes(1));
-        sensors.set_comms_period(std::chrono::minutes(10));
+//        sensors.set_measurement_period(std::chrono::minutes(1));
+//        sensors.set_comms_period(std::chrono::minutes(10));
         CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(10), Sensors::MEASUREMENT_JITTER));
 
-        sensors.set_comms_period(std::chrono::minutes(1));
+//        sensors.set_comms_period(std::chrono::minutes(1));
         CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(1), Sensors::MEASUREMENT_JITTER));
     }
 
@@ -295,25 +295,25 @@ void test_sensor_operations()
 
         Sensors::Clock::duration total_comms_duration = Sensors::COMMS_DURATION * sensor_count;
 
-        sensors.set_measurement_period(std::chrono::minutes(10));
-        sensors.set_comms_period(std::chrono::minutes(10));
+//        sensors.set_measurement_period(std::chrono::minutes(10));
+//        sensors.set_comms_period(std::chrono::minutes(10));
         CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors::MEASUREMENT_JITTER));
 
-        sensors.set_comms_period(std::chrono::minutes(1));
+//        sensors.set_comms_period(std::chrono::minutes(1));
         CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors::MEASUREMENT_JITTER));
 
-        sensors.set_measurement_period(std::chrono::minutes(20));
-        sensors.set_comms_period(std::chrono::minutes(10));
+//        sensors.set_measurement_period(std::chrono::minutes(20));
+//        sensors.set_comms_period(std::chrono::minutes(10));
         CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors::MEASUREMENT_JITTER));
 
-        sensors.set_comms_period(std::chrono::minutes(1));
+//        sensors.set_comms_period(std::chrono::minutes(1));
         CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors::MEASUREMENT_JITTER));
 
-        sensors.set_measurement_period(std::chrono::minutes(1));
-        sensors.set_comms_period(std::chrono::minutes(10));
+//        sensors.set_measurement_period(std::chrono::minutes(1));
+//        sensors.set_comms_period(std::chrono::minutes(10));
         CHECK(equal(sensors.compute_comms_period(), std::max(Sensors::Clock::duration(std::chrono::minutes(10)), std::max(total_comms_duration, sensors.get_measurement_period())), Sensors::MEASUREMENT_JITTER));
 
-        sensors.set_comms_period(std::chrono::minutes(1));
+//        sensors.set_comms_period(std::chrono::minutes(1));
         CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors::MEASUREMENT_JITTER));
     }
 

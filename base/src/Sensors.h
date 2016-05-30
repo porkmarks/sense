@@ -19,6 +19,7 @@ public:
     typedef DB::Sensor_Address Sensor_Address;
     typedef DB::Measurement Measurement;
     typedef DB::Sensor Sensor;
+    typedef DB::Config Config;
 
     Sensors();
     ~Sensors();
@@ -31,7 +32,7 @@ public:
     bool init(std::string const& server, std::string const& db, std::string const& username, std::string const& password, uint16_t port);
 
     //how often will the sensors do the measurement
-    bool set_measurement_period(Clock::duration period);
+    //bool set_measurement_period(Clock::duration period);
     Clock::duration get_measurement_period() const;
 
     uint32_t compute_next_measurement_index();
@@ -41,7 +42,7 @@ public:
     Clock::time_point compute_next_comms_time_point(Sensor_Id id) const;
 
     //how often will the sensors talk to the base station
-    bool set_comms_period(Clock::duration period);
+    //bool set_comms_period(Clock::duration period);
     Clock::duration compute_comms_period() const;
 
     //sensor manipulation
@@ -60,7 +61,10 @@ public:
     void add_measurement(Sensor_Id id, Measurement const& measurement);
 
 private:
-    DB::Config m_config;
+    std::vector<Config> m_configs; //sorted ascendion, by date. Most recent one is last
+
+    Config get_first_config() const;
+    Config get_last_config() const;
 
     mutable std::recursive_mutex m_mutex;
 

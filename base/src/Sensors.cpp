@@ -100,26 +100,28 @@ bool Sensors::init(std::string const& server, std::string const& db, std::string
 
     //////////////////////////////////////////////////////////////////////////////////////////////////
     //get the config
-    boost::optional<DB::Config> config = m_main_db->get_config();
-    if (!config)
+    boost::optional<std::vector<DB::Config>> configs = m_main_db->get_configs();
+    if (!configs || configs->empty())
     {
-        m_config.measurement_period = std::chrono::seconds(10);
-        m_config.comms_period = m_config.measurement_period * 3;
-        m_config.baseline_time_point = Clock::now();
-        if (!m_main_db->set_config(m_config))
+        DB::Config config;
+        config.measurement_period = std::chrono::seconds(10);
+        config.comms_period = config.measurement_period * 3;
+        if (!m_main_db->add_config(config))
         {
             std::cerr << "Cannot set config\n";
             return false;
         }
+        m_configs = { config };
     }
     else
     {
-        m_config = *config;
+        m_configs = *configs;
     }
+
     m_worker.last_config_refresh_time_point = Clock::now();
 
-    m_next_measurement_time_point = m_config.baseline_time_point;
-    m_next_comms_time_point = m_config.baseline_time_point;
+    m_next_measurement_time_point = get_first_config().creation_time_point;
+    m_next_comms_time_point = get_first_config().creation_time_point;
 
 
     //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -304,56 +306,61 @@ Sensors::Sensor const* Sensors::add_sensor(std::string const& name)
     return &m_sensors.back().sensor;
 }
 
-bool Sensors::set_comms_period(Clock::duration period)
-{
-    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+//bool Sensors::set_comms_period(Clock::duration period)
+//{
+//    std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    DB::Config config = m_config;
-    config.comms_period = period;
-    if (m_main_db->set_config(config))
-    {
-        m_config = config;
-        return true;
-    }
-    return false;
-}
+//    DB::Config config = m_config;
+//    config.comms_period = period;
+//    if (m_main_db->set_config(config))
+//    {
+//        m_config = config;
+//        return true;
+//    }
+//    return false;
+//}
 
 Sensors::Clock::duration Sensors::compute_comms_period() const
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
+    Config config = get_last_config();
+
     Clock::duration max_period = m_sensors.size() * COMMS_DURATION;
-    Clock::duration period = std::max(m_config.comms_period, max_period);
-    return std::max(period, m_config.measurement_period + MEASUREMENT_JITTER);
+    Clock::duration period = std::max(config.comms_period, max_period);
+    return std::max(period, config.measurement_period + MEASUREMENT_JITTER);
 }
 
-bool Sensors::set_measurement_period(Clock::duration period)
-{
-    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+//bool Sensors::set_measurement_period(Clock::duration period)
+//{
+//    std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    DB::Config config = m_config;
-    config.measurement_period = period;
-    if (m_main_db->set_config(config))
-    {
-        m_config = config;
-        return true;
-    }
-    return false;
-}
+//    DB::Config config = m_config;
+//    config.measurement_period = period;
+//    if (m_main_db->set_config(config))
+//    {
+//        m_config = config;
+//        return true;
+//    }
+//    return false;
+//}
+
 Sensors::Clock::duration Sensors::get_measurement_period() const
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
-    return m_config.measurement_period;
+    return get_last_config().measurement_period;
 }
 
 Sensors::Clock::time_point Sensors::compute_next_measurement_time_point()
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
+    Config config = get_last_config();
+
     auto now = Clock::now();
     while (m_next_measurement_time_point <= now)
     {
-        m_next_measurement_time_point += m_config.measurement_period;
+        m_next_measurement_time_point += config.measurement_period;
         m_next_measurement_index++;
     }
 
@@ -521,6 +528,9 @@ void Sensors::add_measurement(Sensor_Id id, Measurement const& measurement)
 {
     boost::optional<Worker::Item> item;
 
+    Config first_config = get_first_config();
+    Config last_config = get_last_config();
+
     {
         std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
@@ -539,7 +549,7 @@ void Sensors::add_measurement(Sensor_Id id, Measurement const& measurement)
             item->sensor_id = id;
             item->measurement = measurement;
             item->measurement.b2s_input_dBm = sensor_data->b2s_input_dBm;
-            item->time_point = m_config.baseline_time_point + m_config.measurement_period * measurement.index;
+            item->time_point = first_config.creation_time_point + last_config.measurement_period * measurement.index;
         }
         else
         {
@@ -554,13 +564,25 @@ void Sensors::add_measurement(Sensor_Id id, Measurement const& measurement)
     }
 }
 
+Sensors::Config Sensors::get_first_config() const
+{
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+    return m_configs.front();
+}
+
+Sensors::Config Sensors::get_last_config() const
+{
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+    return m_configs.back();
+}
+
 void Sensors::refresh_config()
 {
-    boost::optional<DB::Config> config = m_worker.db->get_config();
-    if (config)
+    boost::optional<std::vector<DB::Config>> configs = m_worker.db->get_configs();
+    if (configs)
     {
         std::lock_guard<std::recursive_mutex> lg(m_mutex);
-        m_config = *config;
+        m_configs = *configs;
     }
     m_worker.last_config_refresh_time_point = Clock::now();
 }

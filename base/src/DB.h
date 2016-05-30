@@ -48,11 +48,11 @@ public:
     {
         Clock::duration measurement_period;
         Clock::duration comms_period;
-        Clock::time_point baseline_time_point;
+        Clock::time_point creation_time_point;
     };
 
-    boost::optional<Config> get_config();
-    bool set_config(Config const& config);
+    boost::optional<std::vector<Config>> get_configs();
+    bool add_config(Config const& config);
 
 
     struct Measurement

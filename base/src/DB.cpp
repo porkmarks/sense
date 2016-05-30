@@ -19,9 +19,9 @@ sql_create_9(Measurement_Row, 9, 0,
              mysqlpp::sql_tinyint, s2b_input_dBm);
 
 sql_create_3(Config_Row, 3, 0,
+    mysqlpp::sql_datetime, creation_timestamp,
     mysqlpp::sql_int_unsigned, measurement_period,
-    mysqlpp::sql_int_unsigned, comms_period,
-    mysqlpp::sql_datetime, baseline_timestamp);
+    mysqlpp::sql_int_unsigned, comms_period);
 
 
 
@@ -46,13 +46,13 @@ bool DB::init(std::string const& server, std::string const& db, std::string cons
     return false;
 }
 
-boost::optional<DB::Config> DB::get_config()
+boost::optional<std::vector<DB::Config>> DB::get_configs()
 {
     try
     {
         std::vector<Config_Row> rows;
 
-        mysqlpp::Query query = m_connection.query("SELECT * FROM configs ORDER BY creation_timestamp DESC;");
+        mysqlpp::Query query = m_connection.query("SELECT * FROM configs ORDER BY creation_timestamp ASC;");
         query.storein(rows);
 
         if (rows.size() == 0)
@@ -60,12 +60,17 @@ boost::optional<DB::Config> DB::get_config()
             return boost::none;
         }
 
-        Config config;
-        config.measurement_period = std::chrono::seconds(rows.front().measurement_period);
-        config.comms_period = std::chrono::seconds(rows.front().comms_period);
-        config.baseline_time_point = Clock::time_point(std::chrono::seconds(rows.front().baseline_timestamp));
+        std::vector<Config> configs;
+        for (Config_Row const& row: rows)
+        {
+            Config config;
+            config.measurement_period = std::chrono::seconds(row.measurement_period);
+            config.creation_time_point = Clock::time_point(std::chrono::seconds(row.creation_timestamp));
+            config.comms_period = std::chrono::seconds(row.comms_period);
+            configs.push_back(config);
+        }
 
-        return config;
+        return configs;
     }
     catch (const mysqlpp::BadQuery& er)
     {
@@ -88,18 +93,15 @@ boost::optional<DB::Config> DB::get_config()
     }
 }
 
-bool DB::set_config(Config const& config)
+bool DB::add_config(Config const& config)
 {
     try
     {
         mysqlpp::Query query = m_connection.query();
 
-        Config_Row row;
-        row.measurement_period = std::chrono::duration_cast<std::chrono::seconds>(config.measurement_period).count();
-        row.comms_period = std::chrono::duration_cast<std::chrono::seconds>(config.comms_period).count();
-        row.baseline_timestamp = mysqlpp::sql_datetime(Clock::to_time_t(config.baseline_time_point));
-
-        query.insert(row);
+        query << "INSERT INTO configs (measurement_period, comms_period) VALUES (" <<
+                 std::chrono::duration_cast<std::chrono::seconds>(config.measurement_period).count() << "," <<
+                 std::chrono::duration_cast<std::chrono::seconds>(config.comms_period).count() << ");";
         query.execute();
 
         return true;
