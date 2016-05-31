@@ -48,7 +48,7 @@ public:
     {
         Clock::duration measurement_period;
         Clock::duration comms_period;
-        Clock::time_point creation_time_point;
+        Clock::time_point start_time_point;
     };
 
     boost::optional<std::vector<Config>> get_configs();

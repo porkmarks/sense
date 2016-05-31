@@ -45,7 +45,7 @@ void fill_config_packet(data::Config& packet, Sensors::Sensor const& sensor)
 {
     packet.base_time_point = chrono::time_s(Clock::to_time_t(Clock::now()));
     packet.measurement_period = chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(s_sensors.get_measurement_period()).count());
-    packet.next_measurement_time_point = chrono::time_s(Clock::to_time_t(s_sensors.compute_next_measurement_time_point()));
+    packet.next_measurement_time_point = chrono::time_s(Clock::to_time_t(s_sensors.compute_next_measurement().first));
     packet.comms_period = chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(s_sensors.compute_comms_period()).count());
     packet.next_comms_time_point = chrono::time_s(Clock::to_time_t(s_sensors.compute_next_comms_time_point(sensor.id)));
     packet.last_confirmed_measurement_index = s_sensors.compute_last_confirmed_measurement_index(sensor.id);
@@ -73,7 +73,7 @@ int main(int, const char**)
 //    run_tests();
 
     static const std::string db_server = "192.168.1.205";
-    static const std::string db_db = "sensor-test";
+    static const std::string db_db = "sensor-test2";
     static const std::string db_username = "admin";
     static const std::string db_password = "admin";
     static const uint16_t port = 0;
@@ -182,7 +182,7 @@ int main(int, const char**)
                     std::cout << "First config requested by " << sensor->id << "\n";
 
                     data::First_Config packet;
-                    packet.first_measurement_index = s_sensors.compute_next_measurement_index();
+                    packet.first_measurement_index = s_sensors.compute_next_measurement().second;
                     s_sensors.set_sensor_measurement_range(sensor->id, packet.first_measurement_index, 0);
                     fill_config_packet(packet.config, *sensor);
 

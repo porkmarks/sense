@@ -19,7 +19,7 @@ sql_create_9(Measurement_Row, 9, 0,
              mysqlpp::sql_tinyint, s2b_input_dBm);
 
 sql_create_3(Config_Row, 3, 0,
-    mysqlpp::sql_datetime, creation_timestamp,
+    mysqlpp::sql_datetime, start_timestamp,
     mysqlpp::sql_int_unsigned, measurement_period,
     mysqlpp::sql_int_unsigned, comms_period);
 
@@ -52,7 +52,7 @@ boost::optional<std::vector<DB::Config>> DB::get_configs()
     {
         std::vector<Config_Row> rows;
 
-        mysqlpp::Query query = m_connection.query("SELECT * FROM configs ORDER BY creation_timestamp ASC;");
+        mysqlpp::Query query = m_connection.query("SELECT * FROM configs ORDER BY start_timestamp ASC;");
         query.storein(rows);
 
         if (rows.size() == 0)
@@ -65,7 +65,7 @@ boost::optional<std::vector<DB::Config>> DB::get_configs()
         {
             Config config;
             config.measurement_period = std::chrono::seconds(row.measurement_period);
-            config.creation_time_point = Clock::time_point(std::chrono::seconds(row.creation_timestamp));
+            config.start_time_point = Clock::time_point(std::chrono::seconds(row.start_timestamp));
             config.comms_period = std::chrono::seconds(row.comms_period);
             configs.push_back(config);
         }

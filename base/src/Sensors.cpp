@@ -9,55 +9,55 @@
 
 constexpr std::chrono::seconds CONFIG_REFRESH_PERIOD(10);
 
-std::chrono::high_resolution_clock::time_point string_to_time_point(std::string const& str)
-{
-    using namespace std;
-    using namespace std::chrono;
+//std::chrono::high_resolution_clock::time_point string_to_time_point(std::string const& str)
+//{
+//    using namespace std;
+//    using namespace std::chrono;
 
-    int yyyy, mm, dd, HH, MM, SS;
+//    int yyyy, mm, dd, HH, MM, SS;
 
-    char scanf_format[] = "%4d-%2d-%2d %2d:%2d:%2d";
+//    char scanf_format[] = "%4d-%2d-%2d %2d:%2d:%2d";
 
-    sscanf(str.c_str(), scanf_format, &yyyy, &mm, &dd, &HH, &MM, &SS);
+//    sscanf(str.c_str(), scanf_format, &yyyy, &mm, &dd, &HH, &MM, &SS);
 
-    tm ttm = tm();
-    ttm.tm_year = yyyy - 1900; // Year since 1900
-    ttm.tm_mon = mm - 1; // Month since January
-    ttm.tm_mday = dd; // Day of the month [1-31]
-    ttm.tm_hour = HH; // Hour of the day [00-23]
-    ttm.tm_min = MM;
-    ttm.tm_sec = SS;
+//    tm ttm = tm();
+//    ttm.tm_year = yyyy - 1900; // Year since 1900
+//    ttm.tm_mon = mm - 1; // Month since January
+//    ttm.tm_mday = dd; // Day of the month [1-31]
+//    ttm.tm_hour = HH; // Hour of the day [00-23]
+//    ttm.tm_min = MM;
+//    ttm.tm_sec = SS;
 
-    time_t ttime_t = mktime(&ttm);
+//    time_t ttime_t = mktime(&ttm);
 
-    high_resolution_clock::time_point time_point_result = std::chrono::high_resolution_clock::from_time_t(ttime_t);
+//    high_resolution_clock::time_point time_point_result = std::chrono::high_resolution_clock::from_time_t(ttime_t);
 
-    return time_point_result;
-}
+//    return time_point_result;
+//}
 
-std::string time_point_to_string(std::chrono::high_resolution_clock::time_point tp)
-{
-    using namespace std;
-    using namespace std::chrono;
+//std::string time_point_to_string(std::chrono::high_resolution_clock::time_point tp)
+//{
+//    using namespace std;
+//    using namespace std::chrono;
 
-    auto ttime_t = high_resolution_clock::to_time_t(tp);
-    //auto tp_sec = high_resolution_clock::from_time_t(ttime_t);
-    //milliseconds ms = duration_cast<milliseconds>(tp - tp_sec);
+//    auto ttime_t = high_resolution_clock::to_time_t(tp);
+//    //auto tp_sec = high_resolution_clock::from_time_t(ttime_t);
+//    //milliseconds ms = duration_cast<milliseconds>(tp - tp_sec);
 
-    std::tm * ttm = localtime(&ttime_t);
+//    std::tm * ttm = localtime(&ttime_t);
 
-    char date_time_format[] = "%Y-%m-%d %H:%M:%S";
+//    char date_time_format[] = "%Y-%m-%d %H:%M:%S";
 
-    char time_str[256];
+//    char time_str[256];
 
-    strftime(time_str, sizeof(time_str), date_time_format, ttm);
+//    strftime(time_str, sizeof(time_str), date_time_format, ttm);
 
-    string result(time_str);
-    //result.append(".");
-    //result.append(to_string(ms.count()));
+//    string result(time_str);
+//    //result.append(".");
+//    //result.append(to_string(ms.count()));
 
-    return result;
-}
+//    return result;
+//}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -120,8 +120,7 @@ bool Sensors::init(std::string const& server, std::string const& db, std::string
 
     m_worker.last_config_refresh_time_point = Clock::now();
 
-    m_next_measurement_time_point = get_first_config().creation_time_point;
-    m_next_comms_time_point = get_first_config().creation_time_point;
+    m_next_comms_time_point = get_first_config().start_time_point;
 
 
     //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -351,28 +350,75 @@ Sensors::Clock::duration Sensors::get_measurement_period() const
     return get_last_config().measurement_period;
 }
 
-Sensors::Clock::time_point Sensors::compute_next_measurement_time_point()
+std::pair<Sensors::Clock::time_point, uint32_t> Sensors::compute_next_measurement()
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    Config config = get_last_config();
-
-    auto now = Clock::now();
-    while (m_next_measurement_time_point <= now)
+    assert(!m_configs.empty());
+    if (m_configs.empty())
     {
-        m_next_measurement_time_point += config.measurement_period;
-        m_next_measurement_index++;
+        return std::make_pair(Sensors::Clock::time_point(), 0);
     }
 
-    return m_next_measurement_time_point;
-}
+    uint32_t index = 0;
 
-uint32_t Sensors::compute_next_measurement_index()
-{
-    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+    //compute how many indices are 'generate' by the previous configs
+    auto prev_it = m_configs.begin();
+    auto it = m_configs.begin() + 1;
+    do
+    {
+        if (it == m_configs.end())
+        {
+            break;
+        }
 
-    compute_next_measurement_time_point();
-    return m_next_measurement_index;
+        Clock::duration d = it->start_time_point - prev_it->start_time_point;
+        uint32_t prev_indices = d / prev_it->measurement_period;
+        index += prev_indices;
+
+        prev_it = it;
+        it++;
+    } while (true);
+
+
+    //take the period from the last config start point until now
+    Clock::time_point now = Clock::now();
+    Clock::duration d = now - prev_it->start_time_point;
+    uint32_t prev_indices = d / prev_it->measurement_period;
+
+    //adjust for rounding
+    Clock::time_point time_point = prev_it->start_time_point + prev_indices * prev_it->measurement_period;
+    while (time_point < now)
+    {
+        prev_indices++;
+        time_point += prev_it->measurement_period;
+    }
+    index += prev_indices;
+
+    return std::make_pair(time_point, index);
+
+//    auto it = m_configs.begin();
+
+//    auto now = Clock::now();
+
+//    uint32_t index = 0;
+//    Clock::time_point time_point = it->creation_time_point;
+//    while (time_point <= now)
+//    {
+//        index++;
+//        time_point += it->measurement_period;
+
+//        if (it + 1 != m_configs.end())
+//        {
+//            auto new_it = it++;
+//            if (time_point >= new_it->creation_time_point)
+//            {
+//                it = new_it;
+//            }
+//        }
+//    }
+
+//    return std::make_pair(time_point, index);
 }
 
 uint32_t Sensors::compute_last_confirmed_measurement_index(Sensor_Id id)
@@ -528,9 +574,6 @@ void Sensors::add_measurement(Sensor_Id id, Measurement const& measurement)
 {
     boost::optional<Worker::Item> item;
 
-    Config first_config = get_first_config();
-    Config last_config = get_last_config();
-
     {
         std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
@@ -549,7 +592,7 @@ void Sensors::add_measurement(Sensor_Id id, Measurement const& measurement)
             item->sensor_id = id;
             item->measurement = measurement;
             item->measurement.b2s_input_dBm = sensor_data->b2s_input_dBm;
-            item->time_point = first_config.creation_time_point + last_config.measurement_period * measurement.index;
+            item->time_point = compute_measurement_index_time_point(measurement.index);
         }
         else
         {
@@ -576,7 +619,7 @@ Sensors::Config Sensors::get_last_config() const
     return m_configs.back();
 }
 
-void Sensors::refresh_config()
+void Sensors::refresh_config_worker_db()
 {
     boost::optional<std::vector<DB::Config>> configs = m_worker.db->get_configs();
     if (configs)
@@ -587,6 +630,57 @@ void Sensors::refresh_config()
     m_worker.last_config_refresh_time_point = Clock::now();
 }
 
+Sensors::Clock::time_point Sensors::compute_measurement_index_time_point(uint32_t index)
+{
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
+    assert(!m_configs.empty());
+    if (m_configs.empty())
+    {
+        return Sensors::Clock::time_point();
+    }
+
+    auto prev_it = m_configs.begin();
+    auto it = m_configs.begin() + 1;
+    do
+    {
+        if (it == m_configs.end()) //reached the end config - so this is the active one
+        {
+            return prev_it->start_time_point + prev_it->measurement_period * index;
+        }
+
+        Clock::duration d = it->start_time_point - prev_it->start_time_point;
+        uint32_t prev_indices = d / prev_it->measurement_period;
+        if (index <= prev_indices) //if the index is between prev_it and it
+        {
+            return prev_it->start_time_point + prev_it->measurement_period * index;
+        }
+
+        index -= prev_indices;
+
+        prev_it = it;
+        it++;
+    } while (true);
+
+//    auto it = m_configs.begin();
+
+//    Clock::time_point time_point = it->creation_time_point;
+//    for (size_t i = 0; i < index; i++)
+//    {
+//        time_point += it->measurement_period;
+
+//        if (it + 1 != m_configs.end())
+//        {
+//            auto new_it = it++;
+//            if (time_point >= new_it->creation_time_point)
+//            {
+//                it = new_it;
+//            }
+//        }
+//    }
+
+//    return time_point;
+}
 
 void Sensors::process_worker_thread()
 {
@@ -637,7 +731,7 @@ void Sensors::process_worker_thread()
 
         if (Clock::now() - m_worker.last_config_refresh_time_point > CONFIG_REFRESH_PERIOD)
         {
-            refresh_config();
+            refresh_config_worker_db();
         }
     }
 }
