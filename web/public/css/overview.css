@@ -1,11 +1,33 @@
-div.alert.warning {
-  background-color: #fcf8e3;
-  border-color: #fbeed5;
-  background-image: url("../assets/alert-warning.svg");
-  background-size: 10px 16px;
-}
 
-div.alert.warning p,
-div.alert.warning p a {
-  color: #c09853;
+th {
+    display: table-cell;
+    vertical-align: inherit;
+    color: #007acc;
+    text-align: center;
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+    
+}
+td {
+    display: table-cell;
+    vertical-align: inherit;
+    background-image: -ms-linear-gradient(bottom, white,#c0c0c0);
+    text-align: center;
+    padding: 15px;
+    border: none;
+    border-bottom: 1px solid #ddd;
+    
+}
+figure { 
+    display: inline;
+    
+}
+p.message{
+	color: darkgrey;
+	font-size: 8;
+}
+table#overview{
+  table-layout: fixed;
+  float: left;
+  margin-top: 10px;
 }

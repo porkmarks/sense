@@ -11,7 +11,7 @@
 	{
 		echo "Failed to connect to MySQL: " . mysqli_connect_error();
 	}
-	$sql = "SELECT * FROM configs ORDER BY creation_timestamp DESC;";
+	$sql = "SELECT * FROM configs ORDER BY start_timestamp DESC;";
 
 	$result = mysqli_query($db,$sql);
 	$row = mysqli_fetch_array($result, MYSQLI_ASSOC);

@@ -40,65 +40,68 @@
 		  });
 		});
 		</script>
-		<div id="ContentRight">
-			
-			<div id="datePkr">
-			Begin Date: <input type="text" id="beginDate">
-			End Date: <input type="text" id="endDate">
-			</div>
-			<div id="option">
-			    <input name="DayButton" 
-			           type="button" 
-			           value="Last Day"
-			           onclick="updateDay()" />
 
-			    <input name="weekButton" 
-			           type="button" 
-			           value="Last Week"
-			           onclick="updateWeek()"/>
+		<form action ="generateGraph.php" method="submit" id="generateGraph">
+			<div id="ContentRight">
+				
+				<div id="datePkr">
+				Begin Date: <input type="text" id="beginDate">
+				End Date: <input type="text" id="endDate">
+				</div>
+				<div id="option">
+				    <input name="DayButton" 
+				           type="button" 
+				           value="Last Day"
+				           onclick="updateDay()" />
 
-			    <input name="MonthButton" 
-			           type="button" 
-			           value="Last Month"
-			           onclick="updateMonth()"/>
+				    <input name="weekButton" 
+				           type="button" 
+				           value="Last Week"
+				           onclick="updateWeek()"/>
 
-			    <input name="SemesterButton" 
-			           type="button" 
-			           value="Last Semester"
-			           onclick="updateSemester()"/>
+				    <input name="MonthButton" 
+				           type="button" 
+				           value="Last Month"
+				           onclick="updateMonth()"/>
 
-			    <input name="YearButton" 
-			           type="button" 
-			           value="Last Year"
-			           onclick="updateYear()"/>
-			</div>
-			<div class="checkboxListScroll">
-			<?php
-	        	$colors = ["#FF33AA", "#08B37F", "#22ADFF", "#FF4136", "#FF9900", "#3D0000", "#854144b", "#FF3399", "#AAAAAA"];
-	        	$idx = 0;
-		        while ($row = mysqli_fetch_array($result, MYSQLI_ASSOC))
-	            {
-	        ?> 
-	         <ul id="checkboxList" class="checkboxList"> 		  	
-	            <label style = "color: <?php echo $colors[$idx] ?>;"><input type="checkbox" id ="<?php echo $row["name"]; ?>" checked="true"  > <?php echo $row["name"]; ?></label>
-	         </ul>
-	       
-	        <?php
-	        		$idx++;
-	         	}
+				    <input name="SemesterButton" 
+				           type="button" 
+				           value="Last Semester"
+				           onclick="updateSemester()"/>
 
-	        ?>   	
-			</div>
-			<div id ="graphContainer"></div>
+				    <input name="YearButton" 
+				           type="button" 
+				           value="Last Year"
+				           onclick="updateYear()"/>
+				</div>
+				<div class="checkboxListScroll">
+				<?php
+		        	$colors = ["#FF33AA", "#08B37F", "#22ADFF", "#FF4136", "#FF9900", "#3D0000", "#854144b", "#FF3399", "#AAAAAA"];
+		        	$idx = 0;
+			        while ($row = mysqli_fetch_array($result, MYSQLI_ASSOC))
+		            {
+		        ?> 
+		         <ul id="checkboxList" class="checkboxList"> 		  	
+		            <label style = "color: <?php echo $colors[$idx] ?>;"><input type="checkbox" id ="<?php echo $row["name"]; ?>" checked="true"  > <?php echo $row["name"]; ?></label>
+		         </ul>
+		       
+		        <?php
+		        		$idx++;
+		         	}
 
-			<div class = "container">
-			<div id = "checkboxes"> 
-			   <label><input type="checkbox"  id = "temp" checked="true"  > Temperature</label>
-			   <label><input type="checkbox"  id = "hum" checked="true"   > Humidity</label>
-			</div>
+		        ?>   	
+				</div>
+				<div id ="graphContainer"></div>
 
-			<p id ="download" onclick="downloadCsv()"><img src="assets/downloadfile.png"  width="24" height="24"> Download CSV</p>
-			
+				<div class = "container">
+				<div id = "checkboxes"> 
+				   <label><input type="checkbox"  id = "temp" checked="true"  > Temperature</label>
+				   <label><input type="checkbox"  id = "hum" checked="true"   > Humidity</label>
+				</div>
+				</div>
+
+				<p id ="download" onclick="downloadCsv()"><img src="assets/downloadfile.png"  width="24" height="24"> Download CSV</p>
+			</form>
 			<!-- need to do the downloadCsv() function--> 
 			<script>
 

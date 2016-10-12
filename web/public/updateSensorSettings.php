@@ -18,7 +18,7 @@ if(isset($_POST["submit"]))
 	$mesP = mysqli_real_escape_string($db, $mesP);
 	$mesC = mysqli_real_escape_string($db, $mesC);
 	
-	$query = "UPDATE configs SET measurement_period=$mesP, comms_period=$mesC;";
+	$query = "INSERT INTO configs (measurement_period, comms_period) VALUES ($mesP, $mesC);";
 
 	mysqli_query($db, $query);
 

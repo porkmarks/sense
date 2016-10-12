@@ -1,235 +1,161 @@
+<!DOCTYPE html>
+<head><title>Create Alarms</title></head>
 <?php
-  session_start();
-  include('checklogin.php');
-?>
-<!DOCTYPE html><head><title>My Details</title></head>
-<?php
-  
-  include('includes.php');
+    
+    include('includes.php');
+
+    include('checklogin.php');
+
+    include('db.php');
+
+    $db = mysqli_connect(DB_SERVER,DB_USERNAME,DB_PASSWORD, $_SESSION["sensorDB"]);
+    if (mysqli_connect_errno())
+    {
+      echo "Failed to connect to MySQL: " . mysqli_connect_error();
+    }
+    $sql = "SELECT * from sensors";
+
+    $result = mysqli_query($db, $sql);
+
+    $sqlDisplay = "SELECT alerts.id as id, alerts.above as above, alerts.value as value, alerts.measurement as measurement, alerts.duration as duration, sensors.name as name FROM alerts
+                   LEFT JOIN sensors
+                   ON sensors.id = alerts.sensor_id 
+                   ";
+    $resultDisplay = mysqli_query($db, $sqlDisplay);
+
+    $sqlAlarm = "SELECT a.id as alarm_id, m.sensor_id as sensor_id FROM `alerts` AS a 
+              LEFT JOIN `measurements` AS m
+              ON a.sensor_id = m.sensor_id OR a.sensor_id < 0
+              WHERE ((a.above = 0 AND a.measurement = 0 AND m.temperature < a.value) OR
+                    (a.above = 0 AND a.measurement = 1 AND m.humidity < a.value) OR
+                    (a.above = 1 AND a.measurement = 0 AND m.temperature > a.value) OR
+                    (a.above = 1 AND a.measurement = 1 AND m.humidity > a.value)) AND m.flags = 0;"
 ?>
 
-<body>
-  <header>
+<link href= "css/createAlarms.css" rel="stylesheet" type ="text/css"/>
+
+<header>
     <?php
       include('mainTopBar.php');
     ?>
-    </header>
+</header>
+<body>
 
-<div id="Content">
+  <div id="Content">
     <?php
       include('settingsSideBar.php');
     ?>
     <div id="ContentRight">
-      <h2>Alarms</h2>
 
-  <p class="subtle">Create a new alarm to get notificed when measurements
-          passes the threshold value you specify.</p>
+    <form action ="createNewAlarm.php" method="post" id="createAlarmForm">    
+        <p class="message">Create a new alarm to get notificed when measurements
+                passes the threshold value you specify.</p>
 
-  <div class='row clear'>
-      <div>
-        <label for='alarmSensorList' class='mandatory'>Source</label>
-      </div>
-      <div>
-        <select id='alarmSensorList' name='alarmSensorList' class='mandatory'>
-        </select>
-      </div>
-  </div>
+        <table id ="alarmTable" width="400" border="0" cellpadding="6" cellspacing="6">
+          <tr>
+            <td style="font-weight: lighter"><div align="left"><label for="source">Source</label></div></td>
+              <td>
+              <select id='source' name="source">
+                <optgroup label = "Any">
+                    <option value = "any_t">Temperature</option>
+                    <option value = "any_h">Humidity</option>
+                </optgroup>
 
-
-  <div class='row clear'>
-    <div>
-        <label for='direction' class='mandatory'>Direction</label>
-    </div>
-    <div>
-      <select id='direction' name='direction' class='mandatory'>
-        <option value='above'>Above</option>
-        <option value='below'>Below</option>
-      </select>
-    </div>
-  </div>
-
-      
-  <div class='row clear'>
-    <div>
-        <label for='value' class='mandatory number'>Value</label>
-    </div>
-
-    <div>
-     <input type='text' id='value' name='value' value='' class='mandatory number'/>
-    </div>
-  </div>
-
-      
-  <p class="subtle">Optionally delay the alarm. E.g. enter "60" to trigger it only after one hour of measurements continuously exceeding the threshold.</p>
-
-        
-  <div class='row clear'>
-    <div>
-      <label for='delay' class='number'>For minutes</label>
-    </div>
-    <div>
-      <input type='text' id='delay' name='delay' value='' class='number' />
-    </div>
-  </div>
-
-      
-  <div class="row right">
-    <input type='submit' id='create' name='create' value='Create alarm'/>
-  </div>
-
-  <section>
-  
-    <h3>Alarms list</h3>
-        
-    <div class='alert info'>
-      <p>These are your alarms.
-      <a href='data/alarms.php'>Click here</a> to view their notification history.
-      </p>
-    </div>
-
+                <?php
+                     while ($row = mysqli_fetch_array($result, MYSQLI_ASSOC))
+                    {                     
+                      echo "<optgroup label=\"".$row["name"]."\"><option value = \"".$row["id"]."\">Temperature</option>
+                          <option value = \"-".$row["id"]."\">Humidity</option></opgroup>";
+                    }
+                ?>
+               </select></td>
+            </tr>
+            <tr>
+              <td style="font-weight: lighter"><div align="left"><label for="direction">Direction</label></div></td>
+              <td>
+                <select id='direction' name='direction' class='mandatory'>
+                  <option value='1'>Above</option>
+                  <option value='0'>Below</option>
+                </select>
+              </td>
+            </tr>
+            <tr>
+              <td style="font-weight: lighter"><div align="left"><label for="value">Value</label></div></td>
+              <td><div align="left"><input type='text' id='value' name='value' value='' /></div></td>
+            </tr>
+            <tr>
+               <td style="font-weight: lighter"><div align="left"><label for='duration' class='number'>For minutes</label></div></td>
+               <td><div align="left"><input type='text' id='duration' name='duration' value=''  /></div></td>
+            </tr>
     
-    <table>
-      <thead>
-        <tr>
-          <th style='width: 50%;'>Source</th>
-          <th style='width: 20%;'>Threshold</th>
-          <th style='width: 10%;'>Delay</th>
-          <th style='width: 10%;' class='center'>State</th>
-          <th style='width: 10%;' class='center'>Delete</th>
-        </tr>
-      </thead>
-    <tbody>
-      <tr>
-          <td>
-            <span class='subtle'>Tempway:</span> Bathroom / Temperature
-          </td>
-          <td>Above 25 °C
-          </td>
-          <td>5
-          </td>
-          <td class='alarm out'>
-          </td>
+        </table>
+        
+        <p class="message1">Optionally delay the alarm. E.g. enter "60" to trigger it only after one hour of measurements continuously exceeding the threshold.</p>
 
-         <td class='center'>
-             <input type='checkbox' id='alarms-1857' name='alarms[1857]' value='1' />
-         </td>
+       
+          <input type='submit' id='create' name='create' value='Create alarm'  />
 
-      </tr>
-
-      <tr>
-
-        <td>
-          <span class='subtle'>Tempway:</span> Kitchen / Temperature
-        </td>
-      
-        <td>Above 25 °C</td>
-        <td>5</td>
-        <td class='alarm in'></td>
-
-         <td class='center'>
-             <input type='checkbox' id='alarms-1858' name='alarms[1858]' value='1' />
-
-          </td>
-
-      </tr>
-
-      <tr>
-
-        <td>
-          <span class='subtle'>Tempway:</span> Office / Temperature
-        </td>
-      
-        <td>Above 25 °C</td>
-        <td>5</td>
-        <td class='alarm out'></td>
-
-        <td class='center'>
-          <input type='checkbox' id='alarms-1859' name='alarms[1859]' value='1' />
-
-        </td>
-
-      </tr>
-
-      <tr>
-
-        <td>
-          <span class='subtle'>Tempway:</span> Bedroom / Temperature
-        </td>
-      
-        <td>Above 25 °C</td>
-        <td>5</td>
-        <td class='alarm out'></td>
-
-        <td class='center'>
-          <input type='checkbox' id='alarms-1860' name='alarms[1860]' value='1' />
-
-        </td>
-
-      </tr>
-
-      <tr>
-        <td>
-          <span class='subtle'>Tempway:</span> Living / Temperature
-        </td>
-              
-        <td>Above 25 °C</td>
-        <td>5</td>
-        <td class='alarm out'></td>
-
-        <td class='center'>
-          <input type='checkbox' id='alarms-1861' name='alarms[1861]' value='1' />
-        </td>
-
-      </tr>
-    </tbody>
-  </table>
-<input type='submit' id='delete-899' name='delete[899]' value='Delete' class='img delete' />
-</section>
-    
-</form>
+      </form>   
    
- <script type="text/javascript">
+        <br>
+      
+        <h2>Alarms list</h2>
+            
+          <p class = "message">These are your alarms.
+          <a href='data/alarms.php'>Click here</a> to view their notification history.
+          </p>
 
-var colors = ["#FF33AA", "#08B37F", "#22ADFF", "#FF4136", "#FF9900", "#3D0000", "#854144b", "#FF3399", "#AAAAAA", ];
-var sensorFiles = ["living.tsv", "hall.tsv", "bedroom.tsv", "bathroom.tsv", "kitchen.tsv" ];
+      <form action ="deleteAlarms.php" method="post" id="deleteAlarmForm">   
+        <table id="alarmsView";>
+            <tr>
+              <th style='width: 5%;' class='center'></th>
+              <th style='width: 65%;'>Source</th>
+              <th style='width: 15%;'>Duration</th>
+              <th style='width: 15%;' class='center'>State</th>
+              
+            </tr>
 
- 
-function populateAlarmSensorList(fileNames)
-{ 
-  var sensorList = document.getElementById("alarmSensorList");
+        <?php
+          while ($row = mysqli_fetch_array($resultDisplay, MYSQLI_ASSOC)){
+        ?>
+          
+          <tr>
+             <td bgcolor="#E9EDED" id ="deleteCheckbox" ><input name="checkbox[]" type="checkbox" align ='center' value="<?php echo $row['id']; ?>"></td>
+             <td bgcolor="#E9EDED"><?php
+                                        $above = ""; 
+                                        if($row["above"] == 1)
+                                        {
+                                          $above = "above";
+                                        }
+                                        else
+                                        {
+                                          $above = "below";
+                                        }
 
-  var createOptionGroup = function(idx)
-  { 
-    var fileName = fileNames[idx];
-    var color = colors[idx % colors.length];
+                                        $measurementType = "";
+                                        if($row["measurement"] == 1)
+                                        {
+                                          $measurementType = "humidity";
+                                        }
+                                        else
+                                        {
+                                          $measurementType = "temperature";
+                                        }
 
-    var optgroup = document.createElement('optgroup');
-    optgroup.label = fileName;
-    optgroup.style.color = color;
+                                        echo $row["name"]." for any ".$measurementType." ".$above." ".$row["value"] ; ?></td>
+              <td bgcolor="#E9EDED"><?php echo $row["duration"]; ?></td>
+              <td bgcolor="#E9EDED"><?php echo $row["above"]; ?></td>
+          </tr>
+          
+         
+        <?php } ?> 
 
-    var option = document.createElement('option');
-    option.value = 0;
-    option.label = "Temperature";
-    optgroup.appendChild(option);
-
-    var option = document.createElement('option');
-    option.value = 0;
-    option.label = "Humidity";
-    optgroup.appendChild(option);
-
-    sensorList.appendChild(optgroup);
-  };
-
-  for (var idx = 0; idx < fileNames.length; idx++)
-  { 
-    createOptionGroup(idx);
-  }
-}
-
-populateAlarmSensorList(sensorFiles);
-
-
-</script>  
+         <tr>
+          <td><input id ="delete" name="delete" type="submit" value="Delete selected" onclick="return confirm('Are you sure you want to delete these alarms?');">
+          </td>
+        </tr>   
+      </table>   
+    
+     </form> 
 
 </body>
-</html>

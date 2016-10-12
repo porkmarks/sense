@@ -52,10 +52,15 @@ if(isset($_POST["submit"]))
 			echo("bubu");
 			if($query)
 			{
-				echo("caca");
+				
 				$msg = "Thank You! you are now registered.";
 				header('Location: overview.php');
 			}
+			else
+			{
+				die('Invalid query: ' . mysql_error());
+			}	
+
 		}
 	}
 }

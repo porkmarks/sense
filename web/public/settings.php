@@ -24,7 +24,7 @@
 		<div id="ContentRight">
 			<div class="right">
     <section>
-  <form id='details' action='htmlFormSend.php' method='POST' autocomplete='off'>
+  <form id='details' action='changeDetails.php' method='POST' autocomplete='off'>
     <table class="mydetails">
       
       <h4>Your basic personal details.</h4>
@@ -98,7 +98,7 @@
     
      <h4>Units</h4>
  
-     <p class="moreSubtle">Measurement units.</p>
+     <h3>Measurement units.</h3>
      <table>
      <tr>
 		<td valign="top">
@@ -116,7 +116,7 @@
     	
      
     <h4>Password</h4>
-    <p class="moreSubtle">Here you can change your password</p>
+    <h3>Here you can change your password</h3>
     <table>
     <tr>
 	    <td valign="top">
@@ -131,7 +131,7 @@
 	    	<label for='re_password'>Repeat password</label>
 	    </td>
 	    <td valign="top">	
-	    	<input type='password' id='re_password' name='re_password' value='' />
+	    	<input type='password' id='repassword' name='repassword' value='' />
 	    </td>
 	</tr>    
 	<tr>
@@ -140,7 +140,16 @@
 	    </td>
     </tr>
     </table>
-     
+     <h5>
+			<?php
+				$error = $_GET["error"];
+				if (isset($error))
+				{
+					echo $error;
+				}
+
+			?>
+	</h5>
   </form>
 </section>
 </body>
