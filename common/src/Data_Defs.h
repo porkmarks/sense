@@ -105,6 +105,7 @@ struct Pair_Request
 struct Pair_Response
 {
     uint16_t address = 0;
+    //char name[50] = { 0 };
 };
 
 #ifndef __AVR__

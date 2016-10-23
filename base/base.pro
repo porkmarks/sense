@@ -42,10 +42,11 @@ SOURCES += src/main.cpp \
     ../common/src/Storage.cpp \
     src/tests.cpp \
     src/Scheduler.cpp \
-    src/Sensors.cpp \
     src/DB.cpp \
     ../common/src/rfm22b/rfm22b.cpp \
-    ../common/src/rfm22b/rfm22b_spi.cpp
+    ../common/src/rfm22b/rfm22b_spi.cpp \
+    src/Admin.cpp \
+    src/Sensors_DB.cpp
 
 HEADERS += \
     ../common/src/Comms.h \
@@ -53,12 +54,13 @@ HEADERS += \
     ../common/src/Data_Defs.h \
     ../common/src/Storage.h \
     src/Scheduler.h \
-    src/Sensors.h \
     src/DB.h \
     ../common/src/rfm22b/rfm22b.h \
     ../common/src/rfm22b/rfm22b_enums.h \
-    ../common/src/rfm22b/rfm22b_spi.h
+    ../common/src/rfm22b/rfm22b_spi.h \
+    src/Admin.h \
+    src/Sensors_DB.h
 
 DISTFILES +=
 
-LIBS += -lboost_thread -lboost_system -lpthread -lmysqlpp -lmysqlclient
+LIBS += -lboost_thread -lboost_system -lpthread -lmysqlpp -lmysqlclient -lpigpio

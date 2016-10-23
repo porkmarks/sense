@@ -1,5 +1,5 @@
 #include "Storage.h"
-#include "Sensors.h"
+#include "Sensors_DB.h"
 #include <vector>
 #include <stdio.h>
 #include <stdlib.h>
@@ -212,7 +212,7 @@ void test_storage()
 
 ////////////////////////////////////////////////////////////////////////////
 
-static bool equal(Sensors::Clock::duration d1, Sensors::Clock::duration d2, Sensors::Clock::duration epsilon)
+static bool equal(Sensors_DB::Clock::duration d1, Sensors_DB::Clock::duration d2, Sensors_DB::Clock::duration epsilon)
 {
     return std::abs(d2 - d1) <= epsilon;
 }
@@ -229,7 +229,7 @@ void test_sensor_operations()
 
 
     {
-        Sensors sensors;
+        Sensors_DB sensors;
         if (!sensors.init(db_server, db_db, db_username, db_password, port))
         {
             std::cerr << "DB init failed\n";
@@ -246,7 +246,7 @@ void test_sensor_operations()
     //---------------------
 
     {
-        Sensors sensors;
+        Sensors_DB sensors;
         if (!sensors.init(db_server, db_db, db_username, db_password, port))
         {
             std::cerr << "DB init failed\n";
@@ -255,24 +255,24 @@ void test_sensor_operations()
 
 //        sensors.set_measurement_period(std::chrono::minutes(10));
 //        sensors.set_comms_period(std::chrono::minutes(10));
-        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(10), Sensors::MEASUREMENT_JITTER));
+        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(10), Sensors_DB::MEASUREMENT_JITTER));
 
 //        sensors.set_comms_period(std::chrono::minutes(1));
-        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(10), Sensors::MEASUREMENT_JITTER));
+        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(10), Sensors_DB::MEASUREMENT_JITTER));
 
 //        sensors.set_measurement_period(std::chrono::minutes(20));
 //        sensors.set_comms_period(std::chrono::minutes(10));
-        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(20), Sensors::MEASUREMENT_JITTER));
+        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(20), Sensors_DB::MEASUREMENT_JITTER));
 
 //        sensors.set_comms_period(std::chrono::minutes(1));
-        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(20), Sensors::MEASUREMENT_JITTER));
+        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(20), Sensors_DB::MEASUREMENT_JITTER));
 
 //        sensors.set_measurement_period(std::chrono::minutes(1));
 //        sensors.set_comms_period(std::chrono::minutes(10));
-        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(10), Sensors::MEASUREMENT_JITTER));
+        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(10), Sensors_DB::MEASUREMENT_JITTER));
 
 //        sensors.set_comms_period(std::chrono::minutes(1));
-        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(1), Sensors::MEASUREMENT_JITTER));
+        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(1), Sensors_DB::MEASUREMENT_JITTER));
     }
 
     //---------------------
@@ -281,7 +281,7 @@ void test_sensor_operations()
     {
         std::cout << "Sensor count: " << sensor_count << "\n";
 
-        Sensors sensors;
+        Sensors_DB sensors;
         if (!sensors.init(db_server, db_db, db_username, db_password, port))
         {
             std::cerr << "DB init failed\n";
@@ -293,43 +293,43 @@ void test_sensor_operations()
             sensors.add_sensor("s");
         }
 
-        Sensors::Clock::duration total_comms_duration = Sensors::COMMS_DURATION * sensor_count;
+        Sensors_DB::Clock::duration total_comms_duration = Sensors_DB::COMMS_DURATION * sensor_count;
 
 //        sensors.set_measurement_period(std::chrono::minutes(10));
 //        sensors.set_comms_period(std::chrono::minutes(10));
-        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors::MEASUREMENT_JITTER));
+        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors_DB::MEASUREMENT_JITTER));
 
 //        sensors.set_comms_period(std::chrono::minutes(1));
-        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors::MEASUREMENT_JITTER));
+        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors_DB::MEASUREMENT_JITTER));
 
 //        sensors.set_measurement_period(std::chrono::minutes(20));
 //        sensors.set_comms_period(std::chrono::minutes(10));
-        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors::MEASUREMENT_JITTER));
+        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors_DB::MEASUREMENT_JITTER));
 
 //        sensors.set_comms_period(std::chrono::minutes(1));
-        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors::MEASUREMENT_JITTER));
+        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors_DB::MEASUREMENT_JITTER));
 
 //        sensors.set_measurement_period(std::chrono::minutes(1));
 //        sensors.set_comms_period(std::chrono::minutes(10));
-        CHECK(equal(sensors.compute_comms_period(), std::max(Sensors::Clock::duration(std::chrono::minutes(10)), std::max(total_comms_duration, sensors.get_measurement_period())), Sensors::MEASUREMENT_JITTER));
+        CHECK(equal(sensors.compute_comms_period(), std::max(Sensors_DB::Clock::duration(std::chrono::minutes(10)), std::max(total_comms_duration, sensors.get_measurement_period())), Sensors_DB::MEASUREMENT_JITTER));
 
 //        sensors.set_comms_period(std::chrono::minutes(1));
-        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors::MEASUREMENT_JITTER));
+        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors_DB::MEASUREMENT_JITTER));
     }
 
     //---------------------
 
     {
-        Sensors sensors;
+        Sensors_DB sensors;
         if (!sensors.init(db_server, db_db, db_username, db_password, port))
         {
             std::cerr << "DB init failed\n";
             return;
         }
 
-        const Sensors::Sensor* sensor = sensors.find_sensor_by_id(Sensors::Sensor_Id(7));
+        const Sensors_DB::Sensor* sensor = sensors.find_sensor_by_id(Sensors_DB::Sensor_Id(7));
         CHECK(sensor == nullptr);
-        Sensors::Sensor_Id id = sensor->id;
+        Sensors_DB::Sensor_Id id = sensor->id;
 
         sensor = sensors.add_sensor("s1");
         CHECK(sensor);
@@ -345,25 +345,25 @@ void test_sensor_operations()
     //---------------------
 
     {
-        Sensors sensors;
+        Sensors_DB sensors;
         if (!sensors.init(db_server, db_db, db_username, db_password, port))
         {
             std::cerr << "DB init failed\n";
             return;
         }
 
-        Sensors::Sensor const* sensor = sensors.add_sensor("s1");
+        Sensors_DB::Sensor const* sensor = sensors.add_sensor("s1");
         CHECK(sensor);
-        Sensors::Sensor_Id id1 = sensor->id;
+        Sensors_DB::Sensor_Id id1 = sensor->id;
         sensor = sensors.add_sensor("s2");
         CHECK(sensor);
-        Sensors::Sensor_Id id2 = sensor->id;
+        Sensors_DB::Sensor_Id id2 = sensor->id;
 
-        const Sensors::Sensor* sensor1 = sensors.find_sensor_by_id(id1);
+        const Sensors_DB::Sensor* sensor1 = sensors.find_sensor_by_id(id1);
         CHECK(sensor1 != nullptr);
         CHECK(sensor1->name == "s1");
         CHECK(sensor1->id == id1);
-        const Sensors::Sensor* sensor2 = sensors.find_sensor_by_id(id2);
+        const Sensors_DB::Sensor* sensor2 = sensors.find_sensor_by_id(id2);
         CHECK(sensor2 != nullptr);
         CHECK(sensor2->name == "s2");
         CHECK(sensor2->id == id2);
@@ -384,25 +384,25 @@ void test_sensor_operations()
     //---------------------
 
     {
-        Sensors sensors;
+        Sensors_DB sensors;
         if (!sensors.init(db_server, db_db, db_username, db_password, port))
         {
             std::cerr << "DB init failed\n";
             return;
         }
 
-        Sensors::Sensor const* sensor = sensors.add_sensor("s1");
+        Sensors_DB::Sensor const* sensor = sensors.add_sensor("s1");
         CHECK(sensor);
-        Sensors::Sensor_Id id1 = sensor->id;
+        Sensors_DB::Sensor_Id id1 = sensor->id;
         sensor = sensors.add_sensor("s2");
         CHECK(sensor);
-        Sensors::Sensor_Id id2 = sensor->id;
+        Sensors_DB::Sensor_Id id2 = sensor->id;
 
-        const Sensors::Sensor* sensor1 = sensors.find_sensor_by_id(id1);
+        const Sensors_DB::Sensor* sensor1 = sensors.find_sensor_by_id(id1);
         CHECK(sensor1 != nullptr);
         CHECK(sensor1->name == "s1");
         CHECK(sensor1->id == id1);
-        const Sensors::Sensor* sensor2 = sensors.find_sensor_by_id(id2);
+        const Sensors_DB::Sensor* sensor2 = sensors.find_sensor_by_id(id2);
         CHECK(sensor2 != nullptr);
         CHECK(sensor2->name == "s2");
         CHECK(sensor2->id == id2);

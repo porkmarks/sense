@@ -11,7 +11,7 @@
 #include "DB.h"
 
 
-class Sensors
+class Sensors_DB
 {
 public:
     typedef DB::Clock Clock;
@@ -21,8 +21,8 @@ public:
     typedef DB::Sensor Sensor;
     typedef DB::Config Config;
 
-    Sensors();
-    ~Sensors();
+    Sensors_DB();
+    ~Sensors_DB();
 
     //how much sensors can deviate from the measurement global clock. This is due to the unstable clock frequency of the sensor CPU
     static const Clock::duration MEASUREMENT_JITTER;

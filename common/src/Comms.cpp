@@ -152,7 +152,7 @@ bool Comms::init(uint8_t retries)
 //#ifndef __AVR__
 //    while (1)
 //    {
-//        int8_t size = m_rf22.receive(m_buffer, RFM22B::MAX_PACKET_LENGTH, 1000);
+//        int8_t size = m_rf22.receive(m_buffer, RFM22B::MAX_PACKET_SIZE, 1000);
 //        if (size > 0)
 //        {
 //            printf_P("Received %d bytes\n", int(size));
@@ -339,7 +339,7 @@ uint8_t Comms::receive_packet(uint32_t timeout)
 
     do
     {
-        int8_t size = m_rf22.receive(m_buffer, RFM22B::MAX_PACKET_LENGTH, timeout - elapsed);
+        int8_t size = m_rf22.receive(m_buffer, RFM22B::MAX_PACKET_SIZE, timeout - elapsed);
         if (size > 0 && static_cast<uint8_t>(size) > sizeof(Header))
         {
             if (validate_packet(m_buffer, size, 0))

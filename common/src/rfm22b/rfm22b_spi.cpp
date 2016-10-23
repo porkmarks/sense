@@ -19,7 +19,7 @@
 //	Default bits per word is 8
 //	Default clock speed is 10kHz
 SPI::SPI() {
-    const char* device = "/dev/spidev0.0";
+    const char* device = "/dev/spidev1.0";
     m_fd = open(device, O_RDWR);
     if (m_fd < 0) {
         perror("Unable to open SPI device");

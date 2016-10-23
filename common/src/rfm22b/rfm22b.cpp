@@ -774,15 +774,15 @@ bool RFM22B::send(uint8_t const* data, uint8_t length, uint32_t timeout)
     clear_tx_fifo();
 
     // Initialise rx and tx arrays
-    uint8_t tx[MAX_PACKET_LENGTH+1] = { 0 };
+    uint8_t tx[MAX_PACKET_SIZE + 1] = { 0 };
 
     // Set FIFO register address (with write flag)
     tx[0] = (uint8_t)Register::FIFO_ACCESS_7F | (1<<7);
 
     // Truncate data if its too long
-    if (length > MAX_PACKET_LENGTH)
+    if (length > MAX_PACKET_SIZE)
     {
-        length = MAX_PACKET_LENGTH;
+        length = MAX_PACKET_SIZE;
     }
 
     // Copy data from input array to tx array
@@ -866,7 +866,7 @@ int8_t RFM22B::receive(uint8_t *data, uint8_t length, uint32_t timeout)
 //    }
 
     // Initialise rx and tx arrays
-    uint8_t buffer[MAX_PACKET_LENGTH+1] = { 0 };
+    uint8_t buffer[MAX_PACKET_SIZE + 1] = { 0 };
 
     // Set FIFO register address
     buffer[0] = (uint8_t)Register::FIFO_ACCESS_7F;
