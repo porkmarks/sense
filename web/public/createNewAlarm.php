@@ -55,7 +55,7 @@ if(isset($_POST["create"]))
 		if ($query)
 		{				
 			$msg = "Alarm created";
-			echo$msg;
+			echo $msg;
 			header('Location: createAlarms.php');
 		}
 		else

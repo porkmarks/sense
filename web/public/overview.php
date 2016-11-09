@@ -54,9 +54,9 @@
 
 	<div id="Content">
         <div id ="ContentLeft">
-		<?php
-			include('mainSideBar.php');
-		?>
+    		<?php
+    			include('mainSideBar.php');
+    		?>
         </div>
 		<div id="ContentRight">
 

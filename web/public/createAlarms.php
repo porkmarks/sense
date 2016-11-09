@@ -34,17 +34,21 @@
 
 <link href= "css/createAlarms.css" rel="stylesheet" type ="text/css"/>
 
-<header>
+
+<body>
+
+  <div id="Holder">
     <?php
       include('mainTopBar.php');
     ?>
-</header>
-<body>
+  </div>
 
   <div id="Content">
-    <?php
-      include('settingsSideBar.php');
-    ?>
+        <div id ="ContentLeft">
+        <?php
+          include('settingsSideBar.php');
+        ?>
+        </div>
     <div id="ContentRight">
 
     <form action ="createNewAlarm.php" method="post" id="createAlarmForm">    

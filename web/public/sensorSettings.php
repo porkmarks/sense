@@ -32,39 +32,39 @@
 ?>
 
 <body>
-	<header>
-		<?php
-			include('mainTopBar.php');
-		?>
-    </header>
+	<div id="Holder">
+	    <?php
+	      include('mainTopBar.php');
+	    ?>
+  	</div>
 
-<div id="Content">
-		<?php
-			include('settingsSideBar.php');
+  <div id="Content">
+	    <div id ="ContentLeft">
+    	    <?php
+        		  include('settingsSideBar.php');
+        	?>
+    	</div>
+    	<div id="ContentRight">
 			
-			
-		?>
-		<div id="ContentRight">
-		
 			<form action ="updateSensorSettings.php" method="post" id="SensorSettingsForm">
-			<table width="400" border="0" cellpadding="10" cellspacing="10">
-			<tr>
-				<td style="font-weight: bold"><div align="right"><label for="mesp">Measurement period</label><p> the frequency of the measurements in minutes</p></div></td>
-				<td><input name="mesp" type="text" value ="<?php echo $mp; ?>" class="StyleTxtField" size="25" required /></td>
-			</tr>
-			<tr>
-				<td style="font-weight: bold"><div align="right"><label for="mesc">Measurement comms</label><p>the frequency of measurement reporting in minutes</p></div></td>
-				<td><input name="mesc" type="text" value ="<?php echo $cp; ?>" class="StyleTxtField" size="25" required /></td>
-			</tr>
-			<tr>
-				<td height="23" <div align="right"></td>
-			    <td> <input type="submit" name="submit" value="Submit" class="StyleTxtField" /></td>
-			</tr>
-			
-            </table>
-		</form>
+				<table width="400" border="0" cellpadding="10" cellspacing="10">
+				<tr>
+					<td style="font-weight: bold"><div align="right"><label for="mesp">Measurement period</label><p> the frequency of the measurements in minutes</p></div></td>
+					<td><input name="mesp" type="text" value ="<?php echo $mp; ?>" class="StyleTxtField" size="25" required /></td>
+				</tr>
+				<tr>
+					<td style="font-weight: bold"><div align="right"><label for="mesc">Measurement comms</label><p>the frequency of measurement reporting in minutes</p></div></td>
+					<td><input name="mesc" type="text" value ="<?php echo $cp; ?>" class="StyleTxtField" size="25" required /></td>
+				</tr>
+				<tr>
+					<td height="23" <div align="right"></td>
+				    <td> <input type="submit" name="submit" value="Submit" class="StyleTxtField" /></td>
+				</tr>
+				
+	            </table>
+			</form>
 		</div>
-	</div>
+	
 
 
 </body>
