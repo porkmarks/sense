@@ -204,7 +204,7 @@ public:
     void set_register16(Register reg, uint16_t value);
     void set_register32(Register reg, uint32_t value);
 
-    static const uint8_t MAX_PACKET_LENGTH = 64;
+    static const uint8_t MAX_DATAGRAM_LENGTH = 64;
 private:
 
     void set_fifo_threshold(Register reg, uint8_t thresh);

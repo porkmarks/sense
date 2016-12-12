@@ -1,6 +1,9 @@
 <?php
 	session_start();
 	include('checklogin.php');
+
+	ini_set('display_errors', 1); 
+error_reporting(E_ALL);
 ?>
 <!DOCTYPE html>
 <head><title>GRAFICE</title>
@@ -9,13 +12,60 @@
 	include('includes.php');
 	include('db.php');
 
-	$db = mysqli_connect(DB_SERVER,DB_USERNAME,DB_PASSWORD, $_SESSION["sensorDB"]);
+	$db = mysqli_connect(DB_SERVER, DB_USERNAME, DB_PASSWORD, $_SESSION["sensorDB"]);
 	if (mysqli_connect_errno())
 	{
 		echo "Failed to connect to MySQL: " . mysqli_connect_error();
 	}
     $sql = "SELECT * FROM sensors;";
-    $result = mysqli_query($db, $sql);
+    $sensorListResult = mysqli_query($db, $sql);
+
+    if (!isset($_POST["beginDate"]) || !isset($_POST["endDate"]))
+    {
+    	$endDate = time();
+    	$beginDate = $endDate - 3600*24*7; //one week back
+    }
+    else
+    {
+    	$format = '%d/%m/%Y';
+		$endDate = strtotime($_POST["endDate"]);
+		$beginDate = strtotime($_POST["beginDate"]);
+    }
+
+    echo strftime("%D", $beginDate).' xxx '.strftime("%D", $endDate);
+    $beginDateStr = strftime("%Y-%m-%d", $beginDate);
+    $endDateStr = strftime("%Y-%m-%d", $endDate);
+    $sql = "SELECT * FROM measurements WHERE timestamp >= '$beginDateStr' AND timestamp <= '$endDateStr' ORDER BY sensor_id ASC, timestamp ASC;";
+    echo $sql;
+    $measurementsResult = mysqli_query($db, $sql);
+
+	$measurementsPerSensor = array();
+	{
+		$sensorIdx = -1;
+		$oldSensorId = -1;
+		while ($row = mysqli_fetch_array($measurementsResult, MYSQLI_ASSOC))
+		{
+			$crtSensorId = $row["sensor_id"];
+			if ($crtSensorId != $oldSensorId)
+			{
+				//new sensor detected
+				$oldSensorId = $crtSensorId;
+				$sensorIdx++;
+
+				$measurementsPerSensor[$sensorIdx] = array();
+			}
+
+			array_push($measurementsPerSensor[$sensorIdx], $row);
+		}  
+	}
+
+	//now see if there are too many entries per sensor and reduce
+	foreach ($measurementsPerSensor as $measurements) 
+	{
+    	$count = count($measurements);
+    	$x = $count / 1000;
+    }
+
 ?>
 <link href= "css/graphs.css" rel="stylesheet" type ="text/css"/>
 
@@ -30,6 +80,7 @@
 		<?php
 			include('mainSideBar.php');
 		?>
+		<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
 		<!--highlight the current section of the navigation bar-->
 		<script>
 		$(function(){
@@ -42,9 +93,12 @@
 		</script>
 		<div id="ContentRight">
 			
+			<form action ="graphs.php" method="post" id="refreshGraphs">
+			<input type='submit' id='refresh' name='refresh' value='Refresh'/>
+
 			<div id="datePkr">
-			Begin Date: <input type="text" id="beginDate">
-			End Date: <input type="text" id="endDate">
+			Begin Date: <input type="text" id="beginDate" name="beginDate">
+			End Date: <input type="text" id="endDate" name="endDate">
 			</div>
 			<div id="option">
 			    <input name="DayButton" 
@@ -74,27 +128,28 @@
 			</div>
 			<div class="checkboxListScroll">
 			<?php
+				////////////////////////////////////////
+				//show the sensor names
 	        	$colors = ["#FF33AA", "#08B37F", "#22ADFF", "#FF4136", "#FF9900", "#3D0000", "#854144b", "#FF3399", "#AAAAAA"];
 	        	$idx = 0;
-		        while ($row = mysqli_fetch_array($result, MYSQLI_ASSOC))
+		        while ($row = mysqli_fetch_array($sensorListResult, MYSQLI_ASSOC))
 	            {
 	        ?> 
 	         <ul id="checkboxList" class="checkboxList"> 		  	
 	            <label style = "color: <?php echo $colors[$idx] ?>;"><input type="checkbox" id ="<?php echo $row["name"]; ?>" checked="true"  > <?php echo $row["name"]; ?></label>
 	         </ul>
-	       
 	        <?php
 	        		$idx++;
 	         	}
-
+				////////////////////////////////////////
 	        ?>   	
 			</div>
 			<div id ="graphContainer"></div>
 
 			<div class = "container">
 			<div id = "checkboxes"> 
-			   <label><input type="checkbox"  id = "temp" checked="true"  > Temperature</label>
-			   <label><input type="checkbox"  id = "hum" checked="true"   > Humidity</label>
+			   <label><input type="checkbox" id = "temp" checked="true"> Temperature</label>
+			   <label><input type="checkbox" id = "hum" checked="true"> Humidity</label>
 			</div>
 
 			<p id ="download" onclick="downloadCsv()"><img src="assets/downloadfile.png"  width="24" height="24"> Download CSV</p>
@@ -105,25 +160,21 @@
 			$('#beginDate')
 				.datepicker({
 					//showButtonPanel: true,
-					dateFormat: "dd/mm/yy",
-					defaultDate: -12,
-					onSelect: function(dateStr) {
-						refreshGraphs();
-				    }
+					dateFormat: "dd-mm-yy",
+					defaultDate: new Date()
 				})
-				.datepicker('setDate', -7); 
+				.datepicker('setDate', new Date(<?php echo $beginDate*1000; ?>));
+				
 
 			$('#endDate')
 				.datepicker
 				({
 					//showButtonPanel: true,
-					dateFormat: "dd/mm/yy",
-					defaultDate: new Date(),
-					onSelect: function(dateStr) {
-						refreshGraphs();
-				    }
+					dateFormat: "dd-mm-yy",
+					defaultDate: new Date()
 				})
-				.datepicker('setDate', new Date());
+				.datepicker('setDate', new Date(<?php echo $endDate*1000; ?>));
+				
 
 			/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 			// Globals
@@ -131,12 +182,37 @@
 			var graphData = {}; //will be filled later
 
 			var colors = ["#FF33AA", "#08B37F", "#22ADFF", "#FF4136", "#FF9900", "#3D0000", "#854144b", "#FF3399", "#AAAAAA", ];
-			var sensorFiles = ["living.tsv", "hall.tsv", "bedroom.tsv", "bathroom.tsv", "kitchen.tsv" ];
 
 			var selectedPlots = [];
 
 			var checkbTemp = document.getElementById("temp");
 			var checkbHum = document.getElementById("hum");
+
+			var parseDate = d3.time.format("%Y-%m-%d %H:%M:%S").parse;
+
+			var measurementDatas = [
+			<?php
+				foreach ($measurementsPerSensor as $sensorIdx => $measurements) 
+				{
+					//start a new sensor measurement array
+					echo "{\n";
+					echo "measurements: [\n";
+
+					foreach ($measurements as $row) 
+					{
+						echo "{\n";
+						echo "\tdate: parseDate(\"".$row["timestamp"]."\"),\n";
+						echo "\ttemperature: ".$row["temperature"].",\n";
+						echo "\thumidity: ".$row["humidity"].",\n";
+						echo "},\n";
+					}
+
+					echo "\t],\n";
+					echo "\tcolor: \"" . $colors[$sensorIdx] . "\"\n";
+					echo "},\n";
+				}
+			?>
+			];
 
 
 			/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -153,12 +229,10 @@
 
 			window.onresize = function(event) 
 			{
-
 				d3.select("svg").remove();
-				graphData =createGraphs();
+				graphData = createGraphs();
 				refreshGraphs();
 			};
-
 
 			function updateDay()
 			{			
@@ -167,7 +241,6 @@
 				var days = date.getDate() -1;
 				date.setDate(days);
 				$("#beginDate").datepicker('setDate', date);
-				refreshGraphs();
 			}
 
 			function updateMonth()
@@ -177,7 +250,6 @@
 				var month = date.getMonth() - 1;
 				date.setMonth(month);
 				$("#beginDate").datepicker('setDate', date);
-				refreshGraphs();
 			}
 			function updateWeek()
 			{			
@@ -186,8 +258,6 @@
 				var days = date.getDate() -7;
 				date.setDate(days);
 				$("#beginDate").datepicker('setDate', date);
-				refreshGraphs();
-
 			}
 			function updateSemester() 
 			{
@@ -196,7 +266,6 @@
 				var month = date.getMonth() - 6;
 				date.setMonth(month);
 				$("#beginDate").datepicker('setDate', date);
-				refreshGraphs();
 			}
 			function updateYear() 
 			{
@@ -205,7 +274,6 @@
 				var month = date.getMonth() - 12;
 				date.setMonth(month);
 				$("#beginDate").datepicker('setDate', date);
-				refreshGraphs();
 			}
 
 			function createGraphs() 
@@ -264,76 +332,8 @@
 					yAxisRight: yAxisRight
 				}
 				return pd;
-		
-				function displayCheckboxes(fileNames)
-				{	
-					var checkboxList = document.getElementById("checkboxList");
-
-
-					var createCheckbox = function(idx)
-					{	
-						var fileName = fileNames[idx];
-						var color = colors[idx];
-
-						var cb = document.createElement('input');
-						cb.type = "checkbox";
-						cb.name = fileName;
-						cb.value = "value";
-
-
-
-						var label = document.createElement('label')
-						label.htmlFor = "id";
-						label.appendChild(document.createTextNode(fileName.substr(0, fileName.length-4)));
-						label.style.color = color;
-
-						label.onclick = function()
-						{
-							cb.checked = !cb.checked;
-							cb.onchange();
-						};
-
-						cb.onchange = function()
-						{
-							if (cb.checked == true || label.onClick == true)
-							{
-								selectedPlots.push({ fileName: fileName, color: color });
-							}
-							else
-							{
-								for (var i = 0; i < selectedPlots.length; i++)
-								{
-									if (selectedPlots[i].fileName == fileName)
-									{
-										selectedPlots.splice(i, 1);
-										break;
-									}
-								}
-							}
-							
-							refreshGraphs();
-						};
-
-						var item = document.createElement('li');
-						item.className = "itemList";
-
-						item.appendChild(cb);
-						item.appendChild(label);
-
-						checkboxList.appendChild(item);
-					};
-
-					for (var idx = 0; idx < fileNames.length; idx++)
-					{	
-						createCheckbox(idx);
-					}
-
-				}
 			}
 	
-			  
-
-
 			function refreshGraphs()
 			{	
 				var filter = 0;// 1- show temperature, 2- show humidity, 3- show both
@@ -370,7 +370,7 @@
 
 				if (beginDate != null && endDate != null && beginDate.getTime() < endDate.getTime())
 				{
-					plotGraph(graphData, selectedPlots, beginDate, endDate, filter)
+					plotGraph(graphData, measurementDatas, filter)
 				}
 				if ((endDate.getTime() - beginDate.getTime()) <= 86340000)
 				{
@@ -383,15 +383,64 @@
 				}
 			}
 
+			function plotGraph(graphData, measurementDatas, what)
+			{
+				var parseDate = d3.time.format("%Y-%m-%d %H:%M:%S").parse;
+
+				// Define the line
+				var valuelineTemp = d3.svg.line()
+				    .x(function(d) { return graphData.xRange(d.date); })
+				    .y(function(d) { return graphData.y0Range(d.temperature); });
+
+				var valuelineHum = d3.svg.line()
+				    .x(function(d) { return graphData.xRange(d.date); })
+				    .y(function(d) { return graphData.y1Range(d.humidity); });
+				       
+
+				// Get the data
+				for(var i = 0; i < measurementDatas.length; i++)
+				{
+					var measurements = measurementDatas[i].measurements;
+					var color = measurementDatas[i].color;
+
+					graphData.xRange.domain(d3.extent(measurements, function(d) { return d.date; }));
+					if (what == 1 || what == 3)
+					{
+						graphData.y0Range.domain(d3.extent(measurements, function(d) { return d.temperature; }));
+					    graphData.graph.append("path")
+							.attr("class", "line")
+							.attr("stroke", color)
+							//.style("stroke-dasharray", ("10,2"))valueline
+							.attr("d", valuelineTemp(measurements));
+					}
+
+					if (what == 2 || what == 3)
+					{
+						graphData.y1Range.domain(d3.extent(measurements, function(d) { return d.humidity; }));
+						graphData.graph.append("path")
+							.attr("class", "line")
+							.attr("stroke", color)
+							.style("stroke-dasharray", ("3,3"))
+							.attr("d", valuelineHum(measurements));
+					}
+					
+				    var t = graphData.graph.transition().duration(100);
+				    t.select(".x.axis").call(graphData.xAxis);
+				    t.select(".y.axisLeft").call(graphData.yAxisLeft);
+				    t.select(".y.axisRight").call(graphData.yAxisRight);
+				}
+
+			}
+
 			/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 			graphData = createGraphs();
-			displayCheckboxes(sensorFiles);
 			refreshGraphs();
 
 			</script>
 
 		    </div>
+		    </form>
 
 </body>
 </html>

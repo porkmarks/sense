@@ -73,14 +73,22 @@ int main(int, const char**)
 
     gpioInitialise();
 
+    {
+        gpioSetMode(6, PI_OUTPUT);
+        gpioWrite(6, 1);
+        std::this_thread::sleep_for(std::chrono::milliseconds(7));
+        gpioWrite(6, 0);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
 //    run_tests();
 
     //s_sensors.load_sensors("sensors.config");
 
-    static const std::string db_server = "192.168.1.35";
-    static const std::string db_db = "sensor-test";
-    static const std::string db_username = "admin";
-    static const std::string db_password = "admin";
+    static const std::string db_server = "192.168.1.205";
+    static const std::string db_db = "sensor_test";
+    static const std::string db_username = "sensor_test";
+    static const std::string db_password = "sensor_test";
     static const uint16_t port = 0;
 
     if (!s_sensors.init(db_server, db_db, db_username, db_password, port))

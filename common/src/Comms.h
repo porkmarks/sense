@@ -69,9 +69,9 @@ private:
 
     void send_response(const Header& header);
 
-    static const uint8_t MAX_USER_DATA_SIZE = RFM22B::MAX_PACKET_LENGTH - sizeof(Header);
+    static const uint8_t MAX_USER_DATA_SIZE = RFM22B::MAX_DATAGRAM_LENGTH - sizeof(Header);
 
-    uint8_t m_buffer[RFM22B::MAX_PACKET_LENGTH];
+    uint8_t m_buffer[RFM22B::MAX_DATAGRAM_LENGTH];
     uint8_t m_offset = 0;
 };
 
