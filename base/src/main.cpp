@@ -44,21 +44,20 @@ extern std::string time_point_to_string(std::chrono::high_resolution_clock::time
 
 void fill_config_packet(data::Config& packet, Sensors::Sensor const& sensor)
 {
-    packet.base_time_point = chrono::time_s(Clock::to_time_t(Clock::now()));
+    Clock::time_point now = Clock::now();
+    packet.next_measurement_delay = chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(s_sensors.compute_next_measurement_time_point() - now).count());
     packet.measurement_period = chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(s_sensors.get_measurement_period()).count());
-    packet.next_measurement_time_point = chrono::time_s(Clock::to_time_t(s_sensors.compute_next_measurement_time_point()));
+    packet.next_comms_delay = chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(s_sensors.compute_next_comms_time_point(sensor.id) - now).count());
     packet.comms_period = chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(s_sensors.compute_comms_period()).count());
-    packet.next_comms_time_point = chrono::time_s(Clock::to_time_t(s_sensors.compute_next_comms_time_point(sensor.id)));
     packet.last_confirmed_measurement_index = s_sensors.compute_last_confirmed_measurement_index(sensor.id);
 
     std::cout << "\tConfig for id: " << sensor.id
-                                            << "\n\tbase time point: " << packet.base_time_point.ticks
-                                            << "\n\tmeasurement period: " << packet.measurement_period.count
-                                            << "\n\tnext measurement time point: " << packet.next_measurement_time_point.ticks
-                                            << "\n\tcomms period: " << packet.comms_period.count
-                                            << "\n\tnext comms time point: " << packet.next_comms_time_point.ticks
-                                            << "\n\tlast confirmed measurement index: " << packet.last_confirmed_measurement_index
-                                            << "\n";
+              << "\n\next tmeasurement delay: " << packet.next_measurement_delay.count
+              << "\n\tmeasurement period: " << packet.measurement_period.count
+              << "\n\tnext comms delay: " << packet.next_comms_delay.count
+              << "\n\tcomms period: " << packet.comms_period.count
+              << "\n\tlast confirmed measurement index: " << packet.last_confirmed_measurement_index
+              << "\n";
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -81,7 +80,7 @@ int main(int, const char**)
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
-//    run_tests();
+    //    run_tests();
 
     //s_sensors.load_sensors("sensors.config");
 
@@ -130,6 +129,7 @@ int main(int, const char**)
 
                     data::Pair_Response packet;
                     packet.address = sensor->address;
+                    //strncpy(packet.name, sensor->name.c_str(), sizeof(packet.name));
                     s_comms.set_destination_address(s_comms.get_packet_source_address());
                     s_comms.begin_packet(data::Type::PAIR_RESPONSE);
                     s_comms.pack(packet);

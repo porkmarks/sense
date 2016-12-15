@@ -104,3 +104,9 @@ src/Storage.h
 ../common/src/Storage.cpp
 ../common/src/Storage.h
 ../common/src/Chrono.h
+src/SHT2x.h
+src/SHT2x.cpp
+src/Wire.h
+src/Wire.cpp
+src/twi.h
+src/twi.cpp
