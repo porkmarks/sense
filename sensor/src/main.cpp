@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include "Wire.h"
 #include <avr/eeprom.h>
 #include <avr/interrupt.h>
 #include <avr/io.h>
@@ -7,7 +8,6 @@
 
 #include "SPI.h"
 #include "Low_Power.h"
-#include "DHT.h"
 #include "LEDs.h"
 #include "Buttons.h"
 #include "Battery.h"
@@ -16,6 +16,18 @@
 #include "avr_stdio.h"
 #include "deque"
 #include "Storage.h"
+
+#define SENSOR_DHT22 1
+#define SENSOR_SHT21 2
+
+#define SENSOR_TYPE SENSOR_SHT21
+
+#if SENSOR_TYPE == SENSOR_DHT22
+#   include "DHT.h"
+#elif SENSOR_TYPE == SENSOR_SHT21
+#   include "SHT2x.h"
+#endif
+
 
 __extension__ typedef int __guard __attribute__((mode (__DI__)));
 
@@ -57,11 +69,15 @@ enum class State
 };
 State s_state = State::PAIR;
 
-constexpr uint8_t DHT_DATA_PIN1 = 5;
-constexpr uint8_t DHT_DATA_PIN2 = 6;
-constexpr uint8_t DHT_DATA_PIN3 = 7;
-constexpr uint8_t DHT_DATA_PIN4 = 8;
-DHT s_dht(DHT_DATA_PIN1, DHT22);
+#if SENSOR_TYPE == SENSOR_DHT22
+//constexpr uint8_t DHT_DATA_PIN1 = 5;
+//constexpr uint8_t DHT_DATA_PIN2 = 6;
+//constexpr uint8_t DHT_DATA_PIN3 = 7;
+//constexpr uint8_t DHT_DATA_PIN4 = 8;
+//DHT s_dht(DHT_DATA_PIN1, DHT22);
+#else
+SHT2xClass s_sht;
+#endif
 
 Comms s_comms;
 
@@ -76,11 +92,11 @@ namespace chrono
     time_ms s_time_point;
 }
 
-chrono::time_s s_next_measurement_time_point;
-chrono::seconds s_measurement_period;
+chrono::time_ms s_next_measurement_time_point;
+chrono::millis s_measurement_period;
 
-chrono::time_s s_next_comms_time_point;
-chrono::seconds s_comms_period;
+chrono::time_ms s_next_comms_time_point;
+chrono::millis s_comms_period;
 
 Storage s_storage;
 
@@ -114,6 +130,39 @@ void wdt_init(void)
 {
     wdt_disable();
     return;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+const size_t MAX_NAME_LENGTH = 32;
+const uint8_t SETTINGS_VERSION = 1;
+
+uint8_t  EEMEM eeprom_version;
+uint32_t EEMEM eeprom_address;
+
+void reset_settings()
+{
+    eeprom_write_byte(&eeprom_version, 0);
+}
+
+void save_settings(uint32_t address)
+{
+    eeprom_write_dword(&eeprom_address, address);
+    eeprom_write_byte(&eeprom_version, SETTINGS_VERSION);
+}
+
+bool load_settings(uint32_t& address)
+{
+    if (eeprom_read_byte(&eeprom_version) == SETTINGS_VERSION)
+    {
+        address = eeprom_read_dword(&eeprom_address);
+        return true;
+    }
+    else
+    {
+        reset_settings();
+        return false;
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -152,14 +201,24 @@ void setup()
 
     ///////////////////////////////////////////////
     //initialize the sensor
+#if SENSOR_TYPE == SENSOR_DHT22
     s_dht.begin();
+#else
+    Wire.begin();
+#endif
     delay(200);
 
     ///////////////////////////////////////////////
     //seed the RNG
     {
         float t, h;
+#if SENSOR_TYPE == SENSOR_DHT22
         s_dht.read(t, h);
+#else
+        t = s_sht.GetTemperature();
+        h = s_sht.GetHumidity();
+#endif
+        LOG(PSTR("Temperature: %d\nHumidity: %d\n"), (int)t, (int)h);
         float vcc = read_vcc();
         float s = vcc + t + h;
         uint32_t seed = reinterpret_cast<uint32_t&>(s);
@@ -187,6 +246,7 @@ void setup()
         blink_leds(RED_LED, 3, chrono::millis(100));
         Low_Power::power_down(chrono::millis(5000));
     }
+    s_comms.stand_by_mode();
     LOG(PSTR("done\n"));
 
     ///////////////////////////////////////////////
@@ -195,6 +255,22 @@ void setup()
 
     //sleep a bit
     Low_Power::power_down(chrono::millis(1000));
+
+    ///////////////////////////////////////////////
+    //settings
+    {
+        uint32_t address = 0;
+        if (load_settings(address))
+        {
+            s_comms.set_address(address);
+            LOG(PSTR("Loaded settings. Addr: %lu\n"), address);
+            s_state = State::FIRST_CONFIG;
+        }
+        else
+        {
+            s_state = State::PAIR;
+        }
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -202,21 +278,19 @@ void setup()
 bool apply_config(const data::Config& config)
 {
     if (config.measurement_period.count == 0 ||
-            config.comms_period.count == 0 ||
-            config.next_comms_time_point <= config.base_time_point ||
-            config.next_measurement_time_point <= config.base_time_point)
+            config.comms_period.count == 0)
     {
         LOG(PSTR("Bag config received!!!\n"));
         return false;
     }
 
-    chrono::s_time_point = chrono::time_ms(config.base_time_point.ticks * 1000ULL);
+    //chrono::s_time_point = chrono::time_ms(config.base_time_point.ticks * 1000ULL);
 
-    s_next_comms_time_point = config.next_comms_time_point;
-    s_comms_period = config.comms_period;
+    s_next_comms_time_point = chrono::now() + chrono::millis(config.next_comms_delay);
+    s_comms_period = chrono::millis(config.comms_period.count * 1000ULL);
 
-    s_next_measurement_time_point = config.next_measurement_time_point;
-    s_measurement_period = config.measurement_period;
+    s_next_measurement_time_point = chrono::now() + chrono::millis(config.next_measurement_delay);
+    s_measurement_period = chrono::millis(config.measurement_period.count * 1000ULL);
 
     //remove confirmed measurements
     while (s_first_measurement_index <= config.last_confirmed_measurement_index)
@@ -232,10 +306,9 @@ bool apply_config(const data::Config& config)
 
     uint32_t measurement_count = s_storage.get_data_count();
 
-    LOG(PSTR("base time: %lu\n"), config.base_time_point.ticks);
-    LOG(PSTR("next comms: %lu\n"), config.next_comms_time_point.ticks);
+    LOG(PSTR("next comms delay: %lu\n"), config.next_comms_delay.count);
     LOG(PSTR("comms period: %lu\n"), config.comms_period.count);
-    LOG(PSTR("next measurement: %lu\n"), config.next_measurement_time_point.ticks);
+    LOG(PSTR("next measurement delay: %lu\n"), config.next_measurement_delay.count);
     LOG(PSTR("measurement period: %lu\n"), config.measurement_period.count);
     LOG(PSTR("last confirmed index: %lu\n"), config.last_confirmed_measurement_index);
     LOG(PSTR("first index: %lu\n"), s_first_measurement_index);
@@ -313,6 +386,8 @@ void pair()
 
     LOG(PSTR("Starting pairing\n"));
 
+    s_comms.stand_by_mode();
+
     wait_for_release(Button::BUTTON1);
     bool done = false;
     while (!done)
@@ -331,6 +406,7 @@ void pair()
 
                 LOG(PSTR("Sending request..."));
 
+                s_comms.idle_mode();
                 s_comms.begin_packet(data::Type::PAIR_REQUEST);
                 s_comms.pack(data::Pair_Request());
                 if (s_comms.send_packet(5))
@@ -347,15 +423,20 @@ void pair()
 
                     if (size == sizeof(data::Pair_Response) && s_comms.get_packet_type() == data::Type::PAIR_RESPONSE)
                     {
+                        s_comms.stand_by_mode();
+
                         const data::Pair_Response* response_ptr = reinterpret_cast<const data::Pair_Response*>(s_comms.get_packet_payload());
                         s_comms.set_address(response_ptr->address);
-                        LOG(PSTR("done. Addr: %d\n"), response_ptr->address);
+                        LOG(PSTR("done. Addr: %lu\n"), response_ptr->address);
+
+                        save_settings(response_ptr->address);
 
                         done = true;
                         break;
                     }
                     else
                     {
+                        s_comms.stand_by_mode();
                         LOG(PSTR("timeout\n"));
                     }
                 }
@@ -365,6 +446,8 @@ void pair()
                 }
                 blink_leds(RED_LED, 3, chrono::millis(500));
             }
+
+            s_comms.stand_by_mode();
 
             blink_leds(YELLOW_LED, 3, chrono::millis(100));
             Low_Power::power_down_int(chrono::millis(2000));
@@ -387,6 +470,8 @@ void pair()
             wait_for_release(Button::BUTTON1);
         }
     }
+
+    s_comms.stand_by_mode();
 
     blink_leds(GREEN_LED, 3, chrono::millis(500));
 
@@ -414,6 +499,7 @@ void do_measurement()
     do
     {
         LOG(PSTR("Measuring %d..."), tries);
+#if SENSOR_TYPE == SENSOR_DHT22
         bool ok = s_dht.read(data.temperature, data.humidity);
         if (!ok)
         {
@@ -424,6 +510,11 @@ void do_measurement()
             LOG(PSTR("done\n"));
             break;
         }
+#else
+        data.temperature = s_sht.GetTemperature();
+        data.humidity = s_sht.GetHumidity();
+        break;
+#endif
     } while (++tries < max_tries);
 
     if (tries >= max_tries)
@@ -549,6 +640,8 @@ void first_config()
             break;
         }
 
+        s_comms.idle_mode();
+
         if (request_first_config())
         {
             LOG(PSTR("Received config:\ntime_point: %lu\n"), uint32_t(chrono::now().ticks / 1000ULL));
@@ -556,8 +649,11 @@ void first_config()
             break;
         }
 
+        s_comms.stand_by_mode();
         Low_Power::power_down_int(chrono::millis(2000));
     }
+
+    s_comms.stand_by_mode();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -573,14 +669,15 @@ void main_loop()
             {
                 if (chrono::now() - start_tp > chrono::millis(10000))
                 {
+                    reset_settings();
                     soft_reset();
                 }
             }
         }
 
-        chrono::time_s time_point = chrono::time_s((chrono::now().ticks / 1000ULL) + 1);
+        chrono::time_ms now = chrono::now();
 
-        if (time_point >= s_next_measurement_time_point)
+        if (now >= s_next_measurement_time_point)
         {
             s_next_measurement_time_point += s_measurement_period;
 
@@ -589,7 +686,7 @@ void main_loop()
             set_leds(0);
         }
 
-        if (time_point >= s_next_comms_time_point)
+        if (now >= s_next_comms_time_point)
         {
             s_next_comms_time_point += s_comms_period;
 
@@ -598,10 +695,10 @@ void main_loop()
             set_leds(0);
         }
 
-        chrono::time_ms next_time_point = chrono::time_ms(std::min(s_next_measurement_time_point, s_next_comms_time_point).ticks * 1000ULL);
+        chrono::time_ms next_time_point = std::min(s_next_measurement_time_point, s_next_comms_time_point);
         chrono::millis sleep_duration(1000);
 
-        chrono::time_ms now = chrono::now();
+        now = chrono::now();
         if (next_time_point > now)
         {
             sleep_duration = next_time_point - now;
