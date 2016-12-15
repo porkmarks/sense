@@ -71,11 +71,10 @@ struct Config_Request
 struct Config
 {
     //all are in seconds
-    chrono::time_s base_time_point;
-    chrono::time_s next_comms_time_point;
-    chrono::seconds comms_period;
-    chrono::time_s next_measurement_time_point;
-    chrono::seconds measurement_period;
+    chrono::seconds next_comms_delay; //how much to wait for next comms
+    chrono::seconds comms_period; //comms every this much seconds
+    chrono::seconds next_measurement_delay; //how much to wait before th enext measurement
+    chrono::seconds measurement_period; //measurements every this much seconds
     uint32_t last_confirmed_measurement_index = 0;
 };
 
@@ -99,7 +98,7 @@ struct Pair_Request
 };
 struct Pair_Response
 {
-    uint16_t address = 0;
+    uint32_t address = 0;
 };
 
 #ifndef __AVR__

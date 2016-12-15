@@ -9,19 +9,19 @@ class Comms
 public:
     Comms();
 
-    static constexpr uint16_t BROADCAST_ADDRESS = 0;
-    static constexpr uint16_t BASE_ADDRESS = 0xFFFF;
+    static constexpr uint32_t BROADCAST_ADDRESS = 0;
+    static constexpr uint32_t BASE_ADDRESS = 0xFFFFFFFFULL;
 
-    static constexpr uint16_t PAIR_ADDRESS_BEGIN = BROADCAST_ADDRESS + 1;
-    static constexpr uint16_t PAIR_ADDRESS_END = PAIR_ADDRESS_BEGIN + 1000;
+    static constexpr uint32_t PAIR_ADDRESS_BEGIN = BROADCAST_ADDRESS + 1;
+    static constexpr uint32_t PAIR_ADDRESS_END = PAIR_ADDRESS_BEGIN + 1000;
 
-    static constexpr uint16_t SLAVE_ADDRESS_BEGIN = PAIR_ADDRESS_END + 1;
-    static constexpr uint16_t SLAVE_ADDRESS_END = SLAVE_ADDRESS_BEGIN + 10000;
+    static constexpr uint32_t SLAVE_ADDRESS_BEGIN = PAIR_ADDRESS_END + 1;
+    static constexpr uint32_t SLAVE_ADDRESS_END = BASE_ADDRESS - 1;
 
     bool init(uint8_t retries);
 
-    void set_address(uint16_t address);
-    void set_destination_address(uint16_t address);
+    void set_address(uint32_t address);
+    void set_destination_address(uint32_t address);
 
     void idle_mode();
     void stand_by_mode();
@@ -34,7 +34,7 @@ public:
     bool send_packet(uint8_t retries);
 
     uint8_t receive_packet(uint32_t timeout);
-    uint16_t get_packet_source_address() const;
+    uint32_t get_packet_source_address() const;
     int8_t get_input_dBm();
     data::Type get_packet_type() const;
     const void* get_packet_payload() const;
@@ -42,8 +42,8 @@ public:
 private:
     RFM22B m_rf22;
 
-    uint16_t m_address = BROADCAST_ADDRESS;
-    uint16_t m_destination_address = BROADCAST_ADDRESS;
+    uint32_t m_address = BROADCAST_ADDRESS;
+    uint32_t m_destination_address = BROADCAST_ADDRESS;
     uint16_t m_last_req_id = 0;
 
 #ifndef __AVR__
@@ -52,8 +52,8 @@ private:
     struct Header
     {
         uint32_t crc;
-        uint16_t source_address = BROADCAST_ADDRESS;
-        uint16_t destination_address = BROADCAST_ADDRESS;
+        uint32_t source_address = BROADCAST_ADDRESS;
+        uint32_t destination_address = BROADCAST_ADDRESS;
         uint16_t req_id : 15;
         data::Type type;
     };

@@ -23,7 +23,10 @@ Comms::Comms()
 
 bool Comms::init(uint8_t retries)
 {
-    retries += 1;
+    if (retries == 0)
+    {
+        retries = 1;
+    }
 
     uint8_t i = 0;
     for (i = 0; i < retries; i++)
@@ -77,11 +80,11 @@ bool Comms::init(uint8_t retries)
 //    m_rf22.set_modem_configuration(modem_config);
 
     m_rf22.set_carrier_frequency(433.f);
-    m_rf22.set_frequency_deviation(50000);
+    m_rf22.set_frequency_deviation(20000);
     m_rf22.set_modulation_type(RFM22B::Modulation_Type::FSK);
     m_rf22.set_modulation_data_source(RFM22B::Modulation_Data_Source::FIFO);
     m_rf22.set_data_clock_configuration(RFM22B::Data_Clock_Configuration::NONE);
-    m_rf22.set_transmission_power(0);
+    m_rf22.set_transmission_power(20);
     m_rf22.set_preamble_length(8);
     //m_rf22.set_data_rate(39993);
 
@@ -113,11 +116,11 @@ void Comms::stand_by_mode()
     m_rf22.stand_by_mode();
 }
 
-void Comms::set_address(uint16_t address)
+void Comms::set_address(uint32_t address)
 {
     m_address = address;
 }
-void Comms::set_destination_address(uint16_t address)
+void Comms::set_destination_address(uint32_t address)
 {
     m_destination_address = address;
 }
@@ -156,21 +159,27 @@ bool Comms::send_packet(uint8_t retries)
 
     uint8_t response_buffer[RESPONSE_BUFFER_SIZE];
 
-    retries++;
-    uint8_t i = 0;
-    for (i = 0; i < retries; i++)
+    if (retries == 0)
+    {
+        retries = 1;
+    }
+
+    for (uint8_t tx_r = 0; tx_r < retries; tx_r++)
     {
         m_rf22.send(m_buffer, sizeof(Header) + m_offset, 100);
-        int8_t size = m_rf22.receive(response_buffer, sizeof(response_buffer), 100);
-        if (size > 0)
+        for (uint8_t rx_r = 0; rx_r < 3; rx_r++)
         {
-            if (validate_packet(response_buffer, size, sizeof(data::Response)))
+            int8_t size = m_rf22.receive(response_buffer, sizeof(response_buffer), 100);
+            if (size > 0)
             {
-                data::Response* response_ptr = reinterpret_cast<data::Response*>(response_buffer + sizeof(Header));
-                if (response_ptr->req_id == header_ptr->req_id && response_ptr->ack != 0)
+                if (validate_packet(response_buffer, size, sizeof(data::Response)))
                 {
-                    m_offset = 0;
-                    return true;
+                    data::Response* response_ptr = reinterpret_cast<data::Response*>(response_buffer + sizeof(Header));
+                    if (response_ptr->req_id == header_ptr->req_id && response_ptr->ack != 0)
+                    {
+                        m_offset = 0;
+                        return true;
+                    }
                 }
             }
         }
@@ -291,7 +300,7 @@ const void* Comms::get_packet_payload() const
     return m_buffer + sizeof(Header);
 }
 
-uint16_t Comms::get_packet_source_address() const
+uint32_t Comms::get_packet_source_address() const
 {
     const Header* header_ptr = reinterpret_cast<const Header*>(m_buffer);
     return header_ptr->source_address;
