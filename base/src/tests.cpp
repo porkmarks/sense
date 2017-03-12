@@ -7,6 +7,8 @@
 #include <iostream>
 #include <algorithm>
 
+extern std::unique_ptr<User_DB> initialize_user_db(System_DB& system_db);
+
 
 #define CHECK(x) \
 do \
@@ -221,16 +223,23 @@ void test_sensor_operations()
 {
     //---------------------
 
-    static const std::string db_server = "192.168.1.44";
-    static const std::string db_db = "sensor-test";
-    static const std::string db_username = "admin";
-    static const std::string db_password = "admin";
-    static const uint16_t port = 0;
-
-
     {
+        std::unique_ptr<System_DB> system_db(new System_DB());
+        if (!system_db->init("127.0.0.1", "sense", "sense", "s3ns3"))
+        {
+            std::cerr << "Cannot connect to system DB\n";
+            return;
+        }
+
+        std::unique_ptr<User_DB> user_db = initialize_user_db(*system_db);
+        if (!user_db)
+        {
+            std::cerr << "Cannot initialize user DB\n";
+            return;
+        }
+
         Sensors sensors;
-        if (!sensors.init(db_server, db_db, db_username, db_password, port))
+        if (!sensors.init(std::move(system_db), std::move(user_db)))
         {
             std::cerr << "DB init failed\n";
             return;
@@ -246,8 +255,22 @@ void test_sensor_operations()
     //---------------------
 
     {
+        std::unique_ptr<System_DB> system_db(new System_DB());
+        if (!system_db->init("127.0.0.1", "sense", "sense", "s3ns3"))
+        {
+            std::cerr << "Cannot connect to system DB\n";
+            return;
+        }
+
+        std::unique_ptr<User_DB> user_db = initialize_user_db(*system_db);
+        if (!user_db)
+        {
+            std::cerr << "Cannot initialize user DB\n";
+            return;
+        }
+
         Sensors sensors;
-        if (!sensors.init(db_server, db_db, db_username, db_password, port))
+        if (!sensors.init(std::move(system_db), std::move(user_db)))
         {
             std::cerr << "DB init failed\n";
             return;
@@ -281,8 +304,22 @@ void test_sensor_operations()
     {
         std::cout << "Sensor count: " << sensor_count << "\n";
 
+        std::unique_ptr<System_DB> system_db(new System_DB());
+        if (!system_db->init("127.0.0.1", "sense", "sense", "s3ns3"))
+        {
+            std::cerr << "Cannot connect to system DB\n";
+            return;
+        }
+
+        std::unique_ptr<User_DB> user_db = initialize_user_db(*system_db);
+        if (!user_db)
+        {
+            std::cerr << "Cannot initialize user DB\n";
+            return;
+        }
+
         Sensors sensors;
-        if (!sensors.init(db_server, db_db, db_username, db_password, port))
+        if (!sensors.init(std::move(system_db), std::move(user_db)))
         {
             std::cerr << "DB init failed\n";
             return;
@@ -320,8 +357,22 @@ void test_sensor_operations()
     //---------------------
 
     {
+        std::unique_ptr<System_DB> system_db(new System_DB());
+        if (!system_db->init("127.0.0.1", "sense", "sense", "s3ns3"))
+        {
+            std::cerr << "Cannot connect to system DB\n";
+            return;
+        }
+
+        std::unique_ptr<User_DB> user_db = initialize_user_db(*system_db);
+        if (!user_db)
+        {
+            std::cerr << "Cannot initialize user DB\n";
+            return;
+        }
+
         Sensors sensors;
-        if (!sensors.init(db_server, db_db, db_username, db_password, port))
+        if (!sensors.init(std::move(system_db), std::move(user_db)))
         {
             std::cerr << "DB init failed\n";
             return;
@@ -345,8 +396,22 @@ void test_sensor_operations()
     //---------------------
 
     {
+        std::unique_ptr<System_DB> system_db(new System_DB());
+        if (!system_db->init("127.0.0.1", "sense", "sense", "s3ns3"))
+        {
+            std::cerr << "Cannot connect to system DB\n";
+            return;
+        }
+
+        std::unique_ptr<User_DB> user_db = initialize_user_db(*system_db);
+        if (!user_db)
+        {
+            std::cerr << "Cannot initialize user DB\n";
+            return;
+        }
+
         Sensors sensors;
-        if (!sensors.init(db_server, db_db, db_username, db_password, port))
+        if (!sensors.init(std::move(system_db), std::move(user_db)))
         {
             std::cerr << "DB init failed\n";
             return;
@@ -384,8 +449,22 @@ void test_sensor_operations()
     //---------------------
 
     {
+        std::unique_ptr<System_DB> system_db(new System_DB());
+        if (!system_db->init("127.0.0.1", "sense", "sense", "s3ns3"))
+        {
+            std::cerr << "Cannot connect to system DB\n";
+            return;
+        }
+
+        std::unique_ptr<User_DB> user_db = initialize_user_db(*system_db);
+        if (!user_db)
+        {
+            std::cerr << "Cannot initialize user DB\n";
+            return;
+        }
+
         Sensors sensors;
-        if (!sensors.init(db_server, db_db, db_username, db_password, port))
+        if (!sensors.init(std::move(system_db), std::move(user_db)))
         {
             std::cerr << "DB init failed\n";
             return;

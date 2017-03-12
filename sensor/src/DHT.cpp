@@ -4,6 +4,8 @@ MIT license
 written by Adafruit Industries
 */
 
+#if 0
+
 #include "DHT.h"
 #include <avr/eeprom.h>
 #include <avr/interrupt.h>
@@ -206,3 +208,5 @@ uint16_t DHT::expect_pulse(uint8_t bit)
 
     return count;
 }
+
+#endif

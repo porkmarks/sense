@@ -16,13 +16,13 @@
 #include <pigpio.h>
 
 #include "CRC.h"
-#include "DB.h"
+#include "User_DB.h"
 #include "Comms.h"
 #include "Storage.h"
 #include "Sensors.h"
 #include "Scheduler.h"
 
-#include "DB.h"
+#include "User_DB.h"
 
 #include "rfm22b/rfm22b.h"
 
@@ -39,6 +39,7 @@ extern void run_tests();
 extern std::chrono::high_resolution_clock::time_point string_to_time_point(const std::string& str);
 extern std::string time_point_to_string(std::chrono::high_resolution_clock::time_point tp);
 
+extern std::unique_ptr<User_DB> initialize_user_db(System_DB& system_db);
 
 ////////////////////////////////////////////////////////////////////////
 
@@ -52,7 +53,7 @@ void fill_config_packet(data::Config& packet, Sensors::Sensor const& sensor)
     packet.last_confirmed_measurement_index = s_sensors.compute_last_confirmed_measurement_index(sensor.id);
 
     std::cout << "\tConfig for id: " << sensor.id
-              << "\n\next tmeasurement delay: " << packet.next_measurement_delay.count
+              << "\n\tnext measurement delay: " << packet.next_measurement_delay.count
               << "\n\tmeasurement period: " << packet.measurement_period.count
               << "\n\tnext comms delay: " << packet.next_comms_delay.count
               << "\n\tcomms period: " << packet.comms_period.count
@@ -82,15 +83,21 @@ int main(int, const char**)
 
     //    run_tests();
 
-    //s_sensors.load_sensors("sensors.config");
+    std::unique_ptr<System_DB> system_db(new System_DB());
+    if (!system_db->init("127.0.0.1", "sense", "sense", "s3ns3"))
+    {
+        std::cerr << "Cannot connect to system DB\n";
+        return -1;
+    }
 
-    static const std::string db_server = "192.168.1.205";
-    static const std::string db_db = "sensor_test";
-    static const std::string db_username = "sensor_test";
-    static const std::string db_password = "sensor_test";
-    static const uint16_t port = 0;
+    std::unique_ptr<User_DB> user_db = initialize_user_db(*system_db);
+    if (!user_db)
+    {
+        std::cerr << "Cannot initialize user DB\n";
+        return -1;
+    }
 
-    if (!s_sensors.init(db_server, db_db, db_username, db_password, port))
+    if (!s_sensors.init(std::move(system_db), std::move(user_db)))
     {
         std::cerr << "Sensors init failed\n";
         return -1;
@@ -106,6 +113,7 @@ int main(int, const char**)
 
     s_comms.set_address(Comms::BASE_ADDRESS);
 
+    std::vector<uint8_t> raw_packet_data(s_comms.get_payload_raw_buffer_size(Comms::MAX_USER_DATA_SIZE));
 
     while (true)
     {
@@ -115,10 +123,11 @@ int main(int, const char**)
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
-        uint8_t size = s_comms.receive_packet(1000);
-        if (size > 0)
+        uint8_t size = Comms::MAX_USER_DATA_SIZE;
+        uint8_t* packet_data = s_comms.receive_packet(raw_packet_data.data(), size, 1000);
+        if (packet_data)
         {
-            data::Type type = s_comms.get_packet_type();
+            data::Type type = s_comms.get_rx_packet_type(packet_data);
             //LOG_LN("Received packed of " << (int)size << " bytes. Type: "<< (int)type);
             if (type == data::Type::PAIR_REQUEST && size == sizeof(data::Pair_Request))
             {
@@ -130,10 +139,10 @@ int main(int, const char**)
                     data::Pair_Response packet;
                     packet.address = sensor->address;
                     //strncpy(packet.name, sensor->name.c_str(), sizeof(packet.name));
-                    s_comms.set_destination_address(s_comms.get_packet_source_address());
-                    s_comms.begin_packet(data::Type::PAIR_RESPONSE);
-                    s_comms.pack(packet);
-                    if (s_comms.send_packet(10))
+                    s_comms.set_destination_address(s_comms.get_rx_packet_source_address(packet_data));
+                    s_comms.begin_packet(raw_packet_data.data(), data::Type::PAIR_RESPONSE);
+                    s_comms.pack(raw_packet_data.data(), packet);
+                    if (s_comms.send_packet(raw_packet_data.data(), 10))
                     {
                         std::cout << "Pair successful\n";
                     }
@@ -150,23 +159,25 @@ int main(int, const char**)
             }
             else if (type == data::Type::MEASUREMENT_BATCH && size == sizeof(data::Measurement_Batch))
             {
-                Sensors::Sensor_Address address = s_comms.get_packet_source_address();
+                Sensors::Sensor_Address address = s_comms.get_rx_packet_source_address(packet_data);
                 const Sensors::Sensor* sensor = s_sensors.find_sensor_by_address(address);
                 if (sensor)
                 {
                     std::cout << "Measurement batch reported by " << sensor->id << "\n";
 
-                    data::Measurement_Batch const& batch = *reinterpret_cast<data::Measurement_Batch const*>(s_comms.get_packet_payload());
+                    data::Measurement_Batch const& batch = *reinterpret_cast<data::Measurement_Batch const*>(s_comms.get_rx_packet_payload(packet_data));
 
                     Sensors::Measurement m;
                     size_t count = std::min<size_t>(batch.count, data::Measurement_Batch::MAX_COUNT);
                     for (size_t i = 0; i < count; i++)
                     {
-                        m.index = batch.measurements[i].index;
+                        m.index = batch.start_index + i;
                         m.flags = batch.measurements[i].flags;
                         m.b2s_input_dBm = sensor->b2s_input_dBm;
                         m.s2b_input_dBm = s_comms.get_input_dBm();
-                        batch.measurements[i].unpack(m.vcc, m.humidity, m.temperature);
+
+                        batch.unpack(m.vcc);
+                        batch.measurements[i].unpack(m.humidity, m.temperature);
 
                         s_sensors.add_measurement(sensor->id, m);
                     }
@@ -178,7 +189,7 @@ int main(int, const char**)
             }
             else if (type == data::Type::FIRST_CONFIG_REQUEST && size == sizeof(data::First_Config_Request))
             {
-                Sensors::Sensor_Address address = s_comms.get_packet_source_address();
+                Sensors::Sensor_Address address = s_comms.get_rx_packet_source_address(packet_data);
                 const Sensors::Sensor* sensor = s_sensors.find_sensor_by_address(address);
                 if (sensor)
                 {
@@ -189,10 +200,10 @@ int main(int, const char**)
                     s_sensors.set_sensor_measurement_range(sensor->id, packet.first_measurement_index, 0);
                     fill_config_packet(packet.config, *sensor);
 
-                    s_comms.set_destination_address(s_comms.get_packet_source_address());
-                    s_comms.begin_packet(data::Type::FIRST_CONFIG);
-                    s_comms.pack(packet);
-                    if (s_comms.send_packet(3))
+                    s_comms.set_destination_address(s_comms.get_rx_packet_source_address(packet_data));
+                    s_comms.begin_packet(raw_packet_data.data(), data::Type::FIRST_CONFIG);
+                    s_comms.pack(raw_packet_data.data(), packet);
+                    if (s_comms.send_packet(raw_packet_data.data(), 3))
                     {
                         std::cout << "\tFirst Config successful\n";
                     }
@@ -208,14 +219,14 @@ int main(int, const char**)
             }
             else if (type == data::Type::CONFIG_REQUEST && size == sizeof(data::Config_Request))
             {
-                data::Config_Request const& config_request = *reinterpret_cast<data::Config_Request const*>(s_comms.get_packet_payload());
+                data::Config_Request const& config_request = *reinterpret_cast<data::Config_Request const*>(s_comms.get_rx_packet_payload(packet_data));
 
-                Sensors::Sensor_Address address = s_comms.get_packet_source_address();
+                Sensors::Sensor_Address address = s_comms.get_rx_packet_source_address(packet_data);
                 const Sensors::Sensor* sensor = s_sensors.find_sensor_by_address(address);
                 if (sensor)
                 {
                     std::cout << "Config requested by " << sensor->id << "\n";
-                    std::cout << "\nStored range: " << config_request.first_measurement_index << " to " << config_request.first_measurement_index + config_request.measurement_count << " (" << config_request.measurement_count << " measurements) \n";
+                    std::cout << "\nStored range: [" << config_request.first_measurement_index << ", " << config_request.first_measurement_index + config_request.measurement_count << ") - " << config_request.measurement_count << " measurements \n";
 
                     s_sensors.set_sensor_measurement_range(sensor->id, config_request.first_measurement_index, config_request.measurement_count);
                     s_sensors.set_sensor_b2s_input_dBm(sensor->id, config_request.b2s_input_dBm);
@@ -223,10 +234,10 @@ int main(int, const char**)
                     data::Config packet;
                     fill_config_packet(packet, *sensor);
 
-                    s_comms.set_destination_address(s_comms.get_packet_source_address());
-                    s_comms.begin_packet(data::Type::CONFIG);
-                    s_comms.pack(packet);
-                    if (s_comms.send_packet(3))
+                    s_comms.set_destination_address(s_comms.get_rx_packet_source_address(packet_data));
+                    s_comms.begin_packet(raw_packet_data.data(), data::Type::CONFIG);
+                    s_comms.pack(raw_packet_data.data(), packet);
+                    if (s_comms.send_packet(raw_packet_data.data(), 3))
                     {
                         std::cout << "\tSchedule successful\n";
                     }

@@ -5,12 +5,12 @@
 #include <boost/optional.hpp>
 #include <chrono>
 
-class DB
+class System_DB
 {
 public:
-    DB();
+    System_DB();
 
-    bool init(std::string const& server, std::string const& db, std::string const& username, std::string const& password, uint16_t port);
+    bool init(std::string const& server, std::string const& db, std::string const& username, std::string const& password);
 
     struct Expected_Sensor
     {
@@ -19,7 +19,7 @@ public:
 
     typedef std::chrono::high_resolution_clock Clock;
     typedef uint32_t Sensor_Id;
-    typedef uint16_t Sensor_Address;
+    typedef uint32_t Sensor_Address;
 
     struct Sensor
     {
@@ -27,7 +27,8 @@ public:
         Sensor_Address address = 0;
         std::string name;
 
-        uint32_t max_confirmed_measurement_index = 0;
+        bool operator==(Sensor const& other) const;
+        bool operator!=(Sensor const& other) const;
     };
 
     boost::optional<Expected_Sensor> get_expected_sensor();
@@ -35,17 +36,6 @@ public:
     boost::optional<Sensor_Id> add_sensor(std::string const& name, Sensor_Address address);
     bool remove_sensor(Sensor_Id);
     boost::optional<std::vector<Sensor>> get_sensors();
-
-    struct Config
-    {
-        Clock::duration measurement_period;
-        Clock::duration comms_period;
-        Clock::time_point baseline_time_point;
-    };
-
-    boost::optional<Config> get_config();
-    bool set_config(Config const& config);
-
 
     struct Measurement
     {
@@ -58,7 +48,6 @@ public:
             };
         };
 
-        uint32_t index = 0;
         float temperature = 0.f;
         float humidity = 0;
         float vcc = 0.f;
@@ -67,9 +56,27 @@ public:
         uint8_t flags = 0;
     };
 
-    bool add_measurement(Sensor_Id sensor_id, Clock::time_point time_point, Measurement const& measurement);
+    bool set_measurement(Sensor_Id sensor_id, Clock::time_point time_point, Measurement const& measurement);
 
-    void process();
+    struct Config
+    {
+        Clock::duration measurement_period;
+        Clock::duration comms_period;
+        Clock::time_point baseline_time_point;
+    };
+
+    boost::optional<Config> get_config();
+    bool set_config(Config const& config);
+
+    struct Settings
+    {
+        std::string user_db_server;
+        std::string user_db_name;
+        std::string user_db_username;
+        std::string user_db_password;
+    };
+
+    boost::optional<Settings> get_settings();
 
 private:
     mysqlpp::Connection m_connection;

@@ -93,7 +93,7 @@
 #endif
 #endif
 
-bool Low_Power::s_interrupt_fired = false;
+volatile bool Low_Power::s_interrupt_fired = false;
 
 /*******************************************************************************
 * Name: idle

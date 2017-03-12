@@ -8,24 +8,26 @@
 #include <mutex>
 
 #include "Comms.h"
-#include "DB.h"
+#include "User_DB.h"
+#include "System_DB.h"
 
 
 class Sensors
 {
 public:
-    typedef DB::Clock Clock;
-    typedef DB::Sensor_Id Sensor_Id;
-    typedef DB::Sensor_Address Sensor_Address;
+    typedef System_DB::Clock Clock;
+    typedef System_DB::Sensor_Id Sensor_Id;
+    typedef System_DB::Sensor_Address Sensor_Address;
 
 
-    typedef DB::Measurement Measurement;
+    typedef User_DB::Measurement Measurement;
 
-    struct Sensor : public DB::Sensor
+    struct Sensor
     {
-        Sensor() = default;
-        Sensor(Sensor const&) = default;
-        Sensor(DB::Sensor const& other) : DB::Sensor(other) {}
+        Sensor_Id id = 0;
+        Sensor_Address address = 0;
+        std::string name;
+        uint32_t max_confirmed_measurement_index = 0;
 
         int8_t b2s_input_dBm = 0;
         uint32_t first_recorded_measurement_index = 0;
@@ -40,7 +42,7 @@ public:
     //how long does a communication burst take
     static const Clock::duration COMMS_DURATION;
 
-    bool init(std::string const& server, std::string const& db, std::string const& username, std::string const& password, uint16_t port);
+    bool init(std::unique_ptr<System_DB> system_db, std::unique_ptr<User_DB> user_db);
 
     //how often will the sensors do the measurement
     bool set_measurement_period(Clock::duration period);
@@ -74,7 +76,7 @@ private:
     Sensor* _find_sensor_by_id(Sensor_Id id);
 
 
-    DB::Config m_config;
+    System_DB::Config m_config;
 
     mutable std::recursive_mutex m_mutex;
 
@@ -85,13 +87,15 @@ private:
 
     std::vector<Sensor> m_sensor_cache;
 
-    uint16_t m_last_address = Comms::SLAVE_ADDRESS_BEGIN;
+    uint32_t m_last_address = Comms::SLAVE_ADDRESS_BEGIN;
 
-    std::unique_ptr<DB> m_main_db;
+    std::unique_ptr<User_DB> m_main_user_db;
+    std::unique_ptr<System_DB> m_main_system_db;
 
     struct Worker
     {
-        std::unique_ptr<DB> db;
+        std::unique_ptr<System_DB> system_db;
+        std::unique_ptr<User_DB> user_db;
 
         Clock::time_point last_config_refresh_time_point = Clock::now();
 

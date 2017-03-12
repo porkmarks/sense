@@ -1,6 +1,5 @@
 #include "Comms.h"
 #include "CRC.h"
-#include <string.h>
 
 #ifdef __AVR__
 
@@ -84,7 +83,7 @@ bool Comms::init(uint8_t retries)
     m_rf22.set_modulation_type(RFM22B::Modulation_Type::FSK);
     m_rf22.set_modulation_data_source(RFM22B::Modulation_Data_Source::FIFO);
     m_rf22.set_data_clock_configuration(RFM22B::Data_Clock_Configuration::NONE);
-    m_rf22.set_transmission_power(20);
+    m_rf22.set_transmission_power(1);
     m_rf22.set_preamble_length(8);
     //m_rf22.set_data_rate(39993);
 
@@ -125,9 +124,14 @@ void Comms::set_destination_address(uint32_t address)
     m_destination_address = address;
 }
 
-uint8_t Comms::begin_packet(data::Type type)
+uint8_t Comms::get_payload_raw_buffer_size(uint8_t size) const
 {
-    Header* header_ptr = reinterpret_cast<Header*>(m_buffer);
+    return size + sizeof(Header) + 1;
+}
+
+uint8_t Comms::begin_packet(uint8_t* raw_buffer, data::Type type)
+{
+    Header* header_ptr = reinterpret_cast<Header*>(raw_buffer + 1);
     header_ptr->type = type;
     header_ptr->source_address = m_address;
     header_ptr->destination_address = m_destination_address;
@@ -138,26 +142,30 @@ uint8_t Comms::begin_packet(data::Type type)
     return MAX_USER_DATA_SIZE;
 }
 
-uint8_t Comms::pack(const void* data, uint8_t size)
+uint8_t Comms::pack(uint8_t* raw_buffer, const void* data, uint8_t size)
 {
     if (m_offset + size > MAX_USER_DATA_SIZE)
     {
         return 0;
     }
-    memcpy(m_buffer + sizeof(Header) + m_offset, data, size);
+    memcpy(raw_buffer + 1 + sizeof(Header) + m_offset, data, size);
     m_offset += size;
 
     return MAX_USER_DATA_SIZE - m_offset;
 }
 
-bool Comms::send_packet(uint8_t retries)
+bool Comms::send_packet(uint8_t* raw_buffer, uint8_t retries)
 {
-    uint32_t crc = crc32(m_buffer, sizeof(Header) + m_offset);
+    return send_packet(raw_buffer, m_offset, retries);
+}
 
-    Header* header_ptr = reinterpret_cast<Header*>(m_buffer);
+bool Comms::send_packet(uint8_t* raw_buffer, uint8_t packet_size, uint8_t retries)
+{
+    Header* header_ptr = reinterpret_cast<Header*>(raw_buffer + 1);
+    header_ptr->crc = 0;
+
+    uint32_t crc = crc32(raw_buffer + 1, sizeof(Header) + packet_size);
     header_ptr->crc = crc;
-
-    uint8_t response_buffer[RESPONSE_BUFFER_SIZE];
 
     if (retries == 0)
     {
@@ -166,18 +174,19 @@ bool Comms::send_packet(uint8_t retries)
 
     for (uint8_t tx_r = 0; tx_r < retries; tx_r++)
     {
-        m_rf22.send(m_buffer, sizeof(Header) + m_offset, 100);
+        m_rf22.send_raw(raw_buffer, sizeof(Header) + packet_size, 100);
         for (uint8_t rx_r = 0; rx_r < 3; rx_r++)
         {
-            int8_t size = m_rf22.receive(response_buffer, sizeof(response_buffer), 100);
-            if (size > 0)
+            uint8_t response_buffer[RESPONSE_BUFFER_SIZE + 1] = { 0 };
+            uint8_t size = RESPONSE_BUFFER_SIZE;
+            uint8_t* data = m_rf22.receive_raw(response_buffer, size, 100);
+            if (data)
             {
-                if (validate_packet(response_buffer, size, sizeof(data::Response)))
+                if (validate_packet(data, size, sizeof(data::Response)))
                 {
-                    data::Response* response_ptr = reinterpret_cast<data::Response*>(response_buffer + sizeof(Header));
+                    data::Response* response_ptr = reinterpret_cast<data::Response*>(data + sizeof(Header));
                     if (response_ptr->req_id == header_ptr->req_id && response_ptr->ack != 0)
                     {
-                        m_offset = 0;
                         return true;
                     }
                 }
@@ -193,66 +202,71 @@ bool Comms::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload
 {
     if (!data || size <= sizeof(Header))
     {
-        printf_P(PSTR("null or wrong size"));
-        return false;
-    }
-
-    //insufficient data?
-    if (size < sizeof(Header) + desired_payload_size)
-    {
-        printf_P(PSTR("insuficient data"));
+        printf_P(PSTR("null or wrong size\n"));
         return false;
     }
 
     Header* header_ptr = reinterpret_cast<Header*>(data);
+
+    //insufficient data?
+    if (size < sizeof(Header) + desired_payload_size)
+    {
+        printf_P(PSTR("insuficient data: %d < %d for type %d\n"), (int)size, (int)(sizeof(Header) + desired_payload_size), (int)header_ptr->type);
+        return false;
+    }
+
     uint32_t crc = header_ptr->crc;
 
     //zero the crc
     header_ptr->crc = 0;
 
     //corrupted?
-    uint32_t computed_crc = crc32(reinterpret_cast<const uint8_t*>(data), size);
+    uint32_t computed_crc = crc32(data, size);
     if (crc != computed_crc)
     {
-        printf_P(PSTR("bad crc"));
+        printf_P(PSTR("bad crc %lu/%lu for type %d\n"), crc, computed_crc, (int)header_ptr->type);
         return false;
     }
 
     //not addressed to me?
     if (header_ptr->destination_address != m_address && header_ptr->destination_address != BROADCAST_ADDRESS)
     {
-        printf_P(PSTR("not for me"));
+        printf_P(PSTR("not for me\n"));
         return false;
     }
+
+    //printf_P(PSTR("received packet %d, size %d\n"), (int)header_ptr->type, (int)size);
 
     return true;
 }
 
 void Comms::send_response(const Header& header)
 {
-    uint8_t response_buffer[RESPONSE_BUFFER_SIZE];
-    Header* header_ptr = reinterpret_cast<Header*>(response_buffer);
+    uint8_t response_buffer[RESPONSE_BUFFER_SIZE + 1] = { 0 };
+    uint8_t* ptr = response_buffer + 1;
+
+    Header* header_ptr = reinterpret_cast<Header*>(ptr);
     header_ptr->source_address = m_address;
     header_ptr->destination_address = header.source_address;
     header_ptr->type = data::Type::RESPONSE;
     header_ptr->req_id = ++m_last_req_id;
     header_ptr->crc = 0;
 
-    data::Response* response_ptr = reinterpret_cast<data::Response*>(response_buffer + sizeof(Header));
+    data::Response* response_ptr = reinterpret_cast<data::Response*>(ptr + sizeof(Header));
     response_ptr->ack = 1;
     response_ptr->req_id = header.req_id;
 
-    uint32_t crc = crc32(response_buffer, RESPONSE_BUFFER_SIZE);
+    uint32_t crc = crc32(ptr, RESPONSE_BUFFER_SIZE);
     header_ptr->crc = crc;
 
     for (uint8_t i = 0; i < 3; i++)
     {
-        m_rf22.send(response_buffer, RESPONSE_BUFFER_SIZE);
+        m_rf22.send_raw(response_buffer, RESPONSE_BUFFER_SIZE);
         delay(2);
     }
 }
 
-uint8_t Comms::receive_packet(uint32_t timeout)
+uint8_t* Comms::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size, uint32_t timeout)
 {
 #ifdef __AVR__
     uint32_t start = millis();
@@ -264,17 +278,19 @@ uint8_t Comms::receive_packet(uint32_t timeout)
 
     do
     {
-        int8_t size = m_rf22.receive(m_buffer, RFM22B::MAX_DATAGRAM_LENGTH, timeout - elapsed);
-        if (size > 0 && static_cast<uint8_t>(size) > sizeof(Header))
+        uint8_t size = sizeof(Header) + packet_size;
+        uint8_t* data = m_rf22.receive_raw(raw_buffer, size, timeout - elapsed);
+        if (data && size > sizeof(Header))
         {
-            if (validate_packet(m_buffer, size, 0))
+            Header* header_ptr = reinterpret_cast<Header*>(data);
+            if (validate_packet(data, size, 0))
             {
-                if (get_packet_type() != data::Type::RESPONSE) //ignore protocol packets
+                if (get_rx_packet_type(data) != data::Type::RESPONSE) //ignore protocol packets
                 {
-                    Header* header_ptr = reinterpret_cast<Header*>(m_buffer);
                     send_response(*header_ptr);
 
-                    return size - sizeof(Header);
+                    packet_size = size - sizeof(Header);
+                    return data;
                 }
             }
         }
@@ -287,22 +303,26 @@ uint8_t Comms::receive_packet(uint32_t timeout)
 
     } while (elapsed < timeout);
 
-    return 0;
+    return nullptr;
 }
 
-data::Type Comms::get_packet_type() const
+data::Type Comms::get_rx_packet_type(uint8_t* received_buffer) const
 {
-    const Header* header_ptr = reinterpret_cast<const Header*>(m_buffer);
+    const Header* header_ptr = reinterpret_cast<const Header*>(received_buffer);
     return header_ptr->type;
 }
-const void* Comms::get_packet_payload() const
+const void* Comms::get_rx_packet_payload(uint8_t* received_buffer) const
 {
-    return m_buffer + sizeof(Header);
+    return received_buffer + sizeof(Header);
+}
+void* Comms::get_tx_packet_payload(uint8_t* raw_buffer) const
+{
+    return raw_buffer + sizeof(Header) + 1;
 }
 
-uint32_t Comms::get_packet_source_address() const
+uint32_t Comms::get_rx_packet_source_address(uint8_t* received_buffer) const
 {
-    const Header* header_ptr = reinterpret_cast<const Header*>(m_buffer);
+    const Header* header_ptr = reinterpret_cast<const Header*>(received_buffer);
     return header_ptr->source_address;
 }
 

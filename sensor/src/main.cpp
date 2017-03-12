@@ -14,7 +14,6 @@
 #include "Comms.h"
 #include "Data_Defs.h"
 #include "avr_stdio.h"
-#include "deque"
 #include "Storage.h"
 
 #define SENSOR_DHT22 1
@@ -61,13 +60,15 @@ void log(PGM_P fmt, Args... args)
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-enum class State
+enum class State : uint8_t
 {
     PAIR,
     FIRST_CONFIG,
-    MAIN_LOOP
+    MEASUREMENT_LOOP
 };
 State s_state = State::PAIR;
+
+uint8_t s_error_flags = 0;
 
 #if SENSOR_TYPE == SENSOR_DHT22
 //constexpr uint8_t DHT_DATA_PIN1 = 5;
@@ -83,9 +84,7 @@ Comms s_comms;
 
 FILE s_uart_output;
 
-//constexpr uint8_t MAX_MEASUREMENTS = 2;
-//std::deque<data::Measurement> s_measurements;
-uint32_t s_first_measurement_index = 0;
+uint32_t s_first_measurement_index = 0; //the index of the first measurement in storage
 
 namespace chrono
 {
@@ -116,7 +115,7 @@ ISR(BADISR_vect)
 
 void soft_reset()
 {
-    LOG(PSTR("resetting..."));
+    LOG(PSTR("********** resetting..."));
     //cli();
     //wdt_enable(WDTO_15MS);
     //while(1);
@@ -132,13 +131,64 @@ void wdt_init(void)
     return;
 }
 
+#define STACK_CANARY 0xc5
+extern uint8_t _end;
+extern uint8_t __stack;
+
+void stack_paint(void) __attribute__ ((naked)) __attribute__ ((section (".init1")));
+
+void stack_paint(void)
+{
+#if 0
+    uint8_t *p = &_end;
+
+    while(p <= &__stack)
+    {
+        *p = STACK_CANARY;
+        p++;
+    }
+#else
+    __asm volatile ("    ldi r30,lo8(_end)\n"
+                    "    ldi r31,hi8(_end)\n"
+                    "    ldi r24,lo8(0xc5)\n" /* STACK_CANARY = 0xc5 */
+                    "    ldi r25,hi8(__stack)\n"
+                    "    rjmp .cmp\n"
+                    ".loop:\n"
+                    "    st Z+,r24\n"
+                    ".cmp:\n"
+                    "    cpi r30,lo8(__stack)\n"
+                    "    cpc r31,r25\n"
+                    "    brlo .loop\n"
+                    "    breq .loop"::);
+#endif
+}
+
+uint16_t initial_stack_size(void)
+{
+    return &__stack - &_end;
+}
+
+uint16_t stack_size(void)
+{
+    const uint8_t *p = &_end;
+    uint16_t       c = 0;
+
+    while(*p == STACK_CANARY && p <= &__stack)
+    {
+        p++;
+        c++;
+    }
+
+    return c;
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////
 
-const size_t MAX_NAME_LENGTH = 32;
-const uint8_t SETTINGS_VERSION = 1;
+static const size_t MAX_NAME_LENGTH = 32;
+static const uint8_t SETTINGS_VERSION = 1;
 
-uint8_t  EEMEM eeprom_version;
-uint32_t EEMEM eeprom_address;
+static uint8_t  EEMEM eeprom_version;
+static uint32_t EEMEM eeprom_address;
 
 void reset_settings()
 {
@@ -185,10 +235,31 @@ void setup()
     fdev_setup_stream(&s_uart_output, uart_putchar, NULL, _FDEV_SETUP_WRITE);
     stdout = &s_uart_output;
 
-    if (mcusr_value & (1<<PORF )) LOG(PSTR("Power-on reset.\n"));
-    if (mcusr_value & (1<<EXTRF)) LOG(PSTR("External reset!\n"));
-    if (mcusr_value & (1<<BORF )) LOG(PSTR("Brownout reset!\n"));
-    if (mcusr_value & (1<<WDRF )) LOG(PSTR("Watchdog reset!\n"));
+    LOG(PSTR("******************** >> "));
+    s_error_flags = 0;
+    if (mcusr_value & (1<<PORF ))
+    {
+        s_error_flags |= static_cast<uint8_t>(data::Measurement::Flag::REBOOT_POWER_ON);
+        LOG(PSTR("Power-on reset."));
+    }
+    if (mcusr_value & (1<<EXTRF))
+    {
+        s_error_flags |= static_cast<uint8_t>(data::Measurement::Flag::REBOOT_RESET);
+        LOG(PSTR("External reset!"));
+    }
+    if (mcusr_value & (1<<BORF ))
+    {
+        s_error_flags |= static_cast<uint8_t>(data::Measurement::Flag::REBOOT_BROWNOUT);
+        LOG(PSTR("Brownout reset!"));
+    }
+    if (mcusr_value & (1<<WDRF ))
+    {
+        s_error_flags |= static_cast<uint8_t>(data::Measurement::Flag::REBOOT_WATCHDOG);
+        LOG(PSTR("Watchdog reset!"));
+    }
+    LOG(PSTR(" << ********************\n"));
+
+    LOG(PSTR("Stack: initial %d, now: %d\n"), initial_stack_size(), stack_size());
 
     ///////////////////////////////////////////////
     //notify about startup
@@ -275,7 +346,7 @@ void setup()
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-bool apply_config(const data::Config& config)
+static bool apply_config(const data::Config& config)
 {
     if (config.measurement_period.count == 0 ||
             config.comms_period.count == 0)
@@ -319,22 +390,33 @@ bool apply_config(const data::Config& config)
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-bool request_config()
+static bool request_config()
 {
-    s_comms.begin_packet(data::Type::CONFIG_REQUEST);
-    data::Config_Request req;
-    req.first_measurement_index = s_first_measurement_index;
-    req.measurement_count = s_storage.get_data_count();
-    req.b2s_input_dBm = s_comms.get_input_dBm();
-    s_comms.pack(req);
-    if (s_comms.send_packet(5))
+    bool send_successful = false;
     {
-        uint8_t size = s_comms.receive_packet(500);
-        data::Type type = s_comms.get_packet_type();
-        if (type == data::Type::CONFIG && size == sizeof(data::Config))
+        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::Config_Request))];
+        s_comms.begin_packet(raw_buffer, data::Type::CONFIG_REQUEST);
+        data::Config_Request req;
+        req.first_measurement_index = s_first_measurement_index;
+        req.measurement_count = s_storage.get_data_count();
+        req.b2s_input_dBm = s_comms.get_input_dBm();
+        s_comms.pack(raw_buffer, req);
+        send_successful = s_comms.send_packet(raw_buffer, 5);
+    }
+
+    if (send_successful)
+    {
+        uint8_t size = sizeof(data::Config);
+        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(size)];
+        uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, 500);
+        if (buffer)
         {
-            const data::Config* ptr = reinterpret_cast<const data::Config*>(s_comms.get_packet_payload());
-            return apply_config(*ptr);
+            data::Type type = s_comms.get_rx_packet_type(buffer);
+            if (type == data::Type::CONFIG && size == sizeof(data::Config))
+            {
+                const data::Config* ptr = reinterpret_cast<const data::Config*>(s_comms.get_rx_packet_payload(buffer));
+                return apply_config(*ptr);
+            }
         }
     }
     return false;
@@ -342,35 +424,44 @@ bool request_config()
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-bool apply_first_config(const data::First_Config& first_config)
+static bool apply_first_config(const data::First_Config& first_config)
 {
+    s_first_measurement_index = first_config.first_measurement_index;
+    s_storage.clear();
+
     if (!apply_config(first_config.config))
     {
         return false;
     }
-
-    s_first_measurement_index = first_config.first_measurement_index;
-    s_storage.clear();
-
-    LOG(PSTR("first index: %lu\n"), s_first_measurement_index);
 
     return true;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-bool request_first_config()
+static bool request_first_config()
 {
-    s_comms.begin_packet(data::Type::FIRST_CONFIG_REQUEST);
-    s_comms.pack(data::First_Config_Request());
-    if (s_comms.send_packet(5))
+    bool send_successful = false;
     {
-        uint8_t size = s_comms.receive_packet(500);
-        data::Type type = s_comms.get_packet_type();
-        if (type == data::Type::FIRST_CONFIG && size == sizeof(data::First_Config))
+        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::First_Config_Request))];
+        s_comms.begin_packet(raw_buffer, data::Type::FIRST_CONFIG_REQUEST);
+        s_comms.pack(raw_buffer, data::First_Config_Request());
+        send_successful = s_comms.send_packet(raw_buffer, 5);
+    }
+
+    if (send_successful)
+    {
+        uint8_t size = sizeof(data::First_Config);
+        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(size)];
+        uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, 500);
+        if (buffer)
         {
-            const data::First_Config* ptr = reinterpret_cast<const data::First_Config*>(s_comms.get_packet_payload());
-            return apply_first_config(*ptr);
+            data::Type type = s_comms.get_rx_packet_type(buffer);
+            if (type == data::Type::FIRST_CONFIG && size == sizeof(data::First_Config))
+            {
+                const data::First_Config* ptr = reinterpret_cast<const data::First_Config*>(s_comms.get_rx_packet_payload(buffer));
+                return apply_first_config(*ptr);
+            }
         }
     }
     return false;
@@ -378,7 +469,7 @@ bool request_first_config()
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-void pair()
+static void pair()
 {
     uint32_t addr = Comms::PAIR_ADDRESS_BEGIN + random() % (Comms::PAIR_ADDRESS_END - Comms::PAIR_ADDRESS_BEGIN);
     s_comms.set_address(addr);
@@ -407,25 +498,34 @@ void pair()
                 LOG(PSTR("Sending request..."));
 
                 s_comms.idle_mode();
-                s_comms.begin_packet(data::Type::PAIR_REQUEST);
-                s_comms.pack(data::Pair_Request());
-                if (s_comms.send_packet(5))
+
+                bool send_successful = false;
+                {
+                    uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::Pair_Request))];
+                    s_comms.begin_packet(raw_buffer, data::Type::PAIR_REQUEST);
+                    s_comms.pack(raw_buffer, data::Pair_Request());
+                    send_successful = s_comms.send_packet(raw_buffer, 5);
+                }
+
+                if (send_successful)
                 {
                     LOG(PSTR("done.\nWaiting for response..."));
 
                     set_leds(GREEN_LED);
 
-                    uint8_t size = s_comms.receive_packet(10000);
-                    if (size > 0)
+                    uint8_t size = sizeof(data::Pair_Response);
+                    uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(size)];
+                    uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, 10000);
+                    if (buffer)
                     {
-                        LOG(PSTR("Received packet of %d bytes. Type %s\n"), (int)size, (int)s_comms.get_packet_type());
+                        LOG(PSTR("Received packet of %d bytes. Type %s\n"), (int)size, (int)s_comms.get_rx_packet_type(buffer));
                     }
 
-                    if (size == sizeof(data::Pair_Response) && s_comms.get_packet_type() == data::Type::PAIR_RESPONSE)
+                    if (buffer && size == sizeof(data::Pair_Response) && s_comms.get_rx_packet_type(buffer) == data::Type::PAIR_RESPONSE)
                     {
                         s_comms.stand_by_mode();
 
-                        const data::Pair_Response* response_ptr = reinterpret_cast<const data::Pair_Response*>(s_comms.get_packet_payload());
+                        const data::Pair_Response* response_ptr = reinterpret_cast<const data::Pair_Response*>(s_comms.get_rx_packet_payload(buffer));
                         s_comms.set_address(response_ptr->address);
                         LOG(PSTR("done. Addr: %lu\n"), response_ptr->address);
 
@@ -488,7 +588,7 @@ void pair()
 
 static constexpr float MIN_VALID_HUMIDITY = 5.f;
 
-void do_measurement()
+static void do_measurement()
 {
     Storage::Data data;
 
@@ -525,7 +625,7 @@ void do_measurement()
     }
     else
     {
-        data.humidity = std::max(data.humidity, MIN_VALID_HUMIDITY);
+        data.humidity = max(data.humidity, MIN_VALID_HUMIDITY);
     }
 
     data.vcc = read_vcc();
@@ -543,85 +643,90 @@ void do_measurement()
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-void do_comms()
+static void do_comms()
 {
-    size_t count = s_storage.get_data_count();
-    if (count == 0)
     {
-        LOG(PSTR("No data to send!!!!\n"));
-        return;
+        size_t count = s_storage.get_data_count();
+        if (count == 0)
+        {
+            LOG(PSTR("No data to send!!!!\n"));
+            return;
+        }
+        LOG(PSTR("%d items to send\n"), count);
     }
-
-    LOG(PSTR("%d items to send\n"), count);
 
     s_comms.idle_mode();
 
-    const chrono::millis COMMS_SLOT_DURATION = chrono::millis(5000);
-    chrono::time_ms start_tp = chrono::now();
-    chrono::time_ms now = chrono::now();
-    uint32_t measurement_index = s_first_measurement_index;
-
-    data::Measurement_Batch batch;
-
-    bool done = false;
-    Storage::iterator it;
-    do
+    //send measurements
     {
-        bool send = false;
+        const chrono::millis COMMS_SLOT_DURATION = chrono::millis(5000);
+        chrono::time_ms start_tp = chrono::now();
 
-        if (s_storage.unpack_next(it) == false)
-        {
-            done = true;
-            send = true;
-        }
-        else
-        {
-            data::Measurement& item = batch.measurements[batch.count++];
+        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::Measurement_Batch))];
+        data::Measurement_Batch& batch = *(data::Measurement_Batch*)s_comms.get_tx_packet_payload(raw_buffer);
 
-            item.index = measurement_index++;
-            if (it.data.humidity < MIN_VALID_HUMIDITY)
+        batch.start_index = s_first_measurement_index;
+        batch.count = 0;
+
+        bool done = false;
+        Storage::iterator it;
+        do
+        {
+            bool send = false;
+            if (s_storage.unpack_next(it) == false)
             {
-                item.flags = static_cast<uint8_t>(data::Measurement::Flag::SENSOR_ERROR);
-                item.pack(it.data.vcc, 0.f, 0.f);
+                done = true;
+                send = true;
             }
             else
             {
-                item.flags = 0;
-                item.pack(it.data.vcc, it.data.humidity, it.data.temperature);
+                data::Measurement& item = batch.measurements[batch.count++];
+                item.flags = s_error_flags;
+                if (it.data.humidity < MIN_VALID_HUMIDITY)
+                {
+                    item.flags |= static_cast<uint8_t>(data::Measurement::Flag::SENSOR_ERROR);
+                    item.pack(0.f, 0.f);
+                    batch.pack(it.data.vcc);
+                }
+                else
+                {
+                    item.pack(it.data.humidity, it.data.temperature);
+                    batch.pack(it.data.vcc);
+                }
             }
-        }
 
-        if (batch.count >= data::Measurement_Batch::MAX_COUNT)
-        {
-            send = true;
-        }
-
-
-        if (send)
-        {
-            s_comms.begin_packet(data::Type::MEASUREMENT_BATCH);
-            s_comms.pack(batch);
-            LOG(PSTR("Sending measurement..."));
-            if (s_comms.send_packet(3) == true)
+            if (batch.count >= data::Measurement_Batch::MAX_COUNT)
             {
-                LOG(PSTR("done.\n"));
+                send = true;
             }
-            else
+
+            if (send && batch.count > 0)
             {
-                LOG(PSTR("failed: comms\n"));
-                break;
+                LOG(PSTR("Sending measurement batch of %d..."), (int)batch.count);
+                s_comms.begin_packet(raw_buffer, data::Type::MEASUREMENT_BATCH);
+                if (s_comms.send_packet(raw_buffer, sizeof(data::Measurement_Batch), 3) == true)
+                {
+                    s_error_flags = 0;
+                    LOG(PSTR("done.\n"));
+                }
+                else
+                {
+                    s_error_flags |= static_cast<uint8_t>(data::Measurement::Flag::COMMS_ERROR);
+                    LOG(PSTR("failed: comms\n"));
+                    break;
+                }
+
+                batch.count = 0;
             }
 
-            batch.count = 0;
-        }
+            chrono::time_ms now = chrono::now();
+            if (now < start_tp || now - start_tp >= COMMS_SLOT_DURATION)
+            {
+                done = true;
+            }
 
-        now = chrono::now();
-        if (now < start_tp || now - start_tp >= COMMS_SLOT_DURATION)
-        {
-            done = true;
-        }
-
-    } while (!done);
+        } while (!done);
+    }
 
     request_config();
 
@@ -630,7 +735,7 @@ void do_comms()
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-void first_config()
+static void first_config()
 {
     while (true)
     {
@@ -644,8 +749,8 @@ void first_config()
 
         if (request_first_config())
         {
-            LOG(PSTR("Received config:\ntime_point: %lu\n"), uint32_t(chrono::now().ticks / 1000ULL));
-            s_state = State::MAIN_LOOP;
+            LOG(PSTR("Received first config. Starting measuring.\n"));
+            s_state = State::MEASUREMENT_LOOP;
             break;
         }
 
@@ -658,7 +763,7 @@ void first_config()
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-void main_loop()
+static void measurement_loop()
 {
     while (true)
     {
@@ -695,7 +800,7 @@ void main_loop()
             set_leds(0);
         }
 
-        chrono::time_ms next_time_point = std::min(s_next_measurement_time_point, s_next_comms_time_point);
+        chrono::time_ms next_time_point = min(s_next_measurement_time_point, s_next_comms_time_point);
         chrono::millis sleep_duration(1000);
 
         now = chrono::now();
@@ -708,10 +813,11 @@ void main_loop()
             LOG(PSTR("Timing error!\n"));
         }
 
-        //LOG(PSTR("tp: %lu, nm: %lu, nc: %lu\n"), uint32_t(s_time_point / 1000ULL), s_next_measurement_time_point_s, s_next_comms_time_point_s);
-        LOG(PSTR("Sleeping for %lu ms"), sleep_duration.count);
+        LOG(PSTR("tp: %lu, nm: %lu, nc: %lu\n"), uint32_t(now.ticks), uint32_t(s_next_measurement_time_point.ticks), uint32_t(s_next_comms_time_point.ticks));
+        LOG(PSTR("Sleeping for %lu ms\n"), sleep_duration.count);
 
-        Low_Power::power_down_int(sleep_duration);
+        chrono::millis remaining = Low_Power::power_down_int(sleep_duration);
+        LOG(PSTR("Woken up, remaining %lu ms\n"), remaining.count);
     }
 }
 
@@ -732,9 +838,9 @@ int main()
         {
             first_config();
         }
-        else if (s_state == State::MAIN_LOOP)
+        else if (s_state == State::MEASUREMENT_LOOP)
         {
-            main_loop();
+            measurement_loop();
         }
         else
         {

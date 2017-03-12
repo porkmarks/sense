@@ -33,7 +33,7 @@ public:
 	// If you just want to send data you still need to pass in
 	// an rx array, but you can safely ignore its output
 	// Returns true if transfer was successful (false otherwise)
-    bool transfer(uint8_t *tx, uint8_t *rx, size_t length);
+    bool transfer(uint8_t const* tx, uint8_t* rx, size_t length);
 	
 	// Close the bus
 	void close();

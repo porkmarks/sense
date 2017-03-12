@@ -1,10 +1,16 @@
 #include <math.h>
 #include "Storage.h"
-#include <algorithm>
 #include <string.h>
 #include <assert.h>
 
 ///////////////////////////////////////////////////////////////////////////////
+
+namespace std
+{
+template<typename T> T min(T a, T b) { return a < b ? a : b; }
+template<typename T> T max(T a, T b) { return a > b ? a : b; }
+
+}
 
 #ifndef __AVR__
 #   pragma pack(push, 1) // exact fit - no padding

@@ -90,3 +90,4 @@ private:
     uint8_t m_group_count = 0;
 };
 
+static_assert(sizeof(Storage) == 38*30 + 14, "Storage::Group is broken");

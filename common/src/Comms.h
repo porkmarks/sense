@@ -6,6 +6,22 @@
 
 class Comms
 {
+#ifndef __AVR__
+#   pragma pack(push, 1) // exact fit - no padding
+#endif
+    struct Header
+    {
+        uint32_t crc;
+        uint32_t source_address = BROADCAST_ADDRESS;
+        uint32_t destination_address = BROADCAST_ADDRESS;
+        uint16_t req_id : 15;
+        data::Type type;
+    };
+
+#ifndef __AVR__
+#   pragma pack(pop)
+#endif
+
 public:
     Comms();
 
@@ -26,18 +42,25 @@ public:
     void idle_mode();
     void stand_by_mode();
 
-    uint8_t begin_packet(data::Type type);
+    uint8_t get_payload_raw_buffer_size(uint8_t size) const;
+    void* get_tx_packet_payload(uint8_t* raw_buffer) const;
 
-    template<class T> uint8_t pack(const T& data);
-    uint8_t pack(const void* data, uint8_t size);
+    uint8_t begin_packet(uint8_t* raw_buffer, data::Type type);
 
-    bool send_packet(uint8_t retries);
+    template<class T> uint8_t pack(uint8_t* raw_buffer, const T& data);
+    uint8_t pack(uint8_t* raw_buffer, const void* data, uint8_t size);
 
-    uint8_t receive_packet(uint32_t timeout);
-    uint32_t get_packet_source_address() const;
+    bool send_packet(uint8_t* raw_buffer, uint8_t retries);
+    bool send_packet(uint8_t* raw_buffer, uint8_t packet_size, uint8_t retries);
+
+    uint8_t* receive_packet(uint8_t* raw_buffer, uint8_t& packet_size, uint32_t timeout);
+
+    uint32_t get_rx_packet_source_address(uint8_t* received_buffer) const;
     int8_t get_input_dBm();
-    data::Type get_packet_type() const;
-    const void* get_packet_payload() const;
+    data::Type get_rx_packet_type(uint8_t* received_buffer) const;
+    const void* get_rx_packet_payload(uint8_t* received_buffer) const;
+
+    static const uint8_t MAX_USER_DATA_SIZE = RFM22B::MAX_DATAGRAM_LENGTH - sizeof(Header);
 
 private:
     RFM22B m_rf22;
@@ -46,38 +69,19 @@ private:
     uint32_t m_destination_address = BROADCAST_ADDRESS;
     uint16_t m_last_req_id = 0;
 
-#ifndef __AVR__
-#   pragma pack(push, 1) // exact fit - no padding
-#endif
-    struct Header
-    {
-        uint32_t crc;
-        uint32_t source_address = BROADCAST_ADDRESS;
-        uint32_t destination_address = BROADCAST_ADDRESS;
-        uint16_t req_id : 15;
-        data::Type type;
-    };
-
-#ifndef __AVR__
-#   pragma pack(pop)
-#endif
-
-
     static const uint8_t RESPONSE_BUFFER_SIZE = sizeof(Header) + sizeof(data::Response);
 
     bool validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload_size);
 
     void send_response(const Header& header);
 
-    static const uint8_t MAX_USER_DATA_SIZE = RFM22B::MAX_DATAGRAM_LENGTH - sizeof(Header);
 
-    uint8_t m_buffer[RFM22B::MAX_DATAGRAM_LENGTH];
     uint8_t m_offset = 0;
 };
 
 
-template<class T> uint8_t Comms::pack(const T& data)
+template<class T> uint8_t Comms::pack(uint8_t* dst, const T& data)
 {
     static_assert(sizeof(T) <= MAX_USER_DATA_SIZE, "");
-    return pack(&data, sizeof(T));
+    return pack(dst, &data, sizeof(T));
 }

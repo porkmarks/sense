@@ -19,7 +19,6 @@
  */
 
 #include "rfm22b.h"
-#include <math.h>
 
 #ifdef RASPBERRY_PI
 #   include "rfm22b_spi.h"
@@ -29,6 +28,7 @@
 #	include <stdlib.h>
 #	include <math.h>
 #   include <iostream>
+#   include <cstring>
 #elif defined __AVR__
 #   include <SPI.h>
 #else
@@ -125,7 +125,7 @@ void RFM22B::set_sync_words(uint8_t const* ptr, uint8_t size)
         buffer[i + 1] = ptr[i];
     }
 
-    transfer(buffer, size + 1);
+    tx(buffer, size + 1);
 }
 
 // Set the frequency of the carrier wave
@@ -707,18 +707,13 @@ void RFM22B::clear_tx_fifo()
 }
 
 // Send data
-bool RFM22B::send(uint8_t *data, uint8_t length, uint32_t timeout)
+bool RFM22B::send_raw(uint8_t* data, uint8_t length, uint32_t timeout)
 {
-    //idle_mode();
-
     // Clear TX FIFO
     clear_tx_fifo();
 
-    // Initialise rx and tx arrays
-    uint8_t tx[MAX_DATAGRAM_LENGTH+1] = { 0 };
-
     // Set FIFO register address (with write flag)
-    tx[0] = (uint8_t)Register::FIFO_ACCESS_7F | (1<<7);
+    data[0] = (uint8_t)Register::FIFO_ACCESS_7F | (1<<7);
 
     // Truncate data if its too long
     if (length > MAX_DATAGRAM_LENGTH)
@@ -726,14 +721,8 @@ bool RFM22B::send(uint8_t *data, uint8_t length, uint32_t timeout)
         length = MAX_DATAGRAM_LENGTH;
     }
 
-    // Copy data from input array to tx array
-    for (uint8_t i = 0; i < length; i++)
-    {
-        tx[i + 1] = data[i];
-    }
-
     // Make the transfer
-    transfer(tx, length + 1);
+    tx(data, length + 1);
 
     // Set the packet length
     set_transmit_packet_length(length);
@@ -788,28 +777,13 @@ bool RFM22B::send(uint8_t *data, uint8_t length, uint32_t timeout)
 };
 
 // Receive data (blocking with timeout). Returns number of bytes received
-int8_t RFM22B::receive(uint8_t *data, uint8_t length, uint32_t timeout)
+uint8_t* RFM22B::receive_raw(uint8_t* dst, uint8_t& length, uint32_t timeout)
 {
-   //idle_mode();
-
     // Make sure RX FIFO is empty, ready for new data
     clear_rx_fifo();
 
     // Enter RX mode
     rx_mode();
-//    if (((get_register(Register::OPERATING_MODE_AND_FUNCTION_CONTROL_1)>>2) & 1) == 0)
-//    {
-//#ifdef RASPBERRY_PI
-//        std::cerr << "Cannot enter RX Mode\n";
-//        return -1;
-//#endif
-//    }
-
-    // Initialise rx and tx arrays
-    uint8_t buffer[MAX_DATAGRAM_LENGTH+1] = { 0 };
-
-    // Set FIFO register address
-    buffer[0] = (uint8_t)Register::FIFO_ACCESS_7F;
 
     // Timing for the interrupt loop timeout
 #ifdef RASPBERRY_PI
@@ -846,7 +820,7 @@ int8_t RFM22B::receive(uint8_t *data, uint8_t length, uint32_t timeout)
         //Serial.print(count);
 #endif
         idle_mode();
-        return -1;
+        return nullptr;
     }
 #ifdef RASPBERRY_PI
     //std::cout << "Done receiving (" << count << ")\n";
@@ -857,22 +831,22 @@ int8_t RFM22B::receive(uint8_t *data, uint8_t length, uint32_t timeout)
 
     // Get length of packet received
     uint8_t rxLength = get_received_packet_length();
-
     if (rxLength > length)
     {
         rxLength = length;
     }
 
+    //the actual payload is -1 byte
+    length = rxLength;
+
+    // Set FIFO register address
+    memset(dst, rxLength + 1, 0);
+    dst[0] = (uint8_t)Register::FIFO_ACCESS_7F;
+
     // Make the transfer
-    transfer(buffer, rxLength+1);
+    rx(dst, rxLength + 1);
 
-    // Copy the data to the output array
-    for (uint8_t i = 1; i <= rxLength; i++)
-    {
-        data[i-1] = buffer[i];
-    }
-
-    return rxLength;
+    return dst + 1;
 };
 
 // Helper function to read a single byte from the device
@@ -884,7 +858,7 @@ uint8_t RFM22B::get_register(Register reg)
     // clear. Once complete, rx[0] will be left clear (no data was returned whilst
     // the requested register was being sent), and rx[1] will contain the value
     uint8_t buffer[] = {uint8_t(reg), 0x00};
-    transfer(buffer, 2);
+    rx(buffer, 2);
     return buffer[1];
 }
 
@@ -892,7 +866,7 @@ uint8_t RFM22B::get_register(Register reg)
 uint16_t RFM22B::get_register16(Register reg)
 {
     uint8_t buffer[] = {uint8_t(reg), 0x00, 0x00};
-    transfer(buffer,3);
+    rx(buffer,3);
     return (buffer[1] << 8) | buffer[2];
 }
 
@@ -900,7 +874,7 @@ uint16_t RFM22B::get_register16(Register reg)
 uint32_t RFM22B::get_register32(Register reg)
 {
     uint8_t buffer[] = {uint8_t(reg), 0x00, 0x00, 0x00, 0x00};
-    transfer(buffer,5);
+    rx(buffer,5);
     return (uint32_t(buffer[1]) << 24) | (uint32_t(buffer[2]) << 16) | (uint32_t(buffer[3]) << 8) | uint32_t(buffer[4]);
 }
 
@@ -908,24 +882,40 @@ uint32_t RFM22B::get_register32(Register reg)
 void RFM22B::set_register(Register reg, uint8_t value)
 {
     uint8_t buffer[] = {uint8_t(uint8_t(reg) | (1 << 7)), value};
-    transfer(buffer, 2);
+    tx(buffer, 2);
 }
 
 // As above, but for 2 consequitive registers
 void RFM22B::set_register16(Register reg, uint16_t value)
 {
     uint8_t buffer[] = {uint8_t(uint8_t(reg) | (1 << 7)), uint8_t(value >> 8), uint8_t(value & 0xFF)};
-    transfer(buffer, 3);
+    tx(buffer, 3);
 }
 
 // As above, but for 4 consequitive registers
 void RFM22B::set_register32(Register reg, uint32_t value)
 {
     uint8_t buffer[] = {uint8_t(uint8_t(reg) | (1 << 7)), uint8_t(value >> 24), uint8_t((value >> 16) & 0xFF), uint8_t((value >> 8) & 0xFF), uint8_t(value & 0xFF)};
-    transfer(buffer,5);
+    tx(buffer,5);
 }
 
-void RFM22B::transfer(uint8_t* data, size_t size)
+void RFM22B::tx(uint8_t const* data, size_t size)
+{
+#ifdef RASPBERRY_PI
+    m_spi.transfer(data, nullptr, size);
+#elif defined __AVR__
+    digitalWrite(SS, LOW);
+    for (uint8_t i = 0; i < size; i++)
+    {
+        uint8_t v = data[i];
+        SPI.transfer(v);
+    }
+    digitalWrite(SS, HIGH);
+#else
+#endif
+}
+
+void RFM22B::rx(uint8_t* data, size_t size)
 {
 #ifdef RASPBERRY_PI
     m_spi.transfer(data, data, size);

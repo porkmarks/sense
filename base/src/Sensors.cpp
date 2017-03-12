@@ -66,9 +66,11 @@ const Sensors::Clock::duration Sensors::COMMS_DURATION = std::chrono::seconds(10
 
 
 Sensors::Sensors()
-    : m_main_db(new DB())
+    : m_main_user_db(new User_DB())
+    , m_main_system_db(new System_DB())
 {
-    m_worker.db.reset(new DB());
+    m_worker.user_db.reset(new User_DB());
+    m_worker.system_db.reset(new System_DB());
 
     m_sensor_cache.reserve(100);
 }
@@ -82,29 +84,41 @@ Sensors::~Sensors()
     }
 }
 
-bool Sensors::init(std::string const& server, std::string const& db, std::string const& username, std::string const& password, uint16_t port)
+bool Sensors::init(std::unique_ptr<System_DB> system_db, std::unique_ptr<User_DB> user_db)
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    if (!m_main_db->init(server, db, username, password, port))
+    m_main_system_db = std::move(system_db);
+    m_main_user_db = std::move(user_db);
+
+    if (!m_main_system_db || !m_main_user_db)
     {
-        std::cerr << "Failed to initialize main DB\n";
+        std::cerr << "Null database!\n";
         return false;
     }
 
-    if (!m_worker.db->init(server, db, username, password, port))
+    if (!m_worker.system_db->init("127.0.0.1", "sense", "sense", "s3ns3"))
     {
-        std::cerr << "Failed to initialize worker DB\n";
+        std::cerr << "Failed to initialize worker system DB\n";
         return false;
     }
 
-    boost::optional<DB::Config> config = m_main_db->get_config();
+    if (!m_worker.user_db->init(m_main_user_db->get_server(),
+                                m_main_user_db->get_db_name(),
+                                m_main_user_db->get_username(),
+                                m_main_user_db->get_password()))
+    {
+        std::cerr << "Failed to initialize worker user DB\n";
+        return false;
+    }
+
+    boost::optional<System_DB::Config> config = m_main_system_db->get_config();
     if (!config)
     {
         m_config.measurement_period = std::chrono::seconds(10);
         m_config.comms_period = m_config.measurement_period * 3;
         m_config.baseline_time_point = Clock::now();
-        if (!m_main_db->set_config(m_config))
+        if (!m_main_system_db->set_config(m_config))
         {
             std::cerr << "Cannot set config\n";
             return false;
@@ -119,17 +133,40 @@ bool Sensors::init(std::string const& server, std::string const& db, std::string
     m_next_measurement_time_point = m_config.baseline_time_point;
     m_next_comms_time_point = m_config.baseline_time_point;
 
-    boost::optional<std::vector<DB::Sensor>> sensors = m_main_db->get_sensors();
-    if (!sensors)
+    boost::optional<std::vector<System_DB::Sensor>> system_sensors = m_main_system_db->get_sensors();
+    if (!system_sensors)
     {
-        std::cerr << "Cannot load sensors\n";
+        std::cerr << "Cannot load system sensors\n";
         return false;
     }
 
-    for (DB::Sensor const& s: *sensors)
+    boost::optional<std::vector<User_DB::Sensor>> user_sensors = m_main_user_db->get_sensors();
+    if (!user_sensors)
     {
-        m_sensor_cache.emplace_back(s);
-        m_last_address = std::max<uint32_t>(m_last_address, s.address);
+        std::cerr << "Cannot load user sensors\n";
+        return false;
+    }
+
+    //initialize the sensors from both the system ones and the user ones
+    for (System_DB::Sensor const& system_sensor: *system_sensors)
+    {
+        auto it = std::find_if(user_sensors->begin(), user_sensors->end(), [&system_sensor](User_DB::Sensor const& user_sensor) { return system_sensor.id == user_sensor.id; });
+        if (it == user_sensors->end())
+        {
+            std::cerr << "Cannot find user sensors ID " << system_sensor.id << "\n";
+            return false;
+        }
+        User_DB::Sensor const& user_sensor = *it;
+
+        Sensor sensor;
+
+        sensor.id = system_sensor.id;
+        sensor.name = system_sensor.name;
+        sensor.address = system_sensor.address;
+        sensor.max_confirmed_measurement_index = user_sensor.max_confirmed_measurement_index;
+
+        m_sensor_cache.emplace_back(sensor);
+        m_last_address = std::max<uint32_t>(m_last_address, sensor.address);
     }
 
     m_worker.thread = boost::thread([this]()
@@ -144,7 +181,7 @@ Sensors::Sensor const* Sensors::add_expected_sensor()
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    boost::optional<DB::Expected_Sensor> expected_sensor = m_main_db->get_expected_sensor();
+    boost::optional<System_DB::Expected_Sensor> expected_sensor = m_main_system_db->get_expected_sensor();
     if (!expected_sensor)
     {
         std::cerr << "Not expecting any sensor!\n";
@@ -190,12 +227,18 @@ Sensors::Sensor const* Sensors::add_sensor(std::string const& name)
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    uint16_t address = ++m_last_address;
+    uint32_t address = ++m_last_address;
 
-    boost::optional<Sensors::Sensor_Id> opt_id = m_main_db->add_sensor(name, address);
+    boost::optional<Sensors::Sensor_Id> opt_id = m_main_system_db->add_sensor(name, address);
     if (!opt_id)
     {
-        std::cerr << "Failed to add sensor in the DB\n";
+        std::cerr << "Failed to add sensor in the system DB\n";
+        return nullptr;
+    }
+
+    if (!m_main_user_db->add_sensor(*opt_id, name))
+    {
+        std::cerr << "Failed to add sensor in the user DB\n";
         return nullptr;
     }
 
@@ -213,9 +256,9 @@ bool Sensors::set_comms_period(Clock::duration period)
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    DB::Config config = m_config;
+    System_DB::Config config = m_config;
     config.comms_period = period;
-    if (m_main_db->set_config(config))
+    if (m_main_system_db->set_config(config))
     {
         m_config = config;
         return true;
@@ -236,9 +279,9 @@ bool Sensors::set_measurement_period(Clock::duration period)
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    DB::Config config = m_config;
+    System_DB::Config config = m_config;
     config.measurement_period = period;
-    if (m_main_db->set_config(config))
+    if (m_main_system_db->set_config(config))
     {
         m_config = config;
         return true;
@@ -327,9 +370,14 @@ bool Sensors::remove_sensor(Sensor_Id id)
         return false;
     }
 
-    if (!m_main_db->remove_sensor(id))
+    if (!m_main_system_db->remove_sensor(id))
     {
-        std::cerr << "Failed to remove sensor from the DB\n";
+        std::cerr << "Failed to remove sensor from the system DB\n";
+        return false;
+    }
+    if (!m_main_user_db->remove_sensor(id))
+    {
+        std::cerr << "Failed to remove sensor from the user DB\n";
         return false;
     }
 
@@ -418,7 +466,7 @@ void Sensors::add_measurement(Sensor_Id id, Measurement const& measurement)
 
 void Sensors::refresh_config()
 {
-    boost::optional<DB::Config> config = m_worker.db->get_config();
+    boost::optional<System_DB::Config> config = m_worker.system_db->get_config();
     if (config)
     {
         std::lock_guard<std::recursive_mutex> lg(m_mutex);
@@ -447,7 +495,7 @@ void Sensors::process_worker_thread()
             auto start = Clock::now();
             for (Worker::Item const& item: items)
             {
-                if (m_worker.db->add_measurement(item.id, item.time_point, item.measurement))
+                if (m_worker.user_db->add_measurement(item.id, item.time_point, item.measurement))
                 {
                     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
@@ -460,10 +508,17 @@ void Sensors::process_worker_thread()
 
                     if (item.measurement.index == sensor->max_confirmed_measurement_index + 1)
                     {
-                        sensor->max_confirmed_measurement_index++;
+                        sensor->max_confirmed_measurement_index = item.measurement.index;
                     }
                 }
             }
+
+            //add the data to the system db as well
+            {
+                Worker::Item const& item = items.back();
+                m_worker.system_db->set_measurement(item.id, item.time_point, item.measurement);
+            }
+
             std::cout << "Sent " << items.size() << " measurements in " << std::chrono::duration<float>(Clock::now() - start).count() << " seconds\n";
         }
         else

@@ -190,11 +190,14 @@ public:
     void clear_rx_fifo();
     void clear_tx_fifo();
 
-    // Send data
-    bool send(uint8_t *data, uint8_t length, uint32_t timeout = 200);
+    //NOTE!!! the total size of the buffer must be +1 bytes. The payoad must start at offset 1
+    //For a payload of 30 bytes, pass a 31 byte buffer and length of 30
+    bool send_raw(uint8_t* src, uint8_t length, uint32_t timeout = 200);
 
-    // Receive data (blocking with timeout). Returns number of bytes received
-    int8_t receive(uint8_t *data, uint8_t length, uint32_t timeout = 30000);
+    //NOTE!!! the total size of the buffer must be +1 bytes. The payload will start at offset 1
+    //For a payload of 30 bytes, pass a 31 byte buffer and length of 30
+    //The returned length is the actual exact payload, and the returned pointer points to the actual payload (which is at dst + 1)
+    uint8_t* receive_raw(uint8_t* dst, uint8_t& length, uint32_t timeout = 30000);
 
     // Helper functions for getting and getting individual registers
     uint8_t get_register(Register reg);
@@ -206,10 +209,10 @@ public:
 
     static const uint8_t MAX_DATAGRAM_LENGTH = 64;
 private:
-
     void set_fifo_threshold(Register reg, uint8_t thresh);
 
-    void transfer(uint8_t* data, size_t size);
+    void tx(const uint8_t* data, size_t size);
+    void rx(uint8_t* data, size_t size);
 
 #ifdef RASPBERRY_PI
     SPI m_spi;

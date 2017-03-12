@@ -89,7 +89,7 @@ uint16_t SPI::get_delay() {
 }
 
 // Transfer some data
-bool SPI::transfer(uint8_t *tx, uint8_t *rx, size_t length) {
+bool SPI::transfer(uint8_t const* tx, uint8_t* rx, size_t length) {
     struct spi_ioc_transfer tr;
     memset(&tr, 0, sizeof(spi_ioc_transfer));
 
