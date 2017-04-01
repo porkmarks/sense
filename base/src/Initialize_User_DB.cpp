@@ -1,5 +1,8 @@
 #include <iostream>
 #include <sstream>
+#include <string>
+#include <fstream>
+#include <streambuf>
 
 #include "User_DB.h"
 #include "System_DB.h"
@@ -22,16 +25,94 @@ static bool check_sensors(std::vector<System_DB::Sensor>& system_sensors, std::v
     return true;
 }
 
+////////////////////////////////////////////////////////////////////////////
+
 static bool has_system_sensor(System_DB::Sensor const& sensor, std::vector<User_DB::Sensor>& user_sensors)
 {
     auto it = std::find_if(user_sensors.begin(), user_sensors.end(), [&sensor](User_DB::Sensor const& s) { return s == sensor; });
     return it != user_sensors.end();
 }
+
+////////////////////////////////////////////////////////////////////////////
+
 static bool has_user_sensor(User_DB::Sensor const& sensor, std::vector<System_DB::Sensor>& system_sensors)
 {
     auto it = std::find_if(system_sensors.begin(), system_sensors.end(), [&sensor](System_DB::Sensor const& s) { return sensor == s; });
     return it != system_sensors.end();
 }
+
+////////////////////////////////////////////////////////////////////////////
+
+static bool create_user_db(User_DB& user_db)
+{
+    {
+        if (!user_db.query("CREATE TABLE `configs` ("
+                           " `id` int(10) UNSIGNED NOT NULL, "
+                           " `creation_timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'represents when this config activates', "
+                           " `baseline_timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                           " `measurement_period` int(10) UNSIGNED NOT NULL DEFAULT '300', "
+                           " `comms_period` int(10) UNSIGNED NOT NULL DEFAULT '600' "
+                         ") ENGINE=InnoDB DEFAULT CHARSET=latin1;\n"))
+        {
+            return false;
+        }
+        if (!user_db.query("ALTER TABLE `configs` ADD PRIMARY KEY (`id`);\n"))
+        {
+            return false;
+        }
+        if (!user_db.query("ALTER TABLE `configs` MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;\n"))
+        {
+            return false;
+        }
+    }
+    {
+        if (!user_db.query("CREATE TABLE `measurements` ( "
+                           "    `id` int(10) UNSIGNED NOT NULL, "
+                           "    `sensor_id` int(10) UNSIGNED NOT NULL, "
+                           "    `measurement_index` int(10) UNSIGNED NOT NULL, "
+                           "    `timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                           "    `temperature` float NOT NULL, "
+                           "    `humidity` float NOT NULL, "
+                           "    `vcc` float NOT NULL, "
+                           "    `flags` tinyint(3) UNSIGNED NOT NULL, "
+                           "    `b2s_input_dBm` tinyint(4) NOT NULL, "
+                           "    `s2b_input_dBm` tinyint(4) NOT NULL "
+                           "  ) ENGINE=InnoDB DEFAULT CHARSET=latin1;\n "))
+        {
+            return false;
+        }
+        if (!user_db.query("ALTER TABLE `measurements` ADD PRIMARY KEY (`id`);\n"))
+        {
+            return false;
+        }
+        if (!user_db.query("ALTER TABLE `measurements` MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;\n"))
+        {
+            return false;
+        }
+    }
+    {
+        if (!user_db.query("CREATE TABLE `sensors` ( "
+                           "    `id` int(10) UNSIGNED NOT NULL, "
+                           "    `name` varchar(32) NOT NULL, "
+                           "    `creation_timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP "
+                           "  ) ENGINE=InnoDB DEFAULT CHARSET=latin1;\n "))
+        {
+            return false;
+        }
+        if (!user_db.query("ALTER TABLE `sensors` ADD PRIMARY KEY (`id`);\n"))
+        {
+            return false;
+        }
+        if (!user_db.query("ALTER TABLE `sensors` MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;\n"))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////////////
 
 static bool synchronize_user_db(System_DB& system_db, User_DB& user_db)
 {
@@ -43,6 +124,15 @@ static bool synchronize_user_db(System_DB& system_db, User_DB& user_db)
     }
 
     boost::optional<std::vector<User_DB::Sensor>> opt_user_sensors = user_db.get_sensors();
+    if (!opt_user_sensors)
+    {
+        if (!create_user_db(user_db))
+        {
+            return false;
+        }
+    }
+
+    opt_user_sensors = user_db.get_sensors();
     if (!opt_user_sensors)
     {
         std::cerr << "Cannot get user sensors\n";
@@ -112,21 +202,22 @@ static bool synchronize_user_db(System_DB& system_db, User_DB& user_db)
     return true;
 }
 
+////////////////////////////////////////////////////////////////////////////
 
 std::unique_ptr<User_DB> initialize_user_db(System_DB& system_db)
 {
-    boost::optional<System_DB::Settings> opt_settings = system_db.get_settings();
-    if (!opt_settings)
+    boost::optional<System_DB::Config> opt_config = system_db.get_config();
+    if (!opt_config)
     {
-        std::cerr << "System DB doesn't have settings!\n";
+        std::cerr << "System DB doesn't have a config!\n";
         return nullptr;
     }
 
     std::unique_ptr<User_DB> user_db(new User_DB);
-    if (!user_db->init(opt_settings->user_db_server,
-                       opt_settings->user_db_name,
-                       opt_settings->user_db_username,
-                       opt_settings->user_db_password))
+    if (!user_db->init(opt_config->user_db_server,
+                       opt_config->user_db_name,
+                       opt_config->user_db_username,
+                       opt_config->user_db_password))
     {
         return nullptr;
     }
