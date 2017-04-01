@@ -2,16 +2,14 @@
 #include <iostream>
 #include <mysql++/ssqls.h>
 
-sql_create_3(System_DB_Config_Row, 3, 0,
-    mysqlpp::sql_int_unsigned, measurement_period,
-    mysqlpp::sql_int_unsigned, comms_period,
-    mysqlpp::sql_datetime, baseline_timestamp);
-
-sql_create_4(System_DB_Settings_Row, 4, 0,
+sql_create_6(System_DB_Config_Row, 6, 0,
     mysqlpp::sql_varchar, user_db_server,
     mysqlpp::sql_varchar, user_db_name,
     mysqlpp::sql_varchar, user_db_username,
-    mysqlpp::sql_varchar, user_db_password);
+    mysqlpp::sql_varchar, user_db_password,
+    mysqlpp::sql_int_unsigned, measurement_period,
+    mysqlpp::sql_int_unsigned, comms_period
+);
 
 
 bool System_DB::Sensor::operator==(Sensor const& other) const
@@ -29,8 +27,7 @@ bool System_DB::Sensor::operator!=(Sensor const& other) const
 System_DB::System_DB()
     : m_connection(false)
 {
-    System_DB_Config_Row::table("configs");
-    System_DB_Settings_Row::table("settings");
+    System_DB_Config_Row::table("config");
 }
 
 bool System_DB::init(std::string const& server, std::string const& db, std::string const& username, std::string const& password)
@@ -52,8 +49,13 @@ boost::optional<System_DB::Config> System_DB::get_config()
     {
         std::vector<System_DB_Config_Row> rows;
 
-        mysqlpp::Query query = m_connection.query("SELECT * FROM configs ORDER BY creation_timestamp DESC;");
+        mysqlpp::Query query = m_connection.query("SELECT * FROM config;");
         query.storein(rows);
+        if (query.errnum() != 0)
+        {
+            std::cerr << "Error executing query: " << query.error() << "\n";
+            return boost::none;
+        }
 
         if (rows.size() == 0)
         {
@@ -61,91 +63,14 @@ boost::optional<System_DB::Config> System_DB::get_config()
         }
 
         Config config;
+        config.user_db_server = rows.front().user_db_server;
+        config.user_db_name = rows.front().user_db_name;
+        config.user_db_username = rows.front().user_db_username;
+        config.user_db_password = rows.front().user_db_password;
         config.measurement_period = std::chrono::seconds(rows.front().measurement_period);
         config.comms_period = std::chrono::seconds(rows.front().comms_period);
-        config.baseline_time_point = Clock::time_point(std::chrono::seconds(rows.front().baseline_timestamp));
 
         return config;
-    }
-    catch (const mysqlpp::BadQuery& er)
-    {
-        std::cerr << "Query error: " << er.what() << std::endl;
-        return boost::none;
-    }
-    catch (const mysqlpp::BadConversion& er)
-    {
-        // Handle bad conversions
-        std::cerr << "Conversion error: " << er.what() << std::endl <<
-                "\tretrieved data size: " << er.retrieved <<
-                ", actual size: " << er.actual_size << std::endl;
-        return boost::none;
-    }
-    catch (const mysqlpp::Exception& er)
-    {
-        // Catch-all for any other MySQL++ exceptions
-        std::cerr << "Error: " << er.what() << std::endl;
-        return boost::none;
-    }
-}
-
-bool System_DB::set_config(Config const& config)
-{
-    try
-    {
-        mysqlpp::Query query = m_connection.query();
-
-        System_DB_Config_Row row;
-        row.measurement_period = std::chrono::duration_cast<std::chrono::seconds>(config.measurement_period).count();
-        row.comms_period = std::chrono::duration_cast<std::chrono::seconds>(config.comms_period).count();
-        row.baseline_timestamp = mysqlpp::sql_datetime(Clock::to_time_t(config.baseline_time_point));
-
-        query.insert(row);
-        query.execute();
-
-        return true;
-    }
-    catch (const mysqlpp::BadQuery& er)
-    {
-        std::cerr << "Query error: " << er.what() << std::endl;
-        return false;
-    }
-    catch (const mysqlpp::BadConversion& er)
-    {
-        // Handle bad conversions
-        std::cerr << "Conversion error: " << er.what() << std::endl <<
-                "\tretrieved data size: " << er.retrieved <<
-                ", actual size: " << er.actual_size << std::endl;
-        return false;
-    }
-    catch (const mysqlpp::Exception& er)
-    {
-        // Catch-all for any other MySQL++ exceptions
-        std::cerr << "Error: " << er.what() << std::endl;
-        return false;
-    }
-}
-
-boost::optional<System_DB::Settings> System_DB::get_settings()
-{
-    try
-    {
-        std::vector<System_DB_Settings_Row> rows;
-
-        mysqlpp::Query query = m_connection.query("SELECT * FROM settings;");
-        query.storein(rows);
-
-        if (rows.size() == 0)
-        {
-            return boost::none;
-        }
-
-        Settings settings;
-        settings.user_db_server = rows.front().user_db_server;
-        settings.user_db_name = rows.front().user_db_name;
-        settings.user_db_username = rows.front().user_db_username;
-        settings.user_db_password = rows.front().user_db_password;
-
-        return settings;
     }
     catch (const mysqlpp::BadQuery& er)
     {
@@ -182,11 +107,16 @@ boost::optional<System_DB::Expected_Sensor> System_DB::get_expected_sensor()
                     "SELECT id, name, address "
                     "FROM sensors "
                     "WHERE address IS NULL;");
-        mysqlpp::StoreQueryResult res = query.store();
+        mysqlpp::StoreQueryResult result = query.store();
+        if (!result)
+        {
+            std::cerr << "Error executing query: " << query.error() << "\n";
+            return boost::none;
+        }
 
         std::vector<Expected_Sensor> sensors;
 
-        for (mysqlpp::StoreQueryResult::const_iterator it = res.begin(); it != res.end(); ++it)
+        for (mysqlpp::StoreQueryResult::const_iterator it = result.begin(); it != result.end(); ++it)
         {
             Expected_Sensor sensor;
             mysqlpp::Row const& row = *it;
@@ -230,12 +160,22 @@ boost::optional<System_DB::Sensor_Id> System_DB::add_sensor(std::string const& n
         {
             mysqlpp::Query query = m_connection.query();
             query << "DELETE FROM sensors WHERE address IS NULL;";
-            query.execute();
+            mysqlpp::SimpleResult result = query.execute();
+            if (!result)
+            {
+                std::cerr << "Error executing query: " << query.error() << "\n";
+                return boost::none;
+            }
         }
         {
             mysqlpp::Query query = m_connection.query();
             query << "INSERT INTO sensors (name, address) VALUES (\"" << mysqlpp::escape << name << "\"," << address << ");";
-            query.execute();
+            mysqlpp::SimpleResult result = query.execute();
+            if (!result)
+            {
+                std::cerr << "Error executing query: " << query.error() << "\n";
+                return boost::none;
+            }
 
             return query.insert_id();
         }
@@ -268,7 +208,12 @@ bool System_DB::remove_sensor(Sensor_Id id)
         mysqlpp::Query query = m_connection.query();
 
         query << "DELETE FROM sensors WHERE id=" << id << ";";
-        query.execute();
+        mysqlpp::SimpleResult result = query.execute();
+        if (!result)
+        {
+            std::cerr << "Error executing query: " << query.error() << "\n";
+            return false;
+        }
 
         return true;
     }
@@ -307,11 +252,16 @@ boost::optional<std::vector<System_DB::Sensor>> System_DB::get_sensors()
                     "SELECT id, name, address "
                     "FROM sensors "
                     "WHERE address IS NOT NULL;");
-        mysqlpp::StoreQueryResult res = query.store();
+        mysqlpp::StoreQueryResult result = query.store();
+        if (!result)
+        {
+            std::cerr << "Error executing query: " << query.error() << "\n";
+            return boost::none;
+        }
 
         std::vector<Sensor> sensors;
 
-        for (mysqlpp::StoreQueryResult::const_iterator it = res.begin(); it != res.end(); ++it)
+        for (mysqlpp::StoreQueryResult::const_iterator it = result.begin(); it != result.end(); ++it)
         {
             Sensor sensor;
             mysqlpp::Row const& row = *it;
@@ -361,7 +311,12 @@ bool System_DB::set_measurement(Sensor_Id sensor_id, Clock::time_point time_poin
                     "WHERE id=" << sensor_id << ";";
 
         std::cout << query.str() << std::endl << std::flush;
-        query.execute();
+        mysqlpp::SimpleResult result = query.execute();
+        if (!result)
+        {
+            std::cerr << "Error executing query: " << query.error() << "\n";
+            return false;
+        }
 
         return true;
     }

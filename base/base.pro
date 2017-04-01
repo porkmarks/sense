@@ -7,6 +7,12 @@ TARGET = base
 target.path = .
 INSTALLS = target
 
+#sql_files.files = data/configs.sql
+#sql_files.files += data/measurements.sql
+#sql_files.files += data/sensors.sql
+#sql_files.path = .
+#INSTALLS += sql_files
+
 rpi {
     DEFINES+=RASPBERRY_PI
     CONFIG(debug, debug|release) {

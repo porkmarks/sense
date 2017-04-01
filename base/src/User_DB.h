@@ -19,6 +19,8 @@ public:
     std::string get_username() const;
     std::string get_password() const;
 
+    bool query(std::string const& sql);
+
     typedef std::chrono::high_resolution_clock Clock;
     typedef System_DB::Sensor_Id Sensor_Id;
 
@@ -46,6 +48,25 @@ public:
     };
 
     bool add_measurement(Sensor_Id sensor_id, Clock::time_point time_point, Measurement const& measurement);
+
+    struct Config
+    {
+        Clock::duration measurement_period;
+        Clock::duration comms_period;
+
+        //This is computed when creating the config so that this equation holds for any config:
+        // measurement_time_point = config.baseline_time_point + measurement_index * config.measurement_period
+        //
+        //So when creating a new config, this is how to calculate the baseline:
+        // m = some measurement (any)
+        // config.baseline_time_point = m.time_point - m.index * config.measurement_period
+        //
+        //The reason for this is to keep the indices valid in all configs
+        Clock::time_point baseline_time_point;
+    };
+
+    boost::optional<Config> get_config();
+    bool set_config(Config const& config);
 
 private:
     mysqlpp::Connection m_connection;

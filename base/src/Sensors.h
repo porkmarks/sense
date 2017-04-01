@@ -75,8 +75,7 @@ public:
 private:
     Sensor* _find_sensor_by_id(Sensor_Id id);
 
-
-    System_DB::Config m_config;
+    User_DB::Config m_user_config;
 
     mutable std::recursive_mutex m_mutex;
 

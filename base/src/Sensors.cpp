@@ -112,13 +112,20 @@ bool Sensors::init(std::unique_ptr<System_DB> system_db, std::unique_ptr<User_DB
         return false;
     }
 
-    boost::optional<System_DB::Config> config = m_main_system_db->get_config();
-    if (!config)
+    boost::optional<System_DB::Config> opt_system_config = m_main_system_db->get_config();
+    if (!opt_system_config)
     {
-        m_config.measurement_period = std::chrono::seconds(10);
-        m_config.comms_period = m_config.measurement_period * 3;
-        m_config.baseline_time_point = Clock::now();
-        if (!m_main_system_db->set_config(m_config))
+        std::cerr << "Failed to get the system config\n";
+        return false;
+    }
+
+    boost::optional<User_DB::Config> opt_user_config = m_main_user_db->get_config();
+    if (!opt_user_config)
+    {
+        m_user_config.measurement_period = opt_system_config->measurement_period;
+        m_user_config.comms_period = opt_system_config->comms_period;
+        m_user_config.baseline_time_point = Clock::now();
+        if (!m_main_user_db->set_config(m_user_config))
         {
             std::cerr << "Cannot set config\n";
             return false;
@@ -126,12 +133,12 @@ bool Sensors::init(std::unique_ptr<System_DB> system_db, std::unique_ptr<User_DB
     }
     else
     {
-        m_config = *config;
+        m_user_config = *opt_user_config;
     }
     m_worker.last_config_refresh_time_point = Clock::now();
 
-    m_next_measurement_time_point = m_config.baseline_time_point;
-    m_next_comms_time_point = m_config.baseline_time_point;
+    m_next_measurement_time_point = m_user_config.baseline_time_point;
+    m_next_comms_time_point = m_user_config.baseline_time_point;
 
     boost::optional<std::vector<System_DB::Sensor>> system_sensors = m_main_system_db->get_sensors();
     if (!system_sensors)
@@ -256,11 +263,11 @@ bool Sensors::set_comms_period(Clock::duration period)
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    System_DB::Config config = m_config;
+    User_DB::Config config = m_user_config;
     config.comms_period = period;
-    if (m_main_system_db->set_config(config))
+    if (m_main_user_db->set_config(config))
     {
-        m_config = config;
+        m_user_config = config;
         return true;
     }
     return false;
@@ -271,19 +278,19 @@ Sensors::Clock::duration Sensors::compute_comms_period() const
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
     Clock::duration max_period = m_sensor_cache.size() * COMMS_DURATION;
-    Clock::duration period = std::max(m_config.comms_period, max_period);
-    return std::max(period, m_config.measurement_period + MEASUREMENT_JITTER);
+    Clock::duration period = std::max(m_user_config.comms_period, max_period);
+    return std::max(period, m_user_config.measurement_period + MEASUREMENT_JITTER);
 }
 
 bool Sensors::set_measurement_period(Clock::duration period)
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-    System_DB::Config config = m_config;
+    User_DB::Config config = m_user_config;
     config.measurement_period = period;
-    if (m_main_system_db->set_config(config))
+    if (m_main_user_db->set_config(config))
     {
-        m_config = config;
+        m_user_config = config;
         return true;
     }
     return false;
@@ -291,7 +298,7 @@ bool Sensors::set_measurement_period(Clock::duration period)
 Sensors::Clock::duration Sensors::get_measurement_period() const
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
-    return m_config.measurement_period;
+    return m_user_config.measurement_period;
 }
 
 Sensors::Clock::time_point Sensors::compute_next_measurement_time_point()
@@ -301,7 +308,7 @@ Sensors::Clock::time_point Sensors::compute_next_measurement_time_point()
     auto now = Clock::now();
     while (m_next_measurement_time_point <= now)
     {
-        m_next_measurement_time_point += m_config.measurement_period;
+        m_next_measurement_time_point += m_user_config.measurement_period;
         m_next_measurement_index++;
     }
 
@@ -449,7 +456,7 @@ void Sensors::add_measurement(Sensor_Id id, Measurement const& measurement)
             item = Worker::Item();
             item->id = id;
             item->measurement = measurement;
-            item->time_point = m_config.baseline_time_point + m_config.measurement_period * measurement.index;
+            item->time_point = m_user_config.baseline_time_point + m_user_config.measurement_period * measurement.index;
         }
         else
         {
@@ -466,11 +473,11 @@ void Sensors::add_measurement(Sensor_Id id, Measurement const& measurement)
 
 void Sensors::refresh_config()
 {
-    boost::optional<System_DB::Config> config = m_worker.system_db->get_config();
+    boost::optional<User_DB::Config> config = m_worker.user_db->get_config();
     if (config)
     {
         std::lock_guard<std::recursive_mutex> lg(m_mutex);
-        m_config = *config;
+        m_user_config = *config;
     }
     m_worker.last_config_refresh_time_point = Clock::now();
 }

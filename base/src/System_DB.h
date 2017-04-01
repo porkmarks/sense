@@ -60,23 +60,15 @@ public:
 
     struct Config
     {
-        Clock::duration measurement_period;
-        Clock::duration comms_period;
-        Clock::time_point baseline_time_point;
-    };
-
-    boost::optional<Config> get_config();
-    bool set_config(Config const& config);
-
-    struct Settings
-    {
         std::string user_db_server;
         std::string user_db_name;
         std::string user_db_username;
         std::string user_db_password;
+        Clock::duration measurement_period;
+        Clock::duration comms_period;
     };
 
-    boost::optional<Settings> get_settings();
+    boost::optional<Config> get_config();
 
 private:
     mysqlpp::Connection m_connection;
