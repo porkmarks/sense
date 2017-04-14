@@ -53,10 +53,10 @@ struct Item16
 #   pragma pack(pop)
 #endif
 
-static_assert(sizeof(Item8) == 1, "Item8 is broken");
-static_assert(sizeof(Item16) == 2, "Item16 is broken");
+static_assert(sizeof(Item8) == 1, "");
+static_assert(sizeof(Item16) == 2, "");
 
-static_assert(sizeof(Storage) <= 38 * 30 + 18, "Storage is too big");
+static_assert(sizeof(Storage) <= 38 * 30 + 18, "");
 
 
 //////////////////////////////////////////////////////////////////////////
