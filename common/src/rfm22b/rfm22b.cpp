@@ -53,8 +53,7 @@ bool RFM22B::init()
             && deviceType != (uint8_t)Device_Type::TX)
     {
 #ifdef ARDUINO
-        Serial.print("Wrong device: ");
-        Serial.println(deviceType);
+        printf_P(PSTR("Wrong device: %d"), (int)deviceType);
 #else
         std::cout << "Wrong device type " << (int)deviceType << "\n";
 #endif
