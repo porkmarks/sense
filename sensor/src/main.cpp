@@ -716,6 +716,7 @@ static void do_comms()
                     break;
                 }
 
+                batch.start_index += batch.count;
                 batch.count = 0;
             }
 
