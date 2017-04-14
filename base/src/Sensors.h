@@ -6,6 +6,7 @@
 #include <string>
 #include <boost/thread.hpp>
 #include <mutex>
+#include <condition_variable>
 
 #include "Comms.h"
 #include "User_DB.h"
@@ -70,7 +71,7 @@ public:
     void set_sensor_b2s_input_dBm(Sensor_Id id, int8_t dBm);
 
     //measurement manipulation
-    void add_measurement(Sensor_Id id, Measurement const& measurement);
+    void add_measurements(Sensor_Id id, std::vector<Measurement> const& measurements);
 
 private:
     Sensor* _find_sensor_by_id(Sensor_Id id);
@@ -108,7 +109,9 @@ private:
             Measurement measurement;
         };
 
-        mutable std::recursive_mutex items_mutex;
+        mutable std::mutex items_mutex;
+        std::condition_variable items_cv;
+
         std::vector<Item> items;
     };
 

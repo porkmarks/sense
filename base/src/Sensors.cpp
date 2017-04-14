@@ -181,6 +181,8 @@ bool Sensors::init(std::unique_ptr<System_DB> system_db, std::unique_ptr<User_DB
         process_worker_thread();
     });
 
+    std::cout << "Sensors initialized\n";
+
     return true;
 }
 
@@ -213,7 +215,12 @@ void Sensors::set_sensor_measurement_range(Sensor_Id id, uint32_t first_measurem
     sensor->first_recorded_measurement_index = first_measurement_index;
     sensor->recorded_measurement_count = measurement_count;
 
-    sensor->max_confirmed_measurement_index = std::max(sensor->max_confirmed_measurement_index, sensor->first_recorded_measurement_index);
+    if (sensor->first_recorded_measurement_index > 0)
+    {
+        //we'll never receive measurements lower than sensor->first_recorded_measurement_index
+        //so at worst, max_confirmed_measurement_index = sensor->first_recorded_measurement_index - 1 (the one just before the first recorded index)
+        sensor->max_confirmed_measurement_index = std::max(sensor->max_confirmed_measurement_index, sensor->first_recorded_measurement_index - 1);
+    }
 }
 
 void Sensors::set_sensor_b2s_input_dBm(Sensor_Id id, int8_t dBm)
@@ -437,9 +444,9 @@ Sensors::Sensor const* Sensors::find_sensor_by_address(Sensor_Address address) c
     return &(*it);
 }
 
-void Sensors::add_measurement(Sensor_Id id, Measurement const& measurement)
+void Sensors::add_measurements(Sensor_Id id, std::vector<Measurement> const& measurements)
 {
-    boost::optional<Worker::Item> item;
+    std::vector<Worker::Item> items;
 
     {
         std::lock_guard<std::recursive_mutex> lg(m_mutex);
@@ -451,23 +458,31 @@ void Sensors::add_measurement(Sensor_Id id, Measurement const& measurement)
             return;
         }
 
-        if (measurement.index > sensor->max_confirmed_measurement_index)
+        for (Measurement const& measurement: measurements)
         {
-            item = Worker::Item();
-            item->id = id;
-            item->measurement = measurement;
-            item->time_point = m_user_config.baseline_time_point + m_user_config.measurement_period * measurement.index;
-        }
-        else
-        {
-            std::cout << "Sensor " << id << " has reported an already confirmed measurement (" << measurement.index << ")\n";
+            if (measurement.index > sensor->max_confirmed_measurement_index)
+            {
+                Worker::Item item;
+                item.id = id;
+                item.measurement = measurement;
+                item.time_point = m_user_config.baseline_time_point + m_user_config.measurement_period * measurement.index;
+                items.push_back(item);
+            }
+            else
+            {
+                std::cout << "Sensor " << id << " has reported an already confirmed measurement (" << measurement.index << ")\n";
+            }
         }
     }
 
-    if (item)
+    if (!items.empty())
     {
-        std::lock_guard<std::recursive_mutex> lg(m_worker.items_mutex);
-        m_worker.items.push_back(*item);
+        {
+            std::lock_guard<std::mutex> lg(m_worker.items_mutex);
+            std::copy(items.begin(), items.end(), std::back_inserter(m_worker.items));
+        }
+
+        m_worker.items_cv.notify_all();
     }
 }
 
@@ -485,13 +500,17 @@ void Sensors::refresh_config()
 
 void Sensors::process_worker_thread()
 {
+    std::vector<Worker::Item> items;
+
     while (!m_worker.stop_request)
     {
-        std::vector<Worker::Item> items;
+        items.clear();
 
         //make a copy of the items so we don't have to lock the mutex for too long
         {
-            std::lock_guard<std::recursive_mutex> lg(m_worker.items_mutex);
+            std::unique_lock<std::mutex> lg(m_worker.items_mutex);
+            m_worker.items_cv.wait(lg, [this] { return m_worker.items.empty() == false; });
+
             items = std::move(m_worker.items);
             m_worker.items.clear();
         }
@@ -499,6 +518,8 @@ void Sensors::process_worker_thread()
         //send them all to the db
         if (!items.empty())
         {
+            std::cout << "Sending " << items.size() << " measurements...";
+
             auto start = Clock::now();
             for (Worker::Item const& item: items)
             {
@@ -520,17 +541,8 @@ void Sensors::process_worker_thread()
                 }
             }
 
-            //add the data to the system db as well
-            {
-                Worker::Item const& item = items.back();
-                m_worker.system_db->set_measurement(item.id, item.time_point, item.measurement);
-            }
-
-            std::cout << "Sent " << items.size() << " measurements in " << std::chrono::duration<float>(Clock::now() - start).count() << " seconds\n";
-        }
-        else
-        {
-            boost::this_thread::sleep_for(boost::chrono::milliseconds(1000));
+            std::cout << "done in " << std::chrono::duration<float>(Clock::now() - start).count() << " seconds\n";
+            items.clear();
         }
 
         if (Clock::now() - m_worker.last_config_refresh_time_point > CONFIG_REFRESH_PERIOD)
