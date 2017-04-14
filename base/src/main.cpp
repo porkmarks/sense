@@ -52,8 +52,7 @@ void fill_config_packet(data::Config& packet, Sensors::Sensor const& sensor)
     packet.comms_period = chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(s_sensors.compute_comms_period()).count());
     packet.last_confirmed_measurement_index = s_sensors.compute_last_confirmed_measurement_index(sensor.id);
 
-    std::cout << "\tConfig for id: " << sensor.id
-              << "\n\tnext measurement delay: " << packet.next_measurement_delay.count
+    std::cout << "\tnext measurement delay: " << packet.next_measurement_delay.count
               << "\n\tmeasurement period: " << packet.measurement_period.count
               << "\n\tnext comms delay: " << packet.next_comms_delay.count
               << "\n\tcomms period: " << packet.comms_period.count
@@ -163,14 +162,27 @@ int main(int, const char**)
                 const Sensors::Sensor* sensor = s_sensors.find_sensor_by_address(address);
                 if (sensor)
                 {
-                    std::cout << "Measurement batch reported by " << sensor->id << "\n";
-
                     data::Measurement_Batch const& batch = *reinterpret_cast<data::Measurement_Batch const*>(s_comms.get_rx_packet_payload(packet_data));
 
-                    Sensors::Measurement m;
+                    std::cout << "Measurement batch from " << sensor->id << "\n";
+                    if (batch.count == 0)
+                    {
+                        std::cout << "\tRange: [empty]\n";
+                    }
+                    else if (batch.count == 1)
+                    {
+                        std::cout << "\tRange: [" << batch.start_index << "] : 1 measurement\n";
+                    }
+                    else
+                    {
+                        std::cout << "\tRange: [" << batch.start_index << " - " << batch.start_index + batch.count - 1 << "] : " << static_cast<size_t>(batch.count) << " measurements \n";
+                    }
+
+                    std::vector<Sensors::Measurement> measurements;
                     size_t count = std::min<size_t>(batch.count, data::Measurement_Batch::MAX_COUNT);
                     for (size_t i = 0; i < count; i++)
                     {
+                        Sensors::Measurement m;
                         m.index = batch.start_index + i;
                         m.flags = batch.measurements[i].flags;
                         m.b2s_input_dBm = sensor->b2s_input_dBm;
@@ -179,8 +191,10 @@ int main(int, const char**)
                         batch.unpack(m.vcc);
                         batch.measurements[i].unpack(m.humidity, m.temperature);
 
-                        s_sensors.add_measurement(sensor->id, m);
+                        measurements.push_back(m);
                     }
+
+                    s_sensors.add_measurements(sensor->id, measurements);
                 }
                 else
                 {
@@ -193,7 +207,7 @@ int main(int, const char**)
                 const Sensors::Sensor* sensor = s_sensors.find_sensor_by_address(address);
                 if (sensor)
                 {
-                    std::cout << "First config requested by " << sensor->id << "\n";
+                    std::cout << "First config for " << sensor->id << "\n";
 
                     data::First_Config packet;
                     packet.first_measurement_index = s_sensors.compute_next_measurement_index();
@@ -225,8 +239,19 @@ int main(int, const char**)
                 const Sensors::Sensor* sensor = s_sensors.find_sensor_by_address(address);
                 if (sensor)
                 {
-                    std::cout << "Config requested by " << sensor->id << "\n";
-                    std::cout << "\nStored range: [" << config_request.first_measurement_index << ", " << config_request.first_measurement_index + config_request.measurement_count << ") - " << config_request.measurement_count << " measurements \n";
+                    std::cout << "Config for " << sensor->id << "\n";
+                    if (config_request.measurement_count == 0)
+                    {
+                        std::cout << "\tStored range: [empty]\n";
+                    }
+                    else if (config_request.measurement_count == 1)
+                    {
+                        std::cout << "\tStored range: [" << config_request.first_measurement_index << "] : 1 measurement\n";
+                    }
+                    else
+                    {
+                        std::cout << "\tStored range: [" << config_request.first_measurement_index << " - " << config_request.first_measurement_index + config_request.measurement_count - 1 << "] : " << config_request.measurement_count << " measurements \n";
+                    }
 
                     s_sensors.set_sensor_measurement_range(sensor->id, config_request.first_measurement_index, config_request.measurement_count);
                     s_sensors.set_sensor_b2s_input_dBm(sensor->id, config_request.b2s_input_dBm);

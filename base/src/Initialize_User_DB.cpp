@@ -109,6 +109,8 @@ static bool create_user_db(User_DB& user_db)
         }
     }
 
+    std::cout << "Created user db @" << user_db.get_server() << "\n";
+
     return true;
 }
 
@@ -149,8 +151,11 @@ static bool synchronize_user_db(System_DB& system_db, User_DB& user_db)
     //do a first check
     if (check_sensors(system_sensors, user_sensors))
     {
+        std::cout << "Databases are in sync\n";
         return true;
     }
+
+    std::cout << "Databases need synchronization\n";
 
     std::vector<System_DB::Sensor> missing_system_sensors;
     std::vector<User_DB::Sensor> extra_user_sensors;
@@ -198,6 +203,8 @@ static bool synchronize_user_db(System_DB& system_db, User_DB& user_db)
             return false;
         }
     }
+
+    std::cout << "Databases synchronized\n";
 
     return true;
 }
