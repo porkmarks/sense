@@ -37,27 +37,6 @@ public:
     bool remove_sensor(Sensor_Id);
     boost::optional<std::vector<Sensor>> get_sensors();
 
-    struct Measurement
-    {
-        struct Flag
-        {
-            enum type : uint8_t
-            {
-                SENSOR_ERROR   = 1 << 0,
-                COMMS_ERROR    = 1 << 1
-            };
-        };
-
-        float temperature = 0.f;
-        float humidity = 0;
-        float vcc = 0.f;
-        int8_t b2s_input_dBm = 0;
-        int8_t s2b_input_dBm = 0;
-        uint8_t flags = 0;
-    };
-
-    bool set_measurement(Sensor_Id sensor_id, Clock::time_point time_point, Measurement const& measurement);
-
     struct Config
     {
         std::string user_db_server;

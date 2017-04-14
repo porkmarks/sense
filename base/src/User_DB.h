@@ -42,9 +42,24 @@ public:
     bool add_sensor(Sensor_Id id, std::string const& name);
     bool remove_sensor(Sensor_Id);
 
-    struct Measurement : public System_DB::Measurement
+    struct Measurement
     {
+        struct Flag
+        {
+            enum type : uint8_t
+            {
+                SENSOR_ERROR   = 1 << 0,
+                COMMS_ERROR    = 1 << 1
+            };
+        };
+
         uint32_t index = 0;
+        float temperature = 0.f;
+        float humidity = 0;
+        float vcc = 0.f;
+        int8_t b2s_input_dBm = 0;
+        int8_t s2b_input_dBm = 0;
+        uint8_t flags = 0;
     };
 
     bool add_measurement(Sensor_Id sensor_id, Clock::time_point time_point, Measurement const& measurement);
