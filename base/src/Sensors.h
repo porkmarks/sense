@@ -49,10 +49,11 @@ public:
     bool set_measurement_period(Clock::duration period);
     Clock::duration get_measurement_period() const;
 
-    uint32_t compute_next_measurement_index();
+    uint32_t compute_next_measurement_index() const; //the next real-time index
+    uint32_t compute_next_measurement_index(Sensor_Id id) const; //the next index for this sensor. This might be in the future!!!
     uint32_t compute_last_confirmed_measurement_index(Sensor_Id id) const;
 
-    Clock::time_point compute_next_measurement_time_point();
+    Clock::time_point compute_next_measurement_time_point(Sensor_Id id) const;
     Clock::time_point compute_next_comms_time_point(Sensor_Id id) const;
 
     //how often will the sensors talk to the base station
@@ -79,11 +80,6 @@ private:
     User_DB::Config m_user_config;
 
     mutable std::recursive_mutex m_mutex;
-
-    mutable Clock::time_point m_next_measurement_time_point;
-    mutable Clock::time_point m_next_comms_time_point;
-
-    mutable uint32_t m_next_measurement_index = 0;
 
     std::vector<Sensor> m_sensor_cache;
 

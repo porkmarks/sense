@@ -137,9 +137,6 @@ bool Sensors::init(std::unique_ptr<System_DB> system_db, std::unique_ptr<User_DB
     }
     m_worker.last_config_refresh_time_point = Clock::now();
 
-    m_next_measurement_time_point = m_user_config.baseline_time_point;
-    m_next_comms_time_point = m_user_config.baseline_time_point;
-
     boost::optional<std::vector<System_DB::Sensor>> system_sensors = m_main_system_db->get_sensors();
     if (!system_sensors)
     {
@@ -308,26 +305,45 @@ Sensors::Clock::duration Sensors::get_measurement_period() const
     return m_user_config.measurement_period;
 }
 
-Sensors::Clock::time_point Sensors::compute_next_measurement_time_point()
+Sensors::Clock::time_point Sensors::compute_next_measurement_time_point(Sensor_Id id) const
+{
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
+    Sensor const* sensor = find_sensor_by_id(id);
+    if (!sensor)
+    {
+        std::cerr << "Cannot find sensor id " << id << "\n";
+        return Clock::time_point(Clock::duration::zero());
+    }
+
+    uint32_t next_measurement_index = compute_next_measurement_index(id);
+
+    Clock::time_point tp = m_user_config.baseline_time_point + m_user_config.measurement_period * next_measurement_index;
+    return tp;
+}
+
+uint32_t Sensors::compute_next_measurement_index(Sensor_Id id) const
+{
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
+    Sensor const* sensor = find_sensor_by_id(id);
+    if (!sensor)
+    {
+        std::cerr << "Cannot find sensor id " << id << "\n";
+        return 0;
+    }
+
+    uint32_t next_sensor_measurement_index = sensor->first_recorded_measurement_index + sensor->recorded_measurement_count;
+    return std::max(next_sensor_measurement_index, compute_next_measurement_index());
+}
+
+uint32_t Sensors::compute_next_measurement_index() const
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
     auto now = Clock::now();
-    while (m_next_measurement_time_point <= now)
-    {
-        m_next_measurement_time_point += m_user_config.measurement_period;
-        m_next_measurement_index++;
-    }
-
-    return m_next_measurement_time_point;
-}
-
-uint32_t Sensors::compute_next_measurement_index()
-{
-    std::lock_guard<std::recursive_mutex> lg(m_mutex);
-
-    compute_next_measurement_time_point();
-    return m_next_measurement_index;
+    uint32_t index = std::ceil((now - m_user_config.baseline_time_point) / m_user_config.measurement_period);
+    return index;
 }
 
 uint32_t Sensors::compute_last_confirmed_measurement_index(Sensor_Id id) const
@@ -361,12 +377,9 @@ Sensors::Clock::time_point Sensors::compute_next_comms_time_point(Sensor_Id id) 
     Clock::duration period = compute_comms_period();
 
     auto now = Clock::now();
-    while (m_next_comms_time_point <= now)
-    {
-        m_next_comms_time_point += period;
-    }
+    uint32_t index = std::ceil(((now - m_user_config.baseline_time_point) / period)) + 1;
 
-    Clock::time_point start = m_next_comms_time_point;
+    Clock::time_point start = m_user_config.baseline_time_point + period * index;
     return start + std::distance(m_sensor_cache.begin(), it) * COMMS_DURATION;
 }
 
