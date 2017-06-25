@@ -131,4 +131,20 @@ static_assert(sizeof(Pair_Response) == 4, "");
 #   pragma pack(pop)
 #endif
 
+enum class Server_Message
+{
+    SET_CONFIG_REQ,
+    SET_CONFIG_RES,
+    GET_SENSORS_REQ,
+    GET_SENSORS_RES,
+    ADD_SENSOR_REQ,
+    ADD_SENSOR_RES,
+    REMOVE_SENSOR_REQ,
+    REMOVE_SENSOR_RES,
+    REPORT_MEASUREMENT_REQ,
+    REPORT_MEASUREMENT_RES,
+    SENSOR_BOUND_REQ,
+    SENSOR_BOUND_RES,
+};
+
 }

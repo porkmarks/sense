@@ -9,19 +9,33 @@
 #include <condition_variable>
 
 #include "Comms.h"
-#include "User_DB.h"
-#include "System_DB.h"
-
 
 class Sensors
 {
 public:
-    typedef System_DB::Clock Clock;
-    typedef System_DB::Sensor_Id Sensor_Id;
-    typedef System_DB::Sensor_Address Sensor_Address;
+    typedef std::chrono::high_resolution_clock Clock;
+    typedef uint32_t Sensor_Id;
+    typedef uint32_t Sensor_Address;
 
+    struct Measurement
+    {
+        struct Flag
+        {
+            enum type : uint8_t
+            {
+                SENSOR_ERROR   = 1 << 0,
+                COMMS_ERROR    = 1 << 1
+            };
+        };
 
-    typedef User_DB::Measurement Measurement;
+        uint32_t index = 0;
+        float temperature = 0.f;
+        float humidity = 0;
+        float vcc = 0.f;
+        int8_t b2s_input_dBm = 0;
+        int8_t s2b_input_dBm = 0;
+        uint8_t flags = 0;
+    };
 
     struct Sensor
     {
@@ -43,12 +57,32 @@ public:
     //how long does a communication burst take
     static const Clock::duration COMMS_DURATION;
 
-    bool init(std::unique_ptr<System_DB> system_db, std::unique_ptr<User_DB> user_db);
+    bool init();
+    bool is_initialized() const;
 
-    //how often will the sensors do the measurement
-    bool set_measurement_period(Clock::duration period);
-    Clock::duration get_measurement_period() const;
+    std::function<bool(Sensor_Id sensor_id, Clock::time_point time_point, Measurement const& measurement)> cb_report_measurement;
 
+    struct Config
+    {
+        bool sensors_sleeping = false;
+        Clock::duration measurement_period;
+        Clock::duration comms_period;
+
+        //This is computed when creating the config so that this equation holds for any config:
+        // measurement_time_point = config.baseline_time_point + measurement_index * config.measurement_period
+        //
+        //So when creating a new config, this is how to calculate the baseline:
+        // m = some measurement (any)
+        // config.baseline_time_point = m.time_point - m.index * config.measurement_period
+        //
+        //The reason for this is to keep the indices valid in all configs
+        Clock::time_point baseline_time_point;
+    };
+
+    Config const& get_config();
+    void set_config(Config const& config);
+
+    Clock::duration compute_comms_period() const;
     uint32_t compute_next_measurement_index() const; //the next real-time index
     uint32_t compute_next_measurement_index(Sensor_Id id) const; //the next index for this sensor. This might be in the future!!!
     uint32_t compute_last_confirmed_measurement_index(Sensor_Id id) const;
@@ -56,65 +90,44 @@ public:
     Clock::time_point compute_next_measurement_time_point(Sensor_Id id) const;
     Clock::time_point compute_next_comms_time_point(Sensor_Id id) const;
 
-    //how often will the sensors talk to the base station
-    bool set_comms_period(Clock::duration period);
-    Clock::duration compute_comms_period() const;
-
     //sensor manipulation
-    Sensor const* add_expected_sensor();
-    Sensor const* add_sensor(std::string const& name);
+    struct Unbound_Sensor_Data
+    {
+        Sensor_Id id;
+        std::string name;
+    };
+
+    void set_unbound_sensor_data(Unbound_Sensor_Data const& data);
+    boost::optional<Unbound_Sensor_Data> get_unbound_sensor_data() const;
+
+    std::function<bool(Sensor_Id, Sensor_Address)> cb_sensor_bound;
+
+    Sensor const* bind_sensor();
+    Sensor const* add_sensor(Sensor_Id id, std::string const& name, Sensor_Address address);
     bool remove_sensor(Sensor_Id id);
+    std::vector<Sensor> get_sensors() const;
 
     Sensor const* find_sensor_by_id(Sensor_Id id) const;
     Sensor const* find_sensor_by_address(Sensor_Address address) const;
 
-    void set_sensor_measurement_range(Sensor_Id id, uint32_t first_measurement_index, uint32_t  last_measurement_index);
+    void set_sensor_measurement_range(Sensor_Id id, uint32_t first_measurement_index, uint32_t last_measurement_index);
     void set_sensor_b2s_input_dBm(Sensor_Id id, int8_t dBm);
 
     //measurement manipulation
-    void add_measurements(Sensor_Id id, std::vector<Measurement> const& measurements);
+    void report_measurements(Sensor_Id id, std::vector<Measurement> const& measurements);
 
 private:
     Sensor* _find_sensor_by_id(Sensor_Id id);
 
-    User_DB::Config m_user_config;
-
     mutable std::recursive_mutex m_mutex;
 
-    std::vector<Sensor> m_sensor_cache;
+    Config m_config;
+    bool m_is_initialized = false;
+
+    boost::optional<Unbound_Sensor_Data> m_unbound_sensor_data_opt;
+    std::vector<Sensor> m_sensors;
 
     uint32_t m_last_address = Comms::SLAVE_ADDRESS_BEGIN;
-
-    std::unique_ptr<User_DB> m_main_user_db;
-    std::unique_ptr<System_DB> m_main_system_db;
-
-    struct Worker
-    {
-        std::unique_ptr<System_DB> system_db;
-        std::unique_ptr<User_DB> user_db;
-
-        Clock::time_point last_config_refresh_time_point = Clock::now();
-
-        boost::thread thread;
-        bool stop_request = false;
-
-        struct Item
-        {
-            Sensor_Id id;
-            Clock::time_point time_point;
-            Measurement measurement;
-        };
-
-        mutable std::mutex items_mutex;
-        std::condition_variable items_cv;
-
-        std::vector<Item> items;
-    };
-
-    Worker m_worker;
-
-    void process_worker_thread();
-    void refresh_config();
 };
 
 namespace std

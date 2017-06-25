@@ -51,9 +51,7 @@ SOURCES += src/main.cpp \
     src/Sensors.cpp \
     ../common/src/rfm22b/rfm22b.cpp \
     ../common/src/rfm22b/rfm22b_spi.cpp \
-    src/User_DB.cpp \
-    src/System_DB.cpp \
-    src/Initialize_User_DB.cpp
+    src/Server.cpp
 
 HEADERS += \
     ../common/src/Comms.h \
@@ -65,8 +63,9 @@ HEADERS += \
     ../common/src/rfm22b/rfm22b.h \
     ../common/src/rfm22b/rfm22b_enums.h \
     ../common/src/rfm22b/rfm22b_spi.h \
-    src/User_DB.h \
-    src/System_DB.h
+    src/Server.h \
+    ../common/src/ASIO_Socket_Adapter.h \
+    ../common/src/Channel.h
 
 DISTFILES +=
 
