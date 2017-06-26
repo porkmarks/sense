@@ -33,9 +33,12 @@ private:
     void process_set_config_req();
     void process_add_sensor_req();
     void process_remove_sensor_req();
+    void process_report_measurement_res();
+    void process_sensor_bound_res();
 
-    bool report_measurement(Sensors::Sensor_Id sensor_id, Clock::time_point time_point, Sensors::Measurement const& measurement);
-    bool sensor_bound(Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address sensor_address);
+
+    void report_measurement(Sensors::Sensor_Id sensor_id, Clock::time_point time_point, Sensors::Measurement const& measurement);
+    void sensor_bound(Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address sensor_address);
 
     Sensors& m_sensors;
 

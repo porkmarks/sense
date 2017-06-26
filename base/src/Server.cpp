@@ -215,7 +215,7 @@ void Server::broadcast_thread_func()
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-bool Server::report_measurement(Sensors::Sensor_Id sensor_id, Clock::time_point time_point, Sensors::Measurement const& measurement)
+void Server::report_measurement(Sensors::Sensor_Id sensor_id, Clock::time_point time_point, Sensors::Measurement const& measurement)
 {
     std::stringstream ss;
 
@@ -234,21 +234,19 @@ bool Server::report_measurement(Sensors::Sensor_Id sensor_id, Clock::time_point 
         pt.add("measurement_flags", measurement.flags);
 
         boost::property_tree::write_json(ss, pt);
+
+        std::string str = ss.str();
+        m_channel.send(data::Server_Message::REPORT_MEASUREMENT_REQ, str.data(), str.size());
     }
     catch (std::exception const& e)
     {
-        std::cerr << "Cannot deserialize request: " << e.what() << "\n";
+        std::cerr << "Cannot serialize request: " << e.what() << "\n";
     }
-
-    std::string str = ss.str();
-    m_channel.send(data::Server_Message::REPORT_MEASUREMENT_REQ, str.data(), str.size());
-
-    return false; //cannot wait for the response here! the last_measurement_index has to be advanced separately
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-bool Server::sensor_bound(Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address sensor_address)
+void Server::sensor_bound(Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address sensor_address)
 {
     std::stringstream ss;
 
@@ -260,16 +258,14 @@ bool Server::sensor_bound(Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address 
         pt.add("sensor_address", sensor_address);
 
         boost::property_tree::write_json(ss, pt);
+
+        std::string str = ss.str();
+        m_channel.send(data::Server_Message::SENSOR_BOUND_REQ, str.data(), str.size());
     }
     catch (std::exception const& e)
     {
-        std::cerr << "Cannot deserialize request: " << e.what() << "\n";
+        std::cerr << "Cannot serialize request: " << e.what() << "\n";
     }
-
-    std::string str = ss.str();
-    m_channel.send(data::Server_Message::SENSOR_BOUND_REQ, str.data(), str.size());
-
-    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -374,6 +370,56 @@ void Server::process_remove_sensor_req()
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
+void Server::process_report_measurement_res()
+{
+    std::vector<uint8_t> buffer;
+    m_channel.unpack(buffer);
+
+    std::string str_buffer(reinterpret_cast<char*>(buffer.data()), reinterpret_cast<char*>(buffer.data()) + buffer.size());
+    std::stringstream ss(str_buffer);
+
+    try
+    {
+        boost::property_tree::ptree pt;
+        boost::property_tree::read_json(ss, pt);
+
+        Sensors::Sensor_Id id = pt.get<Sensors::Sensor_Id>("id");
+        uint32_t measurement_index = pt.get<uint32_t>("measurement_index");
+        m_sensors.confirm_measurement(id, measurement_index);
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << "Cannot deserialize request: " << e.what() << "\n";
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+void Server::process_sensor_bound_res()
+{
+    std::vector<uint8_t> buffer;
+    m_channel.unpack(buffer);
+
+    std::string str_buffer(reinterpret_cast<char*>(buffer.data()), reinterpret_cast<char*>(buffer.data()) + buffer.size());
+    std::stringstream ss(str_buffer);
+
+    try
+    {
+        boost::property_tree::ptree pt;
+        boost::property_tree::read_json(ss, pt);
+
+        Sensors::Sensor_Id id = pt.get<Sensors::Sensor_Id>("id");
+        bool confirmed = pt.get<bool>("confirmed");
+        m_sensors.confirm_sensor_binding(id, confirmed);
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << "Cannot deserialize request: " << e.what() << "\n";
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
 void Server::process()
 {
     if (!m_socket.is_open() || !m_is_connected)
@@ -394,6 +440,12 @@ void Server::process()
             break;
         case data::Server_Message::REMOVE_SENSOR_REQ:
             process_remove_sensor_req();
+            break;
+        case data::Server_Message::REPORT_MEASUREMENT_RES:
+            process_report_measurement_res();
+            break;
+        case data::Server_Message::SENSOR_BOUND_RES:
+            process_sensor_bound_res();
             break;
         default:
             std::cerr << "Invalid message received: " << (int)message << "\n";

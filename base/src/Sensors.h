@@ -5,8 +5,6 @@
 #include <map>
 #include <string>
 #include <boost/thread.hpp>
-#include <mutex>
-#include <condition_variable>
 
 #include "Comms.h"
 
@@ -60,7 +58,7 @@ public:
     bool init();
     bool is_initialized() const;
 
-    std::function<bool(Sensor_Id sensor_id, Clock::time_point time_point, Measurement const& measurement)> cb_report_measurement;
+    std::function<void(Sensor_Id sensor_id, Clock::time_point time_point, Measurement const& measurement)> cb_report_measurement;
 
     struct Config
     {
@@ -99,8 +97,9 @@ public:
 
     void set_unbound_sensor_data(Unbound_Sensor_Data const& data);
     boost::optional<Unbound_Sensor_Data> get_unbound_sensor_data() const;
+    void confirm_sensor_binding(Sensor_Id id, bool confirmed);
 
-    std::function<bool(Sensor_Id, Sensor_Address)> cb_sensor_bound;
+    std::function<void(Sensor_Id, Sensor_Address)> cb_sensor_bound;
 
     Sensor const* bind_sensor();
     Sensor const* add_sensor(Sensor_Id id, std::string const& name, Sensor_Address address);
@@ -115,11 +114,13 @@ public:
 
     //measurement manipulation
     void report_measurements(Sensor_Id id, std::vector<Measurement> const& measurements);
+    void confirm_measurement(Sensor_Id id, uint32_t measurement_index);
 
 private:
     Sensor* _find_sensor_by_id(Sensor_Id id);
 
-    mutable std::recursive_mutex m_mutex;
+    bool load_settings(std::string const& filename);
+    bool save_settings(std::string const& filename);
 
     Config m_config;
     bool m_is_initialized = false;
