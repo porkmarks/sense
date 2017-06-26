@@ -30,11 +30,14 @@ private:
     void start_accept();
     void accept_func(boost::system::error_code ec);
 
+    void process_get_config_req();
     void process_set_config_req();
+    void process_get_sensors_req();
     void process_add_sensor_req();
     void process_remove_sensor_req();
     void process_report_measurement_res();
     void process_sensor_bound_res();
+    void process_power_off_req();
 
 
     void report_measurement(Sensors::Sensor_Id sensor_id, Clock::time_point time_point, Sensors::Measurement const& measurement);

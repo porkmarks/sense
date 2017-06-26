@@ -133,6 +133,8 @@ static_assert(sizeof(Pair_Response) == 4, "");
 
 enum class Server_Message
 {
+    GET_CONFIG_REQ,
+    GET_CONFIG_RES,
     SET_CONFIG_REQ,
     SET_CONFIG_RES,
     GET_SENSORS_REQ,
@@ -145,6 +147,7 @@ enum class Server_Message
     REPORT_MEASUREMENT_RES,
     SENSOR_BOUND_REQ,
     SENSOR_BOUND_RES,
+    POWER_OFF_REQ,
 };
 
 }

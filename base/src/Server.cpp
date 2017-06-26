@@ -217,10 +217,9 @@ void Server::broadcast_thread_func()
 
 void Server::report_measurement(Sensors::Sensor_Id sensor_id, Clock::time_point time_point, Sensors::Measurement const& measurement)
 {
-    std::stringstream ss;
-
     try
     {
+        std::stringstream ss;
         boost::property_tree::ptree pt;
 
         pt.add("sensor_id", sensor_id);
@@ -248,10 +247,9 @@ void Server::report_measurement(Sensors::Sensor_Id sensor_id, Clock::time_point 
 
 void Server::sensor_bound(Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address sensor_address)
 {
-    std::stringstream ss;
-
     try
     {
+        std::stringstream ss;
         boost::property_tree::ptree pt;
 
         pt.add("sensor_id", sensor_id);
@@ -266,6 +264,34 @@ void Server::sensor_bound(Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address 
     {
         std::cerr << "Cannot serialize request: " << e.what() << "\n";
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+void Server::process_get_config_req()
+{
+    std::stringstream ss;
+
+    try
+    {
+        boost::property_tree::ptree pt;
+
+        Sensors::Config const& config = m_sensors.get_config();
+
+        pt.add("sensors_sleeping", config.sensors_sleeping);
+        pt.add("measurement_period", std::chrono::duration_cast<std::chrono::seconds>(config.measurement_period).count());
+        pt.add("comms_period", std::chrono::duration_cast<std::chrono::seconds>(config.comms_period).count());
+        pt.add("baseline_time_point", std::chrono::duration_cast<std::chrono::seconds>(config.baseline_time_point.time_since_epoch()).count());
+
+        boost::property_tree::write_json(ss, pt);
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << "Cannot serialize request: " << e.what() << "\n";
+    }
+
+    std::string str = ss.str();
+    m_channel.send(data::Server_Message::GET_CONFIG_RES, str.data(), str.size());
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -308,6 +334,33 @@ void Server::process_set_config_req()
     }
 
     m_channel.send(data::Server_Message::SET_CONFIG_RES, &ok, 1);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+void Server::process_get_sensors_req()
+{
+    std::stringstream ss;
+
+    try
+    {
+        boost::property_tree::ptree pt;
+
+        for (Sensors::Sensor const& sensor: m_sensors.get_sensors())
+        {
+            auto node = pt.add("sensors." + sensor.name, "");
+            node.add("address", sensor.name);
+            node.add("id", sensor.id);
+        }
+        boost::property_tree::write_json(ss, pt);
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << "Cannot serialize request: " << e.what() << "\n";
+    }
+
+    std::string str = ss.str();
+    m_channel.send(data::Server_Message::GET_SENSORS_RES, str.data(), str.size());
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -420,6 +473,14 @@ void Server::process_sensor_bound_res()
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
+void Server::process_power_off_req()
+{
+    sync();
+    system("sudo shutdown -h now");
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
 void Server::process()
 {
     if (!m_socket.is_open() || !m_is_connected)
@@ -432,8 +493,14 @@ void Server::process()
     {
         switch (message)
         {
+        case data::Server_Message::GET_CONFIG_REQ:
+            process_get_config_req();
+            break;
         case data::Server_Message::SET_CONFIG_REQ:
             process_set_config_req();
+            break;
+        case data::Server_Message::GET_SENSORS_REQ:
+            process_get_sensors_req();
             break;
         case data::Server_Message::ADD_SENSOR_REQ:
             process_add_sensor_req();
@@ -446,6 +513,9 @@ void Server::process()
             break;
         case data::Server_Message::SENSOR_BOUND_RES:
             process_sensor_bound_res();
+            break;
+        case data::Server_Message::POWER_OFF_REQ:
+            process_power_off_req();
             break;
         default:
             std::cerr << "Invalid message received: " << (int)message << "\n";

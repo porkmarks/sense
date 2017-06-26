@@ -615,6 +615,7 @@ bool Sensors::save_settings(std::string const& filename)
         pt.add("baseline_time_point", std::chrono::duration_cast<std::chrono::seconds>(m_config.baseline_time_point.time_since_epoch()).count());
 
         boost::property_tree::write_json(filename, pt);
+        sync();
     }
     catch (std::exception const& e)
     {
