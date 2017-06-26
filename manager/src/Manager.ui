@@ -44,7 +44,7 @@
       <widget class="BaseStationsWidget" name="baseStationsWidget">
        <attribute name="icon">
         <iconset resource="../res/res.qrc">
-         <normaloff>:/icons/ui/connected.png</normaloff>:/icons/ui/connected.png</iconset>
+         <normaloff>:/icons/ui/station.png</normaloff>:/icons/ui/station.png</iconset>
        </attribute>
        <attribute name="title">
         <string>Base Stations</string>
@@ -88,7 +88,7 @@
       <widget class="AlarmsWidget" name="alarmsWidget">
        <attribute name="icon">
         <iconset resource="../res/res.qrc">
-         <normaloff>:/icons/ui/view.png</normaloff>:/icons/ui/view.png</iconset>
+         <normaloff>:/icons/ui/alarm.png</normaloff>:/icons/ui/alarm.png</iconset>
        </attribute>
        <attribute name="title">
         <string>Alarms</string>

@@ -22,7 +22,15 @@ private:
     Ui::BaseStationsWidget m_ui;
     Comms* m_comms = nullptr;
     QStandardItemModel m_model;
-    std::vector<uint64_t> m_baseStations;
+
+    struct BaseStation
+    {
+        std::array<uint8_t, 6> mac;
+        QHostAddress address;
+        uint16_t port;
+    };
+
+    std::vector<BaseStation> m_baseStations;
 };
 
 

@@ -6,12 +6,13 @@ BaseStationsWidget::BaseStationsWidget(QWidget *parent)
     m_ui.setupUi(this);
     m_ui.list->setModel(&m_model);
 
-    m_model.setColumnCount(3);
-    m_model.setHorizontalHeaderLabels({"MAC", "IP", "Port"});
+    m_model.setColumnCount(4);
+    m_model.setHorizontalHeaderLabels({"", "MAC", "IP", "Port"});
 
     m_ui.list->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
     m_ui.list->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
-    m_ui.list->header()->setSectionResizeMode(2, QHeaderView::Stretch);
+    m_ui.list->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    m_ui.list->header()->setSectionResizeMode(3, QHeaderView::Stretch);
 }
 
 void BaseStationsWidget::init(Comms& comms)
@@ -29,38 +30,44 @@ void BaseStationsWidget::baseStationDiscovered(std::array<uint8_t, 6> const& mac
 //        return;
 //    }
 
-    uint64_t hash = ((uint64_t)mac[0] << 48) | ((uint64_t)mac[1] << 32) | ((uint64_t)mac[2] << 24) |
-            ((uint64_t)mac[3] << 16) | ((uint64_t)mac[4] << 8) | ((uint64_t)mac[5]);
-
-    auto it = std::find(m_baseStations.begin(), m_baseStations.end(), hash);
+    auto it = std::find_if(m_baseStations.begin(), m_baseStations.end(), [mac](BaseStation const& bs) { return bs.mac == mac; });
     if (it != m_baseStations.end())
     {
         return;
     }
 
-    int row = m_baseStations.size();
-    m_baseStations.push_back(hash);
+    BaseStation bs = { mac, address, port };
+    m_baseStations.push_back(bs);
 
+    QStandardItem* selectedItem = new QStandardItem();
     QStandardItem* macItem = new QStandardItem();
     QStandardItem* ipItem = new QStandardItem();
     QStandardItem* portItem = new QStandardItem();
 
+    selectedItem->setIcon(QIcon(":/icons/ui/arrow-right.png"));
+
     {
         char buf[128];
-        sprintf(buf, "%X:%X:%X:%X:%X:%X", mac[0]&0xFF, mac[1]&0xFF, mac[2]&0xFF, mac[3]&0xFF, mac[4]&0xFF, mac[5]&0xFF);
+        sprintf(buf, "  %X:%X:%X:%X:%X:%X  ", mac[0]&0xFF, mac[1]&0xFF, mac[2]&0xFF, mac[3]&0xFF, mac[4]&0xFF, mac[5]&0xFF);
         macItem->setText(buf);
+        macItem->setIcon(QIcon(":/icons/ui/station.png"));
+        macItem->setEditable(false);
     }
 
     {
         char buf[128];
-        sprintf(buf, "%s", address.toString().toLatin1().data());
+        sprintf(buf, "  %s  ", address.toString().toLatin1().data());
         ipItem->setText(buf);
+        ipItem->setIcon(QIcon(":/icons/ui/ip.png"));
+        ipItem->setEditable(false);
     }
 
     {
         portItem->setData(port, Qt::DisplayRole);
+        portItem->setIcon(QIcon(":/icons/ui/port.png"));
+        portItem->setEditable(false);
     }
 
-    m_model.appendRow({ macItem, ipItem, portItem});
+    m_model.appendRow({ selectedItem, macItem, ipItem, portItem});
 }
 
