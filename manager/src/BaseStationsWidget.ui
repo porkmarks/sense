@@ -15,7 +15,7 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <widget class="QListWidget" name="list">
+    <widget class="QTreeView" name="list">
      <property name="alternatingRowColors">
       <bool>true</bool>
      </property>

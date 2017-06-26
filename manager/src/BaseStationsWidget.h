@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QWidget>
+#include <QStandardItemModel>
 #include "ui_BaseStationsWidget.h"
 #include "Comms.h"
 
@@ -20,6 +21,8 @@ public slots:
 private:
     Ui::BaseStationsWidget m_ui;
     Comms* m_comms = nullptr;
+    QStandardItemModel m_model;
+    std::vector<uint64_t> m_baseStations;
 };
 
 
