@@ -1,4 +1,4 @@
-#include "Comms.h"
+#include "Sensor_Comms.h"
 #include "CRC.h"
 
 #ifdef __AVR__
@@ -15,12 +15,12 @@
 
 #endif
 
-Comms::Comms()
+Sensor_Comms::Sensor_Comms()
 {
 
 }
 
-bool Comms::init(uint8_t retries)
+bool Sensor_Comms::init(uint8_t retries)
 {
     if (retries == 0)
     {
@@ -105,31 +105,31 @@ bool Comms::init(uint8_t retries)
     return true;
 }
 
-void Comms::idle_mode()
+void Sensor_Comms::idle_mode()
 {
     m_rf22.idle_mode();
 }
 
-void Comms::stand_by_mode()
+void Sensor_Comms::stand_by_mode()
 {
     m_rf22.stand_by_mode();
 }
 
-void Comms::set_address(uint32_t address)
+void Sensor_Comms::set_address(uint32_t address)
 {
     m_address = address;
 }
-void Comms::set_destination_address(uint32_t address)
+void Sensor_Comms::set_destination_address(uint32_t address)
 {
     m_destination_address = address;
 }
 
-uint8_t Comms::get_payload_raw_buffer_size(uint8_t size) const
+uint8_t Sensor_Comms::get_payload_raw_buffer_size(uint8_t size) const
 {
     return size + sizeof(Header) + 1;
 }
 
-uint8_t Comms::begin_packet(uint8_t* raw_buffer, data::Type type)
+uint8_t Sensor_Comms::begin_packet(uint8_t* raw_buffer, data::sensor::Type type)
 {
     Header* header_ptr = reinterpret_cast<Header*>(raw_buffer + 1);
     header_ptr->type = type;
@@ -142,7 +142,7 @@ uint8_t Comms::begin_packet(uint8_t* raw_buffer, data::Type type)
     return MAX_USER_DATA_SIZE;
 }
 
-uint8_t Comms::pack(uint8_t* raw_buffer, const void* data, uint8_t size)
+uint8_t Sensor_Comms::pack(uint8_t* raw_buffer, const void* data, uint8_t size)
 {
     if (m_offset + size > MAX_USER_DATA_SIZE)
     {
@@ -154,12 +154,12 @@ uint8_t Comms::pack(uint8_t* raw_buffer, const void* data, uint8_t size)
     return MAX_USER_DATA_SIZE - m_offset;
 }
 
-bool Comms::send_packet(uint8_t* raw_buffer, uint8_t retries)
+bool Sensor_Comms::send_packet(uint8_t* raw_buffer, uint8_t retries)
 {
     return send_packet(raw_buffer, m_offset, retries);
 }
 
-bool Comms::send_packet(uint8_t* raw_buffer, uint8_t packet_size, uint8_t retries)
+bool Sensor_Comms::send_packet(uint8_t* raw_buffer, uint8_t packet_size, uint8_t retries)
 {
     Header* header_ptr = reinterpret_cast<Header*>(raw_buffer + 1);
     header_ptr->crc = 0;
@@ -182,9 +182,9 @@ bool Comms::send_packet(uint8_t* raw_buffer, uint8_t packet_size, uint8_t retrie
             uint8_t* data = m_rf22.receive_raw(response_buffer, size, 100);
             if (data)
             {
-                if (validate_packet(data, size, sizeof(data::Response)))
+                if (validate_packet(data, size, sizeof(data::sensor::Response)))
                 {
-                    data::Response* response_ptr = reinterpret_cast<data::Response*>(data + sizeof(Header));
+                    data::sensor::Response* response_ptr = reinterpret_cast<data::sensor::Response*>(data + sizeof(Header));
                     if (response_ptr->req_id == header_ptr->req_id && response_ptr->ack != 0)
                     {
                         return true;
@@ -198,7 +198,7 @@ bool Comms::send_packet(uint8_t* raw_buffer, uint8_t packet_size, uint8_t retrie
     return false;
 }
 
-bool Comms::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload_size)
+bool Sensor_Comms::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload_size)
 {
     if (!data || size <= sizeof(Header))
     {
@@ -240,7 +240,7 @@ bool Comms::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload
     return true;
 }
 
-void Comms::send_response(const Header& header)
+void Sensor_Comms::send_response(const Header& header)
 {
     uint8_t response_buffer[RESPONSE_BUFFER_SIZE + 1] = { 0 };
     uint8_t* ptr = response_buffer + 1;
@@ -248,11 +248,11 @@ void Comms::send_response(const Header& header)
     Header* header_ptr = reinterpret_cast<Header*>(ptr);
     header_ptr->source_address = m_address;
     header_ptr->destination_address = header.source_address;
-    header_ptr->type = data::Type::RESPONSE;
+    header_ptr->type = data::sensor::Type::RESPONSE;
     header_ptr->req_id = ++m_last_req_id;
     header_ptr->crc = 0;
 
-    data::Response* response_ptr = reinterpret_cast<data::Response*>(ptr + sizeof(Header));
+    data::sensor::Response* response_ptr = reinterpret_cast<data::sensor::Response*>(ptr + sizeof(Header));
     response_ptr->ack = 1;
     response_ptr->req_id = header.req_id;
 
@@ -266,7 +266,7 @@ void Comms::send_response(const Header& header)
     }
 }
 
-uint8_t* Comms::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size, uint32_t timeout)
+uint8_t* Sensor_Comms::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size, uint32_t timeout)
 {
 #ifdef __AVR__
     uint32_t start = millis();
@@ -285,7 +285,7 @@ uint8_t* Comms::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size, uint32
             Header* header_ptr = reinterpret_cast<Header*>(data);
             if (validate_packet(data, size, 0))
             {
-                if (get_rx_packet_type(data) != data::Type::RESPONSE) //ignore protocol packets
+                if (get_rx_packet_type(data) != data::sensor::Type::RESPONSE) //ignore protocol packets
                 {
                     send_response(*header_ptr);
 
@@ -306,27 +306,27 @@ uint8_t* Comms::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size, uint32
     return nullptr;
 }
 
-data::Type Comms::get_rx_packet_type(uint8_t* received_buffer) const
+data::sensor::Type Sensor_Comms::get_rx_packet_type(uint8_t* received_buffer) const
 {
     const Header* header_ptr = reinterpret_cast<const Header*>(received_buffer);
     return header_ptr->type;
 }
-const void* Comms::get_rx_packet_payload(uint8_t* received_buffer) const
+const void* Sensor_Comms::get_rx_packet_payload(uint8_t* received_buffer) const
 {
     return received_buffer + sizeof(Header);
 }
-void* Comms::get_tx_packet_payload(uint8_t* raw_buffer) const
+void* Sensor_Comms::get_tx_packet_payload(uint8_t* raw_buffer) const
 {
     return raw_buffer + sizeof(Header) + 1;
 }
 
-uint32_t Comms::get_rx_packet_source_address(uint8_t* received_buffer) const
+uint32_t Sensor_Comms::get_rx_packet_source_address(uint8_t* received_buffer) const
 {
     const Header* header_ptr = reinterpret_cast<const Header*>(received_buffer);
     return header_ptr->source_address;
 }
 
-int8_t Comms::get_input_dBm()
+int8_t Sensor_Comms::get_input_dBm()
 {
     return m_rf22.get_input_dBm();
 }

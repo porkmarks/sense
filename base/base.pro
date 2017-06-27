@@ -43,7 +43,7 @@ INCLUDEPATH += ../common/src/rfm22b
 
 
 SOURCES += src/main.cpp \
-    ../common/src/Comms.cpp \
+    ../common/src/Sensor_Comms.cpp \
     ../common/src/CRC.cpp \
     ../common/src/Storage.cpp \
     src/tests.cpp \
@@ -54,7 +54,7 @@ SOURCES += src/main.cpp \
     src/Server.cpp
 
 HEADERS += \
-    ../common/src/Comms.h \
+    ../common/src/Sensor_Comms.h \
     ../common/src/CRC.h \
     ../common/src/Data_Defs.h \
     ../common/src/Storage.h \

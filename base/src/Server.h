@@ -53,6 +53,7 @@ private:
     std::unique_ptr<boost::asio::ip::tcp::acceptor> m_acceptor;
     boost::asio::ip::tcp::socket m_socket;
     bool m_is_connected = false;
+    bool m_is_accepting = false;
 
     typedef util::comms::ASIO_Socket_Adapter<boost::asio::ip::tcp::socket> Socket_Adapter;
     Socket_Adapter m_socket_adapter;

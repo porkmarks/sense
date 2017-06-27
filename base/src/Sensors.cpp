@@ -238,7 +238,7 @@ Sensors::Sensor const* Sensors::add_sensor(Sensor_Id id, std::string const& name
         return nullptr;
     }
 
-    assert(address >= Comms::SLAVE_ADDRESS_BEGIN && address < Comms::SLAVE_ADDRESS_END);
+    assert(address >= Sensor_Comms::SLAVE_ADDRESS_BEGIN && address < Sensor_Comms::SLAVE_ADDRESS_END);
     Sensor sensor;
     sensor.id = id;
     sensor.name = name;

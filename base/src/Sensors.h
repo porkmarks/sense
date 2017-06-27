@@ -6,7 +6,7 @@
 #include <string>
 #include <boost/thread.hpp>
 
-#include "Comms.h"
+#include "Sensor_Comms.h"
 
 class Sensors
 {
@@ -128,7 +128,7 @@ private:
     boost::optional<Unbound_Sensor_Data> m_unbound_sensor_data_opt;
     std::vector<Sensor> m_sensors;
 
-    uint32_t m_last_address = Comms::SLAVE_ADDRESS_BEGIN;
+    uint32_t m_last_address = Sensor_Comms::SLAVE_ADDRESS_BEGIN;
 };
 
 namespace std

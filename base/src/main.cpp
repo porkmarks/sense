@@ -16,7 +16,7 @@
 #include <pigpio.h>
 
 #include "CRC.h"
-#include "Comms.h"
+#include "Sensor_Comms.h"
 #include "Sensors.h"
 #include "Server.h"
 
@@ -26,7 +26,7 @@
 #define LOG(x) std::cout << x
 #define LOG_LN(x) std::cout << x << std::endl
 
-static Comms s_sensor_comms;
+static Sensor_Comms s_sensor_comms;
 static Sensors s_sensors;
 static Server s_server(s_sensors);
 
@@ -40,7 +40,7 @@ extern std::string time_point_to_string(std::chrono::high_resolution_clock::time
 
 ////////////////////////////////////////////////////////////////////////
 
-void fill_config_packet(data::Config& packet, Sensors::Sensor const& sensor)
+void fill_config_packet(data::sensor::Config& packet, Sensors::Sensor const& sensor)
 {
     Clock::time_point now = Clock::now();
     packet.next_measurement_delay = chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(s_sensors.compute_next_measurement_time_point(sensor.id) - now).count());
@@ -61,26 +61,26 @@ void fill_config_packet(data::Config& packet, Sensors::Sensor const& sensor)
 
 static void process_sensor_requests(std::chrono::high_resolution_clock::duration dt)
 {
-    std::vector<uint8_t> raw_packet_data(s_sensor_comms.get_payload_raw_buffer_size(Comms::MAX_USER_DATA_SIZE));
+    std::vector<uint8_t> raw_packet_data(s_sensor_comms.get_payload_raw_buffer_size(Sensor_Comms::MAX_USER_DATA_SIZE));
 
-    uint8_t size = Comms::MAX_USER_DATA_SIZE;
+    uint8_t size = Sensor_Comms::MAX_USER_DATA_SIZE;
     uint8_t* packet_data = s_sensor_comms.receive_packet(raw_packet_data.data(), size, std::chrono::duration_cast<std::chrono::milliseconds>(dt).count());
     if (packet_data)
     {
-        data::Type type = s_sensor_comms.get_rx_packet_type(packet_data);
+        data::sensor::Type type = s_sensor_comms.get_rx_packet_type(packet_data);
         //LOG_LN("Received packed of " << (int)size << " bytes. Type: "<< (int)type);
-        if (type == data::Type::PAIR_REQUEST && size == sizeof(data::Pair_Request))
+        if (type == data::sensor::Type::PAIR_REQUEST && size == sizeof(data::sensor::Pair_Request))
         {
             Sensors::Sensor const* sensor = s_sensors.bind_sensor();
             if (sensor)
             {
                 std::cout << "Adding sensor " << sensor->name << ", id " << sensor->id << ", address " << sensor->address << "\n";
 
-                data::Pair_Response packet;
+                data::sensor::Pair_Response packet;
                 packet.address = sensor->address;
                 //strncpy(packet.name, sensor->name.c_str(), sizeof(packet.name));
                 s_sensor_comms.set_destination_address(s_sensor_comms.get_rx_packet_source_address(packet_data));
-                s_sensor_comms.begin_packet(raw_packet_data.data(), data::Type::PAIR_RESPONSE);
+                s_sensor_comms.begin_packet(raw_packet_data.data(), data::sensor::Type::PAIR_RESPONSE);
                 s_sensor_comms.pack(raw_packet_data.data(), packet);
                 if (s_sensor_comms.send_packet(raw_packet_data.data(), 10))
                 {
@@ -97,13 +97,13 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
                 std::cerr << "Pairing failed (db)\n";
             }
         }
-        else if (type == data::Type::MEASUREMENT_BATCH && size == sizeof(data::Measurement_Batch))
+        else if (type == data::sensor::Type::MEASUREMENT_BATCH && size == sizeof(data::sensor::Measurement_Batch))
         {
             Sensors::Sensor_Address address = s_sensor_comms.get_rx_packet_source_address(packet_data);
             const Sensors::Sensor* sensor = s_sensors.find_sensor_by_address(address);
             if (sensor)
             {
-                data::Measurement_Batch const& batch = *reinterpret_cast<data::Measurement_Batch const*>(s_sensor_comms.get_rx_packet_payload(packet_data));
+                data::sensor::Measurement_Batch const& batch = *reinterpret_cast<data::sensor::Measurement_Batch const*>(s_sensor_comms.get_rx_packet_payload(packet_data));
 
                 std::cout << "Measurement batch from " << sensor->id << "\n";
                 if (batch.count == 0)
@@ -120,7 +120,7 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
                 }
 
                 std::vector<Sensors::Measurement> measurements;
-                size_t count = std::min<size_t>(batch.count, data::Measurement_Batch::MAX_COUNT);
+                size_t count = std::min<size_t>(batch.count, data::sensor::Measurement_Batch::MAX_COUNT);
                 for (size_t i = 0; i < count; i++)
                 {
                     Sensors::Measurement m;
@@ -142,7 +142,7 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
                 std::cerr << "\tSensor not found!\n";
             }
         }
-        else if (type == data::Type::FIRST_CONFIG_REQUEST && size == sizeof(data::First_Config_Request))
+        else if (type == data::sensor::Type::FIRST_CONFIG_REQUEST && size == sizeof(data::sensor::First_Config_Request))
         {
             Sensors::Sensor_Address address = s_sensor_comms.get_rx_packet_source_address(packet_data);
             const Sensors::Sensor* sensor = s_sensors.find_sensor_by_address(address);
@@ -150,13 +150,13 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
             {
                 std::cout << "First config for " << sensor->id << "\n";
 
-                data::First_Config packet;
+                data::sensor::First_Config packet;
                 packet.first_measurement_index = s_sensors.compute_next_measurement_index();
                 s_sensors.set_sensor_measurement_range(sensor->id, packet.first_measurement_index, 0);
                 fill_config_packet(packet.config, *sensor);
 
                 s_sensor_comms.set_destination_address(s_sensor_comms.get_rx_packet_source_address(packet_data));
-                s_sensor_comms.begin_packet(raw_packet_data.data(), data::Type::FIRST_CONFIG);
+                s_sensor_comms.begin_packet(raw_packet_data.data(), data::sensor::Type::FIRST_CONFIG);
                 s_sensor_comms.pack(raw_packet_data.data(), packet);
                 if (s_sensor_comms.send_packet(raw_packet_data.data(), 3))
                 {
@@ -172,9 +172,9 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
                 std::cerr << "\tSensor not found!\n";
             }
         }
-        else if (type == data::Type::CONFIG_REQUEST && size == sizeof(data::Config_Request))
+        else if (type == data::sensor::Type::CONFIG_REQUEST && size == sizeof(data::sensor::Config_Request))
         {
-            data::Config_Request const& config_request = *reinterpret_cast<data::Config_Request const*>(s_sensor_comms.get_rx_packet_payload(packet_data));
+            data::sensor::Config_Request const& config_request = *reinterpret_cast<data::sensor::Config_Request const*>(s_sensor_comms.get_rx_packet_payload(packet_data));
 
             Sensors::Sensor_Address address = s_sensor_comms.get_rx_packet_source_address(packet_data);
             const Sensors::Sensor* sensor = s_sensors.find_sensor_by_address(address);
@@ -197,11 +197,11 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
                 s_sensors.set_sensor_measurement_range(sensor->id, config_request.first_measurement_index, config_request.measurement_count);
                 s_sensors.set_sensor_b2s_input_dBm(sensor->id, config_request.b2s_input_dBm);
 
-                data::Config packet;
+                data::sensor::Config packet;
                 fill_config_packet(packet, *sensor);
 
                 s_sensor_comms.set_destination_address(s_sensor_comms.get_rx_packet_source_address(packet_data));
-                s_sensor_comms.begin_packet(raw_packet_data.data(), data::Type::CONFIG);
+                s_sensor_comms.begin_packet(raw_packet_data.data(), data::sensor::Type::CONFIG);
                 s_sensor_comms.pack(raw_packet_data.data(), packet);
                 if (s_sensor_comms.send_packet(raw_packet_data.data(), 3))
                 {
@@ -247,7 +247,7 @@ int main(int, const char**)
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
-    s_sensor_comms.set_address(Comms::BASE_ADDRESS);
+    s_sensor_comms.set_address(Sensor_Comms::BASE_ADDRESS);
 
 
     if (!s_server.init(4444, 5555))

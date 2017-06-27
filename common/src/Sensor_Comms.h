@@ -4,7 +4,7 @@
 
 #include "rfm22b/rfm22b.h"
 
-class Comms
+class Sensor_Comms
 {
 #ifndef __AVR__
 #   pragma pack(push, 1) // exact fit - no padding
@@ -15,7 +15,7 @@ class Comms
         uint32_t source_address = BROADCAST_ADDRESS;
         uint32_t destination_address = BROADCAST_ADDRESS;
         uint16_t req_id : 15;
-        data::Type type;
+        data::sensor::Type type;
     };
 
 #ifndef __AVR__
@@ -23,7 +23,7 @@ class Comms
 #endif
 
 public:
-    Comms();
+    Sensor_Comms();
 
     static constexpr uint32_t BROADCAST_ADDRESS = 0;
     static constexpr uint32_t BASE_ADDRESS = 0xFFFFFFFFULL;
@@ -45,7 +45,7 @@ public:
     uint8_t get_payload_raw_buffer_size(uint8_t size) const;
     void* get_tx_packet_payload(uint8_t* raw_buffer) const;
 
-    uint8_t begin_packet(uint8_t* raw_buffer, data::Type type);
+    uint8_t begin_packet(uint8_t* raw_buffer, data::sensor::Type type);
 
     template<class T> uint8_t pack(uint8_t* raw_buffer, const T& data);
     uint8_t pack(uint8_t* raw_buffer, const void* data, uint8_t size);
@@ -57,7 +57,7 @@ public:
 
     uint32_t get_rx_packet_source_address(uint8_t* received_buffer) const;
     int8_t get_input_dBm();
-    data::Type get_rx_packet_type(uint8_t* received_buffer) const;
+    data::sensor::Type get_rx_packet_type(uint8_t* received_buffer) const;
     const void* get_rx_packet_payload(uint8_t* received_buffer) const;
 
     static const uint8_t MAX_USER_DATA_SIZE = RFM22B::MAX_DATAGRAM_LENGTH - sizeof(Header);
@@ -69,7 +69,7 @@ private:
     uint32_t m_destination_address = BROADCAST_ADDRESS;
     uint16_t m_last_req_id = 0;
 
-    static const uint8_t RESPONSE_BUFFER_SIZE = sizeof(Header) + sizeof(data::Response);
+    static const uint8_t RESPONSE_BUFFER_SIZE = sizeof(Header) + sizeof(data::sensor::Response);
 
     bool validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload_size);
 
@@ -80,7 +80,7 @@ private:
 };
 
 
-template<class T> uint8_t Comms::pack(uint8_t* dst, const T& data)
+template<class T> uint8_t Sensor_Comms::pack(uint8_t* dst, const T& data)
 {
     static_assert(sizeof(T) <= MAX_USER_DATA_SIZE, "");
     return pack(dst, &data, sizeof(T));

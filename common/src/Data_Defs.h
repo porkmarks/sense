@@ -6,6 +6,8 @@
 
 namespace data
 {
+namespace sensor
+{
 
 enum class Type : uint8_t
 {
@@ -130,6 +132,7 @@ static_assert(sizeof(Pair_Response) == 4, "");
 #ifndef __AVR__
 #   pragma pack(pop)
 #endif
+}
 
 enum class Server_Message
 {
@@ -149,5 +152,6 @@ enum class Server_Message
     SENSOR_BOUND_RES,
     POWER_OFF_REQ,
 };
+
 
 }

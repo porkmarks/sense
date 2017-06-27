@@ -131,6 +131,7 @@ void Server::start_accept()
 {
     try
     {
+        m_is_accepting = true;
         m_acceptor->async_accept(m_socket, boost::bind(&Server::accept_func, this, boost::asio::placeholders::error));
     }
     catch (std::exception const& e)
@@ -146,14 +147,14 @@ void Server::accept_func(boost::system::error_code ec)
     if (ec)
     {
         std::cerr << "Accept error: " << ec.message() << "\n";
+        start_accept();
     }
     else
     {
+        m_is_accepting = false;
         m_is_connected = true;
         m_socket_adapter.start();
     }
-
-    start_accept();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -281,6 +282,7 @@ void Server::process_get_config_req()
         pt.add("sensors_sleeping", config.sensors_sleeping);
         pt.add("measurement_period", std::chrono::duration_cast<std::chrono::seconds>(config.measurement_period).count());
         pt.add("comms_period", std::chrono::duration_cast<std::chrono::seconds>(config.comms_period).count());
+        pt.add("computed_comms_period", std::chrono::duration_cast<std::chrono::seconds>(m_sensors.compute_comms_period()).count());
         pt.add("baseline_time_point", std::chrono::duration_cast<std::chrono::seconds>(config.baseline_time_point.time_since_epoch()).count());
 
         boost::property_tree::write_json(ss, pt);
@@ -346,9 +348,11 @@ void Server::process_get_sensors_req()
     {
         boost::property_tree::ptree pt;
 
+        auto sensors_node = pt.add("sensors", "");
+
         for (Sensors::Sensor const& sensor: m_sensors.get_sensors())
         {
-            auto node = pt.add("sensors." + sensor.name, "");
+            auto node = sensors_node.add(sensor.name, "");
             node.add("address", sensor.name);
             node.add("id", sensor.id);
         }
@@ -485,6 +489,10 @@ void Server::process()
 {
     if (!m_socket.is_open() || !m_is_connected)
     {
+        if (!m_is_accepting)
+        {
+            start_accept();
+        }
         return;
     }
 
