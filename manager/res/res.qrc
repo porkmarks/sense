@@ -1,22 +1,26 @@
 <RCC>
-    <qresource prefix="/">
-        <file>icons/ui/alarm.png</file>
-        <file>icons/ui/back.png</file>
-        <file>icons/ui/connected.png</file>
-        <file>icons/ui/disconnected.png</file>
-        <file>icons/ui/fft.png</file>
-        <file>icons/ui/graph.png</file>
-        <file>icons/ui/minus.png</file>
-        <file>icons/ui/plus.png</file>
-        <file>icons/ui/reconnect.png</file>
-        <file>icons/ui/search.png</file>
-        <file>icons/ui/setup.png</file>
-        <file>icons/ui/upload.png</file>
-        <file>icons/ui/view.png</file>
-        <file>icons/ui/wifi.png</file>
-        <file>icons/ui/station.png</file>
-        <file>icons/ui/ip.png</file>
-        <file>icons/ui/port.png</file>
-        <file>icons/ui/arrow-right.png</file>
-    </qresource>
+<qresource prefix="/">
+<file>icons/ui/add.png</file>
+<file>icons/ui/alarm.png</file>
+<file>icons/ui/arrow-right.png</file>
+<file>icons/ui/back.png</file>
+<file>icons/ui/connected.png</file>
+<file>icons/ui/disconnected.png</file>
+<file>icons/ui/fft.png</file>
+<file>icons/ui/filter.png</file>
+<file>icons/ui/graph.png</file>
+<file>icons/ui/ip.png</file>
+<file>icons/ui/minus.png</file>
+<file>icons/ui/plus.png</file>
+<file>icons/ui/port.png</file>
+<file>icons/ui/reconnect.png</file>
+<file>icons/ui/reload.png</file>
+<file>icons/ui/remove.png</file>
+<file>icons/ui/search.png</file>
+<file>icons/ui/sensor.png</file>
+<file>icons/ui/setup.png</file>
+<file>icons/ui/station.png</file>
+<file>icons/ui/view.png</file>
+<file>icons/ui/wifi.png</file>
+</qresource>
 </RCC>

@@ -138,10 +138,10 @@ void Comms::processGetSensorsRes()
         boost::property_tree::ptree pt;
         boost::property_tree::read_json(ss, pt);
 
-        std::vector<Sensor> sensors;
+        std::vector<SensorDescriptor> sensors;
         for (auto const& node: pt.get_child("sensors"))
         {
-            Sensor sensor;
+            SensorDescriptor sensor;
             sensor.name = node.first;
             sensor.address = node.second.get<Sensor_Address>("address");
             sensor.id = node.second.get<Sensor_Id>("id");

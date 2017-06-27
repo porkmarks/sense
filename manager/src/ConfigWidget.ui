@@ -225,7 +225,7 @@
         </property>
         <property name="icon">
          <iconset resource="../res/res.qrc">
-          <normaloff>:/icons/ui/reconnect.png</normaloff>:/icons/ui/reconnect.png</iconset>
+          <normaloff>:/icons/ui/reload.png</normaloff>:/icons/ui/reload.png</iconset>
         </property>
        </widget>
       </item>
@@ -235,7 +235,7 @@
          <string>Apply</string>
         </property>
         <property name="icon">
-         <iconset resource="../res/res.qrc">
+         <iconset>
           <normaloff>:/icons/ui/upload.png</normaloff>:/icons/ui/upload.png</iconset>
         </property>
        </widget>

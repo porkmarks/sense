@@ -65,7 +65,11 @@ HEADERS += \
     ../../src/AlarmsWidget.h \
     ../../../common/src/Channel.h \
     ../../../common/src/QTcpSocketAdapter.h \
-    ../../../common/src/CRC.h
+    ../../../common/src/CRC.h \
+    ../../src/DB.h \
+    ../../src/DBModel.h \
+    ../../src/measurement.h \
+    ../../src/SensorsWidget.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -75,13 +79,17 @@ SOURCES += \
     ../../src/ConfigWidget.cpp \
     ../../src/MeasurementsWidget.cpp \
     ../../src/AlarmsWidget.cpp \
-    ../../../common/src/CRC.cpp
+    ../../../common/src/CRC.cpp \
+    ../../src/DB.cpp \
+    ../../src/DBModel.cpp \
+    ../../src/SensorsWidget.cpp
 
 FORMS += \
     ../../src/Manager.ui \
     ../../src/BaseStationsWidget.ui \
     ../../src/ConfigWidget.ui \
-    ../../src/MeasurementsWidget.ui
+    ../../src/MeasurementsWidget.ui \
+    ../../src/SensorsWidget.ui
 
 DISTFILES += \
 

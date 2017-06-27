@@ -27,7 +27,7 @@ public:
         QHostAddress address;
     };
 
-    struct Sensor
+    struct SensorDescriptor
     {
         Sensor_Id id = 0;
         Sensor_Address address = 0;
@@ -64,7 +64,7 @@ signals:
     void baseStationConnected(BaseStationDescriptor const& bs);
     void baseStationDisconnected(BaseStationDescriptor const& bs);
     void configReceived(Config const& config);
-    void sensorsReceived(std::vector<Sensor> const& sensors);
+    void sensorsReceived(std::vector<SensorDescriptor> const& sensors);
 
 private slots:
     void broadcastReceived();
