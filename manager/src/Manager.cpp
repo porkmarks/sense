@@ -9,11 +9,15 @@ Manager::Manager(QWidget *parent)
     m_ui.setupUi(this);
 
     m_ui.baseStationsWidget->init(m_comms);
+    m_ui.configWidget->init(m_comms);
+    m_ui.measurementsWidget->init(m_comms);
 
     auto* timer = new QTimer(this);
     timer->setSingleShot(false);
     timer->start(1);
     connect(timer, &QTimer::timeout, this, &Manager::process, Qt::QueuedConnection);
+
+    connect(m_ui.baseStationsWidget, &BaseStationsWidget::baseStationSelected, this, &Manager::activateBaseStation);
 
     readSettings();
 
@@ -22,6 +26,11 @@ Manager::Manager(QWidget *parent)
 
 Manager::~Manager()
 {
+}
+
+void Manager::activateBaseStation(Comms::BaseStationDescriptor const& bs)
+{
+    m_comms.connectToBaseStation(bs.address);
 }
 
 void Manager::closeEvent(QCloseEvent* event)
@@ -50,5 +59,7 @@ void Manager::process()
 //    {
 //        m_ui.statusbar->showMessage("");
 //    }
+
+    m_comms.process();
 }
 

@@ -11,6 +11,9 @@ public:
     Manager(QWidget* parent = 0);
     ~Manager();
 
+private slots:
+    void activateBaseStation(Comms::BaseStationDescriptor const& bs);
+
 private:
     void process();
 

@@ -1,4 +1,5 @@
 #include "BaseStationsWidget.h"
+#include <cassert>
 
 BaseStationsWidget::BaseStationsWidget(QWidget *parent)
     : QWidget(parent)
@@ -6,13 +7,14 @@ BaseStationsWidget::BaseStationsWidget(QWidget *parent)
     m_ui.setupUi(this);
     m_ui.list->setModel(&m_model);
 
-    m_model.setColumnCount(4);
-    m_model.setHorizontalHeaderLabels({"", "MAC", "IP", "Port"});
+    m_model.setColumnCount(3);
+    m_model.setHorizontalHeaderLabels({"", "MAC", "IP"});
 
     m_ui.list->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
     m_ui.list->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
-    m_ui.list->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
-    m_ui.list->header()->setSectionResizeMode(3, QHeaderView::Stretch);
+    m_ui.list->header()->setSectionResizeMode(2, QHeaderView::Stretch);
+
+    QObject::connect(m_ui.list, &QTreeView::doubleClicked, this, &BaseStationsWidget::activateBaseStation);
 }
 
 void BaseStationsWidget::init(Comms& comms)
@@ -20,9 +22,77 @@ void BaseStationsWidget::init(Comms& comms)
     m_comms = &comms;
 
     QObject::connect(m_comms, &Comms::baseStationDiscovered, this, &BaseStationsWidget::baseStationDiscovered);
+    QObject::connect(m_comms, &Comms::baseStationConnected, this, &BaseStationsWidget::baseStationConnected);
 }
 
-void BaseStationsWidget::baseStationDiscovered(std::array<uint8_t, 6> const& mac, QHostAddress const& address, uint16_t port)
+void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
+{
+    QStandardItem* item = m_model.itemFromIndex(index);
+    if (!item)
+    {
+        return;
+    }
+
+    QStandardItem* selectionItem = m_model.item(item->row(), 0);
+    if (!selectionItem)
+    {
+        return;
+    }
+
+    uint32_t bsIndex = selectionItem->data().toUInt();
+    assert(bsIndex < m_baseStations.size());
+    if (bsIndex >= m_baseStations.size())
+    {
+        return;
+    }
+
+    emit baseStationSelected(m_baseStations[bsIndex]);
+}
+
+void BaseStationsWidget::baseStationConnected(Comms::BaseStationDescriptor const& bs)
+{
+    auto it = std::find_if(m_baseStations.begin(), m_baseStations.end(), [&bs](Comms::BaseStationDescriptor const& _bs) { return _bs.mac == bs.mac; });
+    if (it == m_baseStations.end())
+    {
+        assert(false);
+        return;
+    }
+
+    size_t selectedBsIndex = std::distance(m_baseStations.begin(), it);
+
+    for (int i = 0; i < m_model.rowCount(); i++)
+    {
+        QStandardItem* si = m_model.item(i, 0);
+        if (!si)
+        {
+            continue;
+        }
+        uint32_t bsIndex = si->data().toUInt();
+        if (bsIndex != selectedBsIndex)
+        {
+            si->setIcon(QIcon());
+        }
+        else
+        {
+            si->setIcon(QIcon(":/icons/ui/arrow-right.png"));
+        }
+    }
+}
+
+void BaseStationsWidget::baseStationDisconnected(Comms::BaseStationDescriptor const& bs)
+{
+    for (int i = 0; i < m_model.rowCount(); i++)
+    {
+        QStandardItem* si = m_model.item(i, 0);
+        if (!si)
+        {
+            continue;
+        }
+        si->setIcon(QIcon());
+    }
+}
+
+void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor const& bs)
 {
 //    QList<QListWidgetItem*> items = m_ui.list->findItems(QString(buf), Qt::MatchExactly);
 //    if (!items.empty())
@@ -30,25 +100,21 @@ void BaseStationsWidget::baseStationDiscovered(std::array<uint8_t, 6> const& mac
 //        return;
 //    }
 
-    auto it = std::find_if(m_baseStations.begin(), m_baseStations.end(), [mac](BaseStation const& bs) { return bs.mac == mac; });
+    auto it = std::find_if(m_baseStations.begin(), m_baseStations.end(), [&bs](Comms::BaseStationDescriptor const& _bs) { return _bs.mac == bs.mac; });
     if (it != m_baseStations.end())
     {
         return;
     }
 
-    BaseStation bs = { mac, address, port };
     m_baseStations.push_back(bs);
 
-    QStandardItem* selectedItem = new QStandardItem();
+    QStandardItem* selectionItem = new QStandardItem();
     QStandardItem* macItem = new QStandardItem();
     QStandardItem* ipItem = new QStandardItem();
-    QStandardItem* portItem = new QStandardItem();
-
-    selectedItem->setIcon(QIcon(":/icons/ui/arrow-right.png"));
 
     {
         char buf[128];
-        sprintf(buf, "  %X:%X:%X:%X:%X:%X  ", mac[0]&0xFF, mac[1]&0xFF, mac[2]&0xFF, mac[3]&0xFF, mac[4]&0xFF, mac[5]&0xFF);
+        sprintf(buf, "  %X:%X:%X:%X:%X:%X  ", bs.mac[0]&0xFF, bs.mac[1]&0xFF, bs.mac[2]&0xFF, bs.mac[3]&0xFF, bs.mac[4]&0xFF, bs.mac[5]&0xFF);
         macItem->setText(buf);
         macItem->setIcon(QIcon(":/icons/ui/station.png"));
         macItem->setEditable(false);
@@ -56,18 +122,12 @@ void BaseStationsWidget::baseStationDiscovered(std::array<uint8_t, 6> const& mac
 
     {
         char buf[128];
-        sprintf(buf, "  %s  ", address.toString().toLatin1().data());
+        sprintf(buf, "  %s  ", bs.address.toString().toLatin1().data());
         ipItem->setText(buf);
         ipItem->setIcon(QIcon(":/icons/ui/ip.png"));
         ipItem->setEditable(false);
     }
 
-    {
-        portItem->setData(port, Qt::DisplayRole);
-        portItem->setIcon(QIcon(":/icons/ui/port.png"));
-        portItem->setEditable(false);
-    }
-
-    m_model.appendRow({ selectedItem, macItem, ipItem, portItem});
+    m_model.appendRow({ selectionItem, macItem, ipItem });
 }
 

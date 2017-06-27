@@ -17,6 +17,7 @@ CONFIG += console
 CONFIG += c++11
 
 INCLUDEPATH += ../../src
+INCLUDEPATH += ../../../common/src
 
 QMAKE_CXXFLAGS += -Wno-unused-variable -Wno-unused-parameter -B$HOME/dev/bin/gold
 QMAKE_CFLAGS += -Wno-unused-variable -Wno-unused-parameter -B$HOME/dev/bin/gold
@@ -61,7 +62,10 @@ HEADERS += \
     ../../src/BaseStationsWidget.h \
     ../../src/ConfigWidget.h \
     ../../src/MeasurementsWidget.h \
-    ../../src/AlarmsWidget.h
+    ../../src/AlarmsWidget.h \
+    ../../../common/src/Channel.h \
+    ../../../common/src/QTcpSocketAdapter.h \
+    ../../../common/src/CRC.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -70,11 +74,14 @@ SOURCES += \
     ../../src/BaseStationsWidget.cpp \
     ../../src/ConfigWidget.cpp \
     ../../src/MeasurementsWidget.cpp \
-    ../../src/AlarmsWidget.cpp
+    ../../src/AlarmsWidget.cpp \
+    ../../../common/src/CRC.cpp
 
 FORMS += \
     ../../src/Manager.ui \
-    ../../src/BaseStationsWidget.ui
+    ../../src/BaseStationsWidget.ui \
+    ../../src/ConfigWidget.ui \
+    ../../src/MeasurementsWidget.ui
 
 DISTFILES += \
 
