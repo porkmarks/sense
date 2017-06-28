@@ -1,5 +1,10 @@
 <RCC>
 <qresource prefix="/">
+<file>icons/ui/battery-0.png</file>
+<file>icons/ui/battery-25.png</file>
+<file>icons/ui/battery-50.png</file>
+<file>icons/ui/battery-75.png</file>
+<file>icons/ui/battery-100.png</file>
 <file>icons/ui/add.png</file>
 <file>icons/ui/alarm.png</file>
 <file>icons/ui/arrow-right.png</file>

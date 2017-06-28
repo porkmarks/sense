@@ -107,6 +107,36 @@ void Comms::requestSensors()
     m_bsChannel.send(data::Server_Message::GET_SENSORS_REQ, nullptr, 0);
 }
 
+
+void Comms::requestBindSensor(std::string const& name)
+{
+    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [&name](Comms::Sensor const& s) { return s.name == name; });
+    if (it != m_sensors.end())
+    {
+        std::cerr << "Sensor already exists: " << name << "\n";
+        return;
+    }
+
+    m_sensorWaitingForBinding.name = name;
+
+    try
+    {
+        std::stringstream ss;
+        boost::property_tree::ptree pt;
+
+        pt.add("unbound_sensor_name", name);
+
+        boost::property_tree::write_json(ss, pt);
+
+        std::string str = ss.str();
+        m_bsChannel.send(data::Server_Message::ADD_SENSOR_REQ, str.data(), str.size());
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << "Cannot serialize request: " << e.what() << "\n";
+    }
+}
+
 void Comms::processGetConfigRes()
 {
     std::vector<uint8_t> buffer;
@@ -153,20 +183,27 @@ void Comms::processGetSensorsRes()
         boost::property_tree::read_json(ss, pt);
 
         m_sensors.clear();
-        for (auto const& node: pt.get_child("sensors"))
+        if (pt.get_child_optional("sensors"))
         {
-            Sensor sensor;
-            sensor.name = node.first;
-            sensor.address = node.second.get<Sensor_Address>("address");
-            sensor.id = node.second.get<Sensor_Id>("id");
-            m_sensors.push_back(sensor);
+            for (auto const& node: pt.get_child("sensors"))
+            {
+                Sensor sensor;
+                sensor.name = node.first;
+                sensor.address = node.second.get<Sensor_Address>("address");
+                sensor.id = node.second.get<Sensor_Id>("id");
+                m_sensors.push_back(sensor);
+            }
         }
-
-        emit sensorsReceived(m_sensors);
     }
     catch (std::exception const& e)
     {
         std::cerr << "Cannot deserialize response: " << e.what() << "\n";
+        return;
+    }
+
+    for (Sensor const& sensor: m_sensors)
+    {
+        emit sensorAdded(sensor);
     }
 }
 
@@ -187,7 +224,35 @@ void Comms::processReportMeasurementReq()
 
 void Comms::processSensorBoundReq()
 {
+    std::vector<uint8_t> buffer;
+    m_bsChannel.unpack(buffer);
 
+    std::string str_buffer(reinterpret_cast<char*>(buffer.data()), reinterpret_cast<char*>(buffer.data()) + buffer.size());
+    std::stringstream ss(str_buffer);
+
+    try
+    {
+        boost::property_tree::ptree pt;
+        boost::property_tree::read_json(ss, pt);
+
+        Sensor sensor;
+        sensor.name = pt.get<std::string>("name");;
+        sensor.address = pt.get<Sensor_Address>("address");
+        sensor.id = pt.get<Sensor_Id>("id");
+
+        if (sensor.name != m_sensorWaitingForBinding.name)
+        {
+            std::cerr << "Was waiting to bind sensor '" << m_sensorWaitingForBinding.name << "' but received '" << sensor.name << "'\n";
+        }
+
+        m_sensors.push_back(sensor);
+
+        emit sensorAdded(sensor);
+    }
+    catch (std::exception const& e)
+    {
+        std::cerr << "Cannot deserialize response: " << e.what() << "\n";
+    }
 }
 
 void Comms::process()

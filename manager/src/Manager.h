@@ -4,6 +4,7 @@
 #include "ui_Manager.h"
 
 #include "Comms.h"
+#include "DB.h"
 
 class Manager : public QMainWindow
 {
@@ -24,6 +25,7 @@ private:
     Ui::Manager m_ui;
 
     Comms m_comms;
+    DB m_db;
 };
 
 

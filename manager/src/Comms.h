@@ -62,13 +62,14 @@ public:
 public slots:
     void requestConfig();
     void requestSensors();
+    void requestBindSensor(std::string const& name);
 
 signals:
     void baseStationDiscovered(BaseStation const& bs);
     void baseStationConnected(BaseStation const& bs);
     void baseStationDisconnected(BaseStation const& bs);
     void configReceived(Config const& config);
-    void sensorsReceived(std::vector<Sensor> const& sensors);
+    void sensorAdded(Sensor const& sensor);
 
 private slots:
     void broadcastReceived();
@@ -89,6 +90,7 @@ private:
     QUdpSocket m_broadcastSocket;
     std::vector<BaseStation> m_baseStations;
     std::vector<Sensor> m_sensors;
+    Sensor m_sensorWaitingForBinding;
     Config m_config;
 
     size_t m_connectedBSIndex = size_t(-1);

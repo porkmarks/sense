@@ -104,6 +104,28 @@ size_t DB::get_filtered_measurement_count(Filter const& filter) const
     return count;
 }
 
+bool DB::get_last_measurement_for_sensor(Sensor_Id sensor_id, Measurement& measurement) const
+{
+    auto it = m_measurements.find(sensor_id);
+    if (it == m_measurements.end())
+    {
+        return false;
+    }
+
+    Clock::time_point best_time_point = Clock::time_point(Clock::duration::zero());
+    for (Stored_Measurement const& sm: it->second)
+    {
+        Measurement m = unpack(sensor_id, sm);
+        if (m.time_point > best_time_point)
+        {
+            measurement = m;
+            best_time_point = m.time_point;
+        }
+    }
+
+    return true;
+}
+
 bool DB::cull(Measurement const& measurement, Filter const& filter) const
 {
     if (filter.use_sensor_filter)

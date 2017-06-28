@@ -10,8 +10,8 @@ Manager::Manager(QWidget *parent)
 
     m_ui.baseStationsWidget->init(m_comms);
     m_ui.configWidget->init(m_comms);
-    m_ui.sensorsWidget->init(m_comms);
-    m_ui.measurementsWidget->init(m_comms);
+    m_ui.sensorsWidget->init(m_comms, m_db);
+    m_ui.measurementsWidget->init(m_comms, m_db);
 
     auto* timer = new QTimer(this);
     timer->setSingleShot(false);

@@ -1,5 +1,12 @@
 #include "SensorsWidget.h"
 
+#include <QMessageBox>
+#include <QInputDialog>
+
+extern QIcon getBatteryIcon(float vcc);
+
+
+
 SensorsWidget::SensorsWidget(QWidget *parent)
     : QWidget(parent)
 {
@@ -23,24 +30,65 @@ SensorsWidget::SensorsWidget(QWidget *parent)
     m_ui.list->header()->setSectionResizeMode(9, QHeaderView::Stretch);
 
     //QObject::connect(m_ui.list, &QTreeView::doubleClicked, this, &BaseStationsWidget::activateBaseStation);
+
+    QObject::connect(m_ui.add, &QPushButton::released, this, &SensorsWidget::bindSensor);
+    QObject::connect(m_ui.remove, &QPushButton::released, this, &SensorsWidget::unbindSensor);
 }
 
-void SensorsWidget::init(Comms& comms)
+void SensorsWidget::init(Comms& comms, DB& db)
 {
     m_comms = &comms;
+    m_db = &db;
 
-    QObject::connect(m_comms, &Comms::sensorsReceived, this, &SensorsWidget::sensorsReceived);
+    QObject::connect(m_comms, &Comms::sensorAdded, this, &SensorsWidget::sensorAdded);
+    QObject::connect(m_comms, &Comms::baseStationConnected, this, &SensorsWidget::baseStationConnected);
     QObject::connect(m_comms, &Comms::baseStationDisconnected, this, &SensorsWidget::baseStationDisconnected);
 }
 
-void SensorsWidget::sensorsReceived(std::vector<Comms::Sensor> const& sensors)
+void SensorsWidget::bindSensor()
+{
+    if (!m_comms)
+    {
+        return;
+    }
+
+    while (1)
+    {
+        bool ok = false;
+        QString text = QInputDialog::getText(this, tr("Input Sensor Name"), tr("Name:"), QLineEdit::Normal, "", &ok);
+        if (!ok)
+        {
+            return;
+        }
+        std::string name = text.toUtf8().data();
+
+        if (name.empty())
+        {
+            QMessageBox::critical(this, "Error", "You need to specify a sensor name.");
+            continue;
+        }
+
+        std::vector<Comms::Sensor> const& sensors = m_comms->getLastSensors();
+        auto it = std::find_if(sensors.begin(), sensors.end(), [&name](Comms::Sensor const& sensor) { return sensor.name == name; });
+        if (it != sensors.end())
+        {
+            QMessageBox::critical(this, "Error", QString("There is already a sensor called '%1'").arg(text));
+            continue;
+        }
+
+        m_comms->requestBindSensor(name);
+        return;
+    }
+}
+
+void SensorsWidget::unbindSensor()
+{
+
+}
+
+void SensorsWidget::baseStationConnected(Comms::BaseStation const& bs)
 {
     setEnabled(true);
-
-    for (Comms::Sensor const& sensor: sensors)
-    {
-        addSensor(sensor);
-    }
 }
 
 void SensorsWidget::baseStationDisconnected(Comms::BaseStation const& bs)
@@ -48,7 +96,7 @@ void SensorsWidget::baseStationDisconnected(Comms::BaseStation const& bs)
     setEnabled(false);
 }
 
-void SensorsWidget::addSensor(Comms::Sensor const& sensor)
+void SensorsWidget::sensorAdded(Comms::Sensor const& sensor)
 {
     auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [&sensor](Comms::Sensor const& _s) { return _s.id == sensor.id; });
     if (it != m_sensors.end())
@@ -88,11 +136,26 @@ void SensorsWidget::refreshSensor(Comms::Sensor const& sensor)
     m_model.setItemData(m_model.index(index, 0), {{ Qt::DisplayRole, QVariant(sensor.name.c_str()) }} );
     m_model.setItemData(m_model.index(index, 1), {{ Qt::DisplayRole, QVariant(sensor.id) }} );
     m_model.setItemData(m_model.index(index, 2), {{ Qt::DisplayRole, QVariant(sensor.address) }} );
-    m_model.setItemData(m_model.index(index, 3), {{ Qt::DisplayRole, QVariant("N/A") }} );
-    m_model.setItemData(m_model.index(index, 4), {{ Qt::DisplayRole, QVariant("N/A") }} );
-    m_model.setItemData(m_model.index(index, 5), {{ Qt::DisplayRole, QVariant("N/A") }} );
-    m_model.setItemData(m_model.index(index, 6), {{ Qt::DisplayRole, QVariant("N/A") }} );
-    m_model.setItemData(m_model.index(index, 7), {{ Qt::DisplayRole, QVariant("N/A") }} );
-    m_model.setItemData(m_model.index(index, 8), {{ Qt::DisplayRole, QVariant("N/A") }} );
-    m_model.setItemData(m_model.index(index, 9), {{ Qt::DisplayRole, QVariant("N/A") }} );
+
+    DB::Measurement measurement;
+    if (m_db->get_last_measurement_for_sensor(sensor.id, measurement))
+    {
+        m_model.setItemData(m_model.index(index, 3), {{ Qt::DisplayRole, measurement.temperature }} );
+        m_model.setItemData(m_model.index(index, 4), {{ Qt::DisplayRole, measurement.humidity }} );
+        m_model.setItemData(m_model.index(index, 5), {{ Qt::DecorationRole, getBatteryIcon(measurement.vcc) }} );
+        m_model.setItemData(m_model.index(index, 6), {{ Qt::DisplayRole, "N/A" }} );
+        m_model.setItemData(m_model.index(index, 7), {{ Qt::DisplayRole, QVariant("N/A") }} );
+        m_model.setItemData(m_model.index(index, 8), {{ Qt::DisplayRole, QVariant("N/A") }} );
+        m_model.setItemData(m_model.index(index, 9), {{ Qt::DisplayRole, QVariant("N/A") }} );
+    }
+    else
+    {
+        m_model.setItemData(m_model.index(index, 3), {{ Qt::DisplayRole, QVariant("N/A") }} );
+        m_model.setItemData(m_model.index(index, 4), {{ Qt::DisplayRole, QVariant("N/A") }} );
+        m_model.setItemData(m_model.index(index, 5), {{ Qt::DisplayRole, QVariant("N/A") }} );
+        m_model.setItemData(m_model.index(index, 6), {{ Qt::DisplayRole, QVariant("N/A") }} );
+        m_model.setItemData(m_model.index(index, 7), {{ Qt::DisplayRole, QVariant("N/A") }} );
+        m_model.setItemData(m_model.index(index, 8), {{ Qt::DisplayRole, QVariant("N/A") }} );
+        m_model.setItemData(m_model.index(index, 9), {{ Qt::DisplayRole, QVariant("N/A") }} );
+    }
 }

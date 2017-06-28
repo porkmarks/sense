@@ -97,7 +97,17 @@
     </widget>
    </item>
    <item>
-    <widget class="QTreeView" name="list"/>
+    <widget class="QTreeView" name="list">
+     <property name="alternatingRowColors">
+      <bool>true</bool>
+     </property>
+     <property name="uniformRowHeights">
+      <bool>true</bool>
+     </property>
+     <property name="sortingEnabled">
+      <bool>true</bool>
+     </property>
+    </widget>
    </item>
   </layout>
  </widget>

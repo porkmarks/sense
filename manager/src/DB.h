@@ -86,6 +86,8 @@ public:
     std::vector<Measurement> get_filtered_measurements(Filter const& filter) const;
     size_t get_filtered_measurement_count(Filter const& filter) const;
 
+    bool get_last_measurement_for_sensor(Sensor_Id sensor_id, Measurement& measurement) const;
+
 private:
 
     bool cull(Measurement const& measurement, Filter const& filter) const;
