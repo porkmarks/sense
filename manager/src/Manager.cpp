@@ -29,7 +29,7 @@ Manager::~Manager()
 {
 }
 
-void Manager::activateBaseStation(Comms::BaseStationDescriptor const& bs)
+void Manager::activateBaseStation(Comms::BaseStation const& bs)
 {
     m_comms.connectToBaseStation(bs.address);
 }

@@ -14,13 +14,13 @@ public:
     void init(Comms& comms);
 
 signals:
-    void baseStationSelected(Comms::BaseStationDescriptor const& bs);
+    void baseStationSelected(Comms::BaseStation const& bs);
 
 
 private slots:
-    void baseStationDiscovered(Comms::BaseStationDescriptor const& bs);
-    void baseStationConnected(Comms::BaseStationDescriptor const& bs);
-    void baseStationDisconnected(Comms::BaseStationDescriptor const& bs);
+    void baseStationDiscovered(Comms::BaseStation const& bs);
+    void baseStationConnected(Comms::BaseStation const& bs);
+    void baseStationDisconnected(Comms::BaseStation const& bs);
     void activateBaseStation(QModelIndex const& index);
 
 private:
@@ -28,7 +28,7 @@ private:
     Comms* m_comms = nullptr;
     QStandardItemModel m_model;
 
-    std::vector<Comms::BaseStationDescriptor> m_baseStations;
+    std::vector<Comms::BaseStation> m_baseStations;
 };
 
 

@@ -12,7 +12,7 @@ public:
     ~Manager();
 
 private slots:
-    void activateBaseStation(Comms::BaseStationDescriptor const& bs);
+    void activateBaseStation(Comms::BaseStation const& bs);
 
 private:
     void process();

@@ -33,24 +33,24 @@ void SensorsWidget::init(Comms& comms)
     QObject::connect(m_comms, &Comms::baseStationDisconnected, this, &SensorsWidget::baseStationDisconnected);
 }
 
-void SensorsWidget::sensorsReceived(std::vector<Comms::SensorDescriptor> const& sensors)
+void SensorsWidget::sensorsReceived(std::vector<Comms::Sensor> const& sensors)
 {
     setEnabled(true);
 
-    for (Comms::SensorDescriptor const& sensor: sensors)
+    for (Comms::Sensor const& sensor: sensors)
     {
         addSensor(sensor);
     }
 }
 
-void SensorsWidget::baseStationDisconnected(Comms::BaseStationDescriptor const& bs)
+void SensorsWidget::baseStationDisconnected(Comms::BaseStation const& bs)
 {
     setEnabled(false);
 }
 
-void SensorsWidget::addSensor(Comms::SensorDescriptor const& sensor)
+void SensorsWidget::addSensor(Comms::Sensor const& sensor)
 {
-    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [&sensor](Comms::SensorDescriptor const& _s) { return _s.id == sensor.id; });
+    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [&sensor](Comms::Sensor const& _s) { return _s.id == sensor.id; });
     if (it != m_sensors.end())
     {
         refreshSensor(sensor);
@@ -74,9 +74,9 @@ void SensorsWidget::addSensor(Comms::SensorDescriptor const& sensor)
     refreshSensor(sensor);
 }
 
-void SensorsWidget::refreshSensor(Comms::SensorDescriptor const& sensor)
+void SensorsWidget::refreshSensor(Comms::Sensor const& sensor)
 {
-    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [&sensor](Comms::SensorDescriptor const& _s) { return _s.id == sensor.id; });
+    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [&sensor](Comms::Sensor const& _s) { return _s.id == sensor.id; });
     if (it == m_sensors.end())
     {
         assert(false);

@@ -15,16 +15,16 @@ public:
 signals:
 
 public slots:
-    void sensorsReceived(std::vector<Comms::SensorDescriptor> const& sensors);
-    void baseStationDisconnected(Comms::BaseStationDescriptor const& bs);
+    void sensorsReceived(std::vector<Comms::Sensor> const& sensors);
+    void baseStationDisconnected(Comms::BaseStation const& bs);
 
 private:
     Ui::SensorsWidget m_ui;
     QStandardItemModel m_model;
     Comms* m_comms = nullptr;
 
-    void addSensor(Comms::SensorDescriptor const& sensor);
-    void refreshSensor(Comms::SensorDescriptor const& sensor);
-    std::vector<Comms::SensorDescriptor> m_sensors;
+    void addSensor(Comms::Sensor const& sensor);
+    void refreshSensor(Comms::Sensor const& sensor);
+    std::vector<Comms::Sensor> m_sensors;
 };
 

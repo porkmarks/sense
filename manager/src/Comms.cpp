@@ -23,10 +23,10 @@ void Comms::broadcastReceived()
     {
         if (m_broadcastSocket.pendingDatagramSize() == 6)
         {
-            BaseStationDescriptor bs;
+            BaseStation bs;
             if (m_broadcastSocket.readDatagram(reinterpret_cast<char*>(bs.mac.data()), bs.mac.size(), &bs.address, nullptr) == 6)
             {
-                auto it = std::find_if(m_baseStations.begin(), m_baseStations.end(), [&bs](Comms::BaseStationDescriptor const& _bs) { return _bs.mac == bs.mac; });
+                auto it = std::find_if(m_baseStations.begin(), m_baseStations.end(), [&bs](Comms::BaseStation const& _bs) { return _bs.mac == bs.mac; });
                 if (it == m_baseStations.end())
                 {
                     m_baseStations.push_back(bs);
@@ -46,7 +46,7 @@ void Comms::connectToBaseStation(QHostAddress const& address)
 {
     m_bsSocketAdapter.getSocket().disconnectFromHost();
 
-    auto it = std::find_if(m_baseStations.begin(), m_baseStations.end(), [&address](Comms::BaseStationDescriptor const& _bs) { return _bs.address == address; });
+    auto it = std::find_if(m_baseStations.begin(), m_baseStations.end(), [&address](Comms::BaseStation const& _bs) { return _bs.address == address; });
     if (it == m_baseStations.end())
     {
         assert(false);
@@ -77,9 +77,24 @@ void Comms::disconnectedFromBaseStation()
     {
         size_t index = m_connectedBSIndex;
         m_connectedBSIndex = size_t(-1);
+        m_sensors.clear();
+        m_config = Config();
 
         emit baseStationDisconnected(m_baseStations[index]);
     }
+}
+
+std::vector<Comms::BaseStation> const& Comms::getLastBasestations() const
+{
+    return m_baseStations;
+}
+std::vector<Comms::Sensor> const& Comms::getLastSensors() const
+{
+    return m_sensors;
+}
+Comms::Config const& Comms::getLastConfig() const
+{
+    return m_config;
 }
 
 void Comms::requestConfig()
@@ -105,14 +120,13 @@ void Comms::processGetConfigRes()
         boost::property_tree::ptree pt;
         boost::property_tree::read_json(ss, pt);
 
-        Config config;
-        config.sensors_sleeping = pt.get<bool>("sensors_sleeping");
-        config.measurement_period = std::chrono::seconds(pt.get<std::chrono::seconds::rep>("measurement_period"));
-        config.comms_period = std::chrono::seconds(pt.get<std::chrono::seconds::rep>("comms_period"));
-        config.computed_comms_period = std::chrono::seconds(pt.get<std::chrono::seconds::rep>("computed_comms_period"));
-        config.baseline_time_point = Clock::time_point(std::chrono::seconds(pt.get<std::chrono::seconds::rep>("baseline_time_point")));
+        m_config.sensors_sleeping = pt.get<bool>("sensors_sleeping");
+        m_config.measurement_period = std::chrono::seconds(pt.get<std::chrono::seconds::rep>("measurement_period"));
+        m_config.comms_period = std::chrono::seconds(pt.get<std::chrono::seconds::rep>("comms_period"));
+        m_config.computed_comms_period = std::chrono::seconds(pt.get<std::chrono::seconds::rep>("computed_comms_period"));
+        m_config.baseline_time_point = Clock::time_point(std::chrono::seconds(pt.get<std::chrono::seconds::rep>("baseline_time_point")));
 
-        emit configReceived(config);
+        emit configReceived(m_config);
     }
     catch (std::exception const& e)
     {
@@ -138,17 +152,17 @@ void Comms::processGetSensorsRes()
         boost::property_tree::ptree pt;
         boost::property_tree::read_json(ss, pt);
 
-        std::vector<SensorDescriptor> sensors;
+        m_sensors.clear();
         for (auto const& node: pt.get_child("sensors"))
         {
-            SensorDescriptor sensor;
+            Sensor sensor;
             sensor.name = node.first;
             sensor.address = node.second.get<Sensor_Address>("address");
             sensor.id = node.second.get<Sensor_Id>("id");
-            sensors.push_back(sensor);
+            m_sensors.push_back(sensor);
         }
 
-        emit sensorsReceived(sensors);
+        emit sensorsReceived(m_sensors);
     }
     catch (std::exception const& e)
     {

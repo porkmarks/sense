@@ -27,7 +27,7 @@ void ConfigWidget::configReceived(Comms::Config const& config)
     setEnabled(true);
 }
 
-void ConfigWidget::baseStationDisconnected(Comms::BaseStationDescriptor const& bs)
+void ConfigWidget::baseStationDisconnected(Comms::BaseStation const& bs)
 {
     setEnabled(false);
 }

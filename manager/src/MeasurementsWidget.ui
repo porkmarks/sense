@@ -385,48 +385,7 @@
         <number>0</number>
        </property>
        <item>
-        <widget class="QTreeWidget" name="treeWidget">
-         <column>
-          <property name="text">
-           <string>Index</string>
-          </property>
-         </column>
-         <column>
-          <property name="text">
-           <string>Sensor</string>
-          </property>
-         </column>
-         <column>
-          <property name="text">
-           <string>Timestamp</string>
-          </property>
-         </column>
-         <column>
-          <property name="text">
-           <string>Temperature</string>
-          </property>
-         </column>
-         <column>
-          <property name="text">
-           <string>Humidity</string>
-          </property>
-         </column>
-         <column>
-          <property name="text">
-           <string>Battery</string>
-          </property>
-         </column>
-         <column>
-          <property name="text">
-           <string>Errors</string>
-          </property>
-         </column>
-         <column>
-          <property name="text">
-           <string>Alarms</string>
-          </property>
-         </column>
-        </widget>
+        <widget class="QTreeView" name="list"/>
        </item>
       </layout>
      </widget>

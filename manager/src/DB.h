@@ -14,9 +14,11 @@ public:
     typedef uint32_t Sensor_Id;
     typedef std::chrono::high_resolution_clock Clock;
 
+    bool create(std::string const& name);
     bool open(std::string const& name);
-    bool save();
-    bool save_as(std::string const& filename);
+
+    bool save() const;
+    bool save_as(std::string const& filename) const;
 
     struct Measurement
     {
@@ -100,10 +102,16 @@ private:
         uint8_t flags;
     };
 
-    Stored_Measurement pack(Measurement const& m) const;
-    Measurement unpack(Stored_Measurement const& m) const;
-
     typedef std::vector<Stored_Measurement> Stored_Measurements;
+    typedef uint64_t Primary_Key;
+
+    static inline Stored_Measurement pack(Measurement const& m);
+    static inline Measurement unpack(Sensor_Id sensor_id, Stored_Measurement const& m);
+    static inline Primary_Key compute_primary_key(Measurement const& m);
+    static inline Primary_Key compute_primary_key(Sensor_Id sensor_id, Stored_Measurement const& m);
 
     std::map<Sensor_Id, Stored_Measurements> m_measurements;
+    std::vector<Primary_Key> m_sorted_primary_keys;
+
+    std::string m_filename;
 };

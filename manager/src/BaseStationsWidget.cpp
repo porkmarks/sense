@@ -49,9 +49,9 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
     emit baseStationSelected(m_baseStations[bsIndex]);
 }
 
-void BaseStationsWidget::baseStationConnected(Comms::BaseStationDescriptor const& bs)
+void BaseStationsWidget::baseStationConnected(Comms::BaseStation const& bs)
 {
-    auto it = std::find_if(m_baseStations.begin(), m_baseStations.end(), [&bs](Comms::BaseStationDescriptor const& _bs) { return _bs.mac == bs.mac; });
+    auto it = std::find_if(m_baseStations.begin(), m_baseStations.end(), [&bs](Comms::BaseStation const& _bs) { return _bs.mac == bs.mac; });
     if (it == m_baseStations.end())
     {
         assert(false);
@@ -79,7 +79,7 @@ void BaseStationsWidget::baseStationConnected(Comms::BaseStationDescriptor const
     }
 }
 
-void BaseStationsWidget::baseStationDisconnected(Comms::BaseStationDescriptor const& bs)
+void BaseStationsWidget::baseStationDisconnected(Comms::BaseStation const& bs)
 {
     for (int i = 0; i < m_model.rowCount(); i++)
     {
@@ -92,7 +92,7 @@ void BaseStationsWidget::baseStationDisconnected(Comms::BaseStationDescriptor co
     }
 }
 
-void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor const& bs)
+void BaseStationsWidget::baseStationDiscovered(Comms::BaseStation const& bs)
 {
 //    QList<QListWidgetItem*> items = m_ui.list->findItems(QString(buf), Qt::MatchExactly);
 //    if (!items.empty())
@@ -100,7 +100,7 @@ void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor cons
 //        return;
 //    }
 
-    auto it = std::find_if(m_baseStations.begin(), m_baseStations.end(), [&bs](Comms::BaseStationDescriptor const& _bs) { return _bs.mac == bs.mac; });
+    auto it = std::find_if(m_baseStations.begin(), m_baseStations.end(), [&bs](Comms::BaseStation const& _bs) { return _bs.mac == bs.mac; });
     if (it != m_baseStations.end())
     {
         return;

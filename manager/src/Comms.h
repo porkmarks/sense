@@ -21,13 +21,13 @@ public:
 
     void connectToBaseStation(QHostAddress const& address);
 
-    struct BaseStationDescriptor
+    struct BaseStation
     {
         std::array<uint8_t, 6> mac;
         QHostAddress address;
     };
 
-    struct SensorDescriptor
+    struct Sensor
     {
         Sensor_Id id = 0;
         Sensor_Address address = 0;
@@ -52,6 +52,10 @@ public:
         Clock::time_point baseline_time_point;
     };
 
+    std::vector<BaseStation> const& getLastBasestations() const;
+    std::vector<Sensor> const& getLastSensors() const;
+    Config const& getLastConfig() const;
+
 
     void process();
 
@@ -60,11 +64,11 @@ public slots:
     void requestSensors();
 
 signals:
-    void baseStationDiscovered(BaseStationDescriptor const& bs);
-    void baseStationConnected(BaseStationDescriptor const& bs);
-    void baseStationDisconnected(BaseStationDescriptor const& bs);
+    void baseStationDiscovered(BaseStation const& bs);
+    void baseStationConnected(BaseStation const& bs);
+    void baseStationDisconnected(BaseStation const& bs);
     void configReceived(Config const& config);
-    void sensorsReceived(std::vector<SensorDescriptor> const& sensors);
+    void sensorsReceived(std::vector<Sensor> const& sensors);
 
 private slots:
     void broadcastReceived();
@@ -83,7 +87,9 @@ private:
 
 
     QUdpSocket m_broadcastSocket;
-    std::vector<BaseStationDescriptor> m_baseStations;
+    std::vector<BaseStation> m_baseStations;
+    std::vector<Sensor> m_sensors;
+    Config m_config;
 
     size_t m_connectedBSIndex = size_t(-1);
     QTcpSocketAdapter m_bsSocketAdapter;

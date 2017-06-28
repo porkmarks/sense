@@ -15,7 +15,7 @@ signals:
 
 private slots:
     void configReceived(Comms::Config const& config);
-    void baseStationDisconnected(Comms::BaseStationDescriptor const& bs);
+    void baseStationDisconnected(Comms::BaseStation const& bs);
     void resetConfig();
     void applyConfig();
 
