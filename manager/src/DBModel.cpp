@@ -254,6 +254,13 @@ void DBModel::setFilter(DB::Filter const& filter)
 
 //////////////////////////////////////////////////////////////////////////
 
+size_t DBModel::getMeasurementCount() const
+{
+    return m_measurements.size();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 bool DBModel::setData(QModelIndex const& index, QVariant const& value, int role)
 {
 //    else if (!index.isValid() || role == Qt::EditRole)

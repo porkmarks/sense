@@ -16,11 +16,26 @@ public:
 
 signals:
 
-public slots:
+private slots:
+    void refreshFromDB();
+    void setMinDateTimeNow();
+    void setMaxDateTimeNow();
+    void setDateTimeThisDay();
+    void setDateTimeThisWeek();
+    void setDateTimeThisMonth();
+
+    void minDateTimeChanged(QDateTime const& value);
+    void maxDateTimeChanged(QDateTime const& value);
+
+    void minTemperatureChanged();
+    void maxTemperatureChanged();
+
+    void minHumidityChanged();
+    void maxHumidityChanged();
 
 private:
 
-    void refreshFromDB();
+    DB::Filter createFilter() const;
 
     Ui::MeasurementsWidget m_ui;
 

@@ -16,6 +16,7 @@ public:
 
     void setFilter(DB::Filter const& filter);
     void refresh();
+    size_t getMeasurementCount() const;
 
     virtual QModelIndex parent(QModelIndex const& index) const;
 

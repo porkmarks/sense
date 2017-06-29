@@ -143,19 +143,19 @@ void SensorsWidget::refreshSensor(Comms::Sensor const& sensor)
         m_model.setItemData(m_model.index(index, 3), {{ Qt::DisplayRole, measurement.temperature }} );
         m_model.setItemData(m_model.index(index, 4), {{ Qt::DisplayRole, measurement.humidity }} );
         m_model.setItemData(m_model.index(index, 5), {{ Qt::DecorationRole, getBatteryIcon(measurement.vcc) }} );
-        m_model.setItemData(m_model.index(index, 6), {{ Qt::DisplayRole, "N/A" }} );
-        m_model.setItemData(m_model.index(index, 7), {{ Qt::DisplayRole, QVariant("N/A") }} );
-        m_model.setItemData(m_model.index(index, 8), {{ Qt::DisplayRole, QVariant("N/A") }} );
-        m_model.setItemData(m_model.index(index, 9), {{ Qt::DisplayRole, QVariant("N/A") }} );
+        m_model.setItemData(m_model.index(index, 6), {{ Qt::DecorationRole, QIcon(":/icons/ui/question.png") }} );
+        m_model.setItemData(m_model.index(index, 7), {{ Qt::DecorationRole, QIcon(":/icons/ui/question.png") }} );
+        m_model.setItemData(m_model.index(index, 8), {{ Qt::DecorationRole, QIcon(":/icons/ui/question.png") }} );
+        m_model.setItemData(m_model.index(index, 9), {{ Qt::DecorationRole, QIcon(":/icons/ui/question.png") }} );
     }
     else
     {
-        m_model.setItemData(m_model.index(index, 3), {{ Qt::DisplayRole, QVariant("N/A") }} );
-        m_model.setItemData(m_model.index(index, 4), {{ Qt::DisplayRole, QVariant("N/A") }} );
-        m_model.setItemData(m_model.index(index, 5), {{ Qt::DisplayRole, QVariant("N/A") }} );
-        m_model.setItemData(m_model.index(index, 6), {{ Qt::DisplayRole, QVariant("N/A") }} );
-        m_model.setItemData(m_model.index(index, 7), {{ Qt::DisplayRole, QVariant("N/A") }} );
-        m_model.setItemData(m_model.index(index, 8), {{ Qt::DisplayRole, QVariant("N/A") }} );
-        m_model.setItemData(m_model.index(index, 9), {{ Qt::DisplayRole, QVariant("N/A") }} );
+        m_model.setItemData(m_model.index(index, 3), {{ Qt::DecorationRole, QIcon(":/icons/ui/question.png") }} );
+        m_model.setItemData(m_model.index(index, 4), {{ Qt::DecorationRole, QIcon(":/icons/ui/question.png") }} );
+        m_model.setItemData(m_model.index(index, 5), {{ Qt::DecorationRole, QIcon(":/icons/ui/question.png") }} );
+        m_model.setItemData(m_model.index(index, 6), {{ Qt::DecorationRole, QIcon(":/icons/ui/question.png") }} );
+        m_model.setItemData(m_model.index(index, 7), {{ Qt::DecorationRole, QIcon(":/icons/ui/question.png") }} );
+        m_model.setItemData(m_model.index(index, 8), {{ Qt::DecorationRole, QIcon(":/icons/ui/question.png") }} );
+        m_model.setItemData(m_model.index(index, 9), {{ Qt::DecorationRole, QIcon(":/icons/ui/question.png") }} );
     }
 }
