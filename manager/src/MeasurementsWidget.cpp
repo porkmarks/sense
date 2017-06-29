@@ -2,6 +2,9 @@
 #include <iostream>
 #include <QDateTime>
 
+#include "SensorsModel.h"
+#include "ui_SensorsFilterDialog.h"
+
 MeasurementsWidget::MeasurementsWidget(QWidget *parent)
     : QWidget(parent)
 {
@@ -24,13 +27,13 @@ void MeasurementsWidget::init(Comms& comms, DB& db)
         for (size_t index = 0; index < 100000; index++)
         {
             DB::Measurement m;
-            m.sensor_id = sid;
+            m.sensorId = sid;
             m.index = index;
-            m.time_point = DB::Clock::now() - std::chrono::seconds(index * 1000);
+            m.timePoint = DB::Clock::now() - std::chrono::seconds(index * 1000);
             m.vcc = std::min((index / 1000.f) + 2.f, 3.3f);
             m.temperature = std::min((index / 1000.f) * 55.f, 100.f);
             m.humidity = std::min((index / 1000.f) * 100.f, 100.f);
-            m_db->add_measurement(m);
+            m_db->addMeasurement(m);
         }
     }
     std::cout << "Time to add: " << (std::chrono::duration<float>(DB::Clock::now() - start).count()) << "\n";
@@ -39,7 +42,7 @@ void MeasurementsWidget::init(Comms& comms, DB& db)
     start = DB::Clock::now();
     for (size_t i = 0; i < 1; i++)
     {
-        std::vector<DB::Measurement> result = m_db->get_filtered_measurements(filter);
+        std::vector<DB::Measurement> result = m_db->getFilteredMeasurements(filter);
     }
     std::cout << "Time to filter: " << (std::chrono::duration<float>(DB::Clock::now() - start).count()) << "\n";
 
@@ -53,6 +56,7 @@ void MeasurementsWidget::init(Comms& comms, DB& db)
     QObject::connect(m_ui.thisDay, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisDay);
     QObject::connect(m_ui.thisWeek, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisWeek);
     QObject::connect(m_ui.thisMonth, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisMonth);
+    QObject::connect(m_ui.selectSensors, &QPushButton::released, this, &MeasurementsWidget::selectSensors);
 
     QObject::connect(m_ui.minDateTime, &QDateTimeEdit::dateTimeChanged, this, &MeasurementsWidget::minDateTimeChanged);
     QObject::connect(m_ui.maxDateTime, &QDateTimeEdit::dateTimeChanged, this, &MeasurementsWidget::maxDateTimeChanged);
@@ -73,17 +77,23 @@ DB::Filter MeasurementsWidget::createFilter() const
 {
     DB::Filter filter;
 
-    filter.use_time_point_filter = true;
-    filter.time_point_filter.min = DB::Clock::from_time_t(m_ui.minDateTime->dateTime().toTime_t());
-    filter.time_point_filter.max = DB::Clock::from_time_t(m_ui.maxDateTime->dateTime().toTime_t());
+    if (!m_selectedSensorIds.empty())
+    {
+        filter.useSensorFilter = true;
+        filter.sensorIds = m_selectedSensorIds;
+    }
 
-    filter.use_temperature_filter = m_ui.useTemperature->isChecked();
-    filter.temperature_filter.min = static_cast<float>(m_ui.minTemperature->value());
-    filter.temperature_filter.max = static_cast<float>(m_ui.maxTemperature->value());
+    filter.useTimePointFilter = true;
+    filter.timePointFilter.min = DB::Clock::from_time_t(m_ui.minDateTime->dateTime().toTime_t());
+    filter.timePointFilter.max = DB::Clock::from_time_t(m_ui.maxDateTime->dateTime().toTime_t());
 
-    filter.use_humidity_filter = m_ui.useHumidity->isChecked();
-    filter.humidity_filter.min = static_cast<float>(m_ui.minHumidity->value());
-    filter.humidity_filter.max = static_cast<float>(m_ui.maxHumidity->value());
+    filter.useTemperatureFilter = m_ui.useTemperature->isChecked();
+    filter.temperatureFilter.min = static_cast<float>(m_ui.minTemperature->value());
+    filter.temperatureFilter.max = static_cast<float>(m_ui.maxTemperature->value());
+
+    filter.useHumidityFilter = m_ui.useHumidity->isChecked();
+    filter.humidityFilter.min = static_cast<float>(m_ui.minHumidity->value());
+    filter.humidityFilter.max = static_cast<float>(m_ui.maxHumidity->value());
 
     return filter;
 }
@@ -204,6 +214,48 @@ void MeasurementsWidget::maxHumidityChanged()
     {
         value = std::max(value - 1.0, m_ui.minHumidity->minimum());
         m_ui.minHumidity->setValue(value);
+    }
+}
+
+void MeasurementsWidget::selectSensors()
+{
+    QDialog dialog;
+    Ui::SensorsFilterDialog ui;
+    ui.setupUi(&dialog);
+
+    SensorsModel model(*m_comms, *m_db);
+    model.setShowCheckboxes(true);
+
+
+    std::vector<Comms::Sensor> const& sensors = m_comms->getLastSensors();
+    if (m_selectedSensorIds.empty())
+    {
+        for (Comms::Sensor const& sensor: sensors)
+        {
+            model.setSensorChecked(sensor.id, true);
+        }
+    }
+    else
+    {
+        for (Comms::Sensor_Id id: m_selectedSensorIds)
+        {
+            model.setSensorChecked(id, true);
+        }
+    }
+
+    ui.list->setModel(&model);
+
+    int result = dialog.exec();
+    if (result == QDialog::Accepted)
+    {
+        m_selectedSensorIds.clear();
+        for (Comms::Sensor const& sensor: sensors)
+        {
+            if (model.isSensorChecked(sensor.id))
+            {
+                m_selectedSensorIds.push_back(sensor.id);
+            }
+        }
     }
 }
 

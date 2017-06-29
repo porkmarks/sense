@@ -23,43 +23,43 @@ bool DB::save() const
 {
     return false;
 }
-bool DB::save_as(std::string const& filename) const
+bool DB::saveAs(std::string const& filename) const
 {
     return false;
 }
 
-bool DB::add_measurement(Measurement const& measurement)
+bool DB::addMeasurement(Measurement const& measurement)
 {
-    Primary_Key pk = compute_primary_key(measurement);
+    PrimaryKey pk = computePrimaryKey(measurement);
 
     //check for duplicates
-    auto it = std::lower_bound(m_sorted_primary_keys.begin(), m_sorted_primary_keys.end(), pk);
-    if (it != m_sorted_primary_keys.end() && *it == pk)
+    auto it = std::lower_bound(m_sortedPrimaryKeys.begin(), m_sortedPrimaryKeys.end(), pk);
+    if (it != m_sortedPrimaryKeys.end() && *it == pk)
     {
         return false;
     }
 
-    m_measurements[measurement.sensor_id].push_back(pack(measurement));
-    m_sorted_primary_keys.insert(it, pk);
+    m_measurements[measurement.sensorId].push_back(pack(measurement));
+    m_sortedPrimaryKeys.insert(it, pk);
 
     return true;
 }
 
-std::vector<DB::Measurement> DB::get_all_measurements() const
+std::vector<DB::Measurement> DB::getAllMeasurements() const
 {
     std::vector<DB::Measurement> result;
     result.reserve(8192);
 
     for (auto const& pair : m_measurements)
     {
-        for (Stored_Measurement const& sm: pair.second)
+        for (StoredMeasurement const& sm: pair.second)
         {
             result.push_back(unpack(pair.first, sm));
         }
     }
     return result;
 }
-size_t DB::get_all_measurement_count() const
+size_t DB::getAllMeasurementCount() const
 {
     size_t count = 0;
     for (auto const& pair : m_measurements)
@@ -69,14 +69,14 @@ size_t DB::get_all_measurement_count() const
     return count;
 }
 
-std::vector<DB::Measurement> DB::get_filtered_measurements(Filter const& filter) const
+std::vector<DB::Measurement> DB::getFilteredMeasurements(Filter const& filter) const
 {
     std::vector<DB::Measurement> result;
     result.reserve(8192);
 
     for (auto const& pair : m_measurements)
     {
-        for (Stored_Measurement const& sm: pair.second)
+        for (StoredMeasurement const& sm: pair.second)
         {
             Measurement m = unpack(pair.first, sm);
             if (cull(m, filter))
@@ -87,12 +87,12 @@ std::vector<DB::Measurement> DB::get_filtered_measurements(Filter const& filter)
     }
     return result;
 }
-size_t DB::get_filtered_measurement_count(Filter const& filter) const
+size_t DB::getFilteredMeasurementCount(Filter const& filter) const
 {
     size_t count = 0;
     for (auto const& pair : m_measurements)
     {
-        for (Stored_Measurement const& sm: pair.second)
+        for (StoredMeasurement const& sm: pair.second)
         {
             Measurement m = unpack(pair.first, sm);
             if (cull(m, filter))
@@ -104,7 +104,7 @@ size_t DB::get_filtered_measurement_count(Filter const& filter) const
     return count;
 }
 
-bool DB::get_last_measurement_for_sensor(Sensor_Id sensor_id, Measurement& measurement) const
+bool DB::getLastMeasurementForSensor(SensorId sensor_id, Measurement& measurement) const
 {
     auto it = m_measurements.find(sensor_id);
     if (it == m_measurements.end())
@@ -113,13 +113,13 @@ bool DB::get_last_measurement_for_sensor(Sensor_Id sensor_id, Measurement& measu
     }
 
     Clock::time_point best_time_point = Clock::time_point(Clock::duration::zero());
-    for (Stored_Measurement const& sm: it->second)
+    for (StoredMeasurement const& sm: it->second)
     {
         Measurement m = unpack(sensor_id, sm);
-        if (m.time_point > best_time_point)
+        if (m.timePoint > best_time_point)
         {
             measurement = m;
-            best_time_point = m.time_point;
+            best_time_point = m.timePoint;
         }
     }
 
@@ -128,66 +128,66 @@ bool DB::get_last_measurement_for_sensor(Sensor_Id sensor_id, Measurement& measu
 
 bool DB::cull(Measurement const& measurement, Filter const& filter) const
 {
-    if (filter.use_sensor_filter)
+    if (filter.useSensorFilter)
     {
-        if (std::find(filter.sensor_ids.begin(), filter.sensor_ids.end(), measurement.sensor_id) == filter.sensor_ids.end())
+        if (std::find(filter.sensorIds.begin(), filter.sensorIds.end(), measurement.sensorId) == filter.sensorIds.end())
         {
             return false;
         }
     }
-    if (filter.use_index_filter)
+    if (filter.useIndexFilter)
     {
-        if (measurement.index < filter.index_filter.min || measurement.index > filter.index_filter.max)
+        if (measurement.index < filter.indexFilter.min || measurement.index > filter.indexFilter.max)
         {
             return false;
         }
     }
-    if (filter.use_time_point_filter)
+    if (filter.useTimePointFilter)
     {
-        if (measurement.time_point < filter.time_point_filter.min || measurement.time_point > filter.time_point_filter.max)
+        if (measurement.timePoint < filter.timePointFilter.min || measurement.timePoint > filter.timePointFilter.max)
         {
             return false;
         }
     }
-    if (filter.use_temperature_filter)
+    if (filter.useTemperatureFilter)
     {
-        if (measurement.temperature < filter.temperature_filter.min || measurement.temperature > filter.temperature_filter.max)
+        if (measurement.temperature < filter.temperatureFilter.min || measurement.temperature > filter.temperatureFilter.max)
         {
             return false;
         }
     }
-    if (filter.use_humidity_filter)
+    if (filter.useHumidityFilter)
     {
-        if (measurement.humidity < filter.humidity_filter.min || measurement.humidity > filter.humidity_filter.max)
+        if (measurement.humidity < filter.humidityFilter.min || measurement.humidity > filter.humidityFilter.max)
         {
             return false;
         }
     }
-    if (filter.use_vcc_filter)
+    if (filter.useVccFilter)
     {
-        if (measurement.vcc < filter.vcc_filter.min || measurement.vcc > filter.vcc_filter.max)
+        if (measurement.vcc < filter.vccFilter.min || measurement.vcc > filter.vccFilter.max)
         {
             return false;
         }
     }
-    if (filter.use_b2s_filter)
+    if (filter.useB2SFilter)
     {
-        if (measurement.b2s_input_dBm < filter.b2s_filter.min || measurement.b2s_input_dBm > filter.b2s_filter.max)
+        if (measurement.b2s < filter.b2sFilter.min || measurement.b2s > filter.b2sFilter.max)
         {
             return false;
         }
     }
-    if (filter.use_s2b_filter)
+    if (filter.useS2BFilter)
     {
-        if (measurement.s2b_input_dBm < filter.s2b_filter.min || measurement.s2b_input_dBm > filter.s2b_filter.max)
+        if (measurement.s2b < filter.s2bFilter.min || measurement.s2b > filter.s2bFilter.max)
         {
             return false;
         }
     }
-    if (filter.use_errors_filter)
+    if (filter.useErrorsFilter)
     {
         bool has_errors = measurement.flags != 0;
-        if (has_errors != filter.errors_filter)
+        if (has_errors != filter.errorsFilter)
         {
             return false;
         }
@@ -196,40 +196,40 @@ bool DB::cull(Measurement const& measurement, Filter const& filter) const
     return true;
 }
 
-inline DB::Stored_Measurement DB::pack(Measurement const& m)
+inline DB::StoredMeasurement DB::pack(Measurement const& m)
 {
-    Stored_Measurement sm;
+    StoredMeasurement sm;
     sm.index = m.index;
-    sm.time_point = Clock::to_time_t(m.time_point);
+    sm.time_point = Clock::to_time_t(m.timePoint);
     sm.temperature = static_cast<int16_t>(std::max(std::min(m.temperature, 320.f), -320.f) * 100.f);
     sm.humidity = static_cast<int16_t>(std::max(std::min(m.humidity, 320.f), -320.f) * 100.f);
     sm.vcc = static_cast<uint8_t>(std::max(std::min((m.vcc - 2.f), 2.55f), 0.f) * 100.f);
-    sm.b2s_input_dBm = m.b2s_input_dBm;
-    sm.s2b_input_dBm = m.s2b_input_dBm;
+    sm.b2s = m.b2s;
+    sm.s2b = m.s2b;
     sm.flags = m.flags;
     return sm;
 }
 
-inline DB::Measurement DB::unpack(Sensor_Id sensor_id, Stored_Measurement const& sm)
+inline DB::Measurement DB::unpack(SensorId sensor_id, StoredMeasurement const& sm)
 {
     Measurement m;
-    m.sensor_id = sensor_id;
+    m.sensorId = sensor_id;
     m.index = sm.index;
-    m.time_point = Clock::from_time_t(sm.time_point);
+    m.timePoint = Clock::from_time_t(sm.time_point);
     m.temperature = static_cast<float>(sm.temperature) / 100.f;
     m.humidity = static_cast<float>(sm.humidity) / 100.f;
     m.vcc = static_cast<float>(sm.vcc) / 100.f + 2.f;
-    m.b2s_input_dBm = sm.b2s_input_dBm;
-    m.s2b_input_dBm = sm.s2b_input_dBm;
+    m.b2s = sm.b2s;
+    m.s2b = sm.s2b;
     m.flags = sm.flags;
     return m;
 }
 
-inline DB::Primary_Key DB::compute_primary_key(Measurement const& m)
+inline DB::PrimaryKey DB::computePrimaryKey(Measurement const& m)
 {
-    return (Primary_Key(m.sensor_id) << 32) | Primary_Key(m.index);
+    return (PrimaryKey(m.sensorId) << 32) | PrimaryKey(m.index);
 }
-inline DB::Primary_Key DB::compute_primary_key(Sensor_Id sensor_id, Stored_Measurement const& m)
+inline DB::PrimaryKey DB::computePrimaryKey(SensorId sensor_id, StoredMeasurement const& m)
 {
-    return (Primary_Key(sensor_id) << 32) | Primary_Key(m.index);
+    return (PrimaryKey(sensor_id) << 32) | PrimaryKey(m.index);
 }

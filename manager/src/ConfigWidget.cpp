@@ -34,10 +34,10 @@ void ConfigWidget::baseStationDisconnected(Comms::BaseStation const& bs)
 
 void ConfigWidget::showConfig(Comms::Config const& config)
 {
-    m_ui.measurementPeriod->setValue(std::chrono::duration<float>(config.measurement_period).count() / 60.f);
-    m_ui.commsPeriod->setValue(std::chrono::duration<float>(config.comms_period).count() / 60.f);
-    m_ui.computedCommsPeriod->setValue(std::chrono::duration<float>(config.computed_comms_period).count() / 60.f);
-    m_ui.sensorsSleeping->setChecked(config.sensors_sleeping);
+    m_ui.measurementPeriod->setValue(std::chrono::duration<float>(config.measurementPeriod).count() / 60.f);
+    m_ui.commsPeriod->setValue(std::chrono::duration<float>(config.commsPeriod).count() / 60.f);
+    m_ui.computedCommsPeriod->setValue(std::chrono::duration<float>(config.computedCommsPeriod).count() / 60.f);
+    m_ui.sensorsSleeping->setChecked(config.sensorsSleeping);
 }
 
 void ConfigWidget::resetConfig()

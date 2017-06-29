@@ -11,14 +11,14 @@ class DB
 public:
     DB();
 
-    typedef uint32_t Sensor_Id;
+    typedef uint32_t SensorId;
     typedef std::chrono::high_resolution_clock Clock;
 
     bool create(std::string const& name);
     bool open(std::string const& name);
 
     bool save() const;
-    bool save_as(std::string const& filename) const;
+    bool saveAs(std::string const& filename) const;
 
     struct Measurement
     {
@@ -30,18 +30,18 @@ public:
                 COMMS_ERROR    = 1 << 1
             };
         };
-        Sensor_Id sensor_id = 0;
+        SensorId sensorId = 0;
         uint32_t index = 0;
-        Clock::time_point time_point;
+        Clock::time_point timePoint;
         float temperature = 0;
         float humidity = 0;
         float vcc = 0;
-        int8_t b2s_input_dBm = 0;
-        int8_t s2b_input_dBm = 0;
+        int8_t b2s = 0;
+        int8_t s2b = 0;
         uint8_t flags = 0;
     };
 
-    bool add_measurement(Measurement const& measurement);
+    bool addMeasurement(Measurement const& measurement);
 
     template <typename T>
     struct Range
@@ -52,68 +52,68 @@ public:
 
     struct Filter
     {
-        bool use_sensor_filter = false;
-        std::vector<Sensor_Id> sensor_ids;
+        bool useSensorFilter = false;
+        std::vector<SensorId> sensorIds;
 
-        bool use_index_filter = false;
-        Range<uint32_t> index_filter;
+        bool useIndexFilter = false;
+        Range<uint32_t> indexFilter;
 
-        bool use_time_point_filter = false;
-        Range<Clock::time_point> time_point_filter;
+        bool useTimePointFilter = false;
+        Range<Clock::time_point> timePointFilter;
 
-        bool use_temperature_filter = false;
-        Range<float> temperature_filter;
+        bool useTemperatureFilter = false;
+        Range<float> temperatureFilter;
 
-        bool use_humidity_filter = false;
-        Range<float> humidity_filter;
+        bool useHumidityFilter = false;
+        Range<float> humidityFilter;
 
-        bool use_vcc_filter = false;
-        Range<float> vcc_filter;
+        bool useVccFilter = false;
+        Range<float> vccFilter;
 
-        bool use_b2s_filter = false;
-        Range<int8_t> b2s_filter;
+        bool useB2SFilter = false;
+        Range<int8_t> b2sFilter;
 
-        bool use_s2b_filter = false;
-        Range<int8_t> s2b_filter;
+        bool useS2BFilter = false;
+        Range<int8_t> s2bFilter;
 
-        bool use_errors_filter = false;
-        bool errors_filter = true;
+        bool useErrorsFilter = false;
+        bool errorsFilter = true;
     };
 
-    std::vector<Measurement> get_all_measurements() const;
-    size_t get_all_measurement_count() const;
+    std::vector<Measurement> getAllMeasurements() const;
+    size_t getAllMeasurementCount() const;
 
-    std::vector<Measurement> get_filtered_measurements(Filter const& filter) const;
-    size_t get_filtered_measurement_count(Filter const& filter) const;
+    std::vector<Measurement> getFilteredMeasurements(Filter const& filter) const;
+    size_t getFilteredMeasurementCount(Filter const& filter) const;
 
-    bool get_last_measurement_for_sensor(Sensor_Id sensor_id, Measurement& measurement) const;
+    bool getLastMeasurementForSensor(SensorId sensor_id, Measurement& measurement) const;
 
 private:
 
     bool cull(Measurement const& measurement, Filter const& filter) const;
 
-    struct Stored_Measurement
+    struct StoredMeasurement
     {
         uint32_t index;
         time_t time_point;
         int16_t temperature;    //t * 100
         int16_t humidity;       //h * 100
         uint8_t vcc;            //(vcc - 2) * 100
-        int8_t b2s_input_dBm;
-        int8_t s2b_input_dBm;
+        int8_t b2s;
+        int8_t s2b;
         uint8_t flags;
     };
 
-    typedef std::vector<Stored_Measurement> Stored_Measurements;
-    typedef uint64_t Primary_Key;
+    typedef std::vector<StoredMeasurement> StoredMeasurements;
+    typedef uint64_t PrimaryKey;
 
-    static inline Stored_Measurement pack(Measurement const& m);
-    static inline Measurement unpack(Sensor_Id sensor_id, Stored_Measurement const& m);
-    static inline Primary_Key compute_primary_key(Measurement const& m);
-    static inline Primary_Key compute_primary_key(Sensor_Id sensor_id, Stored_Measurement const& m);
+    static inline StoredMeasurement pack(Measurement const& m);
+    static inline Measurement unpack(SensorId sensor_id, StoredMeasurement const& m);
+    static inline PrimaryKey computePrimaryKey(Measurement const& m);
+    static inline PrimaryKey computePrimaryKey(SensorId sensor_id, StoredMeasurement const& m);
 
-    std::map<Sensor_Id, Stored_Measurements> m_measurements;
-    std::vector<Primary_Key> m_sorted_primary_keys;
+    std::map<SensorId, StoredMeasurements> m_measurements;
+    std::vector<PrimaryKey> m_sortedPrimaryKeys;
 
     std::string m_filename;
 };

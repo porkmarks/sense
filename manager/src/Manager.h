@@ -5,6 +5,7 @@
 
 #include "Comms.h"
 #include "DB.h"
+#include "Alarms.h"
 
 class Manager : public QMainWindow
 {
@@ -22,10 +23,11 @@ private:
 
     void readSettings();
 
-    Ui::Manager m_ui;
-
     Comms m_comms;
     DB m_db;
+    Alarms m_alarms;
+
+    Ui::Manager m_ui;
 };
 
 

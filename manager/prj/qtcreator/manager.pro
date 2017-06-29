@@ -69,7 +69,10 @@ HEADERS += \
     ../../src/DB.h \
     ../../src/DBModel.h \
     ../../src/measurement.h \
-    ../../src/SensorsWidget.h
+    ../../src/SensorsWidget.h \
+    ../../src/SensorsModel.h \
+    ../../src/Alarms.h \
+    ../../src/AlarmsModel.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -82,14 +85,19 @@ SOURCES += \
     ../../../common/src/CRC.cpp \
     ../../src/DB.cpp \
     ../../src/DBModel.cpp \
-    ../../src/SensorsWidget.cpp
+    ../../src/SensorsWidget.cpp \
+    ../../src/SensorsModel.cpp \
+    ../../src/Alarms.cpp \
+    ../../src/AlarmsModel.cpp
 
 FORMS += \
     ../../src/Manager.ui \
     ../../src/BaseStationsWidget.ui \
     ../../src/ConfigWidget.ui \
     ../../src/MeasurementsWidget.ui \
-    ../../src/SensorsWidget.ui
+    ../../src/SensorsWidget.ui \
+    ../../src/SensorsFilterDialog.ui \
+    ../../src/AlarmsWidget.ui
 
 DISTFILES += \
 

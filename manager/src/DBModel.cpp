@@ -40,7 +40,6 @@ DBModel::DBModel(Comms& comms, DB& db)
 
 DBModel::~DBModel()
 {
-
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -55,49 +54,14 @@ QModelIndex DBModel::index(int row, int column, QModelIndex const& parent) const
     {
         return QModelIndex();
     }
-
-//    Tree_Item const* ti = nullptr;
-//    if (!parent.isValid())
-//    {
-//        ti = m_root.get();
-//    }
-//    else
-//    {
-//        ti = (Tree_Item*)parent.internalPointer();
-//    }
-
-//    if (ti && row < (int)ti->m_children.size())
-//    {
-//        QModelIndex const& idx = ti->m_children[row]->m_model_index;
-//        return createIndex(row, column, idx.internalPointer());
-//    }
-
     return createIndex(row, column, nullptr);
-
-//    return QModelIndex();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 QModelIndex DBModel::parent(QModelIndex const& index) const
 {
-    if (!index.isValid())
-    {
-        return QModelIndex();
-    }
-//    Tree_Item* ti = (Tree_Item*)index.internalPointer();
-//    if (!ti)
-//    {
-//        return QModelIndex();
-//    }
-
-//    std::shared_ptr<Tree_Item> parent = ti->m_parent.lock();
-//    if (!parent || parent == m_root)
-    {
-        return QModelIndex();
-    }
-
-//    return parent->m_model_index;
+    return QModelIndex();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -168,7 +132,7 @@ QVariant DBModel::data(QModelIndex const& index, int role) const
         if (column == Column::Sensor)
         {
             std::vector<Comms::Sensor> const& sensors = m_comms.getLastSensors();
-            auto it = std::find_if(sensors.begin(), sensors.end(), [&measurement](Comms::Sensor const& sensor) { return sensor.id == measurement.sensor_id; });
+            auto it = std::find_if(sensors.begin(), sensors.end(), [&measurement](Comms::Sensor const& sensor) { return sensor.id == measurement.sensorId; });
             if (it == sensors.end())
             {
                 return "N/A";
@@ -185,7 +149,7 @@ QVariant DBModel::data(QModelIndex const& index, int role) const
         else if (column == Column::Timestamp)
         {
             QDateTime dt;
-            dt.setTime_t(DB::Clock::to_time_t(measurement.time_point));
+            dt.setTime_t(DB::Clock::to_time_t(measurement.timePoint));
             return dt;
         }
         else if (column == Column::Temperature)
@@ -198,7 +162,7 @@ QVariant DBModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Signal)
         {
-            return std::min(measurement.s2b_input_dBm, measurement.b2s_input_dBm);
+            return std::min(measurement.s2b, measurement.b2s);
         }
         else if (column == Column::Errors)
         {
@@ -230,14 +194,7 @@ QVariant DBModel::data(QModelIndex const& index, int role) const
 
 Qt::ItemFlags DBModel::flags(QModelIndex const& index) const
 {
-    auto defaultFlags = Qt::ItemIsEnabled;
-
-    if (!index.isValid())
-    {
-        return defaultFlags;
-    }
-
-    return defaultFlags;
+    return Qt::ItemIsEnabled;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -246,7 +203,7 @@ void DBModel::setFilter(DB::Filter const& filter)
 {
     beginResetModel();
     m_filter = filter;
-    m_measurements = m_db.get_filtered_measurements(m_filter);
+    m_measurements = m_db.getFilteredMeasurements(m_filter);
     endResetModel();
 
     Q_EMIT layoutChanged();
@@ -263,20 +220,6 @@ size_t DBModel::getMeasurementCount() const
 
 bool DBModel::setData(QModelIndex const& index, QVariant const& value, int role)
 {
-//    else if (!index.isValid() || role == Qt::EditRole)
-//    {
-//        return false;
-//    }
-//    Tree_Item* ti = (Tree_Item*)index.internalPointer();
-//    if (!ti)
-//    {
-//        return false;
-//    }
-
-//    if (index.column() == 0)
-//    {
-//        return true;
-//    }
     return false;
 }
 
@@ -284,7 +227,6 @@ bool DBModel::setData(QModelIndex const& index, QVariant const& value, int role)
 
 bool DBModel::setHeaderData(int section, Qt::Orientation orientation, QVariant const& value, int role)
 {
-
     return false;
 }
 

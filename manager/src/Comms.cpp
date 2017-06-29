@@ -150,11 +150,11 @@ void Comms::processGetConfigRes()
         boost::property_tree::ptree pt;
         boost::property_tree::read_json(ss, pt);
 
-        m_config.sensors_sleeping = pt.get<bool>("sensors_sleeping");
-        m_config.measurement_period = std::chrono::seconds(pt.get<std::chrono::seconds::rep>("measurement_period"));
-        m_config.comms_period = std::chrono::seconds(pt.get<std::chrono::seconds::rep>("comms_period"));
-        m_config.computed_comms_period = std::chrono::seconds(pt.get<std::chrono::seconds::rep>("computed_comms_period"));
-        m_config.baseline_time_point = Clock::time_point(std::chrono::seconds(pt.get<std::chrono::seconds::rep>("baseline_time_point")));
+        m_config.sensorsSleeping = pt.get<bool>("sensors_sleeping");
+        m_config.measurementPeriod = std::chrono::seconds(pt.get<std::chrono::seconds::rep>("measurement_period"));
+        m_config.commsPeriod = std::chrono::seconds(pt.get<std::chrono::seconds::rep>("comms_period"));
+        m_config.computedCommsPeriod = std::chrono::seconds(pt.get<std::chrono::seconds::rep>("computed_comms_period"));
+        m_config.baselineTimePoint = Clock::time_point(std::chrono::seconds(pt.get<std::chrono::seconds::rep>("baseline_time_point")));
 
         emit configReceived(m_config);
     }

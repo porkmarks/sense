@@ -1,5 +1,6 @@
 <RCC>
 <qresource prefix="/">
+<file>icons/ui/export.png</file>
 <file>icons/ui/today.png</file>
 <file>icons/ui/question.png</file>
 <file>icons/ui/battery-0.png</file>

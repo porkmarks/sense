@@ -23,6 +23,7 @@ private slots:
     void setDateTimeThisDay();
     void setDateTimeThisWeek();
     void setDateTimeThisMonth();
+    void selectSensors();
 
     void minDateTimeChanged(QDateTime const& value);
     void maxDateTimeChanged(QDateTime const& value);
@@ -42,5 +43,6 @@ private:
     Comms* m_comms = nullptr;
     DB* m_db = nullptr;
     std::unique_ptr<DBModel> m_model;
+    std::vector<Comms::Sensor_Id> m_selectedSensorIds;
 };
 

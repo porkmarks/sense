@@ -293,6 +293,9 @@
              <iconset resource="../res/res.qrc">
               <normaloff>:/icons/ui/filter.png</normaloff>:/icons/ui/filter.png</iconset>
             </property>
+            <property name="shortcut">
+             <string>Return</string>
+            </property>
            </widget>
           </item>
           <item row="0" column="1">
@@ -394,6 +397,10 @@
            <widget class="QPushButton" name="export_2">
             <property name="text">
              <string>Export</string>
+            </property>
+            <property name="icon">
+             <iconset resource="../res/res.qrc">
+              <normaloff>:/icons/ui/export.png</normaloff>:/icons/ui/export.png</iconset>
             </property>
            </widget>
           </item>

@@ -36,10 +36,10 @@ public:
 
     struct Config
     {
-        bool sensors_sleeping = false;
-        Clock::duration measurement_period;
-        Clock::duration comms_period;
-        Clock::duration computed_comms_period;
+        bool sensorsSleeping = false;
+        Clock::duration measurementPeriod;
+        Clock::duration commsPeriod;
+        Clock::duration computedCommsPeriod;
 
         //This is computed when creating the config so that this equation holds for any config:
         // measurement_time_point = config.baseline_time_point + measurement_index * config.measurement_period
@@ -49,13 +49,12 @@ public:
         // config.baseline_time_point = m.time_point - m.index * config.measurement_period
         //
         //The reason for this is to keep the indices valid in all configs
-        Clock::time_point baseline_time_point;
+        Clock::time_point baselineTimePoint;
     };
 
     std::vector<BaseStation> const& getLastBasestations() const;
     std::vector<Sensor> const& getLastSensors() const;
     Config const& getLastConfig() const;
-
 
     void process();
 

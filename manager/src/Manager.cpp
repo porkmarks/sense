@@ -5,6 +5,7 @@
 
 Manager::Manager(QWidget *parent)
     : QMainWindow(parent)
+    , m_alarms(m_db)
 {
     m_ui.setupUi(this);
 
@@ -12,6 +13,7 @@ Manager::Manager(QWidget *parent)
     m_ui.configWidget->init(m_comms);
     m_ui.sensorsWidget->init(m_comms, m_db);
     m_ui.measurementsWidget->init(m_comms, m_db);
+    m_ui.alarmsWidget->init(m_comms, m_db, m_alarms);
 
     auto* timer = new QTimer(this);
     timer->setSingleShot(false);
@@ -27,6 +29,11 @@ Manager::Manager(QWidget *parent)
 
 Manager::~Manager()
 {
+    delete m_ui.baseStationsWidget;
+    delete m_ui.configWidget;
+    delete m_ui.sensorsWidget;
+    delete m_ui.measurementsWidget;
+    delete m_ui.alarmsWidget;
 }
 
 void Manager::activateBaseStation(Comms::BaseStation const& bs)
