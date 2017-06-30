@@ -10,7 +10,7 @@ Server::Server(Sensors& sensors)
     , m_broadcast_socket(m_io_service)
 {
     m_sensors.cb_report_measurement = std::bind(&Server::report_measurement, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-    m_sensors.cb_sensor_bound = std::bind(&Server::sensor_bound, this, std::placeholders::_1, std::placeholders::_2);
+    m_sensors.cb_sensor_bound = std::bind(&Server::sensor_bound, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -246,15 +246,16 @@ void Server::report_measurement(Sensors::Sensor_Id sensor_id, Clock::time_point 
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-void Server::sensor_bound(Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address sensor_address)
+void Server::sensor_bound(std::string const& name, Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address sensor_address)
 {
     try
     {
         std::stringstream ss;
         boost::property_tree::ptree pt;
 
-        pt.add("sensor_id", sensor_id);
-        pt.add("sensor_address", sensor_address);
+        pt.add("name", name);
+        pt.add("id", sensor_id);
+        pt.add("address", sensor_address);
 
         boost::property_tree::write_json(ss, pt);
 
@@ -348,13 +349,13 @@ void Server::process_get_sensors_req()
     {
         boost::property_tree::ptree pt;
 
-        auto sensors_node = pt.add("sensors", "");
-
         for (Sensors::Sensor const& sensor: m_sensors.get_sensors())
         {
-            auto node = sensors_node.add(sensor.name, "");
-            node.add("address", sensor.name);
+            boost::property_tree::ptree node;
+            node.add("address", sensor.address);
             node.add("id", sensor.id);
+
+            pt.put_child("sensors." + sensor.name, node);
         }
         boost::property_tree::write_json(ss, pt);
     }

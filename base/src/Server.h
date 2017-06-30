@@ -41,7 +41,7 @@ private:
 
 
     void report_measurement(Sensors::Sensor_Id sensor_id, Clock::time_point time_point, Sensors::Measurement const& measurement);
-    void sensor_bound(Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address sensor_address);
+    void sensor_bound(std::string const& name, Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address sensor_address);
 
     Sensors& m_sensors;
 

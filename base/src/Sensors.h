@@ -91,7 +91,6 @@ public:
     //sensor manipulation
     struct Unbound_Sensor_Data
     {
-        Sensor_Id id;
         std::string name;
     };
 
@@ -99,7 +98,7 @@ public:
     boost::optional<Unbound_Sensor_Data> get_unbound_sensor_data() const;
     void confirm_sensor_binding(Sensor_Id id, bool confirmed);
 
-    std::function<void(Sensor_Id, Sensor_Address)> cb_sensor_bound;
+    std::function<void(std::string const&, Sensor_Id, Sensor_Address)> cb_sensor_bound;
 
     Sensor const* bind_sensor();
     Sensor const* add_sensor(Sensor_Id id, std::string const& name, Sensor_Address address);
@@ -128,6 +127,7 @@ private:
     boost::optional<Unbound_Sensor_Data> m_unbound_sensor_data_opt;
     std::vector<Sensor> m_sensors;
 
+    uint32_t m_last_sensor_id = 0;
     uint32_t m_last_address = Sensor_Comms::SLAVE_ADDRESS_BEGIN;
 };
 

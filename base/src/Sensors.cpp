@@ -164,10 +164,10 @@ Sensors::Sensor const* Sensors::bind_sensor()
         return nullptr;
     }
 
-    Sensor const* sensor = add_sensor(m_unbound_sensor_data_opt->id, m_unbound_sensor_data_opt->name, ++m_last_address);
+    Sensor const* sensor = add_sensor(++m_last_sensor_id, m_unbound_sensor_data_opt->name, ++m_last_address);
     if (sensor)
     {
-        cb_sensor_bound(sensor->id, sensor->address);
+        cb_sensor_bound(sensor->name, sensor->id, sensor->address);
         m_unbound_sensor_data_opt = boost::none;
     }
 
@@ -558,6 +558,9 @@ void Sensors::confirm_measurement(Sensor_Id id, uint32_t measurement_index)
 bool Sensors::load_settings(std::string const& filename)
 {
     m_sensors.clear();
+    m_last_address = Sensor_Comms::SLAVE_ADDRESS_BEGIN;
+    m_last_sensor_id = 0;
+
     {
         std::ifstream f(filename);
         if (!f.is_open())
@@ -566,18 +569,27 @@ bool Sensors::load_settings(std::string const& filename)
         }
     }
 
+    std::vector<Sensor> sensors;
+    uint32_t last_address = Sensor_Comms::SLAVE_ADDRESS_BEGIN;
+    uint32_t last_sensor_id = 0;
+
     try
     {
         boost::property_tree::ptree pt;
         boost::property_tree::read_json(filename, pt);
 
-        for (auto const& node: pt.get_child("sensors"))
+        if (pt.get_child_optional("sensors"))
         {
-            Sensor sensor;
-            sensor.name = node.first;
-            sensor.address = node.second.get<Sensor_Address>("address");
-            sensor.id = node.second.get<Sensor_Id>("id");
-            m_sensors.push_back(sensor);
+            for (auto const& node: pt.get_child("sensors"))
+            {
+                Sensor sensor;
+                sensor.name = node.first;
+                sensor.address = node.second.get<Sensor_Address>("address");
+                sensor.id = node.second.get<Sensor_Id>("id");
+                last_address = std::max(last_address, sensor.address);
+                last_sensor_id = std::max(last_sensor_id, sensor.id);
+                sensors.push_back(sensor);
+            }
         }
 
         m_config.sensors_sleeping = pt.get<bool>("sensors_sleeping");
@@ -590,6 +602,10 @@ bool Sensors::load_settings(std::string const& filename)
         std::cerr << "Cannot deserialize settings: " << e.what() << "\n";
         return false;
     }
+
+    m_last_address = last_address;
+    m_last_sensor_id = last_sensor_id;
+    m_sensors = sensors;
 
     return true;
 }
@@ -604,9 +620,11 @@ bool Sensors::save_settings(std::string const& filename)
 
         for (Sensor const& sensor: m_sensors)
         {
-            auto node = pt.add("sensors." + sensor.name, "");
-            node.add("address", sensor.name);
+            boost::property_tree::ptree node;
+            node.add("address", sensor.address);
             node.add("id", sensor.id);
+
+            pt.put_child("sensors." + sensor.name, node);
         }
 
         pt.add("sensors_sleeping", m_config.sensors_sleeping);
