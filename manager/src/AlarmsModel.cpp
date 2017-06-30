@@ -113,65 +113,65 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
     DB::Alarm const& alarm = m_db.getAlarm(index.row());
 
     Column column = static_cast<Column>(index.column());
-    if (role == Qt::DecorationRole)
-    {
-        if (column == Column::Name)
-        {
-            return QIcon(":/icons/ui/alarm.png");
-        }
-    }
-    else if (role == Qt::CheckStateRole)
+    if (role == Qt::CheckStateRole)
     {
         if (column == Column::LowBattery)
         {
-            return alarm.vccWatch ? Qt::Checked : Qt::Unchecked;
+            if (alarm.vccWatch)
+            {
+                return Qt::Checked;
+            }
         }
         else if (column == Column::LowSignal)
         {
-            return alarm.signalWatch ? Qt::Checked : Qt::Unchecked;
+            if (alarm.signalWatch)
+            {
+                return Qt::Checked;
+            }
         }
         else if (column == Column::Errors)
         {
-            return alarm.errorFlagsWatch ? Qt::Checked : Qt::Unchecked;
+            if (alarm.errorFlagsWatch)
+            {
+                return Qt::Checked;
+            }
         }
     }
     else if (role == Qt::DisplayRole)
     {
         if (column == Column::Temperature)
         {
-            std::string str;
+            QString str;
             if (alarm.lowTemperatureWatch)
             {
-                str += "< " + std::to_string(alarm.lowTemperature) + " °, ";
+                str += QString("Below %1 °C").arg(alarm.lowTemperature);
             }
             if (alarm.highTemperatureWatch)
             {
-                str += "> " + std::to_string(alarm.highTemperature) + " °, ";
+                if (!str.isEmpty())
+                {
+                    str += " and ";
+                }
+                str += QString("Above %1 °C").arg(alarm.highTemperature);
             }
-            if (str.empty())
-            {
-                return "<ignored>";
-            }
-            str.pop_back(); //comma
-            return str.c_str();
+            return str;
         }
         else if (column == Column::Humidity)
         {
-            std::string str;
+            QString str;
             if (alarm.lowHumidityWatch)
             {
-                str += "< " + std::to_string(alarm.lowHumidity) + " %, ";
+                str += QString("Below %1 % RH").arg(alarm.lowHumidity);
             }
             if (alarm.highHumidityWatch)
             {
-                str += "> " + std::to_string(alarm.highHumidity) + " %, ";
+                if (!str.isEmpty())
+                {
+                    str += " and ";
+                }
+                str += QString("Above %1 % RH").arg(alarm.highHumidity);
             }
-            if (str.empty())
-            {
-                return "<ignored>";
-            }
-            str.pop_back(); //comma
-            return str.c_str();
+            return str;
         }
         else if (column == Column::Action)
         {
@@ -179,7 +179,40 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
             {
                 return ("Email " + alarm.emailRecipient).c_str();
             }
-            return "<none>";
+        }
+    }
+    else if (role == Qt::DecorationRole)
+    {
+        if (column == Column::Name)
+        {
+            return QIcon(":/icons/ui/alarm.png");
+        }
+        else if (column == Column::Temperature && (alarm.lowTemperatureWatch || alarm.highTemperatureWatch))
+        {
+            return QIcon(":/icons/ui/temperature.png");
+        }
+        else if (column == Column::Humidity && (alarm.lowHumidityWatch || alarm.highHumidityWatch))
+        {
+            return QIcon(":/icons/ui/humidity.png");
+        }
+        else if (column == Column::LowBattery && alarm.vccWatch)
+        {
+            return QIcon(":/icons/ui/battery-0.png");
+        }
+        else if (column == Column::LowSignal && alarm.signalWatch)
+        {
+            return QIcon(":/icons/ui/signal-0.png");
+        }
+        else if (column == Column::Errors && alarm.errorFlagsWatch)
+        {
+            return QIcon(":/icons/ui/sensor.png");
+        }
+        else if (column == Column::Action)
+        {
+            if (alarm.sendEmailAction)
+            {
+                return QIcon(":/icons/ui/email.png");
+            }
         }
     }
 

@@ -70,7 +70,8 @@ HEADERS += \
     ../../src/SensorsWidget.h \
     ../../src/SensorsModel.h \
     ../../src/AlarmsModel.h \
-    ../../src/MeasurementsModel.h
+    ../../src/MeasurementsModel.h \
+    ../../src/CustomItemDelegate.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -85,7 +86,8 @@ SOURCES += \
     ../../src/SensorsWidget.cpp \
     ../../src/SensorsModel.cpp \
     ../../src/AlarmsModel.cpp \
-    ../../src/MeasurementsModel.cpp
+    ../../src/MeasurementsModel.cpp \
+    ../../src/CustomItemDelegate.cpp
 
 FORMS += \
     ../../src/Manager.ui \

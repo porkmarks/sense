@@ -238,7 +238,7 @@
              <string>&lt;= </string>
             </property>
             <property name="suffix">
-             <string> RH</string>
+             <string> % RH</string>
             </property>
             <property name="decimals">
              <number>1</number>
@@ -274,7 +274,7 @@
              <string>&gt;=  </string>
             </property>
             <property name="suffix">
-             <string> RH</string>
+             <string> % RH</string>
             </property>
             <property name="decimals">
              <number>1</number>
@@ -307,7 +307,7 @@
              <string>&gt;=  </string>
             </property>
             <property name="suffix">
-             <string> °</string>
+             <string> °C</string>
             </property>
             <property name="decimals">
              <number>1</number>
@@ -329,7 +329,7 @@
              <string>&lt;= </string>
             </property>
             <property name="suffix">
-             <string> °</string>
+             <string> °C</string>
             </property>
             <property name="decimals">
              <number>1</number>

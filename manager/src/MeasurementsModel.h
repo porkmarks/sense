@@ -3,11 +3,12 @@
 #include <memory>
 #include <vector>
 #include <QAbstractItemModel>
+#include <QStyledItemDelegate>
 
 #include "Comms.h"
 #include "DB.h"
 
-class MeasurementsModel : public QAbstractItemModel
+class MeasurementsModel : public QAbstractItemModel, public QStyledItemDelegate
 {
 public:
 
@@ -41,6 +42,9 @@ protected:
     virtual bool removeRows(int position, int rows, QModelIndex const& parent = QModelIndex());
 
 private:
+    void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
+    QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override;
+
     Comms& m_comms;
     DB& m_db;
     DB::Filter m_filter;

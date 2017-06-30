@@ -22,6 +22,7 @@ void MeasurementsWidget::init(Comms& comms, DB& db)
 
     m_model.reset(new MeasurementsModel(comms, *m_db));
     m_ui.list->setModel(m_model.get());
+    m_ui.list->setItemDelegate(m_model.get());
 
     m_ui.list->setUniformRowHeights(true);
 
@@ -241,7 +242,6 @@ void MeasurementsWidget::selectSensors()
     SensorsModel model(*m_comms, *m_db);
     model.setShowCheckboxes(true);
 
-
     std::vector<Comms::Sensor> const& sensors = m_comms->getLastSensors();
     if (m_selectedSensorIds.empty())
     {
@@ -259,6 +259,7 @@ void MeasurementsWidget::selectSensors()
     }
 
     ui.list->setModel(&model);
+    ui.list->setItemDelegate(&model);
 
     int result = dialog.exec();
     if (result == QDialog::Accepted)

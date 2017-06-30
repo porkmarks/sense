@@ -3,11 +3,12 @@
 #include <memory>
 #include <vector>
 #include <QAbstractItemModel>
+#include <QStyledItemDelegate>
 
 #include "Comms.h"
 #include "DB.h"
 
-class SensorsModel : public QAbstractItemModel
+class SensorsModel : public QAbstractItemModel, public QStyledItemDelegate
 {
 public:
     SensorsModel(Comms& comms, DB& db);
@@ -45,14 +46,22 @@ protected:
     virtual bool removeRows(int position, int rows, QModelIndex const& parent = QModelIndex());
 
 private:
+    void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
+    QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override;
+
     Comms& m_comms;
     DB& m_db;
+
     bool m_showCheckboxes = false;
 
     struct SensorData
     {
         bool isChecked = false;
         Comms::Sensor sensor;
+        uint8_t triggeredAlarms = 0;
+
+        bool isLastMeasurementValid = false;
+        DB::Measurement lastMeasurement;
     };
 
     std::vector<SensorData> m_sensors;

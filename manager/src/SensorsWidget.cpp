@@ -41,6 +41,7 @@ void SensorsWidget::init(Comms& comms, DB& db)
 
     m_model.reset(new SensorsModel(comms, db));
     m_ui.list->setModel(m_model.get());
+    m_ui.list->setItemDelegate(m_model.get());
 
     QObject::connect(m_comms, &Comms::baseStationConnected, this, &SensorsWidget::baseStationConnected);
     QObject::connect(m_comms, &Comms::baseStationDisconnected, this, &SensorsWidget::baseStationDisconnected);
