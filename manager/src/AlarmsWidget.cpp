@@ -37,6 +37,26 @@ void AlarmsWidget::addAlarm()
     int result = dialog.exec();
     if (result == QDialog::Accepted)
     {
+        DB::Alarm alarm;
+        alarm.highTemperatureWatch = ui.highTemperatureWatch->isChecked();
+        alarm.highTemperature = ui.highTemperature->value();
+        alarm.lowTemperatureWatch = ui.lowTemperatureWatch->isChecked();
+        alarm.lowTemperature = ui.lowTemperature->value();
+
+        alarm.highHumidityWatch = ui.highHumidityWatch->isChecked();
+        alarm.highHumidity = ui.highHumidity->value();
+        alarm.lowHumidityWatch = ui.lowHumidityWatch->isChecked();
+        alarm.lowHumidity = ui.lowHumidity->value();
+
+        alarm.errorFlagsWatch = ui.sensorErrorsWatch->isChecked();
+        alarm.signalWatch = ui.lowSignalWatch->isChecked();
+        alarm.vccWatch = ui.lowBatteryWatch->isChecked();
+
+        alarm.sendEmailAction = ui.sendEmailAction->isChecked();
+        alarm.emailRecipient = ui.emailRecipient->text().toUtf8().data();
+
+        m_db->addAlarm(alarm);
+        m_model->refresh();
     }
 }
 

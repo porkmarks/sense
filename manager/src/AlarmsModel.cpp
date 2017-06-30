@@ -31,6 +31,16 @@ AlarmsModel::~AlarmsModel()
 
 //////////////////////////////////////////////////////////////////////////
 
+void AlarmsModel::refresh()
+{
+    beginResetModel();
+    endResetModel();
+
+    Q_EMIT layoutChanged();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 QModelIndex AlarmsModel::index(int row, int column, QModelIndex const& parent) const
 {
     if (row < 0 || column < 0)
@@ -110,6 +120,21 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
             return QIcon(":/icons/ui/alarm.png");
         }
     }
+    else if (role == Qt::CheckStateRole)
+    {
+        if (column == Column::LowBattery)
+        {
+            return alarm.vccWatch ? Qt::Checked : Qt::Unchecked;
+        }
+        else if (column == Column::LowSignal)
+        {
+            return alarm.signalWatch ? Qt::Checked : Qt::Unchecked;
+        }
+        else if (column == Column::Errors)
+        {
+            return alarm.errorFlagsWatch ? Qt::Checked : Qt::Unchecked;
+        }
+    }
     else if (role == Qt::DisplayRole)
     {
         if (column == Column::Temperature)
@@ -147,30 +172,6 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
             }
             str.pop_back(); //comma
             return str.c_str();
-        }
-        else if (column == Column::LowBattery)
-        {
-            if (alarm.vccWatch)
-            {
-                return QString("Yes");
-            }
-            return QString("<ignored>");
-        }
-        else if (column == Column::LowSignal)
-        {
-            if (alarm.signalWatch)
-            {
-                return QString("Yes");
-            }
-            return QString("<ignored>");
-        }
-        else if (column == Column::Errors)
-        {
-            if (alarm.errorFlagsWatch)
-            {
-                return "Yes";
-            }
-            return "<ignored>";
         }
         else if (column == Column::Action)
         {

@@ -11,9 +11,10 @@ public:
     AlarmsModel(DB& db);
     ~AlarmsModel();
 
-    virtual QModelIndex parent(QModelIndex const& index) const;
+    void refresh();
 
-public: //signals
+
+    virtual QModelIndex parent(QModelIndex const& index) const;
     virtual QModelIndex index(int row, int column, QModelIndex const& parent = QModelIndex()) const;
 
     virtual int rowCount(QModelIndex const& parent = QModelIndex()) const;
