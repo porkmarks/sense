@@ -67,12 +67,10 @@ HEADERS += \
     ../../../common/src/QTcpSocketAdapter.h \
     ../../../common/src/CRC.h \
     ../../src/DB.h \
-    ../../src/DBModel.h \
-    ../../src/measurement.h \
     ../../src/SensorsWidget.h \
     ../../src/SensorsModel.h \
-    ../../src/Alarms.h \
-    ../../src/AlarmsModel.h
+    ../../src/AlarmsModel.h \
+    ../../src/MeasurementsModel.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -84,11 +82,10 @@ SOURCES += \
     ../../src/AlarmsWidget.cpp \
     ../../../common/src/CRC.cpp \
     ../../src/DB.cpp \
-    ../../src/DBModel.cpp \
     ../../src/SensorsWidget.cpp \
     ../../src/SensorsModel.cpp \
-    ../../src/Alarms.cpp \
-    ../../src/AlarmsModel.cpp
+    ../../src/AlarmsModel.cpp \
+    ../../src/MeasurementsModel.cpp
 
 FORMS += \
     ../../src/Manager.ui \
@@ -97,7 +94,8 @@ FORMS += \
     ../../src/MeasurementsWidget.ui \
     ../../src/SensorsWidget.ui \
     ../../src/SensorsFilterDialog.ui \
-    ../../src/AlarmsWidget.ui
+    ../../src/AlarmsWidget.ui \
+    ../../src/NewAlarmDialog.ui
 
 DISTFILES += \
 

@@ -4,7 +4,6 @@
 #include "ui_AlarmsWidget.h"
 #include "Comms.h"
 #include "DB.h"
-#include "Alarms.h"
 #include "AlarmsModel.h"
 
 
@@ -14,7 +13,7 @@ class AlarmsWidget : public QWidget
 public:
     explicit AlarmsWidget(QWidget *parent = 0);
     ~AlarmsWidget();
-    void init(Comms& comms, DB& db, Alarms& alarms);
+    void init(Comms& comms, DB& db);
 
 signals:
 
@@ -28,6 +27,6 @@ private:
     Ui::AlarmsWidget m_ui;
     std::unique_ptr<AlarmsModel> m_model;
     Comms* m_comms = nullptr;
-    Alarms* m_alarms = nullptr;
+    DB* m_db = nullptr;
 };
 

@@ -3,14 +3,12 @@
 #include <memory>
 #include <vector>
 #include <QAbstractItemModel>
-
-#include "Alarms.h"
+#include "DB.h"
 
 class AlarmsModel : public QAbstractItemModel
 {
 public:
-
-    AlarmsModel(Alarms& alarms);
+    AlarmsModel(DB& db);
     ~AlarmsModel();
 
     virtual QModelIndex parent(QModelIndex const& index) const;
@@ -36,5 +34,5 @@ protected:
     virtual bool removeRows(int position, int rows, QModelIndex const& parent = QModelIndex());
 
 private:
-    Alarms& m_alarms;
+    DB& m_db;
 };

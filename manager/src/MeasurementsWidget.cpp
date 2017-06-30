@@ -9,6 +9,7 @@ MeasurementsWidget::MeasurementsWidget(QWidget *parent)
     : QWidget(parent)
 {
     m_ui.setupUi(this);
+    setEnabled(false);
 }
 
 void MeasurementsWidget::init(Comms& comms, DB& db)
@@ -16,7 +17,10 @@ void MeasurementsWidget::init(Comms& comms, DB& db)
     m_comms = &comms;
     m_db = &db;
 
-    m_model.reset(new DBModel(comms, *m_db));
+    QObject::connect(m_comms, &Comms::baseStationConnected, this, &MeasurementsWidget::baseStationConnected);
+    QObject::connect(m_comms, &Comms::baseStationDisconnected, this, &MeasurementsWidget::baseStationDisconnected);
+
+    m_model.reset(new MeasurementsModel(comms, *m_db));
     m_ui.list->setModel(m_model.get());
 
     m_ui.list->setUniformRowHeights(true);
@@ -71,6 +75,17 @@ void MeasurementsWidget::init(Comms& comms, DB& db)
 
 //    QObject::connect(m_ui.minHumidity, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &MeasurementsWidget::minHumidityChanged);
 //    QObject::connect(m_ui.maxHumidity, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &MeasurementsWidget::maxHumidityChanged);
+}
+
+
+void MeasurementsWidget::baseStationConnected(Comms::BaseStation const& bs)
+{
+    setEnabled(true);
+}
+
+void MeasurementsWidget::baseStationDisconnected(Comms::BaseStation const& bs)
+{
+    setEnabled(false);
 }
 
 DB::Filter MeasurementsWidget::createFilter() const

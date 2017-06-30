@@ -20,16 +20,40 @@ public:
     bool save() const;
     bool saveAs(std::string const& filename) const;
 
+    struct ErrorFlag
+    {
+        enum type : uint8_t
+        {
+            SensorError   = 1 << 0,
+            CommsError    = 1 << 1
+        };
+    };
+
+
+    struct Alarm
+    {
+        bool lowTemperatureWatch = false;
+        float lowTemperature = 0;
+
+        bool highTemperatureWatch = false;
+        float highTemperature = 0;
+
+        bool lowHumidityWatch = false;
+        float lowHumidity = 0;
+
+        bool highHumidityWatch = false;
+        float highHumidity = 0;
+
+        bool vccWatch = false;
+        bool signalWatch = false;
+        bool errorFlagsWatch = false;
+
+        bool sendEmailAction = false;
+        std::string emailRecipient;
+    };
+
     struct Measurement
     {
-        struct Flag
-        {
-            enum type : uint8_t
-            {
-                SENSOR_ERROR   = 1 << 0,
-                COMMS_ERROR    = 1 << 1
-            };
-        };
         SensorId sensorId = 0;
         uint32_t index = 0;
         Clock::time_point timePoint;
@@ -38,8 +62,30 @@ public:
         float vcc = 0;
         int8_t b2s = 0;
         int8_t s2b = 0;
-        uint8_t flags = 0;
+        uint8_t errorFlags = 0;
     };
+
+
+
+    size_t getAlarmCount() const;
+    Alarm const& getAlarm(size_t index) const;
+    void addAlarm(Alarm const& alarm);
+    void removeAlarm(size_t index);
+
+    struct TriggeredAlarm
+    {
+        enum
+        {
+            Temperature     = 1 << 0,
+            Humidity        = 1 << 1,
+            Vcc             = 1 << 2,
+            Signal          = 1 << 3,
+            ErrorFlags      = 1 << 4,
+        };
+    };
+
+    uint8_t computeTriggeredAlarm(Measurement const& measurement) const;
+
 
     bool addMeasurement(Measurement const& measurement);
 
@@ -89,6 +135,8 @@ public:
     bool getLastMeasurementForSensor(SensorId sensor_id, Measurement& measurement) const;
 
 private:
+
+    std::vector<Alarm> m_alarms;
 
     bool cull(Measurement const& measurement, Filter const& filter) const;
 

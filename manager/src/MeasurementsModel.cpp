@@ -1,9 +1,9 @@
-#include "DBModel.h"
+#include "MeasurementsModel.h"
 
 #include <QWidget>
 #include <QIcon>
 
-static std::array<const char*, 8> s_headerNames = {"Sensor", "Index", "Timestamp", "Temperature", "Humidity", "Battery", "Signal", "Errors"};
+static std::array<const char*, 9> s_headerNames = {"Sensor", "Index", "Timestamp", "Temperature", "Humidity", "Battery", "Signal", "Errors", "Alarms"};
 enum class Column
 {
     Sensor,
@@ -13,7 +13,8 @@ enum class Column
     Humidity,
     Battery,
     Signal,
-    Errors
+    Errors,
+    Alarms
 };
 
 static std::array<const char*, 5> s_batteryIconNames = { "battery-0.png", "battery-25.png", "battery-50.png", "battery-75.png", "battery-100.png" };
@@ -27,9 +28,20 @@ QIcon getBatteryIcon(float vcc)
     return QIcon(QString(":/icons/ui/") + s_batteryIconNames[index]);
 }
 
+static std::array<const char*, 5> s_signalIconNames = { "signal-0.png", "signal-25.png", "signal-50.png", "signal-75.png", "signal-100.png" };
+
+QIcon getSignalIcon(int8_t dBm)
+{
+    constexpr float max = -50.f;
+    constexpr float min = -110.f;
+    float percentage = std::max(std::min(static_cast<float>(dBm), max) - min, 0.f) / (max - min);
+    size_t index = std::floor(percentage * s_signalIconNames.size() + 0.5f);
+    return QIcon(QString(":/icons/ui/") + s_signalIconNames[index]);
+}
+
 //////////////////////////////////////////////////////////////////////////
 
-DBModel::DBModel(Comms& comms, DB& db)
+MeasurementsModel::MeasurementsModel(Comms& comms, DB& db)
     : QAbstractItemModel()
     , m_comms(comms)
     , m_db(db)
@@ -38,13 +50,13 @@ DBModel::DBModel(Comms& comms, DB& db)
 
 //////////////////////////////////////////////////////////////////////////
 
-DBModel::~DBModel()
+MeasurementsModel::~MeasurementsModel()
 {
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-QModelIndex DBModel::index(int row, int column, QModelIndex const& parent) const
+QModelIndex MeasurementsModel::index(int row, int column, QModelIndex const& parent) const
 {
     if (row < 0 || column < 0)
     {
@@ -59,14 +71,14 @@ QModelIndex DBModel::index(int row, int column, QModelIndex const& parent) const
 
 //////////////////////////////////////////////////////////////////////////
 
-QModelIndex DBModel::parent(QModelIndex const& index) const
+QModelIndex MeasurementsModel::parent(QModelIndex const& index) const
 {
     return QModelIndex();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-int DBModel::rowCount(QModelIndex const& index) const
+int MeasurementsModel::rowCount(QModelIndex const& index) const
 {
     if (!index.isValid())
     {
@@ -80,14 +92,14 @@ int DBModel::rowCount(QModelIndex const& index) const
 
 //////////////////////////////////////////////////////////////////////////
 
-int DBModel::columnCount(QModelIndex const& index) const
+int MeasurementsModel::columnCount(QModelIndex const& index) const
 {
     return s_headerNames.size();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-QVariant DBModel::headerData(int section, Qt::Orientation orientation, int role) const
+QVariant MeasurementsModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
     if (orientation == Qt::Horizontal && role == Qt::DisplayRole)
     {
@@ -101,7 +113,7 @@ QVariant DBModel::headerData(int section, Qt::Orientation orientation, int role)
 
 //////////////////////////////////////////////////////////////////////////
 
-QVariant DBModel::data(QModelIndex const& index, int role) const
+QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
 {
     if (!index.isValid())
     {
@@ -125,6 +137,10 @@ QVariant DBModel::data(QModelIndex const& index, int role) const
         else if (column == Column::Battery)
         {
             return getBatteryIcon(measurement.vcc);
+        }
+        else if (column == Column::Signal)
+        {
+            return getBatteryIcon(std::min(measurement.b2s, measurement.s2b));
         }
     }
     else if (role == Qt::DisplayRole)
@@ -162,27 +178,50 @@ QVariant DBModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Signal)
         {
-            return std::min(measurement.s2b, measurement.b2s);
         }
         else if (column == Column::Errors)
         {
             std::string str;
-            if (measurement.flags && DB::Measurement::Flag::COMMS_ERROR)
+            if (measurement.errorFlags && DB::ErrorFlag::CommsError)
             {
-                str += "Comms";
+                str += "C, ";
             }
-            if (measurement.flags && DB::Measurement::Flag::SENSOR_ERROR)
+            if (measurement.errorFlags && DB::ErrorFlag::SensorError)
             {
-                if (!str.empty())
-                {
-                    str += ", ";
-                }
-                str += "Sensor";
+                str += "S, ";
             }
             if (str.empty())
             {
-                str = "-";
+                return "<none>";
             }
+            str.pop_back(); //the comma
+            return str.c_str();
+        }
+        else if (column == Column::Alarms)
+        {
+            uint8_t triggeredAlarm = m_db.computeTriggeredAlarm(measurement);
+            std::string str;
+            if (triggeredAlarm && DB::TriggeredAlarm::Temperature)
+            {
+                str += "T, ";
+            }
+            if (triggeredAlarm && DB::TriggeredAlarm::Humidity)
+            {
+                str += "H, ";
+            }
+            if (triggeredAlarm && DB::TriggeredAlarm::Vcc)
+            {
+                str += "B, ";
+            }
+            if (triggeredAlarm && DB::TriggeredAlarm::ErrorFlags)
+            {
+                str += "E, ";
+            }
+            if (str.empty())
+            {
+                return "<none>";
+            }
+            str.pop_back();//the comma
             return str.c_str();
         }
     }
@@ -192,14 +231,14 @@ QVariant DBModel::data(QModelIndex const& index, int role) const
 
 //////////////////////////////////////////////////////////////////////////
 
-Qt::ItemFlags DBModel::flags(QModelIndex const& index) const
+Qt::ItemFlags MeasurementsModel::flags(QModelIndex const& index) const
 {
     return Qt::ItemIsEnabled;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void DBModel::setFilter(DB::Filter const& filter)
+void MeasurementsModel::setFilter(DB::Filter const& filter)
 {
     beginResetModel();
     m_filter = filter;
@@ -211,49 +250,49 @@ void DBModel::setFilter(DB::Filter const& filter)
 
 //////////////////////////////////////////////////////////////////////////
 
-size_t DBModel::getMeasurementCount() const
+size_t MeasurementsModel::getMeasurementCount() const
 {
     return m_measurements.size();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DBModel::setData(QModelIndex const& index, QVariant const& value, int role)
+bool MeasurementsModel::setData(QModelIndex const& index, QVariant const& value, int role)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DBModel::setHeaderData(int section, Qt::Orientation orientation, QVariant const& value, int role)
+bool MeasurementsModel::setHeaderData(int section, Qt::Orientation orientation, QVariant const& value, int role)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DBModel::insertColumns(int position, int columns, QModelIndex const& parent)
+bool MeasurementsModel::insertColumns(int position, int columns, QModelIndex const& parent)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DBModel::removeColumns(int position, int columns, QModelIndex const& parent)
+bool MeasurementsModel::removeColumns(int position, int columns, QModelIndex const& parent)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DBModel::insertRows(int position, int rows, QModelIndex const& parent)
+bool MeasurementsModel::insertRows(int position, int rows, QModelIndex const& parent)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DBModel::removeRows(int position, int rows, QModelIndex const& parent)
+bool MeasurementsModel::removeRows(int position, int rows, QModelIndex const& parent)
 {
     return false;
 }

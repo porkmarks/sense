@@ -5,7 +5,6 @@
 
 Manager::Manager(QWidget *parent)
     : QMainWindow(parent)
-    , m_alarms(m_db)
 {
     m_ui.setupUi(this);
 
@@ -13,7 +12,7 @@ Manager::Manager(QWidget *parent)
     m_ui.configWidget->init(m_comms);
     m_ui.sensorsWidget->init(m_comms, m_db);
     m_ui.measurementsWidget->init(m_comms, m_db);
-    m_ui.alarmsWidget->init(m_comms, m_db, m_alarms);
+    m_ui.alarmsWidget->init(m_comms, m_db);
 
     auto* timer = new QTimer(this);
     timer->setSingleShot(false);

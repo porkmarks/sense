@@ -1,5 +1,10 @@
 #include "DB.h"
 #include <algorithm>
+#include <cassert>
+
+constexpr float k_alertVcc = 2.2f;
+constexpr int8_t k_alertSignal = -110;
+
 
 DB::DB()
 {
@@ -26,6 +31,73 @@ bool DB::save() const
 bool DB::saveAs(std::string const& filename) const
 {
     return false;
+}
+
+size_t DB::getAlarmCount() const
+{
+    return m_alarms.size();
+}
+
+DB::Alarm const& DB::getAlarm(size_t index) const
+{
+    return m_alarms[index];
+}
+
+void DB::addAlarm(Alarm const& alarm)
+{
+    m_alarms.push_back(alarm);
+}
+void DB::removeAlarm(size_t index)
+{
+    if (index < m_alarms.size())
+    {
+        m_alarms.erase(m_alarms.begin() + index);
+    }
+    else
+    {
+        assert(false);
+    }
+}
+
+uint8_t DB::computeTriggeredAlarm(Measurement const& measurement) const
+{
+    uint8_t triggered = 0;
+
+    for (Alarm const& alarm: m_alarms)
+    {
+        if (alarm.highTemperatureWatch && measurement.temperature > alarm.highTemperature)
+        {
+            triggered |= TriggeredAlarm::Temperature;
+        }
+        if (alarm.lowTemperatureWatch && measurement.temperature < alarm.lowTemperature)
+        {
+            triggered |= TriggeredAlarm::Temperature;
+        }
+
+        if (alarm.highHumidityWatch && measurement.humidity > alarm.highHumidity)
+        {
+            triggered |= TriggeredAlarm::Humidity;
+        }
+        if (alarm.lowHumidityWatch && measurement.humidity < alarm.lowHumidity)
+        {
+            triggered |= TriggeredAlarm::Humidity;
+        }
+
+        if (alarm.vccWatch && measurement.vcc <= k_alertVcc)
+        {
+            triggered |= TriggeredAlarm::Vcc;
+        }
+        if (alarm.errorFlagsWatch && measurement.errorFlags != 0)
+        {
+            triggered |= TriggeredAlarm::ErrorFlags;
+        }
+        if (alarm.signalWatch && std::min(measurement.s2b, measurement.b2s) <= k_alertSignal)
+        {
+            triggered |= TriggeredAlarm::Signal;
+        }
+    }
+
+    return triggered;
 }
 
 bool DB::addMeasurement(Measurement const& measurement)
@@ -186,7 +258,7 @@ bool DB::cull(Measurement const& measurement, Filter const& filter) const
     }
     if (filter.useErrorsFilter)
     {
-        bool has_errors = measurement.flags != 0;
+        bool has_errors = measurement.errorFlags != 0;
         if (has_errors != filter.errorsFilter)
         {
             return false;
@@ -206,7 +278,7 @@ inline DB::StoredMeasurement DB::pack(Measurement const& m)
     sm.vcc = static_cast<uint8_t>(std::max(std::min((m.vcc - 2.f), 2.55f), 0.f) * 100.f);
     sm.b2s = m.b2s;
     sm.s2b = m.s2b;
-    sm.flags = m.flags;
+    sm.flags = m.errorFlags;
     return sm;
 }
 
@@ -221,7 +293,7 @@ inline DB::Measurement DB::unpack(SensorId sensor_id, StoredMeasurement const& s
     m.vcc = static_cast<float>(sm.vcc) / 100.f + 2.f;
     m.b2s = sm.b2s;
     m.s2b = sm.s2b;
-    m.flags = sm.flags;
+    m.errorFlags = sm.flags;
     return m;
 }
 

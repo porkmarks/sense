@@ -3,22 +3,23 @@
 #include <QWidget>
 #include <QIcon>
 
-static std::array<const char*, 7> s_headerNames = {"Name", "Temperature", "Humidity", "Battery", "Errors", "Action"};
+static std::array<const char*, 8> s_headerNames = {"Name", "Temperature", "Humidity", "Low Battery", "Errors", "Low Signal", "Action"};
 enum class Column
 {
     Name,
     Temperature,
     Humidity,
-    Battery,
+    LowBattery,
     Errors,
+    LowSignal,
     Action
 };
 
 //////////////////////////////////////////////////////////////////////////
 
-AlarmsModel::AlarmsModel(Alarms& alarms)
+AlarmsModel::AlarmsModel(DB& db)
     : QAbstractItemModel()
-    , m_alarms(alarms)
+    , m_db(db)
 {
 }
 
@@ -56,7 +57,7 @@ int AlarmsModel::rowCount(QModelIndex const& index) const
 {
     if (!index.isValid())
     {
-        return m_alarms.getAlarmCount();
+        return m_db.getAlarmCount();
     }
     else
     {
@@ -94,12 +95,12 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
         return QVariant();
     }
 
-    if (static_cast<size_t>(index.row()) >= m_alarms.getAlarmCount())
+    if (static_cast<size_t>(index.row()) >= m_db.getAlarmCount())
     {
         return QVariant();
     }
 
-    Alarms::Alarm const& alarm = m_alarms.getAlarm(index.row());
+    DB::Alarm const& alarm = m_db.getAlarm(index.row());
 
     Column column = static_cast<Column>(index.column());
     if (role == Qt::DecorationRole)
@@ -113,29 +114,41 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
     {
         if (column == Column::Temperature)
         {
-            if (alarm.temperatureWatch == Alarms::Watch::Bigger)
+            std::string str;
+            if (alarm.lowTemperatureWatch)
             {
-                return QString("> %1 °").arg(alarm.temperature);
+                str += "< " + std::to_string(alarm.lowTemperature) + " °, ";
             }
-            else if (alarm.temperatureWatch == Alarms::Watch::Smaller)
+            if (alarm.highTemperatureWatch)
             {
-                return QString("< %1 °").arg(alarm.temperature);
+                str += "> " + std::to_string(alarm.highTemperature) + " °, ";
             }
-            return QString("<ignored>");
+            if (str.empty())
+            {
+                return "<ignored>";
+            }
+            str.pop_back(); //comma
+            return str.c_str();
         }
         else if (column == Column::Humidity)
         {
-            if (alarm.humidityWatch == Alarms::Watch::Bigger)
+            std::string str;
+            if (alarm.lowHumidityWatch)
             {
-                return QString("> %1 %").arg(alarm.humidity);
+                str += "< " + std::to_string(alarm.lowHumidity) + " %, ";
             }
-            else if (alarm.humidityWatch == Alarms::Watch::Smaller)
+            if (alarm.highHumidityWatch)
             {
-                return QString("< %1 %").arg(alarm.humidity);
+                str += "> " + std::to_string(alarm.highHumidity) + " %, ";
             }
-            return QString("<ignored>");
+            if (str.empty())
+            {
+                return "<ignored>";
+            }
+            str.pop_back(); //comma
+            return str.c_str();
         }
-        else if (column == Column::Battery)
+        else if (column == Column::LowBattery)
         {
             if (alarm.vccWatch)
             {
@@ -143,30 +156,25 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
             }
             return QString("<ignored>");
         }
+        else if (column == Column::LowSignal)
+        {
+            if (alarm.signalWatch)
+            {
+                return QString("Yes");
+            }
+            return QString("<ignored>");
+        }
         else if (column == Column::Errors)
         {
-            std::string str;
-            if (alarm.flags && DB::Measurement::Flag::COMMS_ERROR)
+            if (alarm.errorFlagsWatch)
             {
-                str += "Comms";
+                return "Yes";
             }
-            if (alarm.flags && DB::Measurement::Flag::SENSOR_ERROR)
-            {
-                if (!str.empty())
-                {
-                    str += ", ";
-                }
-                str += "Sensor";
-            }
-            if (str.empty())
-            {
-                str = "<ignored>";
-            }
-            return str.c_str();
+            return "<ignored>";
         }
         else if (column == Column::Action)
         {
-            if (alarm.action == Alarms::Action::Email)
+            if (alarm.sendEmailAction)
             {
                 return ("Email " + alarm.emailRecipient).c_str();
             }

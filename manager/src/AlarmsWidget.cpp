@@ -1,4 +1,5 @@
 #include "AlarmsWidget.h"
+#include "ui_NewAlarmDialog.h"
 
 AlarmsWidget::AlarmsWidget(QWidget *parent)
     : QWidget(parent)
@@ -15,12 +16,12 @@ AlarmsWidget::~AlarmsWidget()
     m_ui.list->setModel(nullptr);
 }
 
-void AlarmsWidget::init(Comms& comms, DB& db, Alarms& alarms)
+void AlarmsWidget::init(Comms& comms, DB& db)
 {
     m_comms = &comms;
-    m_alarms = &alarms;
+    m_db = &db;
 
-    m_model.reset(new AlarmsModel(alarms));
+    m_model.reset(new AlarmsModel(db));
     m_ui.list->setModel(m_model.get());
 
     QObject::connect(m_comms, &Comms::baseStationConnected, this, &AlarmsWidget::baseStationConnected);
@@ -29,7 +30,14 @@ void AlarmsWidget::init(Comms& comms, DB& db, Alarms& alarms)
 
 void AlarmsWidget::addAlarm()
 {
+    QDialog dialog;
+    Ui::NewAlarmDialog ui;
+    ui.setupUi(&dialog);
 
+    int result = dialog.exec();
+    if (result == QDialog::Accepted)
+    {
+    }
 }
 
 void AlarmsWidget::removeAlarms()

@@ -7,12 +7,12 @@
 #include "Comms.h"
 #include "DB.h"
 
-class DBModel : public QAbstractItemModel
+class MeasurementsModel : public QAbstractItemModel
 {
 public:
 
-    DBModel(Comms& comms, DB& db);
-    ~DBModel();
+    MeasurementsModel(Comms& comms, DB& db);
+    ~MeasurementsModel();
 
     void setFilter(DB::Filter const& filter);
     void refresh();

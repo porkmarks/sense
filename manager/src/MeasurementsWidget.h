@@ -5,7 +5,7 @@
 #include "ui_MeasurementsWidget.h"
 #include "Comms.h"
 #include "DB.h"
-#include "DBModel.h"
+#include "MeasurementsModel.h"
 
 class MeasurementsWidget : public QWidget
 {
@@ -17,6 +17,9 @@ public:
 signals:
 
 private slots:
+    void baseStationConnected(Comms::BaseStation const& bs);
+    void baseStationDisconnected(Comms::BaseStation const& bs);
+
     void refreshFromDB();
     void setMinDateTimeNow();
     void setMaxDateTimeNow();
@@ -42,7 +45,7 @@ private:
 
     Comms* m_comms = nullptr;
     DB* m_db = nullptr;
-    std::unique_ptr<DBModel> m_model;
+    std::unique_ptr<MeasurementsModel> m_model;
     std::vector<Comms::Sensor_Id> m_selectedSensorIds;
 };
 

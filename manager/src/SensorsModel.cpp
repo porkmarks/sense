@@ -221,39 +221,15 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                 {
                     return getBatteryIcon(measurement.vcc);
                 }
-                else if (column == Column::Temperature)
-                {
-                    return measurement.temperature;
-                }
-                else if (column == Column::Humidity)
-                {
-                    return measurement.humidity;
-                }
-                else if (column == Column::Errors)
-                {
-                    std::string str;
-                    if (measurement.flags && DB::Measurement::Flag::COMMS_ERROR)
-                    {
-                        str += "Comms";
-                    }
-                    if (measurement.flags && DB::Measurement::Flag::SENSOR_ERROR)
-                    {
-                        if (!str.empty())
-                        {
-                            str += ", ";
-                        }
-                        str += "Sensor";
-                    }
-                    if (str.empty())
-                    {
-                        str = "-";
-                    }
-                    return str.c_str();
-                }
             }
             else
             {
-                return QIcon(":/icons/ui/question.png");
+                if (column == Column::Temperature ||
+                    column == Column::Humidity ||
+                    column == Column::Errors)
+                {
+                    return QIcon(":/icons/ui/question.png");
+                }
             }
         }
     }
@@ -296,11 +272,11 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                 else if (column == Column::Errors)
                 {
                     std::string str;
-                    if (measurement.flags && DB::Measurement::Flag::COMMS_ERROR)
+                    if (measurement.errorFlags && DB::ErrorFlag::CommsError)
                     {
                         str += "Comms";
                     }
-                    if (measurement.flags && DB::Measurement::Flag::SENSOR_ERROR)
+                    if (measurement.errorFlags && DB::ErrorFlag::SensorError)
                     {
                         if (!str.empty())
                         {
