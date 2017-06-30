@@ -190,7 +190,7 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
 
 Qt::ItemFlags AlarmsModel::flags(QModelIndex const& index) const
 {
-    return Qt::ItemIsEnabled;
+    return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
 }
 
 //////////////////////////////////////////////////////////////////////////

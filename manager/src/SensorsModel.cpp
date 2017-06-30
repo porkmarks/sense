@@ -3,7 +3,7 @@
 #include <QWidget>
 #include <QIcon>
 
-static std::array<const char*, 10> s_headerNames = {"Name", "Id", "Address", "Temperature", "Humidity", "Battery", "State", "Next Measurement", "Next Comms", "Errors"};
+static std::array<const char*, 12> s_headerNames = {"Name", "Id", "Address", "Temperature", "Humidity", "Battery", "Signal", "State", "Next Measurement", "Next Comms", "Errors", "Alarms"};
 enum class Column
 {
     Name,
@@ -12,13 +12,16 @@ enum class Column
     Temperature,
     Humidity,
     Battery,
+    Signal,
     State,
     NextMeasurement,
     NextComms,
     Errors,
+    Alarms
 };
 
 extern QIcon getBatteryIcon(float vcc);
+extern QIcon getSignalIcon(int8_t dBm);
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -221,6 +224,10 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                 {
                     return getBatteryIcon(measurement.vcc);
                 }
+                else if (column == Column::Signal)
+                {
+                    return getSignalIcon(std::min(measurement.b2s, measurement.s2b));
+                }
             }
             else
             {
@@ -256,6 +263,37 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         else if (column == Column::NextComms)
         {
         }
+        else if (column == Column::Alarms)
+        {
+            uint8_t triggeredAlarm = m_db.computeTriggeredAlarm(sensor.id);
+            std::string str;
+            if (triggeredAlarm && DB::TriggeredAlarm::Temperature)
+            {
+                str += "T, ";
+            }
+            if (triggeredAlarm && DB::TriggeredAlarm::Humidity)
+            {
+                str += "H, ";
+            }
+            if (triggeredAlarm && DB::TriggeredAlarm::Vcc)
+            {
+                str += "B, ";
+            }
+            if (triggeredAlarm && DB::TriggeredAlarm::ErrorFlags)
+            {
+                str += "E, ";
+            }
+            if (triggeredAlarm && DB::TriggeredAlarm::Signal)
+            {
+                str += "S, ";
+            }
+            if (str.empty())
+            {
+                return "<none>";
+            }
+            str.pop_back();//the comma
+            return str.c_str();
+        }
         else
         {
             DB::Measurement measurement;
@@ -274,20 +312,17 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                     std::string str;
                     if (measurement.errorFlags && DB::ErrorFlag::CommsError)
                     {
-                        str += "Comms";
+                        str += "C, ";
                     }
                     if (measurement.errorFlags && DB::ErrorFlag::SensorError)
                     {
-                        if (!str.empty())
-                        {
-                            str += ", ";
-                        }
-                        str += "Sensor";
+                        str += "S, ";
                     }
                     if (str.empty())
                     {
-                        str = "-";
+                        return "<none>";
                     }
+                    str.pop_back(); //comma
                     return str.c_str();
                 }
             }
@@ -303,7 +338,7 @@ Qt::ItemFlags SensorsModel::flags(QModelIndex const& index) const
 {
     Column column = static_cast<Column>(index.column());
 
-    Qt::ItemFlags flags = Qt::ItemIsEnabled;
+    Qt::ItemFlags flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
     if (m_showCheckboxes && column == Column::Name)
     {
         flags |= Qt::ItemIsUserCheckable | Qt::ItemIsEditable;

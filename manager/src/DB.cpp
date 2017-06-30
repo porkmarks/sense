@@ -100,6 +100,29 @@ uint8_t DB::computeTriggeredAlarm(Measurement const& measurement) const
     return triggered;
 }
 
+uint8_t DB::computeTriggeredAlarm(SensorId sensorId) const
+{
+    uint8_t triggered = 0;
+
+    auto it = m_measurements.find(sensorId);
+    if (it == m_measurements.end())
+    {
+        return triggered;
+    }
+
+    for (StoredMeasurement const& sm: it->second)
+    {
+        Measurement m = unpack(sensorId, sm);
+        triggered |= computeTriggeredAlarm(m);
+        if ((triggered & TriggeredAlarm::All) == TriggeredAlarm::All)
+        {
+            return triggered;
+        }
+    }
+
+    return triggered;
+}
+
 bool DB::addMeasurement(Measurement const& measurement)
 {
     PrimaryKey pk = computePrimaryKey(measurement);

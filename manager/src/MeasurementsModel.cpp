@@ -28,7 +28,7 @@ QIcon getBatteryIcon(float vcc)
     return QIcon(QString(":/icons/ui/") + s_batteryIconNames[index]);
 }
 
-static std::array<const char*, 5> s_signalIconNames = { "signal-0.png", "signal-25.png", "signal-50.png", "signal-75.png", "signal-100.png" };
+static std::array<const char*, 6> s_signalIconNames = { "signal-0.png", "signal-20.png", "signal-40.png", "signal-60.png", "signal-80.png", "signal-100.png" };
 
 QIcon getSignalIcon(int8_t dBm)
 {
@@ -140,7 +140,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Signal)
         {
-            return getBatteryIcon(std::min(measurement.b2s, measurement.s2b));
+            return getSignalIcon(std::min(measurement.b2s, measurement.s2b));
         }
     }
     else if (role == Qt::DisplayRole)
@@ -217,6 +217,10 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
             {
                 str += "E, ";
             }
+            if (triggeredAlarm && DB::TriggeredAlarm::Signal)
+            {
+                str += "S, ";
+            }
             if (str.empty())
             {
                 return "<none>";
@@ -233,7 +237,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
 
 Qt::ItemFlags MeasurementsModel::flags(QModelIndex const& index) const
 {
-    return Qt::ItemIsEnabled;
+    return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
 }
 
 //////////////////////////////////////////////////////////////////////////

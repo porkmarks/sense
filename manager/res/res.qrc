@@ -1,5 +1,11 @@
 <RCC>
 <qresource prefix="/">
+<file>icons/ui/signal-0.png</file>
+<file>icons/ui/signal-20.png</file>
+<file>icons/ui/signal-40.png</file>
+<file>icons/ui/signal-60.png</file>
+<file>icons/ui/signal-80.png</file>
+<file>icons/ui/signal-100.png</file>
 <file>icons/ui/export.png</file>
 <file>icons/ui/today.png</file>
 <file>icons/ui/question.png</file>

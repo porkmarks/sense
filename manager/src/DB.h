@@ -81,10 +81,13 @@ public:
             Vcc             = 1 << 2,
             Signal          = 1 << 3,
             ErrorFlags      = 1 << 4,
+
+            All             = Temperature | Humidity | Vcc | Signal | ErrorFlags
         };
     };
 
     uint8_t computeTriggeredAlarm(Measurement const& measurement) const;
+    uint8_t computeTriggeredAlarm(SensorId sensorId) const;
 
 
     bool addMeasurement(Measurement const& measurement);
