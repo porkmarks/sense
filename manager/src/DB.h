@@ -20,7 +20,7 @@ public:
     bool save() const;
     bool saveAs(std::string const& filename) const;
 
-    struct ErrorFlag
+    struct SensorErrors
     {
         enum type : uint8_t
         {
@@ -32,6 +32,8 @@ public:
 
     struct Alarm
     {
+        std::string name;
+
         bool lowTemperatureWatch = false;
         float lowTemperature = 0;
 
@@ -44,9 +46,9 @@ public:
         bool highHumidityWatch = false;
         float highHumidity = 0;
 
-        bool vccWatch = false;
-        bool signalWatch = false;
-        bool errorFlagsWatch = false;
+        bool lowVccWatch = false;
+        bool lowSignalWatch = false;
+        bool sensorErrorsWatch = false;
 
         bool sendEmailAction = false;
         std::string emailRecipient;
@@ -62,13 +64,14 @@ public:
         float vcc = 0;
         int8_t b2s = 0;
         int8_t s2b = 0;
-        uint8_t errorFlags = 0;
+        uint8_t sensorErrors = 0;
     };
 
 
 
     size_t getAlarmCount() const;
     Alarm const& getAlarm(size_t index) const;
+    int32_t findAlarmIndexByName(std::string const& name) const;
     void addAlarm(Alarm const& alarm);
     void removeAlarm(size_t index);
 
@@ -78,11 +81,11 @@ public:
         {
             Temperature     = 1 << 0,
             Humidity        = 1 << 1,
-            Vcc             = 1 << 2,
-            Signal          = 1 << 3,
-            ErrorFlags      = 1 << 4,
+            LowVcc          = 1 << 2,
+            LowSignal       = 1 << 3,
+            SensorErrors    = 1 << 4,
 
-            All             = Temperature | Humidity | Vcc | Signal | ErrorFlags
+            All             = Temperature | Humidity | LowVcc | LowSignal | SensorErrors
         };
     };
 
@@ -125,8 +128,8 @@ public:
         bool useS2BFilter = false;
         Range<int8_t> s2bFilter;
 
-        bool useErrorsFilter = false;
-        bool errorsFilter = true;
+        bool useSensorErrorsFilter = false;
+        bool sensorErrorsFilter = true;
     };
 
     std::vector<Measurement> getAllMeasurements() const;

@@ -4,7 +4,7 @@
 #include <QIcon>
 #include <QPainter>
 
-static std::array<const char*, 12> s_headerNames = {"Name", "Id", "Address", "Temperature", "Humidity", "Battery", "Signal", "State", "Next Measurement", "Next Comms", "Errors", "Alarms"};
+static std::array<const char*, 12> s_headerNames = {"Name", "Id", "Address", "Temperature", "Humidity", "Battery", "Signal", "State", "Next Measurement", "Next Comms", "Sensor Errors", "Alarms"};
 enum class Column
 {
     Name,
@@ -17,7 +17,7 @@ enum class Column
     State,
     NextMeasurement,
     NextComms,
-    Errors,
+    SensorErrors,
     Alarms
 };
 
@@ -399,19 +399,19 @@ void SensorsModel::paint(QPainter* painter, const QStyleOptionViewItem& option, 
             painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
             pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
         }
-        if (triggeredAlarms & DB::TriggeredAlarm::Vcc)
+        if (triggeredAlarms & DB::TriggeredAlarm::LowVcc)
         {
             static QIcon icon(":/icons/ui/battery-0.png");
             painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
             pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
         }
-        if (triggeredAlarms & DB::TriggeredAlarm::ErrorFlags)
+        if (triggeredAlarms & DB::TriggeredAlarm::SensorErrors)
         {
             static QIcon icon(":/icons/ui/sensor.png");
             painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
             pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
         }
-        if (triggeredAlarms & DB::TriggeredAlarm::Signal)
+        if (triggeredAlarms & DB::TriggeredAlarm::LowSignal)
         {
             static QIcon icon(":/icons/ui/signal-0.png");
             painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
@@ -421,7 +421,7 @@ void SensorsModel::paint(QPainter* painter, const QStyleOptionViewItem& option, 
         painter->restore();
         return;
     }
-    else if (column == Column::Errors)
+    else if (column == Column::SensorErrors)
     {
         QApplication::style()->drawControl(QStyle::CE_ItemViewItem, &option, painter);
 
@@ -431,13 +431,13 @@ void SensorsModel::paint(QPainter* painter, const QStyleOptionViewItem& option, 
 
         if (sensorData.isLastMeasurementValid)
         {
-            if (sensorData.lastMeasurement.errorFlags & DB::ErrorFlag::CommsError)
+            if (sensorData.lastMeasurement.sensorErrors & DB::SensorErrors::CommsError)
             {
                 static QIcon icon(":/icons/ui/signal-0.png");
                 painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
                 pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
             }
-            if (sensorData.lastMeasurement.errorFlags & DB::ErrorFlag::SensorError)
+            if (sensorData.lastMeasurement.sensorErrors & DB::SensorErrors::SensorError)
             {
                 static QIcon icon(":/icons/ui/sensor.png");
                 painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
@@ -478,32 +478,32 @@ QSize SensorsModel::sizeHint(const QStyleOptionViewItem& option, const QModelInd
         {
             width += k_iconSize.width() + k_iconMargin;
         }
-        if (triggeredAlarms & DB::TriggeredAlarm::Vcc)
+        if (triggeredAlarms & DB::TriggeredAlarm::LowVcc)
         {
             width += k_iconSize.width() + k_iconMargin;
         }
-        if (triggeredAlarms & DB::TriggeredAlarm::ErrorFlags)
+        if (triggeredAlarms & DB::TriggeredAlarm::SensorErrors)
         {
             width += k_iconSize.width() + k_iconMargin;
         }
-        if (triggeredAlarms & DB::TriggeredAlarm::Signal)
+        if (triggeredAlarms & DB::TriggeredAlarm::LowSignal)
         {
             width += k_iconSize.width() + k_iconMargin;
         }
 
         return QSize(width, k_iconSize.height());
     }
-    else if (column == Column::Errors)
+    else if (column == Column::SensorErrors)
     {
         int32_t width = 0;
 
         if (sensorData.isLastMeasurementValid)
         {
-            if (sensorData.lastMeasurement.errorFlags & DB::ErrorFlag::CommsError)
+            if (sensorData.lastMeasurement.sensorErrors & DB::SensorErrors::CommsError)
             {
                 width += k_iconSize.width() + k_iconMargin;
             }
-            if (sensorData.lastMeasurement.errorFlags & DB::ErrorFlag::SensorError)
+            if (sensorData.lastMeasurement.sensorErrors & DB::SensorErrors::SensorError)
             {
                 width += k_iconSize.width() + k_iconMargin;
             }

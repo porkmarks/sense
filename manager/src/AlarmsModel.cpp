@@ -3,14 +3,14 @@
 #include <QWidget>
 #include <QIcon>
 
-static std::array<const char*, 8> s_headerNames = {"Name", "Temperature", "Humidity", "Low Battery", "Errors", "Low Signal", "Action"};
+static std::array<const char*, 8> s_headerNames = {"Name", "Temperature", "Humidity", "Low Battery", "Sensor Errors", "Low Signal", "Action"};
 enum class Column
 {
     Name,
     Temperature,
     Humidity,
     LowBattery,
-    Errors,
+    SensorErrors,
     LowSignal,
     Action
 };
@@ -117,21 +117,21 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
     {
         if (column == Column::LowBattery)
         {
-            if (alarm.vccWatch)
+            if (alarm.lowVccWatch)
             {
                 return Qt::Checked;
             }
         }
         else if (column == Column::LowSignal)
         {
-            if (alarm.signalWatch)
+            if (alarm.lowSignalWatch)
             {
                 return Qt::Checked;
             }
         }
-        else if (column == Column::Errors)
+        else if (column == Column::SensorErrors)
         {
-            if (alarm.errorFlagsWatch)
+            if (alarm.sensorErrorsWatch)
             {
                 return Qt::Checked;
             }
@@ -139,7 +139,11 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
     }
     else if (role == Qt::DisplayRole)
     {
-        if (column == Column::Temperature)
+        if (column == Column::Name)
+        {
+            return alarm.name.c_str();
+        }
+        else if (column == Column::Temperature)
         {
             QString str;
             if (alarm.lowTemperatureWatch)
@@ -195,15 +199,15 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
         {
             return QIcon(":/icons/ui/humidity.png");
         }
-        else if (column == Column::LowBattery && alarm.vccWatch)
+        else if (column == Column::LowBattery && alarm.lowVccWatch)
         {
             return QIcon(":/icons/ui/battery-0.png");
         }
-        else if (column == Column::LowSignal && alarm.signalWatch)
+        else if (column == Column::LowSignal && alarm.lowSignalWatch)
         {
             return QIcon(":/icons/ui/signal-0.png");
         }
-        else if (column == Column::Errors && alarm.errorFlagsWatch)
+        else if (column == Column::SensorErrors && alarm.sensorErrorsWatch)
         {
             return QIcon(":/icons/ui/sensor.png");
         }

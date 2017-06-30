@@ -58,6 +58,15 @@ void DB::removeAlarm(size_t index)
         assert(false);
     }
 }
+int32_t DB::findAlarmIndexByName(std::string const& name) const
+{
+    auto it = std::find_if(m_alarms.begin(), m_alarms.end(), [&name](Alarm const& alarm) { return alarm.name == name; });
+    if (it == m_alarms.end())
+    {
+        return -1;
+    }
+    return std::distance(m_alarms.begin(), it);
+}
 
 uint8_t DB::computeTriggeredAlarm(Measurement const& measurement) const
 {
@@ -83,17 +92,17 @@ uint8_t DB::computeTriggeredAlarm(Measurement const& measurement) const
             triggered |= TriggeredAlarm::Humidity;
         }
 
-        if (alarm.vccWatch && measurement.vcc <= k_alertVcc)
+        if (alarm.lowVccWatch && measurement.vcc <= k_alertVcc)
         {
-            triggered |= TriggeredAlarm::Vcc;
+            triggered |= TriggeredAlarm::LowVcc;
         }
-        if (alarm.errorFlagsWatch && measurement.errorFlags != 0)
+        if (alarm.sensorErrorsWatch && measurement.sensorErrors != 0)
         {
-            triggered |= TriggeredAlarm::ErrorFlags;
+            triggered |= TriggeredAlarm::SensorErrors;
         }
-        if (alarm.signalWatch && std::min(measurement.s2b, measurement.b2s) <= k_alertSignal)
+        if (alarm.lowSignalWatch && std::min(measurement.s2b, measurement.b2s) <= k_alertSignal)
         {
-            triggered |= TriggeredAlarm::Signal;
+            triggered |= TriggeredAlarm::LowSignal;
         }
     }
 
@@ -279,10 +288,10 @@ bool DB::cull(Measurement const& measurement, Filter const& filter) const
             return false;
         }
     }
-    if (filter.useErrorsFilter)
+    if (filter.useSensorErrorsFilter)
     {
-        bool has_errors = measurement.errorFlags != 0;
-        if (has_errors != filter.errorsFilter)
+        bool has_errors = measurement.sensorErrors != 0;
+        if (has_errors != filter.sensorErrorsFilter)
         {
             return false;
         }
@@ -301,7 +310,7 @@ inline DB::StoredMeasurement DB::pack(Measurement const& m)
     sm.vcc = static_cast<uint8_t>(std::max(std::min((m.vcc - 2.f), 2.55f), 0.f) * 100.f);
     sm.b2s = m.b2s;
     sm.s2b = m.s2b;
-    sm.flags = m.errorFlags;
+    sm.flags = m.sensorErrors;
     return sm;
 }
 
@@ -316,7 +325,7 @@ inline DB::Measurement DB::unpack(SensorId sensor_id, StoredMeasurement const& s
     m.vcc = static_cast<float>(sm.vcc) / 100.f + 2.f;
     m.b2s = sm.b2s;
     m.s2b = sm.s2b;
-    m.errorFlags = sm.flags;
+    m.sensorErrors = sm.flags;
     return m;
 }
 
