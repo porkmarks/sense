@@ -30,6 +30,11 @@ void AlarmsWidget::init(DB& db)
 
     m_model.reset(new AlarmsModel(db));
     m_ui.list->setModel(m_model.get());
+
+    for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
+    {
+        m_ui.list->resizeColumnToContents(i);
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -104,13 +109,21 @@ void AlarmsWidget::addAlarm()
             break;
         }
     }
+
+    for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
+    {
+        m_ui.list->resizeColumnToContents(i);
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void AlarmsWidget::removeAlarms()
 {
-
+    for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
+    {
+        m_ui.list->resizeColumnToContents(i);
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////

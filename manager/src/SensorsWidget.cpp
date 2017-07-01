@@ -46,6 +46,11 @@ void SensorsWidget::init(DB& db)
     m_model.reset(new SensorsModel(db));
     m_ui.list->setModel(m_model.get());
     m_ui.list->setItemDelegate(m_model.get());
+
+    for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
+    {
+        m_ui.list->resizeColumnToContents(i);
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////

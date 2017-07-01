@@ -68,6 +68,10 @@ bool DB::create(std::string const& name)
     m_dbFilename = "sense-" + name + ".db";
     m_dataFilename = "sense-" + name + ".data";
     m_mainData.measurements.clear();
+
+    remove(m_dbFilename.c_str());
+    remove(m_dataFilename.c_str());
+
     return true;
 }
 
@@ -853,7 +857,7 @@ bool DB::addMeasurement(Measurement const& measurement)
         emit sensorTriggeredAlarmsChanged(sensor.id);
     }
 
-    //triggerSave();
+    triggerSave();
 
     return true;
 }

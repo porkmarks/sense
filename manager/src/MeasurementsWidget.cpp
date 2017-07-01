@@ -34,23 +34,23 @@ void MeasurementsWidget::init(DB& db)
 
     m_ui.list->setUniformRowHeights(true);
 
-//    DB::SensorDescriptor sd;
-//    sd.name = "test1";
-//    m_db->addSensor(sd);
+    DB::SensorDescriptor sd;
+    sd.name = "test1";
+    m_db->addSensor(sd);
 
-//    DB::Clock::time_point start = DB::Clock::now();
-//    for (size_t index = 0; index < 5000000; index++)
-//    {
-//        DB::Measurement m;
-//        m.sensorId = m_db->getSensor(m_db->findSensorIndexByName(sd.name)).id;
-//        m.index = index;
-//        m.timePoint = DB::Clock::now() - std::chrono::seconds(index * 1000);
-//        m.vcc = std::min((index / 1000.f) + 2.f, 3.3f);
-//        m.temperature = std::min((index / 1000.f) * 55.f, 100.f);
-//        m.humidity = std::min((index / 1000.f) * 100.f, 100.f);
-//        m_db->addMeasurement(m);
-//    }
-//    std::cout << "Time to add: " << (std::chrono::duration<float>(DB::Clock::now() - start).count()) << "\n";
+    DB::Clock::time_point start = DB::Clock::now();
+    for (size_t index = 0; index < 500; index++)
+    {
+        DB::Measurement m;
+        m.sensorId = m_db->getSensor(m_db->findSensorIndexByName(sd.name)).id;
+        m.index = index;
+        m.timePoint = DB::Clock::now() - std::chrono::seconds(index * 1000);
+        m.vcc = std::min((index / 1000.f) + 2.f, 3.3f);
+        m.temperature = std::min((index / 1000.f) * 55.f, 100.f);
+        m.humidity = std::min((index / 1000.f) * 100.f, 100.f);
+        m_db->addMeasurement(m);
+    }
+    std::cout << "Time to add: " << (std::chrono::duration<float>(DB::Clock::now() - start).count()) << "\n";
 
 //    DB::Filter filter;
 //    start = DB::Clock::now();
@@ -133,6 +133,11 @@ void MeasurementsWidget::refreshFromDB()
     m_model->setFilter(filter);
 
     m_ui.resultCount->setText(QString("%1 results.").arg(m_model->getMeasurementCount()));
+
+    for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
+    {
+        m_ui.list->resizeColumnToContents(i);
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////

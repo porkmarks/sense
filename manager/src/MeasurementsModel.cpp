@@ -17,26 +17,41 @@ enum class Column
     Alarms
 };
 
-static std::array<const char*, 5> s_batteryIconNames = { "battery-0.png", "battery-25.png", "battery-50.png", "battery-75.png", "battery-100.png" };
-
 QIcon getBatteryIcon(float vcc)
 {
+    static std::array<QIcon, 5> s_batteryIconNames =
+    {
+        QIcon(":/icons/ui/battery-0.png"),
+        QIcon(":/icons/ui/battery-25.png"),
+        QIcon(":/icons/ui/battery-50.png"),
+        QIcon(":/icons/ui/battery-75.png"),
+        QIcon(":/icons/ui/battery-100.png")
+    };
+
     constexpr float max = 3.2f;
     constexpr float min = 2.f;
     float percentage = std::max(std::min(vcc, max) - min, 0.f) / (max - min);
     size_t index = std::floor(percentage * (s_batteryIconNames.size() - 1) + 0.5f);
-    return QIcon(QString(":/icons/ui/") + s_batteryIconNames[index]);
+    return s_batteryIconNames[index];
 }
-
-static std::array<const char*, 6> s_signalIconNames = { "signal-0.png", "signal-20.png", "signal-40.png", "signal-60.png", "signal-80.png", "signal-100.png" };
 
 QIcon getSignalIcon(int8_t dBm)
 {
+    static std::array<QIcon, 6> s_signalIconNames =
+    {
+        QIcon(":/icons/ui/signal-0.png"),
+        QIcon(":/icons/ui/signal-20.png"),
+        QIcon(":/icons/ui/signal-40.png"),
+        QIcon(":/icons/ui/signal-60.png"),
+        QIcon(":/icons/ui/signal-80.png"),
+        QIcon(":/icons/ui/signal-100.png")
+    };
+
     constexpr float max = -50.f;
     constexpr float min = -110.f;
     float percentage = std::max(std::min(static_cast<float>(dBm), max) - min, 0.f) / (max - min);
     size_t index = std::floor(percentage * (s_signalIconNames.size() - 1) + 0.5f);
-    return QIcon(QString(":/icons/ui/") + s_signalIconNames[index]);
+    return s_signalIconNames[index];
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -131,15 +146,18 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
     {
         if (column == Column::Sensor)
         {
-            return QIcon(":/icons/ui/sensor.png");
+            static QIcon icon(":/icons/ui/sensor.png");
+            return icon;
         }
         else if (column == Column::Temperature)
         {
-            return QIcon(":/icons/ui/temperature.png");
+            static QIcon icon(":/icons/ui/temperature.png");
+            return icon;
         }
         else if (column == Column::Humidity)
         {
-            return QIcon(":/icons/ui/humidity.png");
+            static QIcon icon(":/icons/ui/humidity.png");
+            return icon;
         }
         else if (column == Column::Battery)
         {
