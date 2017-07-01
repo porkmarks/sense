@@ -243,10 +243,12 @@ private:
 
     bool cull(Measurement const& measurement, Filter const& filter) const;
 
+#pragma pack(push, 1) // exact fit - no padding
+
     struct StoredMeasurement
     {
         uint32_t index;
-        time_t timePoint;
+        uint64_t timePoint;
         int16_t temperature;    //t * 100
         int16_t humidity;       //h * 100
         uint8_t vcc;            //(vcc - 2) * 100
@@ -254,6 +256,8 @@ private:
         int8_t s2b;
         uint8_t sensorErrors;
     };
+
+#pragma pack(push, 0) // exact fit - no padding
 
     typedef std::vector<StoredMeasurement> StoredMeasurements;
     typedef uint64_t PrimaryKey;

@@ -28,37 +28,37 @@ void MeasurementsWidget::init(DB& db)
     setEnabled(true);
     m_db = &db;
 
-    DB::SensorDescriptor sd;
-    sd.name = "test1";
-    m_db->addSensor(sd);
-
     m_model.reset(new MeasurementsModel(*m_db));
     m_ui.list->setModel(m_model.get());
     m_ui.list->setItemDelegate(m_model.get());
 
     m_ui.list->setUniformRowHeights(true);
 
-    DB::Clock::time_point start = DB::Clock::now();
-    for (size_t index = 0; index < 5000000; index++)
-    {
-        DB::Measurement m;
-        m.sensorId = m_db->getSensor(m_db->findSensorIndexByName(sd.name)).id;
-        m.index = index;
-        m.timePoint = DB::Clock::now() - std::chrono::seconds(index * 1000);
-        m.vcc = std::min((index / 1000.f) + 2.f, 3.3f);
-        m.temperature = std::min((index / 1000.f) * 55.f, 100.f);
-        m.humidity = std::min((index / 1000.f) * 100.f, 100.f);
-        m_db->addMeasurement(m);
-    }
-    std::cout << "Time to add: " << (std::chrono::duration<float>(DB::Clock::now() - start).count()) << "\n";
+//    DB::SensorDescriptor sd;
+//    sd.name = "test1";
+//    m_db->addSensor(sd);
 
-    DB::Filter filter;
-    start = DB::Clock::now();
-    for (size_t i = 0; i < 1; i++)
-    {
-        std::vector<DB::Measurement> result = m_db->getFilteredMeasurements(filter);
-    }
-    std::cout << "Time to filter: " << (std::chrono::duration<float>(DB::Clock::now() - start).count()) << "\n";
+//    DB::Clock::time_point start = DB::Clock::now();
+//    for (size_t index = 0; index < 5000000; index++)
+//    {
+//        DB::Measurement m;
+//        m.sensorId = m_db->getSensor(m_db->findSensorIndexByName(sd.name)).id;
+//        m.index = index;
+//        m.timePoint = DB::Clock::now() - std::chrono::seconds(index * 1000);
+//        m.vcc = std::min((index / 1000.f) + 2.f, 3.3f);
+//        m.temperature = std::min((index / 1000.f) * 55.f, 100.f);
+//        m.humidity = std::min((index / 1000.f) * 100.f, 100.f);
+//        m_db->addMeasurement(m);
+//    }
+//    std::cout << "Time to add: " << (std::chrono::duration<float>(DB::Clock::now() - start).count()) << "\n";
+
+//    DB::Filter filter;
+//    start = DB::Clock::now();
+//    for (size_t i = 0; i < 1; i++)
+//    {
+//        std::vector<DB::Measurement> result = m_db->getFilteredMeasurements(filter);
+//    }
+//    std::cout << "Time to filter: " << (std::chrono::duration<float>(DB::Clock::now() - start).count()) << "\n";
 
     std::cout.flush();
 

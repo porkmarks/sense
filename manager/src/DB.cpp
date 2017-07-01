@@ -11,10 +11,36 @@
 #include "rapidjson/reader.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/ostreamwrapper.h"
+#include "rapidjson/istreamwrapper.h"
+
+#include "CRC.h"
 
 constexpr float k_alertVcc = 2.2f;
 constexpr int8_t k_alertSignal = -110;
 
+
+static bool renameFile(const char* oldName, const char* newName)
+{
+#ifdef _WIN32
+    //one on success
+    return MoveFile(_T(oldName), _T(newName)) != 0;
+#else
+    //zero on success
+    return rename(oldName, newName) == 0;
+#endif
+}
+
+template <typename Stream, typename T>
+void write(Stream& s, T const& t)
+{
+    s.write(reinterpret_cast<const char*>(&t), sizeof(T));
+}
+
+template <typename Stream, typename T>
+bool read(Stream& s, T& t)
+{
+    return s.read(reinterpret_cast<char*>(&t), sizeof(T)).good();
+}
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -49,7 +75,380 @@ bool DB::create(std::string const& name)
 
 bool DB::open(std::string const& name)
 {
-    return false;
+    Clock::time_point start = Clock::now();
+
+    m_dbFilename = "sense-" + name + ".db";
+    m_dataFilename = "sense-" + name + ".data";
+
+    Data data;
+
+    {
+        std::ifstream file(m_dataFilename);
+        if (!file.is_open())
+        {
+            std::cerr << "Failed to open " << m_dataFilename << " file: " << std::strerror(errno) << "\n";
+            return false;
+        }
+
+        rapidjson::Document document;
+        rapidjson::BasicIStreamWrapper<std::ifstream> reader(file);
+        document.ParseStream(reader);
+        if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
+        {
+            std::cerr << "Failed to open " << m_dataFilename << " file: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
+            return false;
+        }
+        if (!document.IsObject())
+        {
+            std::cerr << "Bad document.\n";
+            return false;
+        }
+
+        auto it = document.FindMember("config");
+        if (it == document.MemberEnd() || !it->value.IsObject())
+        {
+            std::cerr << "Bad or missing config object\n";
+            return false;
+        }
+
+        {
+            rapidjson::Value const& configj = it->value;
+            auto it = configj.FindMember("name");
+            if (it == configj.MemberEnd() || !it->value.IsString())
+            {
+                std::cerr << "Bad or missing config name\n";
+                return false;
+            }
+            data.config.descriptor.name = it->value.GetString();
+
+            it = configj.FindMember("sensors_sleeping");
+            if (it == configj.MemberEnd() || !it->value.IsBool())
+            {
+                std::cerr << "Bad or missing config sensors_sleeping\n";
+                return false;
+            }
+            data.config.descriptor.sensorsSleeping = it->value.GetBool();
+
+            it = configj.FindMember("measurement_period");
+            if (it == configj.MemberEnd() || !it->value.IsUint64())
+            {
+                std::cerr << "Bad or missing config measurement_period\n";
+                return false;
+            }
+            data.config.descriptor.measurementPeriod = std::chrono::seconds(it->value.GetUint64());
+
+            it = configj.FindMember("comms_period");
+            if (it == configj.MemberEnd() || !it->value.IsUint64())
+            {
+                std::cerr << "Bad or missing config comms_period\n";
+                return false;
+            }
+            data.config.descriptor.commsPeriod = std::chrono::seconds(it->value.GetUint64());
+
+            it = configj.FindMember("baseline");
+            if (it == configj.MemberEnd() || !it->value.IsUint64())
+            {
+                std::cerr << "Bad or missing config baseline\n";
+                return false;
+            }
+            data.config.baselineTimePoint = Clock::time_point(std::chrono::seconds(it->value.GetUint64()));
+        }
+
+        it = document.FindMember("sensors");
+        if (it == document.MemberEnd() || !it->value.IsArray())
+        {
+            std::cerr << "Bad or missing sensors array\n";
+            return false;
+        }
+
+        {
+            rapidjson::Value const& sensorsj = it->value;
+            for (size_t i = 0; i < sensorsj.Size(); i++)
+            {
+                Sensor sensor;
+                rapidjson::Value const& sensorj = sensorsj[i];
+                auto it = sensorj.FindMember("name");
+                if (it == sensorj.MemberEnd() || !it->value.IsString())
+                {
+                    std::cerr << "Bad or missing config name\n";
+                    return false;
+                }
+                sensor.descriptor.name = it->value.GetString();
+
+                it = sensorj.FindMember("id");
+                if (it == sensorj.MemberEnd() || !it->value.IsUint())
+                {
+                    std::cerr << "Bad or missing sensor id\n";
+                    return false;
+                }
+                sensor.id = it->value.GetUint();
+
+                it = sensorj.FindMember("address");
+                if (it == sensorj.MemberEnd() || !it->value.IsUint())
+                {
+                    std::cerr << "Bad or missing sensor address\n";
+                    return false;
+                }
+                sensor.address = it->value.GetUint();
+
+                it = sensorj.FindMember("state");
+                if (it == sensorj.MemberEnd() || !it->value.IsUint())
+                {
+                    std::cerr << "Bad or missing sensor state\n";
+                    return false;
+                }
+                sensor.state = static_cast<Sensor::State>(it->value.GetUint());
+
+                it = sensorj.FindMember("next_measurement");
+                if (it == sensorj.MemberEnd() || !it->value.IsUint64())
+                {
+                    std::cerr << "Bad or missing sensor next_measurement\n";
+                    return false;
+                }
+                sensor.nextMeasurementTimePoint = Clock::time_point(std::chrono::seconds(it->value.GetUint64()));
+
+                it = sensorj.FindMember("next_comms");
+                if (it == sensorj.MemberEnd() || !it->value.IsUint64())
+                {
+                    std::cerr << "Bad or missing sensor next_comms\n";
+                    return false;
+                }
+                sensor.nextCommsTimePoint = Clock::time_point(std::chrono::seconds(it->value.GetUint64()));
+
+                data.sensors.push_back(sensor);
+            }
+        }
+
+        it = document.FindMember("alarms");
+        if (it == document.MemberEnd() || !it->value.IsArray())
+        {
+            std::cerr << "Bad or missing alarms array\n";
+            return false;
+        }
+
+        {
+            rapidjson::Value const& alarmsj = it->value;
+            for (size_t i = 0; i < alarmsj.Size(); i++)
+            {
+                Alarm alarm;
+                rapidjson::Value const& alarmj = alarmsj[i];
+                auto it = alarmj.FindMember("name");
+                if (it == alarmj.MemberEnd() || !it->value.IsString())
+                {
+                    std::cerr << "Bad or missing config name\n";
+                    return false;
+                }
+                alarm.descriptor.name = it->value.GetString();
+
+                it = alarmj.FindMember("id");
+                if (it == alarmj.MemberEnd() || !it->value.IsUint())
+                {
+                    std::cerr << "Bad or missing alarm id\n";
+                    return false;
+                }
+                alarm.id = it->value.GetUint();
+
+                it = alarmj.FindMember("low_temperature_watch");
+                if (it == alarmj.MemberEnd() || !it->value.IsBool())
+                {
+                    std::cerr << "Bad or missing alarm low_temperature_watch\n";
+                    return false;
+                }
+                alarm.descriptor.lowTemperatureWatch = it->value.GetBool();
+
+                it = alarmj.FindMember("low_temperature");
+                if (it == alarmj.MemberEnd() || !it->value.IsDouble())
+                {
+                    std::cerr << "Bad or missing alarm low_temperature\n";
+                    return false;
+                }
+                alarm.descriptor.lowTemperature = static_cast<float>(it->value.GetDouble());
+
+                it = alarmj.FindMember("high_temperature_watch");
+                if (it == alarmj.MemberEnd() || !it->value.IsBool())
+                {
+                    std::cerr << "Bad or missing alarm high_temperature_watch\n";
+                    return false;
+                }
+                alarm.descriptor.highTemperatureWatch = it->value.GetBool();
+
+                it = alarmj.FindMember("high_temperature");
+                if (it == alarmj.MemberEnd() || !it->value.IsDouble())
+                {
+                    std::cerr << "Bad or missing alarm high_temperature\n";
+                    return false;
+                }
+                alarm.descriptor.highTemperature = static_cast<float>(it->value.GetDouble());
+
+                it = alarmj.FindMember("low_humidity_watch");
+                if (it == alarmj.MemberEnd() || !it->value.IsBool())
+                {
+                    std::cerr << "Bad or missing alarm low_humidity_watch\n";
+                    return false;
+                }
+                alarm.descriptor.lowHumidityWatch = it->value.GetBool();
+
+                it = alarmj.FindMember("low_humidity");
+                if (it == alarmj.MemberEnd() || !it->value.IsDouble())
+                {
+                    std::cerr << "Bad or missing alarm low_humidity\n";
+                    return false;
+                }
+                alarm.descriptor.lowHumidity = static_cast<float>(it->value.GetDouble());
+
+                it = alarmj.FindMember("high_humidity_watch");
+                if (it == alarmj.MemberEnd() || !it->value.IsBool())
+                {
+                    std::cerr << "Bad or missing alarm high_humidity_watch\n";
+                    return false;
+                }
+                alarm.descriptor.highHumidityWatch = it->value.GetBool();
+
+                it = alarmj.FindMember("high_humidity");
+                if (it == alarmj.MemberEnd() || !it->value.IsDouble())
+                {
+                    std::cerr << "Bad or missing alarm high_humidity\n";
+                    return false;
+                }
+                alarm.descriptor.highHumidity = static_cast<float>(it->value.GetDouble());
+
+                it = alarmj.FindMember("low_vcc_watch");
+                if (it == alarmj.MemberEnd() || !it->value.IsBool())
+                {
+                    std::cerr << "Bad or missing alarm low_vcc_watch\n";
+                    return false;
+                }
+                alarm.descriptor.lowVccWatch = it->value.GetBool();
+
+                it = alarmj.FindMember("low_signal_watch");
+                if (it == alarmj.MemberEnd() || !it->value.IsBool())
+                {
+                    std::cerr << "Bad or missing alarm low_signal_watch\n";
+                    return false;
+                }
+                alarm.descriptor.lowSignalWatch = it->value.GetBool();
+
+                it = alarmj.FindMember("sensor_errors_watch");
+                if (it == alarmj.MemberEnd() || !it->value.IsBool())
+                {
+                    std::cerr << "Bad or missing alarm sensor_errors_watch\n";
+                    return false;
+                }
+                alarm.descriptor.sensorErrorsWatch = it->value.GetBool();
+
+                it = alarmj.FindMember("send_email_action");
+                if (it == alarmj.MemberEnd() || !it->value.IsBool())
+                {
+                    std::cerr << "Bad or missing alarm send_email_action\n";
+                    return false;
+                }
+                alarm.descriptor.sendEmailAction = it->value.GetBool();
+
+                it = alarmj.FindMember("email_recipient");
+                if (it == alarmj.MemberEnd() || !it->value.IsString())
+                {
+                    std::cerr << "Bad or missing config email_recipient\n";
+                    return false;
+                }
+                alarm.descriptor.emailRecipient = it->value.GetString();
+
+                data.alarms.push_back(alarm);
+            }
+        }
+
+        file.close();
+    }
+
+
+    {
+        std::ifstream file(m_dbFilename);
+        if (!file.is_open())
+        {
+            std::cerr << "Failed to open " << m_dbFilename << " file: " << std::strerror(errno) << "\n";
+            return false;
+        }
+
+        uint32_t sensorCount = 0;
+        if (!read(file, sensorCount))
+        {
+            std::cerr << "Failed to read the DB: " << std::strerror(errno) << "\n";
+            return false;
+        }
+        if (sensorCount > 10000)
+        {
+            std::cerr << "DB seems to be corrupted\n";
+            return false;
+        }
+
+        for (uint32_t i = 0; i < sensorCount; i++)
+        {
+            uint32_t sensorId = 0;
+            uint32_t measurementsCount = 0;
+            if (!read(file, sensorId) || !read(file, measurementsCount))
+            {
+                std::cerr << "Failed to read the DB: " << std::strerror(errno) << "\n";
+                return false;
+            }
+            if (measurementsCount > 100000000)
+            {
+                std::cerr << "DB seems to be corrupted\n";
+                return false;
+            }
+
+            auto sensorIt = std::find_if(data.sensors.begin(), data.sensors.end(), [&sensorId](Sensor const& sensor) { return sensor.id == sensorId; });
+            if (sensorIt == data.sensors.end())
+            {
+                std::cerr << "Cannot find sensor\n";
+                return false;
+            }
+            Sensor& sensor = *sensorIt;
+
+            StoredMeasurements& storedMeasurements = data.measurements[sensorId];
+
+            storedMeasurements.resize(measurementsCount);
+            if (file.read(reinterpret_cast<char*>(storedMeasurements.data()), storedMeasurements.size() * sizeof(StoredMeasurement)).bad())
+            {
+                std::cerr << "Failed to read the DB: " << std::strerror(errno) << "\n";
+                return false;
+            }
+
+            uint32_t crc = 0;
+            if (!read(file, crc))
+            {
+                std::cerr << "Failed to read the DB: " << std::strerror(errno) << "\n";
+                return false;
+            }
+
+            uint32_t computedCrc = crc32(storedMeasurements.data(), storedMeasurements.size() * sizeof(StoredMeasurement));
+            if (computedCrc != crc)
+            {
+                std::cerr << "DB crc failed\n";
+                return false;
+            }
+
+            for (StoredMeasurement const& sm: storedMeasurements)
+            {
+                Measurement measurement = unpack(sensorId, sm);
+                sensor.isLastMeasurementValid = true;
+                sensor.lastMeasurement = measurement;
+            }
+        }
+
+        file.close();
+    }
+
+    m_mainData = data;
+
+    //refresh the sensor triggered alarms
+    for (Sensor& sensor: m_mainData.sensors)
+    {
+        sensor.triggeredAlarms = computeTriggeredAlarm(sensor.id);
+    }
+
+    std::cout << "Time to load DB:" << std::chrono::duration<float>(Clock::now() - start).count() << "s\n";
+    std::cout.flush();
+
+    return true;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -166,7 +565,6 @@ bool DB::addSensor(SensorDescriptor const& descriptor)
 {
     if (findSensorIndexByName(descriptor.name) >= 0)
     {
-        assert(false);
         return false;
     }
 
@@ -701,9 +1099,9 @@ void DB::save(Data const& data) const
             configj.SetObject();
             configj.AddMember("name", rapidjson::Value(data.config.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
             configj.AddMember("sensors_sleeping", data.config.descriptor.sensorsSleeping, document.GetAllocator());
-            configj.AddMember("measurement_period", std::chrono::duration_cast<std::chrono::seconds>(data.config.descriptor.measurementPeriod).count(), document.GetAllocator());
-            configj.AddMember("comms_period", std::chrono::duration_cast<std::chrono::seconds>(data.config.descriptor.measurementPeriod).count(), document.GetAllocator());
-            configj.AddMember("baseline", std::chrono::duration_cast<std::chrono::seconds>(data.config.baselineTimePoint.time_since_epoch()).count(), document.GetAllocator());
+            configj.AddMember("measurement_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.config.descriptor.measurementPeriod).count()), document.GetAllocator());
+            configj.AddMember("comms_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.config.descriptor.commsPeriod).count()), document.GetAllocator());
+            configj.AddMember("baseline", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.config.baselineTimePoint.time_since_epoch()).count()), document.GetAllocator());
             document.AddMember("config", configj, document.GetAllocator());
         }
 
@@ -718,9 +1116,8 @@ void DB::save(Data const& data) const
                 sensorj.AddMember("id", sensor.id, document.GetAllocator());
                 sensorj.AddMember("address", sensor.address, document.GetAllocator());
                 sensorj.AddMember("state", static_cast<int>(sensor.state), document.GetAllocator());
-                sensorj.AddMember("next_measurement", std::chrono::duration_cast<std::chrono::seconds>(sensor.nextMeasurementTimePoint.time_since_epoch()).count(), document.GetAllocator());
-                sensorj.AddMember("next_comms", std::chrono::duration_cast<std::chrono::seconds>(sensor.nextCommsTimePoint.time_since_epoch()).count(), document.GetAllocator());
-                sensorj.AddMember("triggeredAlarms", sensor.triggeredAlarms, document.GetAllocator());
+                sensorj.AddMember("next_measurement", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(sensor.nextMeasurementTimePoint.time_since_epoch()).count()), document.GetAllocator());
+                sensorj.AddMember("next_comms", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(sensor.nextCommsTimePoint.time_since_epoch()).count()), document.GetAllocator());
                 sensorsj.PushBack(sensorj, document.GetAllocator());
             }
             document.AddMember("sensors", sensorsj, document.GetAllocator());
@@ -753,68 +1150,104 @@ void DB::save(Data const& data) const
             document.AddMember("alarms", alarmsj, document.GetAllocator());
         }
 
-        rapidjson::StringBuffer buffer;
-        rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
-        document.Accept(writer);
-
-        std::ofstream file(m_dataFilename);
+        std::string tempFileName = m_dataFilename + "_temp";
+        std::ofstream file(tempFileName);
         if (!file.is_open())
         {
-            std::cerr << "Failed to open " << m_dataFilename << " file\n";
+            std::cerr << "Failed to open " << tempFileName << " file: " << std::strerror(errno) << "\n";
         }
         else
         {
-            file.write(buffer.GetString(), buffer.GetSize());
-        }
-        file.close();
-    }
-
-
-    {
-        rapidjson::Document document;
-        document.SetObject();
-
-        for (auto const& pair: data.measurements)
-        {
-            rapidjson::Value measurementsPerSensorj;
-            measurementsPerSensorj.SetObject();
-
-            rapidjson::Value measurementsj;
-            measurementsj.SetArray();
-            for (StoredMeasurement const& sm: pair.second)
-            {
-                rapidjson::Value mj;
-                mj.SetArray();
-                mj.PushBack(sm.index, document.GetAllocator());
-                mj.PushBack(sm.timePoint, document.GetAllocator());
-                mj.PushBack(sm.temperature, document.GetAllocator());
-                mj.PushBack(sm.humidity, document.GetAllocator());
-                mj.PushBack(sm.vcc, document.GetAllocator());
-                mj.PushBack(sm.b2s, document.GetAllocator());
-                mj.PushBack(sm.s2b, document.GetAllocator());
-                mj.PushBack(sm.sensorErrors, document.GetAllocator());
-                measurementsj.PushBack(mj, document.GetAllocator());
-            }
-            measurementsPerSensorj.AddMember("id", pair.first, document.GetAllocator());
-            measurementsPerSensorj.AddMember("m", std::move(measurementsj), document.GetAllocator());
-
-            document.AddMember("measurements", std::move(measurementsPerSensorj), document.GetAllocator());
-        }
-
-        std::ofstream file(m_dbFilename);
-        if (!file.is_open())
-        {
-            std::cerr << "Failed to open " << m_dbFilename << " file\n";
-        }
-        else
-        {
-            //rapidjson::StringBuffer buffer;
             rapidjson::BasicOStreamWrapper<std::ofstream> buffer{file};
-            rapidjson::Writer<rapidjson::BasicOStreamWrapper<std::ofstream>> writer(buffer);
-            //rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
+            //rapidjson::Writer<rapidjson::BasicOStreamWrapper<std::ofstream>> writer(buffer);
+            rapidjson::PrettyWriter<rapidjson::BasicOStreamWrapper<std::ofstream>> writer(buffer);
             document.Accept(writer);
         }
         file.close();
+
+        if (!renameFile(tempFileName.c_str(), m_dataFilename.c_str()))
+        {
+            std::perror("Error renaming");
+        }
+    }
+
+
+//    {
+//        rapidjson::Document document;
+//        document.SetArray();
+
+//        for (auto const& pair: data.measurements)
+//        {
+//            rapidjson::Value measurementsPerSensorj;
+//            measurementsPerSensorj.SetObject();
+
+//            rapidjson::Value measurementsj;
+//            measurementsj.SetArray();
+//            for (StoredMeasurement const& sm: pair.second)
+//            {
+//                rapidjson::Value mj;
+//                mj.SetArray();
+//                mj.PushBack(sm.index, document.GetAllocator());
+//                mj.PushBack(static_cast<uint64_t>(sm.timePoint), document.GetAllocator());
+//                mj.PushBack(sm.temperature, document.GetAllocator());
+//                mj.PushBack(sm.humidity, document.GetAllocator());
+//                mj.PushBack(sm.vcc, document.GetAllocator());
+//                mj.PushBack(sm.b2s, document.GetAllocator());
+//                mj.PushBack(sm.s2b, document.GetAllocator());
+//                mj.PushBack(sm.sensorErrors, document.GetAllocator());
+//                measurementsj.PushBack(mj, document.GetAllocator());
+//            }
+//            measurementsPerSensorj.AddMember("id", pair.first, document.GetAllocator());
+//            measurementsPerSensorj.AddMember("m", std::move(measurementsj), document.GetAllocator());
+
+//            document.PushBack(std::move(measurementsPerSensorj), document.GetAllocator());
+//        }
+
+//        std::string tempFileName = m_dbFilename + "_temp";
+//        std::ofstream file(tempFileName);
+//        if (!file.is_open())
+//        {
+//            std::cerr << "Failed to open " << tempFileName << " file: " << std::strerror(errno) << "\n";
+//        }
+//        else
+//        {
+//            rapidjson::BasicOStreamWrapper<std::ofstream> buffer{file};
+//            rapidjson::Writer<rapidjson::BasicOStreamWrapper<std::ofstream>> writer(buffer);
+//            //rapidjson::PrettyWriter<rapidjson::BasicOStreamWrapper<std::ofstream>> writer(buffer);
+//            document.Accept(writer);
+//        }
+//        file.close();
+
+//        if (!renameFile(tempFileName.c_str(), m_dbFilename.c_str()))
+//        {
+//            std::perror("Error renaming");
+//        }
+//    }
+    {
+        std::string tempFileName = m_dbFilename + "_temp";
+        std::ofstream file(tempFileName, std::ios_base::binary);
+        if (!file.is_open())
+        {
+            std::cerr << "Failed to open " << tempFileName << " file: " << std::strerror(errno) << "\n";
+        }
+        else
+        {
+            write(file, static_cast<uint32_t>(data.measurements.size()));
+            for (auto const& pair: data.measurements)
+            {
+                write(file, static_cast<uint32_t>(pair.first));
+                write(file, static_cast<uint32_t>(pair.second.size()));
+                file.write(reinterpret_cast<const char*>(pair.second.data()), pair.second.size() * sizeof(StoredMeasurement));
+                uint32_t crc = crc32(pair.second.data(), pair.second.size() * sizeof(StoredMeasurement));
+                write(file, crc);
+            }
+            file.close();
+
+            if (!renameFile(tempFileName.c_str(), m_dbFilename.c_str()))
+            {
+                std::perror("Error renaming");
+            }
+        }
     }
 
     std::cout << "Time to save DB:" << std::chrono::duration<float>(Clock::now() - start).count() << "s\n";
