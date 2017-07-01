@@ -18,6 +18,7 @@ CONFIG += c++11
 
 INCLUDEPATH += ../../src
 INCLUDEPATH += ../../../common/src
+INCLUDEPATH += ../../../common/src/rapidjson/include
 
 QMAKE_CXXFLAGS += -Wno-unused-variable -Wno-unused-parameter -B$HOME/dev/bin/gold
 QMAKE_CFLAGS += -Wno-unused-variable -Wno-unused-parameter -B$HOME/dev/bin/gold

@@ -236,13 +236,8 @@ signals:
 private:
     Clock::time_point computeBaselineTimePoint(Config const& oldConfig, ConfigDescriptor const& newDescriptor);
 
-    Config m_config;
-
     SensorId m_lastSensorId = 0;
-    std::vector<Sensor> m_sensors;
-
     AlarmId m_lastAlarmId = 0;
-    std::vector<Alarm> m_alarms;
 
     bool cull(Measurement const& measurement, Filter const& filter) const;
 
@@ -266,8 +261,19 @@ private:
     static inline PrimaryKey computePrimaryKey(Measurement const& m);
     static inline PrimaryKey computePrimaryKey(SensorId sensor_id, StoredMeasurement const& m);
 
-    std::map<SensorId, StoredMeasurements> m_measurements;
     std::vector<PrimaryKey> m_sortedPrimaryKeys;
 
-    std::string m_filename;
+    struct Data
+    {
+        Config config;
+        std::vector<Sensor> sensors;
+        std::vector<Alarm> alarms;
+        std::map<SensorId, StoredMeasurements> measurements;
+    };
+
+    Data m_mainData;
+    Data m_storeData;
+
+    std::string m_dbFilename;
+    std::string m_dataFilename;
 };
