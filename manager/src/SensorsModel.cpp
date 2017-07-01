@@ -33,6 +33,10 @@ SensorsModel::SensorsModel(DB& db)
     , m_db(db)
 {
     QObject::connect(&m_db, &DB::sensorAdded, [this](DB::SensorId id) { sensorAdded(id); });
+    QObject::connect(&m_db, &DB::sensorBound, [this](DB::SensorId id) { sensorChanged(id); });
+    QObject::connect(&m_db, &DB::sensorMeasurementChanged, [this](DB::SensorId id) { sensorChanged(id); });
+    QObject::connect(&m_db, &DB::sensorTriggeredAlarmsChanged, [this](DB::SensorId id) { sensorChanged(id); });
+    QObject::connect(&m_db, &DB::sensorRemoved, [this](DB::SensorId id) { sensorRemoved(id); });
 
     size_t sensorCount = m_db.getSensorCount();
     for (size_t i = 0; i < sensorCount; i++)
@@ -62,9 +66,41 @@ void SensorsModel::sensorAdded(DB::SensorId id)
 
     emit beginInsertRows(QModelIndex(), m_sensors.size(), m_sensors.size());
     SensorData sd;
-    sd.sensor = sensor;
+    sd.sensorId = id;
     m_sensors.push_back(sd);
     emit endInsertRows();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SensorsModel::sensorChanged(DB::SensorId id)
+{
+    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](SensorData const& sd) { return sd.sensorId == id; });
+    if (it == m_sensors.end())
+    {
+        assert(false);
+        return;
+    }
+
+    int32_t sensorIndex = std::distance(m_sensors.begin(), it);
+    emit dataChanged(index(sensorIndex, 0), index(sensorIndex, columnCount() - 1));
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SensorsModel::sensorRemoved(DB::SensorId id)
+{
+    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](SensorData const& sd) { return sd.sensorId == id; });
+    if (it == m_sensors.end())
+    {
+        assert(false);
+        return;
+    }
+
+    int32_t sensorIndex = std::distance(m_sensors.begin(), it);
+    emit beginRemoveRows(QModelIndex(), sensorIndex, sensorIndex);
+    m_sensors.erase(it);
+    emit endRemoveRows();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -94,7 +130,7 @@ void SensorsModel::setShowCheckboxes(bool show)
 
 void SensorsModel::setSensorChecked(DB::SensorId id, bool checked)
 {
-    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](SensorData const& sd) { return sd.sensor.id == id; });
+    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](SensorData const& sd) { return sd.sensorId == id; });
     if (it == m_sensors.end())
     {
         return;
@@ -106,7 +142,7 @@ void SensorsModel::setSensorChecked(DB::SensorId id, bool checked)
 
 bool SensorsModel::isSensorChecked(DB::SensorId id) const
 {
-    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](SensorData const& sd) { return sd.sensor.id == id; });
+    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](SensorData const& sd) { return sd.sensorId == id; });
     if (it == m_sensors.end())
     {
         return false;
@@ -186,7 +222,13 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
     }
 
     SensorData const& sensorData = m_sensors[index.row()];
-    DB::Sensor const& sensor = sensorData.sensor;
+    int32_t dbSensorIndex = m_db.findSensorIndexById(sensorData.sensorId);
+    assert(dbSensorIndex >= 0);
+    if (dbSensorIndex < 0)
+    {
+        return QVariant();
+    }
+    DB::Sensor const& sensor = m_db.getSensor(dbSensorIndex);
 
     Column column = static_cast<Column>(index.column());
     if (role == Qt::CheckStateRole && m_showCheckboxes)
@@ -201,15 +243,6 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         if (column == Column::Name)
         {
             return QIcon(":/icons/ui/sensor.png");
-        }
-        else if (column == Column::Id)
-        {
-        }
-        else if (column == Column::Address)
-        {
-        }
-        else if (column == Column::State)
-        {
         }
         else if (column == Column::NextMeasurement)
         {
@@ -237,11 +270,22 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                 {
                     return getSignalIcon(std::min(sensor.lastMeasurement.b2s, sensor.lastMeasurement.s2b));
                 }
+                else if (column == Column::Temperature)
+                {
+                    return QIcon(":/icons/ui/temperature.png");
+                }
+                else if (column == Column::Humidity)
+                {
+                    return QIcon(":/icons/ui/humidity.png");
+                }
             }
             else
             {
-                if (column == Column::Temperature ||
-                    column == Column::Humidity)
+                if (column == Column::Battery ||
+                    column == Column::Signal ||
+                    column == Column::Temperature ||
+                    column == Column::Humidity ||
+                    column == Column::SensorErrors)
                 {
                     return QIcon(":/icons/ui/question.png");
                 }
@@ -299,6 +343,17 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Alarms)
         {
+            if (sensor.triggeredAlarms == 0)
+            {
+                return "<none>";
+            }
+        }
+        else if (column == Column::SensorErrors)
+        {
+            if (sensor.isLastMeasurementValid && sensor.lastMeasurement.sensorErrors == 0)
+            {
+                return "<none>";
+            }
         }
         else
         {
@@ -408,18 +463,29 @@ void SensorsModel::paint(QPainter* painter, const QStyleOptionViewItem& option, 
     }
 
     SensorData const& sensorData = m_sensors[index.row()];
-    DB::Sensor const& sensor = sensorData.sensor;
+    int32_t dbSensorIndex = m_db.findSensorIndexById(sensorData.sensorId);
+    assert(dbSensorIndex >= 0);
+    if (dbSensorIndex < 0)
+    {
+        return QStyledItemDelegate::paint(painter, option, index);
+    }
+    DB::Sensor const& sensor = m_db.getSensor(dbSensorIndex);
 
     Column column = static_cast<Column>(index.column());
     if (column == Column::Alarms)
     {
+        uint8_t triggeredAlarms = sensor.triggeredAlarms;
+        if (triggeredAlarms == 0)
+        {
+            return QStyledItemDelegate::paint(painter, option, index);
+        }
+
         QApplication::style()->drawControl(QStyle::CE_ItemViewItem, &option, painter);
 
         painter->save();
 
         QPoint pos = option.rect.topLeft();
 
-        uint8_t triggeredAlarms = sensor.triggeredAlarms;
         if (triggeredAlarms & DB::TriggeredAlarm::Temperature)
         {
             static QIcon icon(":/icons/ui/temperature.png");
@@ -456,26 +522,28 @@ void SensorsModel::paint(QPainter* painter, const QStyleOptionViewItem& option, 
     }
     else if (column == Column::SensorErrors)
     {
+        if (!sensor.isLastMeasurementValid || sensor.lastMeasurement.sensorErrors == 0)
+        {
+            return QStyledItemDelegate::paint(painter, option, index);
+        }
+
         QApplication::style()->drawControl(QStyle::CE_ItemViewItem, &option, painter);
 
         painter->save();
 
         QPoint pos = option.rect.topLeft();
 
-        if (sensor.isLastMeasurementValid)
+        if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::CommsError)
         {
-            if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::CommsError)
-            {
-                static QIcon icon(":/icons/ui/signal-0.png");
-                painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
-                pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
-            }
-            if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::SensorError)
-            {
-                static QIcon icon(":/icons/ui/sensor.png");
-                painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
-                pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
-            }
+            static QIcon icon(":/icons/ui/signal-0.png");
+            painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
+            pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
+        }
+        if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::SensorError)
+        {
+            static QIcon icon(":/icons/ui/sensor.png");
+            painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
+            pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
         }
 
         painter->restore();
@@ -495,14 +563,24 @@ QSize SensorsModel::sizeHint(const QStyleOptionViewItem& option, const QModelInd
     }
 
     SensorData const& sensorData = m_sensors[index.row()];
-    DB::Sensor const& sensor = sensorData.sensor;
+    int32_t dbSensorIndex = m_db.findSensorIndexById(sensorData.sensorId);
+    assert(dbSensorIndex >= 0);
+    if (dbSensorIndex < 0)
+    {
+        return QStyledItemDelegate::sizeHint(option, index);
+    }
+    DB::Sensor const& sensor = m_db.getSensor(dbSensorIndex);
 
     Column column = static_cast<Column>(index.column());
     if (column == Column::Alarms)
     {
-        int32_t width = 0;
-
         uint8_t triggeredAlarms = sensor.triggeredAlarms;
+        if (triggeredAlarms == 0)
+        {
+            return QStyledItemDelegate::sizeHint(option, index);
+        }
+
+        int32_t width = 0;
         if (triggeredAlarms & DB::TriggeredAlarm::Temperature)
         {
             width += k_iconSize.width() + k_iconMargin;
@@ -528,18 +606,19 @@ QSize SensorsModel::sizeHint(const QStyleOptionViewItem& option, const QModelInd
     }
     else if (column == Column::SensorErrors)
     {
-        int32_t width = 0;
-
-        if (sensor.isLastMeasurementValid)
+        if (!sensor.isLastMeasurementValid)
         {
-            if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::CommsError)
-            {
-                width += k_iconSize.width() + k_iconMargin;
-            }
-            if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::SensorError)
-            {
-                width += k_iconSize.width() + k_iconMargin;
-            }
+            return QStyledItemDelegate::sizeHint(option, index);
+        }
+
+        int32_t width = 0;
+        if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::CommsError)
+        {
+            width += k_iconSize.width() + k_iconMargin;
+        }
+        if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::SensorError)
+        {
+            width += k_iconSize.width() + k_iconMargin;
         }
 
         return QSize(width, k_iconSize.height());

@@ -23,15 +23,16 @@ public:
 
     struct ConfigDescriptor
     {
+        std::string name = "Base Station";
         bool sensorsSleeping = false;
-        Clock::duration measurementPeriod;
-        Clock::duration commsPeriod;
-        Clock::duration computedCommsPeriod;
+        Clock::duration measurementPeriod = std::chrono::minutes(5);
+        Clock::duration commsPeriod = std::chrono::minutes(10);
     };
 
     struct Config
     {
         ConfigDescriptor descriptor;
+        Clock::duration computedCommsPeriod;
 
         //This is computed when creating the config so that this equation holds for any config:
         // measurement_time_point = config.baseline_time_point + measurement_index * config.measurement_period
@@ -233,7 +234,7 @@ signals:
     void measurementsRemoved(SensorId id);
 
 private:
-    Clock::time_point computeBaselineTimePoint(ConfigDescriptor const& oldDescriptor, ConfigDescriptor const& newDescriptor);
+    Clock::time_point computeBaselineTimePoint(Config const& oldConfig, ConfigDescriptor const& newDescriptor);
 
     Config m_config;
 

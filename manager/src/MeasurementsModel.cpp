@@ -24,7 +24,7 @@ QIcon getBatteryIcon(float vcc)
     constexpr float max = 3.2f;
     constexpr float min = 2.f;
     float percentage = std::max(std::min(vcc, max) - min, 0.f) / (max - min);
-    size_t index = std::floor(percentage * s_batteryIconNames.size() + 0.5f);
+    size_t index = std::floor(percentage * (s_batteryIconNames.size() - 1) + 0.5f);
     return QIcon(QString(":/icons/ui/") + s_batteryIconNames[index]);
 }
 
@@ -35,7 +35,7 @@ QIcon getSignalIcon(int8_t dBm)
     constexpr float max = -50.f;
     constexpr float min = -110.f;
     float percentage = std::max(std::min(static_cast<float>(dBm), max) - min, 0.f) / (max - min);
-    size_t index = std::floor(percentage * s_signalIconNames.size() + 0.5f);
+    size_t index = std::floor(percentage * (s_signalIconNames.size() - 1) + 0.5f);
     return QIcon(QString(":/icons/ui/") + s_signalIconNames[index]);
 }
 
@@ -133,6 +133,14 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         {
             return QIcon(":/icons/ui/sensor.png");
         }
+        else if (column == Column::Temperature)
+        {
+            return QIcon(":/icons/ui/temperature.png");
+        }
+        else if (column == Column::Humidity)
+        {
+            return QIcon(":/icons/ui/humidity.png");
+        }
         else if (column == Column::Battery)
         {
             return getBatteryIcon(measurement.vcc);
@@ -174,14 +182,20 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         {
             return QString("%1 % RH").arg(measurement.humidity);
         }
-        else if (column == Column::Signal)
-        {
-        }
         else if (column == Column::SensorErrors)
         {
+            if (measurement.sensorErrors == 0)
+            {
+                return "<none>";
+            }
         }
         else if (column == Column::Alarms)
         {
+            uint8_t triggeredAlarms = m_db.computeTriggeredAlarm(measurement);
+            if (triggeredAlarms == 0)
+            {
+                return "<none>";
+            }
         }
     }
 
@@ -273,13 +287,18 @@ void MeasurementsModel::paint(QPainter* painter, const QStyleOptionViewItem& opt
     Column column = static_cast<Column>(index.column());
     if (column == Column::Alarms)
     {
+        uint8_t triggeredAlarms = m_db.computeTriggeredAlarm(measurement);
+        if (triggeredAlarms == 0)
+        {
+            return QStyledItemDelegate::paint(painter, option, index);
+        }
+
         QApplication::style()->drawControl(QStyle::CE_ItemViewItem, &option, painter);
 
         painter->save();
 
         QPoint pos = option.rect.topLeft();
 
-        uint8_t triggeredAlarms = m_db.computeTriggeredAlarm(measurement);
         if (triggeredAlarms & DB::TriggeredAlarm::Temperature)
         {
             static QIcon icon(":/icons/ui/temperature.png");
@@ -316,6 +335,11 @@ void MeasurementsModel::paint(QPainter* painter, const QStyleOptionViewItem& opt
     }
     else if (column == Column::SensorErrors)
     {
+        if (measurement.sensorErrors == 0)
+        {
+            return QStyledItemDelegate::paint(painter, option, index);
+        }
+
         QApplication::style()->drawControl(QStyle::CE_ItemViewItem, &option, painter);
 
         painter->save();
@@ -356,9 +380,13 @@ QSize MeasurementsModel::sizeHint(const QStyleOptionViewItem& option, const QMod
     Column column = static_cast<Column>(index.column());
     if (column == Column::Alarms)
     {
-        int32_t width = 0;
-
         uint8_t triggeredAlarms = m_db.computeTriggeredAlarm(measurement);
+        if (triggeredAlarms == 0)
+        {
+            return QStyledItemDelegate::sizeHint(option, index);
+        }
+
+        int32_t width = 0;
         if (triggeredAlarms & DB::TriggeredAlarm::Temperature)
         {
             width += k_iconSize.width() + k_iconMargin;
@@ -384,8 +412,12 @@ QSize MeasurementsModel::sizeHint(const QStyleOptionViewItem& option, const QMod
     }
     else if (column == Column::SensorErrors)
     {
-        int32_t width = 0;
+        if (measurement.sensorErrors == 0)
+        {
+            return QStyledItemDelegate::sizeHint(option, index);
+        }
 
+        int32_t width = 0;
         if (measurement.sensorErrors & DB::SensorErrors::CommsError)
         {
             width += k_iconSize.width() + k_iconMargin;

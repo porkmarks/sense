@@ -63,23 +63,24 @@ DB::Sensor const& DB::getSensor(size_t index) const
 
 bool DB::setConfig(ConfigDescriptor const& descriptor)
 {
+    if (descriptor.name.empty())
+    {
+        return false;
+    }
     if (descriptor.commsPeriod < std::chrono::seconds(1))
     {
-        assert(false);
         return false;
     }
     if (descriptor.measurementPeriod < std::chrono::seconds(1))
     {
-        assert(false);
         return false;
     }
     if (descriptor.commsPeriod < descriptor.measurementPeriod)
     {
-        assert(false);
         return false;
     }
 
-    Clock::time_point baselineTimePoint = computeBaselineTimePoint(m_config.descriptor, descriptor);
+    Clock::time_point baselineTimePoint = computeBaselineTimePoint(m_config, descriptor);
 
     emit configWillBeChanged();
 
@@ -100,9 +101,53 @@ DB::Config const& DB::getConfig() const
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::Clock::time_point DB::computeBaselineTimePoint(ConfigDescriptor const& oldDescriptor, ConfigDescriptor const& newDescriptor)
+DB::Clock::time_point DB::computeBaselineTimePoint(Config const& oldconfig, ConfigDescriptor const& newDescriptor)
 {
-    return Clock::time_point(Clock::duration::zero());
+    //This is computed when creating the config so that this equation holds for any config:
+    // measurement_time_point = config.baseline_time_point + measurement_index * config.measurement_period
+    //
+    //So when creating a new config, this is how to calculate the baseline:
+    // m = some measurement (any)
+    // config.baseline_time_point = m.time_point - m.index * config.measurement_period
+    //
+    //The reason for this is to keep the indices valid in all configs
+
+    Clock::time_point newBaseline;
+
+    bool found = false;
+    for (auto const& pair: m_measurements)
+    {
+        if (pair.second.empty())
+        {
+            continue;
+        }
+
+        Measurement m = unpack(pair.first, pair.second.back());
+        Clock::time_point tp = m.timePoint - m.index * newDescriptor.measurementPeriod;
+        if (!found)
+        {
+            found = true;
+        }
+        else
+        {
+            Clock::duration d = tp - newBaseline;
+
+            //std::abs doesn't work with durations
+            if (d < Clock::duration::zero())
+            {
+                d = -d;
+            }
+
+            //check for errors
+            if (d > std::chrono::minutes(1))
+            {
+                assert(false);
+            }
+        }
+        newBaseline = tp;
+    }
+
+    return found ? newBaseline : oldconfig.baselineTimePoint;
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -29,6 +29,9 @@ public: //signals
 
 protected slots:
     void sensorAdded(DB::SensorId id);
+    void sensorChanged(DB::SensorId id);
+    void sensorRemoved(DB::SensorId id);
+
     void bindSensor(std::string const& name);
     void unbindSensor(DB::SensorId id);
 
@@ -55,7 +58,7 @@ private:
     struct SensorData
     {
         bool isChecked = false;
-        DB::Sensor sensor;
+        DB::SensorId sensorId;
     };
 
     std::vector<SensorData> m_sensors;

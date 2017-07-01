@@ -11,6 +11,7 @@ class BaseStationsWidget : public QWidget
     Q_OBJECT
 public:
     explicit BaseStationsWidget(QWidget *parent = 0);
+    ~BaseStationsWidget();
 
     void init(Comms& comms);
 

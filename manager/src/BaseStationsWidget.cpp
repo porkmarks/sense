@@ -22,6 +22,15 @@ BaseStationsWidget::BaseStationsWidget(QWidget *parent)
 
 //////////////////////////////////////////////////////////////////////////
 
+BaseStationsWidget::~BaseStationsWidget()
+{
+    m_ui.list->setModel(nullptr);
+    m_comms = nullptr;
+    m_baseStations.clear();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void BaseStationsWidget::init(Comms& comms)
 {
     m_comms = &comms;
