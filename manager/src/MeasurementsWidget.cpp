@@ -39,7 +39,7 @@ void MeasurementsWidget::init(DB& db)
     m_ui.list->setUniformRowHeights(true);
 
     DB::Clock::time_point start = DB::Clock::now();
-    for (size_t index = 0; index < 100000; index++)
+    for (size_t index = 0; index < 5000000; index++)
     {
         DB::Measurement m;
         m.sensorId = m_db->getSensor(m_db->findSensorIndexByName(sd.name)).id;

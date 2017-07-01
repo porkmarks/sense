@@ -98,7 +98,7 @@ void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor cons
     char macStr[128];
     sprintf(macStr, "%X:%X:%X:%X:%X:%X", bs.mac[0]&0xFF, bs.mac[1]&0xFF, bs.mac[2]&0xFF, bs.mac[3]&0xFF, bs.mac[4]&0xFF, bs.mac[5]&0xFF);
 
-    std::string dbName = bs.name + "_" + macStr;
+    std::string dbName = bs.name + "-" + macStr;
 
     std::unique_ptr<DB> db(new DB);
     if (!db->open(dbName))

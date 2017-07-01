@@ -5,6 +5,10 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <mutex>
+#include <thread>
+#include <atomic>
+#include <condition_variable>
 #include "Data_Defs.h"
 
 class DB : public QObject
@@ -12,14 +16,12 @@ class DB : public QObject
     Q_OBJECT
 public:
     DB();
+    ~DB();
 
     typedef std::chrono::high_resolution_clock Clock;
 
     bool create(std::string const& name);
     bool open(std::string const& name);
-
-    bool save() const;
-    bool saveAs(std::string const& filename) const;
 
     struct ConfigDescriptor
     {
@@ -244,13 +246,13 @@ private:
     struct StoredMeasurement
     {
         uint32_t index;
-        time_t time_point;
+        time_t timePoint;
         int16_t temperature;    //t * 100
         int16_t humidity;       //h * 100
         uint8_t vcc;            //(vcc - 2) * 100
         int8_t b2s;
         int8_t s2b;
-        uint8_t flags;
+        uint8_t sensorErrors;
     };
 
     typedef std::vector<StoredMeasurement> StoredMeasurements;
@@ -272,6 +274,15 @@ private:
     };
 
     Data m_mainData;
+
+    void triggerSave();
+    void storeThreadProc();
+    void save(Data const& data) const;
+    std::atomic_bool m_storeThreadExit = { false };
+    std::atomic_bool m_saveTriggered = { false };
+    std::thread m_storeThread;
+    std::condition_variable m_storeCV;
+    std::mutex m_storeMutex;
     Data m_storeData;
 
     std::string m_dbFilename;

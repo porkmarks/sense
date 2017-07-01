@@ -1,11 +1,16 @@
 #include "DB.h"
 #include <algorithm>
+#include <functional>
 #include <cassert>
+#include <fstream>
+#include <iostream>
 
 #include "rapidjson/document.h"
+#include "rapidjson/prettywriter.h"
 #include "rapidjson/writer.h"
 #include "rapidjson/reader.h"
 #include "rapidjson/stringbuffer.h"
+#include "rapidjson/ostreamwrapper.h"
 
 constexpr float k_alertVcc = 2.2f;
 constexpr int8_t k_alertSignal = -110;
@@ -15,7 +20,19 @@ constexpr int8_t k_alertSignal = -110;
 
 DB::DB()
 {
+    m_storeThread = std::thread(std::bind(&DB::storeThreadProc, this));
+}
 
+//////////////////////////////////////////////////////////////////////////
+
+DB::~DB()
+{
+    m_storeThreadExit = true;
+    m_storeCV.notify_all();
+    if (m_storeThread.joinable())
+    {
+        m_storeThread.join();
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -31,20 +48,6 @@ bool DB::create(std::string const& name)
 //////////////////////////////////////////////////////////////////////////
 
 bool DB::open(std::string const& name)
-{
-    return false;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-bool DB::save() const
-{
-    return false;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-bool DB::saveAs(std::string const& filename) const
 {
     return false;
 }
@@ -93,6 +96,8 @@ bool DB::setConfig(ConfigDescriptor const& descriptor)
     m_mainData.config.baselineTimePoint = baselineTimePoint;
 
     emit configChanged();
+
+    triggerSave();
 
     return true;
 }
@@ -185,6 +190,8 @@ bool DB::addSensor(SensorDescriptor const& descriptor)
         }
     }
 
+    triggerSave();
+
     return true;
 }
 
@@ -211,6 +218,8 @@ bool DB::bindSensor(SensorDescriptor const& descriptor, SensorAddress address)
     sensor.state = Sensor::State::Active;
 
     emit sensorBound(sensor.id);
+
+    triggerSave();
 
     return true;
 }
@@ -247,6 +256,8 @@ void DB::removeSensor(size_t index)
     emit sensorWillBeRemoved(id);
     m_mainData.sensors.erase(m_mainData.sensors.begin() + index);
     emit sensorRemoved(id);
+
+    triggerSave();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -305,6 +316,8 @@ bool DB::addAlarm(AlarmDescriptor const& descriptor)
     m_mainData.alarms.push_back(alarm);
     emit alarmAdded(alarm.id);
 
+    triggerSave();
+
     return true;
 }
 
@@ -318,6 +331,8 @@ void DB::removeAlarm(size_t index)
     emit alarmWillBeRemoved(id);
     m_mainData.alarms.erase(m_mainData.alarms.begin() + index);
     emit alarmRemoved(id);
+
+    triggerSave();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -439,6 +454,8 @@ bool DB::addMeasurement(Measurement const& measurement)
     {
         emit sensorTriggeredAlarmsChanged(sensor.id);
     }
+
+    //triggerSave();
 
     return true;
 }
@@ -615,13 +632,13 @@ inline DB::StoredMeasurement DB::pack(Measurement const& m)
 {
     StoredMeasurement sm;
     sm.index = m.index;
-    sm.time_point = Clock::to_time_t(m.timePoint);
+    sm.timePoint = Clock::to_time_t(m.timePoint);
     sm.temperature = static_cast<int16_t>(std::max(std::min(m.temperature, 320.f), -320.f) * 100.f);
     sm.humidity = static_cast<int16_t>(std::max(std::min(m.humidity, 320.f), -320.f) * 100.f);
     sm.vcc = static_cast<uint8_t>(std::max(std::min((m.vcc - 2.f), 2.55f), 0.f) * 100.f);
     sm.b2s = m.b2s;
     sm.s2b = m.s2b;
-    sm.flags = m.sensorErrors;
+    sm.sensorErrors = m.sensorErrors;
     return sm;
 }
 
@@ -632,13 +649,13 @@ inline DB::Measurement DB::unpack(SensorId sensor_id, StoredMeasurement const& s
     Measurement m;
     m.sensorId = sensor_id;
     m.index = sm.index;
-    m.timePoint = Clock::from_time_t(sm.time_point);
+    m.timePoint = Clock::from_time_t(sm.timePoint);
     m.temperature = static_cast<float>(sm.temperature) / 100.f;
     m.humidity = static_cast<float>(sm.humidity) / 100.f;
     m.vcc = static_cast<float>(sm.vcc) / 100.f + 2.f;
     m.b2s = sm.b2s;
     m.s2b = sm.s2b;
-    m.sensorErrors = sm.flags;
+    m.sensorErrors = sm.sensorErrors;
     return m;
 }
 
@@ -657,3 +674,181 @@ inline DB::PrimaryKey DB::computePrimaryKey(SensorId sensor_id, StoredMeasuremen
 }
 
 //////////////////////////////////////////////////////////////////////////
+
+void DB::triggerSave()
+{
+    {
+        std::unique_lock<std::mutex> lg(m_storeMutex);
+        m_storeData = m_mainData;
+        m_saveTriggered = true;
+    }
+    m_storeCV.notify_all();
+
+    std::cout << "Save triggered\n";
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void DB::save(Data const& data) const
+{
+    Clock::time_point start = Clock::now();
+
+    {
+        rapidjson::Document document;
+        document.SetObject();
+        {
+            rapidjson::Value configj;
+            configj.SetObject();
+            configj.AddMember("name", rapidjson::Value(data.config.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
+            configj.AddMember("sensors_sleeping", data.config.descriptor.sensorsSleeping, document.GetAllocator());
+            configj.AddMember("measurement_period", std::chrono::duration_cast<std::chrono::seconds>(data.config.descriptor.measurementPeriod).count(), document.GetAllocator());
+            configj.AddMember("comms_period", std::chrono::duration_cast<std::chrono::seconds>(data.config.descriptor.measurementPeriod).count(), document.GetAllocator());
+            configj.AddMember("baseline", std::chrono::duration_cast<std::chrono::seconds>(data.config.baselineTimePoint.time_since_epoch()).count(), document.GetAllocator());
+            document.AddMember("config", configj, document.GetAllocator());
+        }
+
+        {
+            rapidjson::Value sensorsj;
+            sensorsj.SetArray();
+            for (Sensor const& sensor: data.sensors)
+            {
+                rapidjson::Value sensorj;
+                sensorj.SetObject();
+                sensorj.AddMember("name", rapidjson::Value(sensor.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
+                sensorj.AddMember("id", sensor.id, document.GetAllocator());
+                sensorj.AddMember("address", sensor.address, document.GetAllocator());
+                sensorj.AddMember("state", static_cast<int>(sensor.state), document.GetAllocator());
+                sensorj.AddMember("next_measurement", std::chrono::duration_cast<std::chrono::seconds>(sensor.nextMeasurementTimePoint.time_since_epoch()).count(), document.GetAllocator());
+                sensorj.AddMember("next_comms", std::chrono::duration_cast<std::chrono::seconds>(sensor.nextCommsTimePoint.time_since_epoch()).count(), document.GetAllocator());
+                sensorj.AddMember("triggeredAlarms", sensor.triggeredAlarms, document.GetAllocator());
+                sensorsj.PushBack(sensorj, document.GetAllocator());
+            }
+            document.AddMember("sensors", sensorsj, document.GetAllocator());
+        }
+
+        {
+            rapidjson::Value alarmsj;
+            alarmsj.SetArray();
+            for (Alarm const& alarm: data.alarms)
+            {
+                rapidjson::Value alarmj;
+                alarmj.SetObject();
+                alarmj.AddMember("name", rapidjson::Value(alarm.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
+                alarmj.AddMember("id", alarm.id, document.GetAllocator());
+                alarmj.AddMember("low_temperature_watch", alarm.descriptor.lowTemperatureWatch, document.GetAllocator());
+                alarmj.AddMember("low_temperature", alarm.descriptor.lowTemperature, document.GetAllocator());
+                alarmj.AddMember("high_temperature_watch", alarm.descriptor.highTemperatureWatch, document.GetAllocator());
+                alarmj.AddMember("high_temperature", alarm.descriptor.highTemperature, document.GetAllocator());
+                alarmj.AddMember("low_humidity_watch", alarm.descriptor.lowHumidityWatch, document.GetAllocator());
+                alarmj.AddMember("low_humidity", alarm.descriptor.lowHumidity, document.GetAllocator());
+                alarmj.AddMember("high_humidity_watch", alarm.descriptor.highHumidityWatch, document.GetAllocator());
+                alarmj.AddMember("high_humidity", alarm.descriptor.highHumidity, document.GetAllocator());
+                alarmj.AddMember("low_vcc_watch", alarm.descriptor.lowVccWatch, document.GetAllocator());
+                alarmj.AddMember("low_signal_watch", alarm.descriptor.lowSignalWatch, document.GetAllocator());
+                alarmj.AddMember("sensor_errors_watch", alarm.descriptor.sensorErrorsWatch, document.GetAllocator());
+                alarmj.AddMember("send_email_action", alarm.descriptor.sendEmailAction, document.GetAllocator());
+                alarmj.AddMember("email_recipient", rapidjson::Value(alarm.descriptor.emailRecipient.c_str(), document.GetAllocator()), document.GetAllocator());
+                alarmsj.PushBack(alarmj, document.GetAllocator());
+            }
+            document.AddMember("alarms", alarmsj, document.GetAllocator());
+        }
+
+        rapidjson::StringBuffer buffer;
+        rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
+        document.Accept(writer);
+
+        std::ofstream file(m_dataFilename);
+        if (!file.is_open())
+        {
+            std::cerr << "Failed to open " << m_dataFilename << " file\n";
+        }
+        else
+        {
+            file.write(buffer.GetString(), buffer.GetSize());
+        }
+        file.close();
+    }
+
+
+    {
+        rapidjson::Document document;
+        document.SetObject();
+
+        for (auto const& pair: data.measurements)
+        {
+            rapidjson::Value measurementsPerSensorj;
+            measurementsPerSensorj.SetObject();
+
+            rapidjson::Value measurementsj;
+            measurementsj.SetArray();
+            for (StoredMeasurement const& sm: pair.second)
+            {
+                rapidjson::Value mj;
+                mj.SetArray();
+                mj.PushBack(sm.index, document.GetAllocator());
+                mj.PushBack(sm.timePoint, document.GetAllocator());
+                mj.PushBack(sm.temperature, document.GetAllocator());
+                mj.PushBack(sm.humidity, document.GetAllocator());
+                mj.PushBack(sm.vcc, document.GetAllocator());
+                mj.PushBack(sm.b2s, document.GetAllocator());
+                mj.PushBack(sm.s2b, document.GetAllocator());
+                mj.PushBack(sm.sensorErrors, document.GetAllocator());
+                measurementsj.PushBack(mj, document.GetAllocator());
+            }
+            measurementsPerSensorj.AddMember("id", pair.first, document.GetAllocator());
+            measurementsPerSensorj.AddMember("m", std::move(measurementsj), document.GetAllocator());
+
+            document.AddMember("measurements", std::move(measurementsPerSensorj), document.GetAllocator());
+        }
+
+        std::ofstream file(m_dbFilename);
+        if (!file.is_open())
+        {
+            std::cerr << "Failed to open " << m_dbFilename << " file\n";
+        }
+        else
+        {
+            //rapidjson::StringBuffer buffer;
+            rapidjson::BasicOStreamWrapper<std::ofstream> buffer{file};
+            rapidjson::Writer<rapidjson::BasicOStreamWrapper<std::ofstream>> writer(buffer);
+            //rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
+            document.Accept(writer);
+        }
+        file.close();
+    }
+
+    std::cout << "Time to save DB:" << std::chrono::duration<float>(Clock::now() - start).count() << "s\n";
+    std::cout.flush();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void DB::storeThreadProc()
+{
+    while (!m_storeThreadExit)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        Data data;
+        {
+            //wait for data
+            std::unique_lock<std::mutex> lg(m_storeMutex);
+            if (!m_saveTriggered)
+            {
+                m_storeCV.wait(lg, [this]{ return m_saveTriggered || m_storeThreadExit; });
+            }
+            if (m_storeThreadExit)
+            {
+                break;
+            }
+
+            data = std::move(m_storeData);
+            m_storeData = Data();
+            m_saveTriggered = false;
+        }
+        save(data);
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+
