@@ -5,14 +5,13 @@
 #include <QAbstractItemModel>
 #include <QStyledItemDelegate>
 
-#include "Comms.h"
 #include "DB.h"
 
 class MeasurementsModel : public QAbstractItemModel, public QStyledItemDelegate
 {
 public:
 
-    MeasurementsModel(Comms& comms, DB& db);
+    MeasurementsModel(DB& db);
     ~MeasurementsModel();
 
     void setFilter(DB::Filter const& filter);
@@ -45,7 +44,6 @@ private:
     void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
     QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override;
 
-    Comms& m_comms;
     DB& m_db;
     DB::Filter m_filter;
     std::vector<DB::Measurement> m_measurements;

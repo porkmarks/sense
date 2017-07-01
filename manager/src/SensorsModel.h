@@ -5,18 +5,17 @@
 #include <QAbstractItemModel>
 #include <QStyledItemDelegate>
 
-#include "Comms.h"
 #include "DB.h"
 
 class SensorsModel : public QAbstractItemModel, public QStyledItemDelegate
 {
 public:
-    SensorsModel(Comms& comms, DB& db);
+    SensorsModel(DB& db);
     ~SensorsModel();
 
     void setShowCheckboxes(bool show);
-    void setSensorChecked(Comms::Sensor_Id id, bool checked);
-    bool isSensorChecked(Comms::Sensor_Id id) const;
+    void setSensorChecked(DB::SensorId id, bool checked);
+    bool isSensorChecked(DB::SensorId id) const;
 
     virtual QModelIndex parent(QModelIndex const& index) const;
 
@@ -29,9 +28,9 @@ public: //signals
     virtual QVariant data(QModelIndex const& index, int role = Qt::DisplayRole) const;
 
 protected slots:
-    void sensorAdded(Comms::Sensor const& sensor);
+    void sensorAdded(DB::SensorId id);
     void bindSensor(std::string const& name);
-    void unbindSensor(Comms::Sensor_Id id);
+    void unbindSensor(DB::SensorId id);
 
 protected:
     //read-only
@@ -49,7 +48,6 @@ private:
     void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
     QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override;
 
-    Comms& m_comms;
     DB& m_db;
 
     bool m_showCheckboxes = false;
@@ -57,11 +55,7 @@ private:
     struct SensorData
     {
         bool isChecked = false;
-        Comms::Sensor sensor;
-        uint8_t triggeredAlarms = 0;
-
-        bool isLastMeasurementValid = false;
-        DB::Measurement lastMeasurement;
+        DB::Sensor sensor;
     };
 
     std::vector<SensorData> m_sensors;

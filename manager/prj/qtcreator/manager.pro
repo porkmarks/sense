@@ -66,12 +66,11 @@ HEADERS += \
     ../../../common/src/Channel.h \
     ../../../common/src/QTcpSocketAdapter.h \
     ../../../common/src/CRC.h \
-    ../../src/DB.h \
     ../../src/SensorsWidget.h \
     ../../src/SensorsModel.h \
     ../../src/AlarmsModel.h \
     ../../src/MeasurementsModel.h \
-    ../../src/CustomItemDelegate.h
+    ../../src/DB.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -86,8 +85,7 @@ SOURCES += \
     ../../src/SensorsWidget.cpp \
     ../../src/SensorsModel.cpp \
     ../../src/AlarmsModel.cpp \
-    ../../src/MeasurementsModel.cpp \
-    ../../src/CustomItemDelegate.cpp
+    ../../src/MeasurementsModel.cpp
 
 FORMS += \
     ../../src/Manager.ui \

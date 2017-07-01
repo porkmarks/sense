@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QWidget>
+#include <unordered_map>
 #include <QStandardItemModel>
 #include "ui_BaseStationsWidget.h"
 #include "Comms.h"
@@ -14,12 +15,12 @@ public:
     void init(Comms& comms);
 
 signals:
-    void baseStationSelected(Comms::BaseStation const& bs);
+    void baseStationActivated(Comms::BaseStationDescriptor const& bs, DB& db);
+    void baseStationDeactivated(Comms::BaseStationDescriptor const& bs);
 
 
 private slots:
-    void baseStationDiscovered(Comms::BaseStation const& bs);
-    void baseStationConnected(Comms::BaseStation const& bs);
+    void baseStationDiscovered(Comms::BaseStationDescriptor const& bs);
     void baseStationDisconnected(Comms::BaseStation const& bs);
     void activateBaseStation(QModelIndex const& index);
 
@@ -28,7 +29,14 @@ private:
     Comms* m_comms = nullptr;
     QStandardItemModel m_model;
 
-    std::vector<Comms::BaseStation> m_baseStations;
+    struct BaseStationData
+    {
+        Comms::BaseStationDescriptor descriptor;
+        std::unique_ptr<DB> db;
+    };
+
+    std::vector<BaseStationData> m_baseStations;
+    Comms::BaseStationDescriptor m_activatedBaseStation;
 };
 
 

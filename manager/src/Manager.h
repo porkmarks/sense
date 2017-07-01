@@ -13,7 +13,8 @@ public:
     ~Manager();
 
 private slots:
-    void activateBaseStation(Comms::BaseStation const& bs);
+    void activateBaseStation(Comms::BaseStationDescriptor const& bs, DB& db);
+    void deactivateBaseStation(Comms::BaseStationDescriptor const& bs);
 
 private:
     void process();
@@ -23,7 +24,6 @@ private:
     void readSettings();
 
     Comms m_comms;
-    DB m_db;
 
     Ui::Manager m_ui;
 };

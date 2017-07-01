@@ -1,6 +1,9 @@
 #include "BaseStationsWidget.h"
 #include <cassert>
 
+
+//////////////////////////////////////////////////////////////////////////
+
 BaseStationsWidget::BaseStationsWidget(QWidget *parent)
     : QWidget(parent)
 {
@@ -8,7 +11,7 @@ BaseStationsWidget::BaseStationsWidget(QWidget *parent)
     m_ui.list->setModel(&m_model);
 
     m_model.setColumnCount(3);
-    m_model.setHorizontalHeaderLabels({"", "MAC", "IP"});
+    m_model.setHorizontalHeaderLabels({"Name", "MAC", "IP"});
 
     m_ui.list->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
     m_ui.list->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
@@ -17,82 +20,59 @@ BaseStationsWidget::BaseStationsWidget(QWidget *parent)
     QObject::connect(m_ui.list, &QTreeView::doubleClicked, this, &BaseStationsWidget::activateBaseStation);
 }
 
+//////////////////////////////////////////////////////////////////////////
+
 void BaseStationsWidget::init(Comms& comms)
 {
     m_comms = &comms;
 
     QObject::connect(m_comms, &Comms::baseStationDiscovered, this, &BaseStationsWidget::baseStationDiscovered);
-    QObject::connect(m_comms, &Comms::baseStationConnected, this, &BaseStationsWidget::baseStationConnected);
+    QObject::connect(m_comms, &Comms::baseStationDisconnected, this, &BaseStationsWidget::baseStationDisconnected);
 }
+
+//////////////////////////////////////////////////////////////////////////
 
 void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
 {
-    QStandardItem* item = m_model.itemFromIndex(index);
-    if (!item)
-    {
-        return;
-    }
-
-    QStandardItem* selectionItem = m_model.item(item->row(), 0);
-    if (!selectionItem)
-    {
-        return;
-    }
-
-    uint32_t bsIndex = selectionItem->data().toUInt();
-    assert(bsIndex < m_baseStations.size());
+    uint32_t bsIndex = index.row();
     if (bsIndex >= m_baseStations.size())
     {
+        assert(false);
         return;
     }
 
-    emit baseStationSelected(m_baseStations[bsIndex]);
+    BaseStationData& bsd = m_baseStations[bsIndex];
+    m_activatedBaseStation = bsd.descriptor;
+
+    emit baseStationActivated(bsd.descriptor, *bsd.db);
 }
 
-void BaseStationsWidget::baseStationConnected(Comms::BaseStation const& bs)
+//////////////////////////////////////////////////////////////////////////
+
+void BaseStationsWidget::baseStationDisconnected(Comms::BaseStation const& bs)
 {
-    auto it = std::find_if(m_baseStations.begin(), m_baseStations.end(), [&bs](Comms::BaseStation const& _bs) { return _bs.mac == bs.mac; });
+    auto it = std::find_if(m_baseStations.begin(), m_baseStations.end(), [&bs](BaseStationData const& bsd) { return bsd.descriptor == bs.descriptor; });
     if (it == m_baseStations.end())
     {
         assert(false);
         return;
     }
 
-    size_t selectedBsIndex = std::distance(m_baseStations.begin(), it);
-
-    for (int i = 0; i < m_model.rowCount(); i++)
+    if (bs.descriptor == m_activatedBaseStation)
     {
-        QStandardItem* si = m_model.item(i, 0);
-        if (!si)
-        {
-            continue;
-        }
-        uint32_t bsIndex = si->data().toUInt();
-        if (bsIndex != selectedBsIndex)
-        {
-            si->setIcon(QIcon());
-        }
-        else
-        {
-            si->setIcon(QIcon(":/icons/ui/arrow-right.png"));
-        }
+        emit baseStationDeactivated(bs.descriptor);
+        m_activatedBaseStation = Comms::BaseStationDescriptor();
     }
+
+    size_t bsIndex = std::distance(m_baseStations.begin(), it);
+    m_model.removeRow(bsIndex);
+
+    m_baseStations.erase(it);
 }
 
-void BaseStationsWidget::baseStationDisconnected(Comms::BaseStation const& bs)
-{
-    for (int i = 0; i < m_model.rowCount(); i++)
-    {
-        QStandardItem* si = m_model.item(i, 0);
-        if (!si)
-        {
-            continue;
-        }
-        si->setIcon(QIcon());
-    }
-}
+//////////////////////////////////////////////////////////////////////////
 
-void BaseStationsWidget::baseStationDiscovered(Comms::BaseStation const& bs)
+void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor const& bs)
 {
 //    QList<QListWidgetItem*> items = m_ui.list->findItems(QString(buf), Qt::MatchExactly);
 //    if (!items.empty())
@@ -100,23 +80,50 @@ void BaseStationsWidget::baseStationDiscovered(Comms::BaseStation const& bs)
 //        return;
 //    }
 
-    auto it = std::find_if(m_baseStations.begin(), m_baseStations.end(), [&bs](Comms::BaseStation const& _bs) { return _bs.mac == bs.mac; });
+    auto it = std::find_if(m_baseStations.begin(), m_baseStations.end(), [&bs](BaseStationData const& bsd) { return bsd.descriptor == bs; });
     if (it != m_baseStations.end())
     {
         return;
     }
 
-    m_baseStations.push_back(bs);
+    char macStr[128];
+    sprintf(macStr, "%X:%X:%X:%X:%X:%X", bs.mac[0]&0xFF, bs.mac[1]&0xFF, bs.mac[2]&0xFF, bs.mac[3]&0xFF, bs.mac[4]&0xFF, bs.mac[5]&0xFF);
 
-    QStandardItem* selectionItem = new QStandardItem();
+    std::string dbName = bs.name + "_" + macStr;
+
+    std::unique_ptr<DB> db(new DB);
+    if (!db->open(dbName))
+    {
+        if (!db->create(dbName))
+        {
+            QMessageBox::critical(this, "Error", QString("Cannot open nor create a DB for Base Station '%1' (%2)").arg(bs.name.c_str()).arg(macStr));
+            return;
+        }
+    }
+
+    if (!m_comms->connectToBaseStation(*db, bs.address))
+    {
+        QMessageBox::critical(this, "Error", QString("Cannot connect to Base Station '%1' (%2)").arg(bs.name.c_str()).arg(macStr));
+        return;
+    }
+
+    BaseStationData bsd;
+    bsd.descriptor = bs;
+    bsd.db = std::move(db);
+    m_baseStations.push_back(std::move(bsd));
+
+    QStandardItem* nameItem = new QStandardItem();
     QStandardItem* macItem = new QStandardItem();
     QStandardItem* ipItem = new QStandardItem();
 
     {
-        char buf[128];
-        sprintf(buf, "  %X:%X:%X:%X:%X:%X  ", bs.mac[0]&0xFF, bs.mac[1]&0xFF, bs.mac[2]&0xFF, bs.mac[3]&0xFF, bs.mac[4]&0xFF, bs.mac[5]&0xFF);
-        macItem->setText(buf);
-        macItem->setIcon(QIcon(":/icons/ui/station.png"));
+        nameItem->setText(bs.name.c_str());
+        nameItem->setIcon(QIcon(":/icons/ui/station.png"));
+        nameItem->setEditable(false);
+    }
+
+    {
+        macItem->setText(QString("   %1   ").arg(macStr));
         macItem->setEditable(false);
     }
 
@@ -124,10 +131,11 @@ void BaseStationsWidget::baseStationDiscovered(Comms::BaseStation const& bs)
         char buf[128];
         sprintf(buf, "  %s  ", bs.address.toString().toLatin1().data());
         ipItem->setText(buf);
-        ipItem->setIcon(QIcon(":/icons/ui/ip.png"));
         ipItem->setEditable(false);
     }
 
-    m_model.appendRow({ selectionItem, macItem, ipItem });
+    m_model.appendRow({ nameItem, macItem, ipItem });
 }
+
+//////////////////////////////////////////////////////////////////////////
 

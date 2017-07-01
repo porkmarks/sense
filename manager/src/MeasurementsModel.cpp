@@ -41,9 +41,8 @@ QIcon getSignalIcon(int8_t dBm)
 
 //////////////////////////////////////////////////////////////////////////
 
-MeasurementsModel::MeasurementsModel(Comms& comms, DB& db)
+MeasurementsModel::MeasurementsModel(DB& db)
     : QAbstractItemModel()
-    , m_comms(comms)
     , m_db(db)
 {
 }
@@ -147,15 +146,14 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
     {
         if (column == Column::Sensor)
         {
-            std::vector<Comms::Sensor> const& sensors = m_comms.getLastSensors();
-            auto it = std::find_if(sensors.begin(), sensors.end(), [&measurement](Comms::Sensor const& sensor) { return sensor.id == measurement.sensorId; });
-            if (it == sensors.end())
+            int32_t sensorIndex = m_db.findSensorIndexById(measurement.sensorId);
+            if (sensorIndex < 0)
             {
                 return "N/A";
             }
             else
             {
-                return it->name.c_str();
+                return m_db.getSensor(sensorIndex).descriptor.name.c_str();
             }
         }
         else if (column == Column::Index)

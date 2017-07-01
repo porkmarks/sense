@@ -111,27 +111,28 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
     }
 
     DB::Alarm const& alarm = m_db.getAlarm(index.row());
+    DB::AlarmDescriptor const& descriptor = alarm.descriptor;
 
     Column column = static_cast<Column>(index.column());
     if (role == Qt::CheckStateRole)
     {
         if (column == Column::LowBattery)
         {
-            if (alarm.lowVccWatch)
+            if (descriptor.lowVccWatch)
             {
                 return Qt::Checked;
             }
         }
         else if (column == Column::LowSignal)
         {
-            if (alarm.lowSignalWatch)
+            if (descriptor.lowSignalWatch)
             {
                 return Qt::Checked;
             }
         }
         else if (column == Column::SensorErrors)
         {
-            if (alarm.sensorErrorsWatch)
+            if (descriptor.sensorErrorsWatch)
             {
                 return Qt::Checked;
             }
@@ -141,47 +142,47 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
     {
         if (column == Column::Name)
         {
-            return alarm.name.c_str();
+            return descriptor.name.c_str();
         }
         else if (column == Column::Temperature)
         {
             QString str;
-            if (alarm.lowTemperatureWatch)
+            if (descriptor.lowTemperatureWatch)
             {
-                str += QString("Below %1 °C").arg(alarm.lowTemperature);
+                str += QString("Below %1 °C").arg(descriptor.lowTemperature);
             }
-            if (alarm.highTemperatureWatch)
+            if (descriptor.highTemperatureWatch)
             {
                 if (!str.isEmpty())
                 {
                     str += " and ";
                 }
-                str += QString("Above %1 °C").arg(alarm.highTemperature);
+                str += QString("Above %1 °C").arg(descriptor.highTemperature);
             }
             return str;
         }
         else if (column == Column::Humidity)
         {
             QString str;
-            if (alarm.lowHumidityWatch)
+            if (descriptor.lowHumidityWatch)
             {
-                str += QString("Below %1 % RH").arg(alarm.lowHumidity);
+                str += QString("Below %1 % RH").arg(descriptor.lowHumidity);
             }
-            if (alarm.highHumidityWatch)
+            if (descriptor.highHumidityWatch)
             {
                 if (!str.isEmpty())
                 {
                     str += " and ";
                 }
-                str += QString("Above %1 % RH").arg(alarm.highHumidity);
+                str += QString("Above %1 % RH").arg(descriptor.highHumidity);
             }
             return str;
         }
         else if (column == Column::Action)
         {
-            if (alarm.sendEmailAction)
+            if (descriptor.sendEmailAction)
             {
-                return ("Email " + alarm.emailRecipient).c_str();
+                return ("Email " + descriptor.emailRecipient).c_str();
             }
         }
     }
@@ -191,29 +192,29 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
         {
             return QIcon(":/icons/ui/alarm.png");
         }
-        else if (column == Column::Temperature && (alarm.lowTemperatureWatch || alarm.highTemperatureWatch))
+        else if (column == Column::Temperature && (descriptor.lowTemperatureWatch || descriptor.highTemperatureWatch))
         {
             return QIcon(":/icons/ui/temperature.png");
         }
-        else if (column == Column::Humidity && (alarm.lowHumidityWatch || alarm.highHumidityWatch))
+        else if (column == Column::Humidity && (descriptor.lowHumidityWatch || descriptor.highHumidityWatch))
         {
             return QIcon(":/icons/ui/humidity.png");
         }
-        else if (column == Column::LowBattery && alarm.lowVccWatch)
+        else if (column == Column::LowBattery && descriptor.lowVccWatch)
         {
             return QIcon(":/icons/ui/battery-0.png");
         }
-        else if (column == Column::LowSignal && alarm.lowSignalWatch)
+        else if (column == Column::LowSignal && descriptor.lowSignalWatch)
         {
             return QIcon(":/icons/ui/signal-0.png");
         }
-        else if (column == Column::SensorErrors && alarm.sensorErrorsWatch)
+        else if (column == Column::SensorErrors && descriptor.sensorErrorsWatch)
         {
             return QIcon(":/icons/ui/sensor.png");
         }
         else if (column == Column::Action)
         {
-            if (alarm.sendEmailAction)
+            if (descriptor.sendEmailAction)
             {
                 return QIcon(":/icons/ui/email.png");
             }

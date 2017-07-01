@@ -1,9 +1,11 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 #include <QUdpSocket>
 #include <QTcpSocket>
 
+#include "DB.h"
 #include "Data_Defs.h"
 #include "Channel.h"
 #include "QTcpSocketAdapter.h"
@@ -14,47 +16,32 @@ class Comms : public QObject
 public:
 
     typedef std::chrono::high_resolution_clock Clock;
-    typedef uint32_t Sensor_Id;
-    typedef uint32_t Sensor_Address;
 
     Comms();
+    ~Comms();
 
-    void connectToBaseStation(QHostAddress const& address);
+    bool connectToBaseStation(DB& db, QHostAddress const& address);
+
+    struct BaseStationDescriptor
+    {
+        std::string name;
+        std::array<uint8_t, 6> mac;
+        QHostAddress address;
+        bool operator==(BaseStationDescriptor const& other) const { return name == other.name && mac == other.mac && address == other.address; }
+    };
 
     struct BaseStation
     {
-        std::array<uint8_t, 6> mac;
-        QHostAddress address;
+        BaseStation(DB& db)
+            : db(db)
+        {}
+
+        BaseStationDescriptor descriptor;
+        DB& db;
     };
 
-    struct Sensor
-    {
-        Sensor_Id id = 0;
-        Sensor_Address address = 0;
-        std::string name;
-    };
-
-    struct Config
-    {
-        bool sensorsSleeping = false;
-        Clock::duration measurementPeriod;
-        Clock::duration commsPeriod;
-        Clock::duration computedCommsPeriod;
-
-        //This is computed when creating the config so that this equation holds for any config:
-        // measurement_time_point = config.baseline_time_point + measurement_index * config.measurement_period
-        //
-        //So when creating a new config, this is how to calculate the baseline:
-        // m = some measurement (any)
-        // config.baseline_time_point = m.time_point - m.index * config.measurement_period
-        //
-        //The reason for this is to keep the indices valid in all configs
-        Clock::time_point baselineTimePoint;
-    };
-
-    std::vector<BaseStation> const& getLastBasestations() const;
-    std::vector<Sensor> const& getLastSensors() const;
-    Config const& getLastConfig() const;
+    std::vector<BaseStationDescriptor> const& getDiscoveredBaseStations() const;
+    std::vector<BaseStation> const& getConnectedBasestations() const;
 
     void process();
 
@@ -64,16 +51,29 @@ public slots:
     void requestBindSensor(std::string const& name);
 
 signals:
-    void baseStationDiscovered(BaseStation const& bs);
+    void baseStationDiscovered(BaseStationDescriptor const& bs);
     void baseStationConnected(BaseStation const& bs);
     void baseStationDisconnected(BaseStation const& bs);
-    void configReceived(Config const& config);
-    void sensorAdded(Sensor const& sensor);
+
+private:
+    struct ConnectedBaseStation
+    {
+        ConnectedBaseStation(DB& db)
+            : baseStation(db)
+            , channel(socketAdapter)
+        {
+            socketAdapter.start();
+        }
+
+        BaseStation baseStation;
+        QTcpSocketAdapter socketAdapter;
+        util::comms::Channel<data::Server_Message, QTcpSocketAdapter> channel;
+    };
 
 private slots:
     void broadcastReceived();
-    void connectedToBaseStation();
-    void disconnectedFromBaseStation();
+    void connectedToBaseStation(ConnectedBaseStation* cbs);
+    void disconnectedFromBaseStation(ConnectedBaseStation* cbs);
 
 private:
 
@@ -87,14 +87,29 @@ private:
 
 
     QUdpSocket m_broadcastSocket;
-    std::vector<BaseStation> m_baseStations;
-    std::vector<Sensor> m_sensors;
-    Sensor m_sensorWaitingForBinding;
-    Config m_config;
 
-    size_t m_connectedBSIndex = size_t(-1);
-    QTcpSocketAdapter m_bsSocketAdapter;
-    util::comms::Channel<data::Server_Message, QTcpSocketAdapter> m_bsChannel;
+    std::vector<BaseStationDescriptor> m_discoveredBaseStations;
+    std::vector<std::unique_ptr<ConnectedBaseStation>> m_connectedBaseStations;
 };
 
+namespace std
+{
+
+template <>
+struct hash<Comms::BaseStationDescriptor>
+{
+    size_t operator()(Comms::BaseStationDescriptor const& bs) const
+    {
+        return hash<uint8_t>()(bs.mac[0]) ^
+                hash<uint8_t>()(bs.mac[1]) ^
+                hash<uint8_t>()(bs.mac[2]) ^
+                hash<uint8_t>()(bs.mac[3]) ^
+                hash<uint8_t>()(bs.mac[4]) ^
+                hash<uint8_t>()(bs.mac[5]) ^
+                hash<std::string>()(bs.name) ^
+                hash<std::string>()(std::string(bs.address.toString().toUtf8().data()));
+    }
+};
+
+}
 

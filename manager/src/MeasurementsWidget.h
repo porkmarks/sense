@@ -3,7 +3,6 @@
 #include <QWidget>
 #include <QStandardItemModel>
 #include "ui_MeasurementsWidget.h"
-#include "Comms.h"
 #include "DB.h"
 #include "MeasurementsModel.h"
 
@@ -12,14 +11,13 @@ class MeasurementsWidget : public QWidget
     Q_OBJECT
 public:
     explicit MeasurementsWidget(QWidget *parent = 0);
-    void init(Comms& comms, DB& db);
+    ~MeasurementsWidget();
+    void init(DB& db);
+    void shutdown();
 
 signals:
 
 private slots:
-    void baseStationConnected(Comms::BaseStation const& bs);
-    void baseStationDisconnected(Comms::BaseStation const& bs);
-
     void refreshFromDB();
     void setMinDateTimeNow();
     void setMaxDateTimeNow();
@@ -43,9 +41,8 @@ private:
 
     Ui::MeasurementsWidget m_ui;
 
-    Comms* m_comms = nullptr;
     DB* m_db = nullptr;
     std::unique_ptr<MeasurementsModel> m_model;
-    std::vector<Comms::Sensor_Id> m_selectedSensorIds;
+    std::vector<DB::SensorId> m_selectedSensorIds;
 };
 

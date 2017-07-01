@@ -256,12 +256,20 @@
             <property name="text">
              <string>Humidity Filter</string>
             </property>
+            <property name="icon">
+             <iconset resource="../res/res.qrc">
+              <normaloff>:/icons/ui/humidity.png</normaloff>:/icons/ui/humidity.png</iconset>
+            </property>
            </widget>
           </item>
           <item row="0" column="0">
            <widget class="QCheckBox" name="useTemperature">
             <property name="text">
              <string>Temperature Filter</string>
+            </property>
+            <property name="icon">
+             <iconset resource="../res/res.qrc">
+              <normaloff>:/icons/ui/temperature.png</normaloff>:/icons/ui/temperature.png</iconset>
             </property>
            </widget>
           </item>
@@ -477,7 +485,14 @@
            <bool>true</bool>
           </property>
          </widget>
-         <widget class="QWidget" name="plotWidget" native="true"/>
+         <widget class="QWidget" name="plotWidget" native="true">
+          <property name="maximumSize">
+           <size>
+            <width>12</width>
+            <height>16777215</height>
+           </size>
+          </property>
+         </widget>
         </widget>
        </item>
       </layout>

@@ -5,6 +5,8 @@
 #include "SensorsModel.h"
 #include "ui_SensorsFilterDialog.h"
 
+//////////////////////////////////////////////////////////////////////////
+
 MeasurementsWidget::MeasurementsWidget(QWidget *parent)
     : QWidget(parent)
 {
@@ -12,34 +14,41 @@ MeasurementsWidget::MeasurementsWidget(QWidget *parent)
     setEnabled(false);
 }
 
-void MeasurementsWidget::init(Comms& comms, DB& db)
+//////////////////////////////////////////////////////////////////////////
+
+MeasurementsWidget::~MeasurementsWidget()
 {
-    m_comms = &comms;
+    shutdown();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsWidget::init(DB& db)
+{
+    setEnabled(true);
     m_db = &db;
 
-    QObject::connect(m_comms, &Comms::baseStationConnected, this, &MeasurementsWidget::baseStationConnected);
-    QObject::connect(m_comms, &Comms::baseStationDisconnected, this, &MeasurementsWidget::baseStationDisconnected);
+    DB::SensorDescriptor sd;
+    sd.name = "test1";
+    m_db->addSensor(sd);
 
-    m_model.reset(new MeasurementsModel(comms, *m_db));
+    m_model.reset(new MeasurementsModel(*m_db));
     m_ui.list->setModel(m_model.get());
     m_ui.list->setItemDelegate(m_model.get());
 
     m_ui.list->setUniformRowHeights(true);
 
     DB::Clock::time_point start = DB::Clock::now();
-    for (size_t sid = 0; sid < 4; sid++)
+    for (size_t index = 0; index < 100000; index++)
     {
-        for (size_t index = 0; index < 100000; index++)
-        {
-            DB::Measurement m;
-            m.sensorId = sid;
-            m.index = index;
-            m.timePoint = DB::Clock::now() - std::chrono::seconds(index * 1000);
-            m.vcc = std::min((index / 1000.f) + 2.f, 3.3f);
-            m.temperature = std::min((index / 1000.f) * 55.f, 100.f);
-            m.humidity = std::min((index / 1000.f) * 100.f, 100.f);
-            m_db->addMeasurement(m);
-        }
+        DB::Measurement m;
+        m.sensorId = m_db->getSensor(m_db->findSensorIndexByName(sd.name)).id;
+        m.index = index;
+        m.timePoint = DB::Clock::now() - std::chrono::seconds(index * 1000);
+        m.vcc = std::min((index / 1000.f) + 2.f, 3.3f);
+        m.temperature = std::min((index / 1000.f) * 55.f, 100.f);
+        m.humidity = std::min((index / 1000.f) * 100.f, 100.f);
+        m_db->addMeasurement(m);
     }
     std::cout << "Time to add: " << (std::chrono::duration<float>(DB::Clock::now() - start).count()) << "\n";
 
@@ -78,16 +87,18 @@ void MeasurementsWidget::init(Comms& comms, DB& db)
 //    QObject::connect(m_ui.maxHumidity, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &MeasurementsWidget::maxHumidityChanged);
 }
 
+//////////////////////////////////////////////////////////////////////////
 
-void MeasurementsWidget::baseStationConnected(Comms::BaseStation const& bs)
-{
-    setEnabled(true);
-}
-
-void MeasurementsWidget::baseStationDisconnected(Comms::BaseStation const& bs)
+void MeasurementsWidget::shutdown()
 {
     setEnabled(false);
+    m_ui.list->setModel(nullptr);
+    m_ui.list->setItemDelegate(nullptr);
+    m_model.reset();
+    m_db = nullptr;
 }
+
+//////////////////////////////////////////////////////////////////////////
 
 DB::Filter MeasurementsWidget::createFilter() const
 {
@@ -114,6 +125,8 @@ DB::Filter MeasurementsWidget::createFilter() const
     return filter;
 }
 
+//////////////////////////////////////////////////////////////////////////
+
 void MeasurementsWidget::refreshFromDB()
 {
     DB::Filter filter = createFilter();
@@ -121,6 +134,8 @@ void MeasurementsWidget::refreshFromDB()
 
     m_ui.resultCount->setText(QString("%1 results.").arg(m_model->getMeasurementCount()));
 }
+
+//////////////////////////////////////////////////////////////////////////
 
 void MeasurementsWidget::setMinDateTimeNow()
 {
@@ -130,6 +145,8 @@ void MeasurementsWidget::setMinDateTimeNow()
     m_ui.minDateTime->setDateTime(dt);
 }
 
+//////////////////////////////////////////////////////////////////////////
+
 void MeasurementsWidget::setMaxDateTimeNow()
 {
     DB::Clock::time_point now = DB::Clock::now();
@@ -137,6 +154,8 @@ void MeasurementsWidget::setMaxDateTimeNow()
     dt.setTime_t(DB::Clock::to_time_t(now));
     m_ui.maxDateTime->setDateTime(dt);
 }
+
+//////////////////////////////////////////////////////////////////////////
 
 void MeasurementsWidget::setDateTimeThisDay()
 {
@@ -148,6 +167,8 @@ void MeasurementsWidget::setDateTimeThisDay()
     dt.setTime(QTime(0, 0));
     m_ui.minDateTime->setDateTime(dt);
 }
+
+//////////////////////////////////////////////////////////////////////////
 
 void MeasurementsWidget::setDateTimeThisWeek()
 {
@@ -161,6 +182,8 @@ void MeasurementsWidget::setDateTimeThisWeek()
     m_ui.minDateTime->setDateTime(dt);
 }
 
+//////////////////////////////////////////////////////////////////////////
+
 void MeasurementsWidget::setDateTimeThisMonth()
 {
     DB::Clock::time_point now = DB::Clock::now();
@@ -173,6 +196,8 @@ void MeasurementsWidget::setDateTimeThisMonth()
     m_ui.minDateTime->setDateTime(dt);
 }
 
+//////////////////////////////////////////////////////////////////////////
+
 void MeasurementsWidget::minDateTimeChanged(QDateTime const& value)
 {
     if (value >= m_ui.maxDateTime->dateTime())
@@ -182,6 +207,8 @@ void MeasurementsWidget::minDateTimeChanged(QDateTime const& value)
         m_ui.maxDateTime->setDateTime(dt);
     }
 }
+
+//////////////////////////////////////////////////////////////////////////
 
 void MeasurementsWidget::maxDateTimeChanged(QDateTime const& value)
 {
@@ -193,6 +220,8 @@ void MeasurementsWidget::maxDateTimeChanged(QDateTime const& value)
     }
 }
 
+//////////////////////////////////////////////////////////////////////////
+
 void MeasurementsWidget::minTemperatureChanged()
 {
     double value = m_ui.minTemperature->value();
@@ -202,6 +231,8 @@ void MeasurementsWidget::minTemperatureChanged()
         m_ui.maxTemperature->setValue(value);
     }
 }
+
+//////////////////////////////////////////////////////////////////////////
 
 void MeasurementsWidget::maxTemperatureChanged()
 {
@@ -213,6 +244,8 @@ void MeasurementsWidget::maxTemperatureChanged()
     }
 }
 
+//////////////////////////////////////////////////////////////////////////
+
 void MeasurementsWidget::minHumidityChanged()
 {
     double value = m_ui.minHumidity->value();
@@ -222,6 +255,8 @@ void MeasurementsWidget::minHumidityChanged()
         m_ui.maxHumidity->setValue(value);
     }
 }
+
+//////////////////////////////////////////////////////////////////////////
 
 void MeasurementsWidget::maxHumidityChanged()
 {
@@ -233,26 +268,28 @@ void MeasurementsWidget::maxHumidityChanged()
     }
 }
 
+//////////////////////////////////////////////////////////////////////////
+
 void MeasurementsWidget::selectSensors()
 {
     QDialog dialog;
     Ui::SensorsFilterDialog ui;
     ui.setupUi(&dialog);
 
-    SensorsModel model(*m_comms, *m_db);
+    SensorsModel model(*m_db);
     model.setShowCheckboxes(true);
 
-    std::vector<Comms::Sensor> const& sensors = m_comms->getLastSensors();
+    size_t sensorCount = m_db->getSensorCount();
     if (m_selectedSensorIds.empty())
     {
-        for (Comms::Sensor const& sensor: sensors)
+        for (size_t i = 0; i < sensorCount; i++)
         {
-            model.setSensorChecked(sensor.id, true);
+            model.setSensorChecked(m_db->getSensor(i).id, true);
         }
     }
     else
     {
-        for (Comms::Sensor_Id id: m_selectedSensorIds)
+        for (DB::SensorId id: m_selectedSensorIds)
         {
             model.setSensorChecked(id, true);
         }
@@ -265,8 +302,9 @@ void MeasurementsWidget::selectSensors()
     if (result == QDialog::Accepted)
     {
         m_selectedSensorIds.clear();
-        for (Comms::Sensor const& sensor: sensors)
+        for (size_t i = 0; i < sensorCount; i++)
         {
+            DB::Sensor const& sensor = m_db->getSensor(i);
             if (model.isSensorChecked(sensor.id))
             {
                 m_selectedSensorIds.push_back(sensor.id);
@@ -274,4 +312,6 @@ void MeasurementsWidget::selectSensors()
         }
     }
 }
+
+//////////////////////////////////////////////////////////////////////////
 

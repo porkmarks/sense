@@ -1,6 +1,9 @@
 #include "AlarmsWidget.h"
 #include "ui_NewAlarmDialog.h"
 
+
+//////////////////////////////////////////////////////////////////////////
+
 AlarmsWidget::AlarmsWidget(QWidget *parent)
     : QWidget(parent)
 {
@@ -11,22 +14,36 @@ AlarmsWidget::AlarmsWidget(QWidget *parent)
     QObject::connect(m_ui.remove, &QPushButton::released, this, &AlarmsWidget::removeAlarms);
 }
 
+//////////////////////////////////////////////////////////////////////////
+
 AlarmsWidget::~AlarmsWidget()
 {
-    m_ui.list->setModel(nullptr);
+    shutdown();
 }
 
-void AlarmsWidget::init(Comms& comms, DB& db)
+//////////////////////////////////////////////////////////////////////////
+
+void AlarmsWidget::init(DB& db)
 {
-    m_comms = &comms;
+    setEnabled(true);
     m_db = &db;
 
     m_model.reset(new AlarmsModel(db));
     m_ui.list->setModel(m_model.get());
-
-    QObject::connect(m_comms, &Comms::baseStationConnected, this, &AlarmsWidget::baseStationConnected);
-    QObject::connect(m_comms, &Comms::baseStationDisconnected, this, &AlarmsWidget::baseStationDisconnected);
 }
+
+//////////////////////////////////////////////////////////////////////////
+
+void AlarmsWidget::shutdown()
+{
+    setEnabled(false);
+    m_ui.list->setModel(nullptr);
+    m_ui.list->setItemDelegate(nullptr);
+    m_model.reset();
+    m_db = nullptr;
+}
+
+//////////////////////////////////////////////////////////////////////////
 
 void AlarmsWidget::addAlarm()
 {
@@ -41,7 +58,7 @@ void AlarmsWidget::addAlarm()
         int result = dialog.exec();
         if (result == QDialog::Accepted)
         {
-            DB::Alarm alarm;
+            DB::AlarmDescriptor alarm;
             alarm.name = ui.name->text().toUtf8().data();
 
             if (!ui.highTemperatureWatch->isChecked() && !ui.lowTemperatureWatch->isChecked() &&
@@ -89,18 +106,12 @@ void AlarmsWidget::addAlarm()
     }
 }
 
+//////////////////////////////////////////////////////////////////////////
+
 void AlarmsWidget::removeAlarms()
 {
 
 }
 
-void AlarmsWidget::baseStationConnected(Comms::BaseStation const& bs)
-{
-    setEnabled(true);
-}
-
-void AlarmsWidget::baseStationDisconnected(Comms::BaseStation const& bs)
-{
-    setEnabled(false);
-}
+//////////////////////////////////////////////////////////////////////////
 

@@ -1,17 +1,18 @@
 #pragma once
 
+#include <QObject>
 #include <chrono>
 #include <string>
 #include <vector>
 #include <map>
 #include "Data_Defs.h"
 
-class DB
+class DB : public QObject
 {
+    Q_OBJECT
 public:
     DB();
 
-    typedef uint32_t SensorId;
     typedef std::chrono::high_resolution_clock Clock;
 
     bool create(std::string const& name);
@@ -19,6 +20,32 @@ public:
 
     bool save() const;
     bool saveAs(std::string const& filename) const;
+
+    struct ConfigDescriptor
+    {
+        bool sensorsSleeping = false;
+        Clock::duration measurementPeriod;
+        Clock::duration commsPeriod;
+        Clock::duration computedCommsPeriod;
+    };
+
+    struct Config
+    {
+        ConfigDescriptor descriptor;
+
+        //This is computed when creating the config so that this equation holds for any config:
+        // measurement_time_point = config.baseline_time_point + measurement_index * config.measurement_period
+        //
+        //So when creating a new config, this is how to calculate the baseline:
+        // m = some measurement (any)
+        // config.baseline_time_point = m.time_point - m.index * config.measurement_period
+        //
+        //The reason for this is to keep the indices valid in all configs
+        Clock::time_point baselineTimePoint;
+    };
+
+    bool setConfig(ConfigDescriptor const& descriptor);
+    Config const& getConfig() const;
 
     struct SensorErrors
     {
@@ -29,8 +56,57 @@ public:
         };
     };
 
+    typedef uint32_t SensorId;
+    typedef uint32_t SensorAddress;
 
-    struct Alarm
+    struct Measurement
+    {
+        SensorId sensorId = 0;
+        uint32_t index = 0;
+        Clock::time_point timePoint;
+        float temperature = 0;
+        float humidity = 0;
+        float vcc = 0;
+        int8_t b2s = 0;
+        int8_t s2b = 0;
+        uint8_t sensorErrors = 0;
+    };
+
+    struct SensorDescriptor
+    {
+        std::string name;
+    };
+
+    struct Sensor
+    {
+        enum class State
+        {
+            Active,
+            Sleeping,
+            Unbound
+        };
+
+        SensorDescriptor descriptor;
+        SensorId id = 0;
+        SensorAddress address = 0;
+        State state = State::Active;
+        Clock::time_point nextCommsTimePoint = Clock::time_point(Clock::duration::zero());
+        Clock::time_point nextMeasurementTimePoint = Clock::time_point(Clock::duration::zero());
+
+        uint8_t triggeredAlarms = 0;
+        bool isLastMeasurementValid = false;
+        Measurement lastMeasurement;
+    };
+
+    size_t getSensorCount() const;
+    Sensor const& getSensor(size_t index) const;
+    bool addSensor(SensorDescriptor const& descriptor);
+    bool bindSensor(SensorDescriptor const& descriptor, SensorAddress address);
+    void removeSensor(size_t index);
+    int32_t findSensorIndexByName(std::string const& name) const;
+    int32_t findSensorIndexById(SensorId id) const;
+
+    struct AlarmDescriptor
     {
         std::string name;
 
@@ -54,25 +130,18 @@ public:
         std::string emailRecipient;
     };
 
-    struct Measurement
+    typedef uint32_t AlarmId;
+    struct Alarm
     {
-        SensorId sensorId = 0;
-        uint32_t index = 0;
-        Clock::time_point timePoint;
-        float temperature = 0;
-        float humidity = 0;
-        float vcc = 0;
-        int8_t b2s = 0;
-        int8_t s2b = 0;
-        uint8_t sensorErrors = 0;
+        AlarmDescriptor descriptor;
+        AlarmId id;
     };
-
-
 
     size_t getAlarmCount() const;
     Alarm const& getAlarm(size_t index) const;
     int32_t findAlarmIndexByName(std::string const& name) const;
-    void addAlarm(Alarm const& alarm);
+    int32_t findAlarmIndexById(AlarmId id) const;
+    bool addAlarm(AlarmDescriptor const& descriptor);
     void removeAlarm(size_t index);
 
     struct TriggeredAlarm
@@ -140,8 +209,38 @@ public:
 
     bool getLastMeasurementForSensor(SensorId sensor_id, Measurement& measurement) const;
 
-private:
+signals:
+    void configWillBeChanged();
+    void configChanged();
 
+    void sensorWillBeAdded(SensorId id);
+    void sensorAdded(SensorId id);
+    void sensorBound(SensorId id);
+    void sensorWillBeRemoved(SensorId id);
+    void sensorRemoved(SensorId id);
+    void sensorTriggeredAlarmsChanged(SensorId id);
+    void sensorMeasurementChanged(SensorId id);
+
+    void alarmWillBeAdded(AlarmId id);
+    void alarmAdded(AlarmId id);
+    void alarmWillBeRemoved(AlarmId id);
+    void alarmRemoved(AlarmId id);
+    void alarmTriggered(AlarmId id);
+
+    void measurementsWillBeAdded(SensorId id);
+    void measurementsAdded(SensorId id);
+    void measurementsWillBeRemoved(SensorId id);
+    void measurementsRemoved(SensorId id);
+
+private:
+    Clock::time_point computeBaselineTimePoint(ConfigDescriptor const& oldDescriptor, ConfigDescriptor const& newDescriptor);
+
+    Config m_config;
+
+    SensorId m_lastSensorId = 0;
+    std::vector<Sensor> m_sensors;
+
+    AlarmId m_lastAlarmId = 0;
     std::vector<Alarm> m_alarms;
 
     bool cull(Measurement const& measurement, Filter const& filter) const;

@@ -3,28 +3,29 @@
 #include <QInputDialog>
 #include <QMessageBox>
 
+//////////////////////////////////////////////////////////////////////////
+
 Manager::Manager(QWidget *parent)
     : QMainWindow(parent)
 {
     m_ui.setupUi(this);
 
     m_ui.baseStationsWidget->init(m_comms);
-    m_ui.configWidget->init(m_comms);
-    m_ui.sensorsWidget->init(m_comms, m_db);
-    m_ui.measurementsWidget->init(m_comms, m_db);
-    m_ui.alarmsWidget->init(m_comms, m_db);
 
     auto* timer = new QTimer(this);
     timer->setSingleShot(false);
     timer->start(1);
     connect(timer, &QTimer::timeout, this, &Manager::process, Qt::QueuedConnection);
 
-    connect(m_ui.baseStationsWidget, &BaseStationsWidget::baseStationSelected, this, &Manager::activateBaseStation);
+    connect(m_ui.baseStationsWidget, &BaseStationsWidget::baseStationActivated, this, &Manager::activateBaseStation);
+    connect(m_ui.baseStationsWidget, &BaseStationsWidget::baseStationDeactivated, this, &Manager::deactivateBaseStation);
 
     readSettings();
 
     show();
 }
+
+//////////////////////////////////////////////////////////////////////////
 
 Manager::~Manager()
 {
@@ -35,10 +36,27 @@ Manager::~Manager()
     delete m_ui.alarmsWidget;
 }
 
-void Manager::activateBaseStation(Comms::BaseStation const& bs)
+//////////////////////////////////////////////////////////////////////////
+
+void Manager::activateBaseStation(Comms::BaseStationDescriptor const& bs, DB& db)
 {
-    m_comms.connectToBaseStation(bs.address);
+    m_ui.configWidget->init(db);
+    m_ui.sensorsWidget->init(db);
+    m_ui.measurementsWidget->init(db);
+    m_ui.alarmsWidget->init(db);
 }
+
+//////////////////////////////////////////////////////////////////////////
+
+void Manager::deactivateBaseStation(Comms::BaseStationDescriptor const& bs)
+{
+    m_ui.configWidget->shutdown();
+    m_ui.sensorsWidget->shutdown();
+    m_ui.measurementsWidget->shutdown();
+    m_ui.alarmsWidget->shutdown();
+}
+
+//////////////////////////////////////////////////////////////////////////
 
 void Manager::closeEvent(QCloseEvent* event)
 {
@@ -49,12 +67,16 @@ void Manager::closeEvent(QCloseEvent* event)
     QMainWindow::closeEvent(event);
 }
 
+//////////////////////////////////////////////////////////////////////////
+
 void Manager::readSettings()
 {
     QSettings settings;
     restoreGeometry(settings.value("geometry").toByteArray());
     restoreState(settings.value("windowState").toByteArray());
 }
+
+//////////////////////////////////////////////////////////////////////////
 
 void Manager::process()
 {
@@ -69,4 +91,6 @@ void Manager::process()
 
     m_comms.process();
 }
+
+//////////////////////////////////////////////////////////////////////////
 
