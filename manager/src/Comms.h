@@ -45,11 +45,6 @@ public:
 
     void process();
 
-public slots:
-    void requestConfig();
-    void requestSensors();
-    void requestBindSensor(std::string const& name);
-
 signals:
     void baseStationDiscovered(BaseStationDescriptor const& bs);
     void baseStationConnected(BaseStation const& bs);
@@ -76,15 +71,15 @@ private slots:
     void disconnectedFromBaseStation(ConnectedBaseStation* cbs);
 
 private:
+    void processSetConfigRes(ConnectedBaseStation& cbs);
+    void processSetSensorsRes(ConnectedBaseStation& cbs);
+    void processAddSensorRes(ConnectedBaseStation& cbs);
+    void processReportMeasurementReq(ConnectedBaseStation& cbs);
+    void processSensorBoundReq(ConnectedBaseStation& cbs);
 
-    void processGetConfigRes();
-    void processSetConfigRes();
-    void processGetSensorsRes();
-    void processAddSensorRes();
-    void processRemoveSensorRes();
-    void processReportMeasurementReq();
-    void processSensorBoundReq();
-
+    void sendConfig(ConnectedBaseStation& cbs);
+    void sendSensors(ConnectedBaseStation& cbs);
+    void requestBindSensor(std::string const& name);
 
     QUdpSocket m_broadcastSocket;
 

@@ -1,8 +1,12 @@
 #include "Comms.h"
 #include <cassert>
 #include <iostream>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
+
+#include "rapidjson/document.h"
+#include "rapidjson/prettywriter.h"
+#include "rapidjson/writer.h"
+#include "rapidjson/reader.h"
+#include "rapidjson/stringbuffer.h"
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -82,8 +86,8 @@ void Comms::connectedToBaseStation(ConnectedBaseStation* cbs)
     {
         emit baseStationConnected(cbs->baseStation);
 
-//        requestConfig();
-//        requestSensors();
+        sendConfig(*cbs);
+        sendSensors(*cbs);
     }
 }
 
@@ -93,9 +97,6 @@ void Comms::disconnectedFromBaseStation(ConnectedBaseStation* cbs)
 {
     if (cbs)
     {
-//        m_sensors.clear();
-//        m_config = Config();
-
         emit baseStationDisconnected(cbs->baseStation);
 
         auto it = std::find_if(m_connectedBaseStations.begin(), m_connectedBaseStations.end(), [cbs](std::unique_ptr<ConnectedBaseStation> const& _cbs) { return _cbs.get() == cbs; });
@@ -119,18 +120,51 @@ std::vector<Comms::BaseStationDescriptor> const& Comms::getDiscoveredBaseStation
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::requestConfig()
+void Comms::sendConfig(ConnectedBaseStation& cbs)
 {
-//    m_bsChannel.send(data::Server_Message::GET_CONFIG_REQ, nullptr, 0);
+    DB::Config const& config = cbs.baseStation.db.getConfig();
+
+    rapidjson::Document document;
+    document.SetObject();
+    document.SetObject();
+    document.AddMember("name", rapidjson::Value(config.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
+    document.AddMember("sensors_sleeping", config.descriptor.sensorsSleeping, document.GetAllocator());
+    document.AddMember("measurement_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.measurementPeriod).count()), document.GetAllocator());
+    document.AddMember("comms_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.commsPeriod).count()), document.GetAllocator());
+    document.AddMember("baseline", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.baselineTimePoint.time_since_epoch()).count()), document.GetAllocator());
+
+    rapidjson::StringBuffer buffer;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    document.Accept(writer);
+
+    cbs.channel.send(data::Server_Message::SET_CONFIG_REQ, buffer.GetString(), buffer.GetSize());
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::requestSensors()
+void Comms::sendSensors(ConnectedBaseStation& cbs)
 {
-//    m_bsChannel.send(data::Server_Message::GET_SENSORS_REQ, nullptr, 0);
-}
+    DB& db = cbs.baseStation.db;
 
+    rapidjson::Document document;
+    document.SetArray();
+    for (size_t i = 0; i < db.getSensorCount(); i++)
+    {
+        DB::Sensor const& sensor = db.getSensor(i);
+        rapidjson::Value sensorj;
+        sensorj.SetObject();
+        sensorj.AddMember("name", rapidjson::Value(sensor.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
+        sensorj.AddMember("id", sensor.id, document.GetAllocator());
+        sensorj.AddMember("address", sensor.address, document.GetAllocator());
+        document.PushBack(sensorj, document.GetAllocator());
+    }
+
+    rapidjson::StringBuffer buffer;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    document.Accept(writer);
+
+    cbs.channel.send(data::Server_Message::SET_SENSORS_REQ, buffer.GetString(), buffer.GetSize());
+}
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -165,170 +199,250 @@ void Comms::requestBindSensor(std::string const& name)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processGetConfigRes()
+void Comms::processSetSensorsRes(ConnectedBaseStation& cbs)
 {
-//    std::vector<uint8_t> buffer;
-//    m_bsChannel.unpack(buffer);
+    std::vector<uint8_t> buffer;
+    cbs.channel.unpack(buffer);
 
-//    std::string str_buffer(reinterpret_cast<char*>(buffer.data()), reinterpret_cast<char*>(buffer.data()) + buffer.size());
-//    std::stringstream ss(str_buffer);
+    if (buffer.size() != 1)
+    {
+        std::cerr << "Cannot deserialize request: Bad data.\n";
+        return;
+    }
 
-//    try
-//    {
-//        boost::property_tree::ptree pt;
-//        boost::property_tree::read_json(ss, pt);
+    bool ok = *reinterpret_cast<bool const*>(buffer.data());
+    if (!ok)
+    {
+        std::cerr << "Setting the sensors FAILED.\n";
+        return;
+    }
 
-//        m_config.sensorsSleeping = pt.get<bool>("sensors_sleeping");
-//        m_config.measurementPeriod = std::chrono::seconds(pt.get<std::chrono::seconds::rep>("measurement_period"));
-//        m_config.commsPeriod = std::chrono::seconds(pt.get<std::chrono::seconds::rep>("comms_period"));
-//        m_config.computedCommsPeriod = std::chrono::seconds(pt.get<std::chrono::seconds::rep>("computed_comms_period"));
-//        m_config.baselineTimePoint = Clock::time_point(std::chrono::seconds(pt.get<std::chrono::seconds::rep>("baseline_time_point")));
-
-//        emit configReceived(m_config);
-//    }
-//    catch (std::exception const& e)
-//    {
-//        std::cerr << "Cannot deserialize response: " << e.what() << "\n";
-//    }
+    std::cout << "Setting the sensors succeded.\n";
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processSetConfigRes()
+void Comms::processSetConfigRes(ConnectedBaseStation& cbs)
 {
+    std::vector<uint8_t> buffer;
+    cbs.channel.unpack(buffer);
 
+    if (buffer.size() != 1)
+    {
+        std::cerr << "Cannot deserialize request: Bad data.\n";
+        return;
+    }
+
+    bool ok = *reinterpret_cast<bool const*>(buffer.data());
+    if (!ok)
+    {
+        std::cerr << "Setting the config FAILED.\n";
+        return;
+    }
+
+    std::cout << "Setting the config succeded.\n";
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processGetSensorsRes()
-{
-//    std::vector<uint8_t> buffer;
-//    m_bsChannel.unpack(buffer);
-
-//    std::string str_buffer(reinterpret_cast<char*>(buffer.data()), reinterpret_cast<char*>(buffer.data()) + buffer.size());
-//    std::stringstream ss(str_buffer);
-
-//    try
-//    {
-//        boost::property_tree::ptree pt;
-//        boost::property_tree::read_json(ss, pt);
-
-//        m_sensors.clear();
-//        if (pt.get_child_optional("sensors"))
-//        {
-//            for (auto const& node: pt.get_child("sensors"))
-//            {
-//                Sensor sensor;
-//                sensor.name = node.first;
-//                sensor.address = node.second.get<Sensor_Address>("address");
-//                sensor.id = node.second.get<Sensor_Id>("id");
-//                m_sensors.push_back(sensor);
-//            }
-//        }
-//    }
-//    catch (std::exception const& e)
-//    {
-//        std::cerr << "Cannot deserialize response: " << e.what() << "\n";
-//        return;
-//    }
-
-//    for (Sensor const& sensor: m_sensors)
-//    {
-//        emit sensorAdded(sensor);
-//    }
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Comms::processAddSensorRes()
+void Comms::processAddSensorRes(ConnectedBaseStation& cbs)
 {
 
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processRemoveSensorRes()
+void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
 {
+    std::vector<uint8_t> buffer;
+    cbs.channel.unpack(buffer);
 
+    bool ok = false;
+
+    {
+        rapidjson::Document document;
+        document.Parse(reinterpret_cast<const char*>(buffer.data()), buffer.size());
+        if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
+        {
+            std::cerr << "Cannot deserialize request: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
+            goto end;
+        }
+        if (!document.IsObject())
+        {
+            std::cerr << "Cannot deserialize request: Bad document.\n";
+            goto end;
+        }
+
+        DB::Measurement measurement;
+
+        auto it = document.FindMember("sensor_id");
+        if (it == document.MemberEnd() || !it->value.IsUint())
+        {
+            std::cerr << "Cannot deserialize request: Missing sensor_id.\n";
+            goto end;
+        }
+        measurement.sensorId = it->value.GetUint();
+
+        it = document.FindMember("index");
+        if (it == document.MemberEnd() || !it->value.IsUint())
+        {
+            std::cerr << "Cannot deserialize request: Missing index.\n";
+            goto end;
+        }
+        measurement.index = it->value.GetUint();
+
+        it = document.FindMember("time_point");
+        if (it == document.MemberEnd() || !it->value.IsUint64())
+        {
+            std::cerr << "Cannot deserialize request: Missing time_point.\n";
+            goto end;
+        }
+        measurement.timePoint = DB::Clock::time_point(std::chrono::seconds(it->value.GetUint64()));
+
+        it = document.FindMember("temperature");
+        if (it == document.MemberEnd() || !it->value.IsNumber())
+        {
+            std::cerr << "Cannot deserialize request: Missing temperature.\n";
+            goto end;
+        }
+        measurement.temperature = static_cast<float>(it->value.GetDouble());
+
+        it = document.FindMember("humidity");
+        if (it == document.MemberEnd() || !it->value.IsNumber())
+        {
+            std::cerr << "Cannot deserialize request: Missing humidity.\n";
+            goto end;
+        }
+        measurement.humidity = static_cast<float>(it->value.GetDouble());
+
+        it = document.FindMember("vcc");
+        if (it == document.MemberEnd() || !it->value.IsNumber())
+        {
+            std::cerr << "Cannot deserialize request: Missing vcc.\n";
+            goto end;
+        }
+        measurement.vcc = static_cast<float>(it->value.GetDouble());
+
+        it = document.FindMember("b2s");
+        if (it == document.MemberEnd() || !it->value.IsInt())
+        {
+            std::cerr << "Cannot deserialize request: Missing b2s.\n";
+            goto end;
+        }
+        measurement.b2s = static_cast<int8_t>(it->value.GetInt());
+
+        it = document.FindMember("s2b");
+        if (it == document.MemberEnd() || !it->value.IsInt())
+        {
+            std::cerr << "Cannot deserialize request: Missing s2b.\n";
+            goto end;
+        }
+        measurement.s2b = static_cast<int8_t>(it->value.GetInt());
+
+        it = document.FindMember("sensor_errors");
+        if (it == document.MemberEnd() || !it->value.IsUint())
+        {
+            std::cerr << "Cannot deserialize request: Missing sensor_errors.\n";
+            goto end;
+        }
+        measurement.sensorErrors = static_cast<uint8_t>(it->value.GetUint());
+
+        if (!cbs.baseStation.db.addMeasurement(measurement))
+        {
+            std::cerr << "Cannot deserialize request: Adding measurement failed.\n";
+            goto end;
+        }
+
+        ok = true;
+    }
+
+end:
+    cbs.channel.send(data::Server_Message::REPORT_MEASUREMENT_RES, &ok, 1);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processReportMeasurementReq()
+void Comms::processSensorBoundReq(ConnectedBaseStation& cbs)
 {
+    std::vector<uint8_t> buffer;
+    cbs.channel.unpack(buffer);
 
-}
+    bool ok = false;
 
-//////////////////////////////////////////////////////////////////////////
+    {
+        rapidjson::Document document;
+        document.Parse(reinterpret_cast<const char*>(buffer.data()), buffer.size());
+        if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
+        {
+            std::cerr << "Cannot deserialize request: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
+            goto end;
+        }
+        if (!document.IsObject())
+        {
+            std::cerr << "Cannot deserialize request: Bad document.\n";
+            goto end;
+        }
 
-void Comms::processSensorBoundReq()
-{
-//    std::vector<uint8_t> buffer;
-//    m_bsChannel.unpack(buffer);
+        auto it = document.FindMember("id");
+        if (it == document.MemberEnd() || !it->value.IsUint())
+        {
+            std::cerr << "Cannot deserialize request: Missing id.\n";
+            goto end;
+        }
+        DB::SensorId id = it->value.GetUint();
 
-//    std::string str_buffer(reinterpret_cast<char*>(buffer.data()), reinterpret_cast<char*>(buffer.data()) + buffer.size());
-//    std::stringstream ss(str_buffer);
+        it = document.FindMember("address");
+        if (it == document.MemberEnd() || !it->value.IsUint())
+        {
+            std::cerr << "Cannot deserialize request: Missing address.\n";
+            goto end;
+        }
+        DB::SensorAddress address = it->value.GetUint();
 
-//    try
-//    {
-//        boost::property_tree::ptree pt;
-//        boost::property_tree::read_json(ss, pt);
+        if (!cbs.baseStation.db.bindSensor(id, address))
+        {
+            std::cerr << "Cannot deserialize request: Bind failed.\n";
+            goto end;
+        }
 
-//        Sensor sensor;
-//        sensor.name = pt.get<std::string>("name");;
-//        sensor.address = pt.get<Sensor_Address>("address");
-//        sensor.id = pt.get<Sensor_Id>("id");
+        ok = true;
+    }
 
-//        if (sensor.name != m_sensorWaitingForBinding.name)
-//        {
-//            std::cerr << "Was waiting to bind sensor '" << m_sensorWaitingForBinding.name << "' but received '" << sensor.name << "'\n";
-//        }
-
-//        m_sensors.push_back(sensor);
-
-//        emit sensorAdded(sensor);
-//    }
-//    catch (std::exception const& e)
-//    {
-//        std::cerr << "Cannot deserialize response: " << e.what() << "\n";
-//    }
+end:
+    cbs.channel.send(data::Server_Message::SENSOR_BOUND_RES, &ok, 1);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void Comms::process()
 {
-//    data::Server_Message message;
-//    while (m_bsChannel.get_next_message(message))
-//    {
-//        switch (message)
-//        {
-//        case data::Server_Message::GET_CONFIG_RES:
-//            processGetConfigRes();
-//            break;
-//        case data::Server_Message::SET_CONFIG_RES:
-//            processSetConfigRes();
-//            break;
-//        case data::Server_Message::GET_SENSORS_RES:
-//            processGetSensorsRes();
-//            break;
-//        case data::Server_Message::ADD_SENSOR_RES:
-//            processAddSensorRes();
-//            break;
-//        case data::Server_Message::REMOVE_SENSOR_RES:
-//            processRemoveSensorRes();
-//            break;
-//        case data::Server_Message::REPORT_MEASUREMENT_REQ:
-//            processReportMeasurementReq();
-//            break;
-//        case data::Server_Message::SENSOR_BOUND_REQ:
-//            processSensorBoundReq();
-//            break;
-//        default:
-//            std::cerr << "Invalid message received: " << (int)message << "\n";
-//        }
-//    }
+    data::Server_Message message;
+    for (std::unique_ptr<ConnectedBaseStation>& cbs: m_connectedBaseStations)
+    {
+        while (cbs->channel.get_next_message(message))
+        {
+            switch (message)
+            {
+            case data::Server_Message::SET_CONFIG_RES:
+                processSetConfigRes(*cbs);
+                break;
+            case data::Server_Message::SET_SENSORS_RES:
+                processSetSensorsRes(*cbs);
+                break;
+            case data::Server_Message::ADD_SENSOR_RES:
+                processAddSensorRes(*cbs);
+                break;
+            case data::Server_Message::REPORT_MEASUREMENT_REQ:
+                processReportMeasurementReq(*cbs);
+                break;
+            case data::Server_Message::SENSOR_BOUND_REQ:
+                processSensorBoundReq(*cbs);
+                break;
+            default:
+                std::cerr << "Invalid message received: " << (int)message << "\n";
+            }
+        }
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////

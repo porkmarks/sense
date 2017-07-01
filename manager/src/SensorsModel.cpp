@@ -34,8 +34,7 @@ SensorsModel::SensorsModel(DB& db)
 {
     QObject::connect(&m_db, &DB::sensorAdded, [this](DB::SensorId id) { sensorAdded(id); });
     QObject::connect(&m_db, &DB::sensorBound, [this](DB::SensorId id) { sensorChanged(id); });
-    QObject::connect(&m_db, &DB::sensorMeasurementChanged, [this](DB::SensorId id) { sensorChanged(id); });
-    QObject::connect(&m_db, &DB::sensorTriggeredAlarmsChanged, [this](DB::SensorId id) { sensorChanged(id); });
+    QObject::connect(&m_db, &DB::sensorChanged, [this](DB::SensorId id) { sensorChanged(id); });
     QObject::connect(&m_db, &DB::sensorRemoved, [this](DB::SensorId id) { sensorRemoved(id); });
 
     size_t sensorCount = m_db.getSensorCount();

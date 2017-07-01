@@ -104,7 +104,9 @@ public:
     size_t getSensorCount() const;
     Sensor const& getSensor(size_t index) const;
     bool addSensor(SensorDescriptor const& descriptor);
-    bool bindSensor(SensorDescriptor const& descriptor, SensorAddress address);
+    bool bindSensor(SensorId id, SensorAddress address);
+    bool setSensorState(SensorId id, Sensor::State state);
+    bool setSensorNextTimePoints(SensorId id, Clock::time_point nextMeasurementTimePoint, Clock::time_point nextCommsTimePoint);
     void removeSensor(size_t index);
     int32_t findSensorIndexByName(std::string const& name) const;
     int32_t findSensorIndexById(SensorId id) const;
@@ -221,8 +223,7 @@ signals:
     void sensorBound(SensorId id);
     void sensorWillBeRemoved(SensorId id);
     void sensorRemoved(SensorId id);
-    void sensorTriggeredAlarmsChanged(SensorId id);
-    void sensorMeasurementChanged(SensorId id);
+    void sensorChanged(SensorId id);
 
     void alarmWillBeAdded(AlarmId id);
     void alarmAdded(AlarmId id);

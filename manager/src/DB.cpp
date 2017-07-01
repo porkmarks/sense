@@ -571,6 +571,11 @@ bool DB::addSensor(SensorDescriptor const& descriptor)
     {
         return false;
     }
+    auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [](Sensor const& sensor) { return sensor.state == Sensor::State::Unbound; });
+    if (it != m_mainData.sensors.end())
+    {
+        return false;
+    }
 
     {
         Sensor sensor;
@@ -588,7 +593,7 @@ bool DB::addSensor(SensorDescriptor const& descriptor)
         sensor.triggeredAlarms = computeTriggeredAlarm(sensor.id);
         if (sensor.triggeredAlarms != 0)
         {
-            emit sensorTriggeredAlarmsChanged(sensor.id);
+            emit sensorChanged(sensor.id);
         }
     }
 
@@ -599,27 +604,80 @@ bool DB::addSensor(SensorDescriptor const& descriptor)
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::bindSensor(SensorDescriptor const& descriptor, SensorAddress address)
+bool DB::bindSensor(SensorId id, SensorAddress address)
 {
-    int32_t index = findSensorIndexByName(descriptor.name);
+    int32_t index = findSensorIndexById(id);
     if (index < 0)
     {
-        assert(false);
         return false;
     }
     auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [&address](Sensor const& sensor) { return sensor.address == address; });
     if (it != m_mainData.sensors.end())
     {
-        assert(false);
         return false;
     }
 
     Sensor& sensor = m_mainData.sensors[index];
+    if (sensor.state != Sensor::State::Unbound)
+    {
+        return false;
+    }
 
     sensor.address = address;
     sensor.state = Sensor::State::Active;
 
     emit sensorBound(sensor.id);
+    emit sensorChanged(sensor.id);
+
+    triggerSave();
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool DB::setSensorState(SensorId id, Sensor::State state)
+{
+    int32_t index = findSensorIndexById(id);
+    if (index < 0)
+    {
+        return false;
+    }
+    if (state == Sensor::State::Unbound)
+    {
+        return false;
+    }
+
+    Sensor& sensor = m_mainData.sensors[index];
+    sensor.state = state;
+
+    emit sensorChanged(sensor.id);
+
+    triggerSave();
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool DB::setSensorNextTimePoints(SensorId id, Clock::time_point nextMeasurementTimePoint, Clock::time_point nextCommsTimePoint)
+{
+    int32_t index = findSensorIndexById(id);
+    if (index < 0)
+    {
+        return false;
+    }
+
+    Sensor& sensor = m_mainData.sensors[index];
+    if (sensor.state == Sensor::State::Unbound)
+    {
+        return false;
+    }
+
+    sensor.nextMeasurementTimePoint = nextMeasurementTimePoint;
+    sensor.nextCommsTimePoint = nextCommsTimePoint;
+
+    emit sensorChanged(sensor.id);
 
     triggerSave();
 
@@ -848,13 +906,13 @@ bool DB::addMeasurement(Measurement const& measurement)
     sensor.isLastMeasurementValid = true;
     sensor.lastMeasurement = measurement;
 
-    emit sensorMeasurementChanged(sensor.id);
+    emit sensorChanged(sensor.id);
 
     uint8_t triggeredAlarms = sensor.triggeredAlarms;
     sensor.triggeredAlarms |= computeTriggeredAlarm(measurement);
     if (sensor.triggeredAlarms != triggeredAlarms)
     {
-        emit sensorTriggeredAlarmsChanged(sensor.id);
+        emit sensorChanged(sensor.id);
     }
 
     triggerSave();
