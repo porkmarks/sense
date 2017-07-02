@@ -324,13 +324,28 @@ void MeasurementsWidget::exportData()
         return;
     }
 
-    int dateTimeFormat = ui.dateFormat->currentIndex();
+    enum class DateTimeFormat
+    {
+        YYYY_MM_DD_Slash,
+        YYYY_MM_DD_Dash,
+        DD_MM_YYYY_Dash,
+        MM_DD_YYYY_Slash
+    };
+
+    enum class UnitsFormat
+    {
+        None,
+        Embedded,
+        SeparateColumn
+    };
+
+    DateTimeFormat dateTimeFormat = static_cast<DateTimeFormat>(ui.dateFormat->currentIndex());
     bool exportSensorName = ui.exportSensorName->isChecked();
     bool exportTimePoint = ui.exportTimePoint->isChecked();
     bool exportIndex = ui.exportIndex->isChecked();
     bool exportTemperature = ui.exportTemperature->isChecked();
     bool exportHumidity = ui.exportHumidity->isChecked();
-    int unitsFormat = ui.units->currentIndex();
+    UnitsFormat unitsFormat = static_cast<UnitsFormat>(ui.units->currentIndex());
     int decimalPlaces = ui.decimalPlaces->value();
 
     //header
@@ -354,7 +369,7 @@ void MeasurementsWidget::exportData()
         file << "Temperature";
         file << separator;
     }
-    if (unitsFormat == 2) //separate column
+    if (unitsFormat == UnitsFormat::SeparateColumn)
     {
         file << "Temperature Unit";
         file << separator;
@@ -364,7 +379,7 @@ void MeasurementsWidget::exportData()
         file << "Humidity";
         file << separator;
     }
-    if (unitsFormat == 2) //separate column
+    if (unitsFormat == UnitsFormat::SeparateColumn)
     {
         file << "Humidity Unit";
         file << separator;
@@ -393,15 +408,15 @@ void MeasurementsWidget::exportData()
         {
             char buf[128];
             time_t t = DB::Clock::to_time_t(m.descriptor.timePoint);
-            if (dateTimeFormat == 0)
+            if (dateTimeFormat == DateTimeFormat::YYYY_MM_DD_Slash)
             {
                 strftime(buf, 128, "%Y/%m/%d %H:%M:%S", localtime(&t));
             }
-            else if (dateTimeFormat == 1)
+            else if (dateTimeFormat == DateTimeFormat::YYYY_MM_DD_Dash)
             {
                 strftime(buf, 128, "%Y-%m-%d %H:%M:%S", localtime(&t));
             }
-            else if (dateTimeFormat == 2)
+            else if (dateTimeFormat == DateTimeFormat::DD_MM_YYYY_Dash)
             {
                 strftime(buf, 128, "%d-%m-%Y %H:%M:%S", localtime(&t));
             }
@@ -421,13 +436,13 @@ void MeasurementsWidget::exportData()
         if (exportTemperature)
         {
             file << std::fixed << std::setprecision(decimalPlaces) << m.descriptor.temperature;
-            if (unitsFormat == 1) //embedded
+            if (unitsFormat == UnitsFormat::Embedded)
             {
                 file << u8" °C";
             }
             file << separator;
         }
-        if (unitsFormat == 2) //separate column
+        if (unitsFormat == UnitsFormat::SeparateColumn)
         {
             file << u8"°C";
             file << separator;
@@ -435,13 +450,13 @@ void MeasurementsWidget::exportData()
         if (exportHumidity)
         {
             file << std::fixed << std::setprecision(decimalPlaces) << m.descriptor.humidity;
-            if (unitsFormat == 1) //embedded
+            if (unitsFormat == UnitsFormat::Embedded)
             {
                 file << " % RH";
             }
             file << separator;
         }
-        if (unitsFormat == 2) //separate column
+        if (unitsFormat == UnitsFormat::SeparateColumn)
         {
             file << "% RH";
             file << separator;
@@ -486,7 +501,7 @@ void MeasurementsWidget::selectSensors()
         }
     }
 
-    ui.list->setModel(&model);
+    ui.list->setModel(&sortingModel);
     ui.list->setItemDelegate(&delegate);
 
     for (int i = 0; i < model.columnCount(); i++)
