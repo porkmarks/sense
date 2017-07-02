@@ -8,7 +8,7 @@ void __assert_fail(const char *__assertion, const char *__file, unsigned int __l
     bool enter = true;
     if (enter)
     {
-        qt_assert(__assertion, __file, __line);
+        //qt_assert(__assertion, __file, __line);
     }
 }
 

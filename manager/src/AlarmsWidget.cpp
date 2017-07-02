@@ -1,9 +1,4 @@
 #include "AlarmsWidget.h"
-#include "ui_NewAlarmDialog.h"
-
-#include "SensorsModel.h"
-#include "SensorsDelegate.h"
-#include <QSortFilterProxyModel>
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -54,59 +49,131 @@ void AlarmsWidget::shutdown()
 
 //////////////////////////////////////////////////////////////////////////
 
-void AlarmsWidget::addAlarm()
+void AlarmsWidget::prepareAlarmDialog(AlarmDialog& dialog)
 {
-    QDialog dialog;
-    Ui::NewAlarmDialog ui;
-    ui.setupUi(&dialog);
-
-    SensorsModel model(*m_db);
-    model.setShowCheckboxes(true);
-
-    QSortFilterProxyModel sortingModel;
-    sortingModel.setSourceModel(&model);
-
-    SensorsDelegate delegate(sortingModel);
+    dialog.ui.setupUi(&dialog.dialog);
+    dialog.model.setShowCheckboxes(true);
+    dialog.sortingModel.setSourceModel(&dialog.model);
 
     size_t sensorCount = m_db->getSensorCount();
     for (size_t i = 0; i < sensorCount; i++)
     {
-        model.setSensorChecked(m_db->getSensor(i).id, true);
+        dialog.model.setSensorChecked(m_db->getSensor(i).id, true);
     }
 
-    ui.sensorList->setModel(&sortingModel);
-    ui.sensorList->setItemDelegate(&delegate);
+    dialog.ui.sensorList->setModel(&dialog.sortingModel);
+    dialog.ui.sensorList->setItemDelegate(&dialog.delegate);
 
-    for (int i = 0; i < model.columnCount(); i++)
+    for (int i = 0; i < dialog.model.columnCount(); i++)
     {
-        ui.sensorList->header()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
+        dialog.ui.sensorList->header()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
     }
-    ui.sensorList->header()->setStretchLastSection(true);
+    dialog.ui.sensorList->header()->setStretchLastSection(true);
+}
 
+//////////////////////////////////////////////////////////////////////////
 
-    ui.name->setText(QString("Alarm %1").arg(m_db->getAlarmCount()));
+void AlarmsWidget::getAlarmData(DB::AlarmDescriptor& alarm, AlarmDialog const& dialog)
+{
+    alarm.name = dialog.ui.name->text().toUtf8().data();
+
+    alarm.filterSensors = dialog.ui.sensorGroup->isChecked();
+    alarm.sensors.clear();
+    if (alarm.filterSensors)
+    {
+        size_t sensorCount = m_db->getSensorCount();
+        for (size_t i = 0; i < sensorCount; i++)
+        {
+            DB::Sensor const& sensor = m_db->getSensor(i);
+            if (dialog.model.isSensorChecked(sensor.id))
+            {
+                alarm.sensors.push_back(sensor.id);
+            }
+        }
+    }
+
+    alarm.highTemperatureWatch = dialog.ui.highTemperatureWatch->isChecked();
+    alarm.highTemperature = dialog.ui.highTemperature->value();
+    alarm.lowTemperatureWatch = dialog.ui.lowTemperatureWatch->isChecked();
+    alarm.lowTemperature = dialog.ui.lowTemperature->value();
+
+    alarm.highHumidityWatch = dialog.ui.highHumidityWatch->isChecked();
+    alarm.highHumidity = dialog.ui.highHumidity->value();
+    alarm.lowHumidityWatch = dialog.ui.lowHumidityWatch->isChecked();
+    alarm.lowHumidity = dialog.ui.lowHumidity->value();
+
+    alarm.sensorErrorsWatch = dialog.ui.sensorErrorsWatch->isChecked();
+    alarm.lowSignalWatch = dialog.ui.lowSignalWatch->isChecked();
+    alarm.lowVccWatch = dialog.ui.lowBatteryWatch->isChecked();
+
+    alarm.sendEmailAction = dialog.ui.sendEmailAction->isChecked();
+    alarm.emailRecipient = dialog.ui.emailRecipient->text().toUtf8().data();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void AlarmsWidget::setAlarmData(AlarmDialog& dialog, DB::AlarmDescriptor const& alarm)
+{
+    dialog.ui.name->setText(alarm.name.c_str());
+
+    dialog.ui.sensorGroup->setChecked(alarm.filterSensors);
+    if (alarm.filterSensors)
+    {
+        size_t sensorCount = m_db->getSensorCount();
+        for (size_t i = 0; i < sensorCount; i++)
+        {
+            dialog.model.setSensorChecked(m_db->getSensor(i).id, false);
+        }
+
+        for (DB::SensorId id: alarm.sensors)
+        {
+            dialog.model.setSensorChecked(id, true);
+        }
+    }
+    else
+    {
+        size_t sensorCount = m_db->getSensorCount();
+        for (size_t i = 0; i < sensorCount; i++)
+        {
+            dialog.model.setSensorChecked(m_db->getSensor(i).id, true);
+        }
+    }
+
+    dialog.ui.highTemperatureWatch->setChecked(alarm.highTemperatureWatch);
+    dialog.ui.highTemperature->setValue(alarm.highTemperature);
+    dialog.ui.lowTemperatureWatch->setChecked(alarm.lowTemperatureWatch);
+    dialog.ui.lowTemperature->setValue(alarm.lowTemperature);
+
+    dialog.ui.highHumidityWatch->setChecked(alarm.highHumidityWatch);
+    dialog.ui.highHumidity->setValue(alarm.highHumidity);
+    dialog.ui.lowHumidityWatch->setChecked(alarm.lowHumidityWatch);
+    dialog.ui.lowHumidity->setValue(alarm.lowHumidity);
+
+    dialog.ui.sensorErrorsWatch->setChecked(alarm.sensorErrorsWatch);
+    dialog.ui.lowSignalWatch->setChecked(alarm.lowSignalWatch);
+    dialog.ui.lowBatteryWatch->setChecked(alarm.lowVccWatch);
+
+    dialog.ui.sendEmailAction->setChecked(alarm.sendEmailAction);
+    dialog.ui.emailRecipient->setText(alarm.emailRecipient.c_str());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void AlarmsWidget::addAlarm()
+{
+    AlarmDialog dialog(*m_db);
+
+    prepareAlarmDialog(dialog);
+
+    dialog.ui.name->setText(QString("Alarm %1").arg(m_db->getAlarmCount()));
 
     while (1)
     {
-        int result = dialog.exec();
+        int result = dialog.dialog.exec();
         if (result == QDialog::Accepted)
         {
             DB::AlarmDescriptor alarm;
-            alarm.name = ui.name->text().toUtf8().data();
-
-            alarm.filterSensors = ui.sensorGroup->isChecked();
-            alarm.sensors.clear();
-            if (alarm.filterSensors)
-            {
-                for (size_t i = 0; i < sensorCount; i++)
-                {
-                    DB::Sensor const& sensor = m_db->getSensor(i);
-                    if (model.isSensorChecked(sensor.id))
-                    {
-                        alarm.sensors.push_back(sensor.id);
-                    }
-                }
-            }
+            getAlarmData(alarm, dialog);
 
             if (alarm.filterSensors && alarm.sensors.empty())
             {
@@ -114,11 +181,11 @@ void AlarmsWidget::addAlarm()
                 continue;
             }
 
-            if (!ui.highTemperatureWatch->isChecked() && !ui.lowTemperatureWatch->isChecked() &&
-                    !ui.highHumidityWatch->isChecked() && !ui.lowHumidityWatch->isChecked() &&
-                    !ui.sensorErrorsWatch->isChecked() &&
-                    !ui.lowSignalWatch->isChecked() &&
-                    !ui.lowBatteryWatch->isChecked())
+            if (!alarm.highTemperatureWatch && !alarm.lowTemperatureWatch &&
+                    !alarm.highHumidityWatch && !alarm.lowHumidityWatch &&
+                    !alarm.sensorErrorsWatch &&
+                    !alarm.lowSignalWatch &&
+                    !alarm.lowVccWatch)
             {
                 QMessageBox::critical(this, "Error", "You need to specify at least a trigger condition.");
                 continue;
@@ -130,23 +197,6 @@ void AlarmsWidget::addAlarm()
             }
             else
             {
-                alarm.highTemperatureWatch = ui.highTemperatureWatch->isChecked();
-                alarm.highTemperature = ui.highTemperature->value();
-                alarm.lowTemperatureWatch = ui.lowTemperatureWatch->isChecked();
-                alarm.lowTemperature = ui.lowTemperature->value();
-
-                alarm.highHumidityWatch = ui.highHumidityWatch->isChecked();
-                alarm.highHumidity = ui.highHumidity->value();
-                alarm.lowHumidityWatch = ui.lowHumidityWatch->isChecked();
-                alarm.lowHumidity = ui.lowHumidity->value();
-
-                alarm.sensorErrorsWatch = ui.sensorErrorsWatch->isChecked();
-                alarm.lowSignalWatch = ui.lowSignalWatch->isChecked();
-                alarm.lowVccWatch = ui.lowBatteryWatch->isChecked();
-
-                alarm.sendEmailAction = ui.sendEmailAction->isChecked();
-                alarm.emailRecipient = ui.emailRecipient->text().toUtf8().data();
-
                 m_db->addAlarm(alarm);
                 m_model->refresh();
                 break;

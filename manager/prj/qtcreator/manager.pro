@@ -100,7 +100,8 @@ FORMS += \
     ../../src/SensorsWidget.ui \
     ../../src/SensorsFilterDialog.ui \
     ../../src/AlarmsWidget.ui \
-    ../../src/NewAlarmDialog.ui
+    ../../src/AlarmDialog.ui \
+    ../../src/ExportDataDialog.ui
 
 DISTFILES += \
 

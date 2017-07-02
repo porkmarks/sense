@@ -1,4 +1,5 @@
 #include "MeasurementsDelegate.h"
+#include "MeasurementsModel.h"
 
 #include <QWidget>
 #include <QIcon>
@@ -9,9 +10,8 @@ constexpr int32_t k_iconMargin = 4;
 
 //////////////////////////////////////////////////////////////////////////
 
-MeasurementsDelegate::MeasurementsDelegate(MeasurementsModel& sourceModel, QSortFilterProxyModel& proxyModel)
-    : m_sourceModel(sourceModel)
-    , m_proxyModel(proxyModel)
+MeasurementsDelegate::MeasurementsDelegate(QAbstractItemModel& model)
+    : m_model(model)
 {
 }
 
@@ -33,7 +33,7 @@ void MeasurementsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& 
     MeasurementsModel::Column column = static_cast<MeasurementsModel::Column>(index.column());
     if (column == MeasurementsModel::Column::Alarms)
     {
-        uint8_t triggeredAlarms = m_proxyModel.data(index).toUInt();
+        uint8_t triggeredAlarms = m_model.data(index).toUInt();
 
         QApplication::style()->drawControl(QStyle::CE_ItemViewItem, &option, painter);
 
@@ -77,7 +77,7 @@ void MeasurementsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& 
     }
     else if (column == MeasurementsModel::Column::SensorErrors)
     {
-        uint8_t sensorErrors = m_proxyModel.data(index).toUInt();
+        uint8_t sensorErrors = m_model.data(index).toUInt();
 
         QApplication::style()->drawControl(QStyle::CE_ItemViewItem, &option, painter);
 
@@ -117,7 +117,7 @@ QSize MeasurementsDelegate::sizeHint(const QStyleOptionViewItem& option, const Q
     MeasurementsModel::Column column = static_cast<MeasurementsModel::Column>(index.column());
     if (column == MeasurementsModel::Column::Alarms)
     {
-        uint8_t triggeredAlarms = m_proxyModel.data(index).toUInt();
+        uint8_t triggeredAlarms = m_model.data(index).toUInt();
 
         int32_t width = 0;
         if (triggeredAlarms & DB::TriggeredAlarm::Temperature)
@@ -145,7 +145,7 @@ QSize MeasurementsDelegate::sizeHint(const QStyleOptionViewItem& option, const Q
     }
     else if (column == MeasurementsModel::Column::SensorErrors)
     {
-        uint8_t sensorErrors = m_proxyModel.data(index).toUInt();
+        uint8_t sensorErrors = m_model.data(index).toUInt();
 
         int32_t width = 0;
         if (sensorErrors & DB::SensorErrors::Comms)

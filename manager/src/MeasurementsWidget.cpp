@@ -1,12 +1,20 @@
 #include "MeasurementsWidget.h"
 #include <iostream>
 #include <QDateTime>
+#include <QFileDialog>
+#include <QMessageBox>
 
 #include "SensorsModel.h"
 #include "SensorsDelegate.h"
 #include <QSortFilterProxyModel>
 
 #include "ui_SensorsFilterDialog.h"
+#include "ui_ExportDataDialog.h"
+
+#include <fstream>
+#include <iostream>
+#include <iomanip>
+#include <cstring>
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -35,7 +43,7 @@ void MeasurementsWidget::init(DB& db)
     m_sortingModel.setSourceModel(m_model.get());
     m_sortingModel.setSortRole(Qt::UserRole + 5);
 
-    m_delegate.reset(new MeasurementsDelegate(*m_model, m_sortingModel));
+    m_delegate.reset(new MeasurementsDelegate(m_sortingModel));
 
     m_ui.list->setModel(&m_sortingModel);
     m_ui.list->setItemDelegate(m_delegate.get());
@@ -79,6 +87,7 @@ void MeasurementsWidget::init(DB& db)
     connect(m_ui.thisWeek, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisWeek);
     connect(m_ui.thisMonth, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisMonth);
     connect(m_ui.selectSensors, &QPushButton::released, this, &MeasurementsWidget::selectSensors);
+    connect(m_ui.exportData, &QPushButton::released, this, &MeasurementsWidget::exportData);
 
     connect(m_ui.minDateTime, &QDateTimeEdit::dateTimeChanged, this, &MeasurementsWidget::minDateTimeChanged);
     connect(m_ui.maxDateTime, &QDateTimeEdit::dateTimeChanged, this, &MeasurementsWidget::maxDateTimeChanged);
@@ -120,7 +129,7 @@ DB::Filter MeasurementsWidget::createFilter() const
         filter.sensorIds = m_selectedSensorIds;
     }
 
-    filter.useTimePointFilter = true;
+    filter.useTimePointFilter = m_ui.dateTimeFilter->isChecked();
     filter.timePointFilter.min = DB::Clock::from_time_t(m_ui.minDateTime->dateTime().toTime_t());
     filter.timePointFilter.max = DB::Clock::from_time_t(m_ui.maxDateTime->dateTime().toTime_t());
 
@@ -142,12 +151,14 @@ void MeasurementsWidget::refreshFromDB()
     DB::Filter filter = createFilter();
     m_model->setFilter(filter);
 
-    m_ui.resultCount->setText(QString("%1 results.").arg(m_model->getMeasurementCount()));
+    m_ui.resultCount->setText(QString("%1 out of %2 results.").arg(m_model->getMeasurementCount()).arg(m_db->getAllMeasurementCount()));
 
     for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
     {
         m_ui.list->resizeColumnToContents(i);
     }
+
+    m_ui.exportData->setEnabled(m_model->getMeasurementCount() > 0);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -281,6 +292,166 @@ void MeasurementsWidget::maxHumidityChanged()
         value = std::max(value - 1.0, m_ui.minHumidity->minimum());
         m_ui.minHumidity->setValue(value);
     }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsWidget::exportData()
+{
+    QDialog dialog;
+    Ui::ExportDataDialog ui;
+    ui.setupUi(&dialog);
+
+    int result = dialog.exec();
+    if (result != QDialog::Accepted)
+    {
+        return;
+    }
+
+    std::string separator = ui.separator->text().toUtf8().data();
+    QString extension = "Export Files (*.csv)";
+
+    QString fileName = QFileDialog::getSaveFileName(this, "Select export file", QString(), extension);
+    if (fileName.isEmpty())
+    {
+        return;
+    }
+
+    std::ofstream file(fileName.toUtf8().data());
+    if (!file.is_open())
+    {
+        QMessageBox::critical(this, "Error", QString("Cannot open file '%1' for writing:\n%2").arg(fileName).arg(std::strerror(errno)));
+        return;
+    }
+
+    int dateTimeFormat = ui.dateFormat->currentIndex();
+    bool exportSensorName = ui.exportSensorName->isChecked();
+    bool exportTimePoint = ui.exportTimePoint->isChecked();
+    bool exportIndex = ui.exportIndex->isChecked();
+    bool exportTemperature = ui.exportTemperature->isChecked();
+    bool exportHumidity = ui.exportHumidity->isChecked();
+    int unitsFormat = ui.units->currentIndex();
+    int decimalPlaces = ui.decimalPlaces->value();
+
+    //header
+    if (exportSensorName)
+    {
+        file << "Sensor Name";
+        file << separator;
+    }
+    if (exportTimePoint)
+    {
+        file << "Date/Time";
+        file << separator;
+    }
+    if (exportIndex)
+    {
+        file << "Index";
+        file << separator;
+    }
+    if (exportTemperature)
+    {
+        file << "Temperature";
+        file << separator;
+    }
+    if (unitsFormat == 2) //separate column
+    {
+        file << "Temperature Unit";
+        file << separator;
+    }
+    if (exportHumidity)
+    {
+        file << "Humidity";
+        file << separator;
+    }
+    if (unitsFormat == 2) //separate column
+    {
+        file << "Humidity Unit";
+        file << separator;
+    }
+    file << std::endl;
+
+    //data
+    size_t size = m_model->getMeasurementCount();
+    for (size_t i = 0; i < size; i++)
+    {
+        DB::Measurement const& m = m_model->getMeasurement(i);
+        if (exportSensorName)
+        {
+            int32_t sensorIndex = m_db->findSensorIndexById(m.descriptor.sensorId);
+            if (sensorIndex < 0)
+            {
+                file << "N/A";
+            }
+            else
+            {
+                file << m_db->getSensor(sensorIndex).descriptor.name;
+            }
+            file << separator;
+        }
+        if (exportTimePoint)
+        {
+            char buf[128];
+            time_t t = DB::Clock::to_time_t(m.descriptor.timePoint);
+            if (dateTimeFormat == 0)
+            {
+                strftime(buf, 128, "%Y/%m/%d %H:%M:%S", localtime(&t));
+            }
+            else if (dateTimeFormat == 1)
+            {
+                strftime(buf, 128, "%Y-%m-%d %H:%M:%S", localtime(&t));
+            }
+            else if (dateTimeFormat == 2)
+            {
+                strftime(buf, 128, "%d-%m-%Y %H:%M:%S", localtime(&t));
+            }
+            else
+            {
+                strftime(buf, 128, "%m/%d/%y %H:%M:%S", localtime(&t));
+            }
+
+            file << buf;
+            file << separator;
+        }
+        if (exportIndex)
+        {
+            file << m.descriptor.index;
+            file << separator;
+        }
+        if (exportTemperature)
+        {
+            file << std::fixed << std::setprecision(decimalPlaces) << m.descriptor.temperature;
+            if (unitsFormat == 1) //embedded
+            {
+                file << u8" °C";
+            }
+            file << separator;
+        }
+        if (unitsFormat == 2) //separate column
+        {
+            file << u8"°C";
+            file << separator;
+        }
+        if (exportHumidity)
+        {
+            file << std::fixed << std::setprecision(decimalPlaces) << m.descriptor.humidity;
+            if (unitsFormat == 1) //embedded
+            {
+                file << " % RH";
+            }
+            file << separator;
+        }
+        if (unitsFormat == 2) //separate column
+        {
+            file << "% RH";
+            file << separator;
+        }
+        file << std::endl;
+    }
+
+    file.close();
+
+    QMessageBox::information(this, "Success", QString("Data was exported to file '%1'").arg(fileName));
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -27,6 +27,7 @@ private slots:
     void setDateTimeThisWeek();
     void setDateTimeThisMonth();
     void selectSensors();
+    void exportData();
 
     void minDateTimeChanged(QDateTime const& value);
     void maxDateTimeChanged(QDateTime const& value);
