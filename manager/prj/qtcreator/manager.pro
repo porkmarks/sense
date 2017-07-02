@@ -71,7 +71,9 @@ HEADERS += \
     ../../src/SensorsModel.h \
     ../../src/AlarmsModel.h \
     ../../src/MeasurementsModel.h \
-    ../../src/DB.h
+    ../../src/DB.h \
+    ../../src/MeasurementsDelegate.h \
+    ../../src/SensorsDelegate.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -86,7 +88,9 @@ SOURCES += \
     ../../src/SensorsWidget.cpp \
     ../../src/SensorsModel.cpp \
     ../../src/AlarmsModel.cpp \
-    ../../src/MeasurementsModel.cpp
+    ../../src/MeasurementsModel.cpp \
+    ../../src/MeasurementsDelegate.cpp \
+    ../../src/SensorsDelegate.cpp
 
 FORMS += \
     ../../src/Manager.ui \

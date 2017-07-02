@@ -3,6 +3,9 @@
 #include <QDateTime>
 
 #include "SensorsModel.h"
+#include "SensorsDelegate.h"
+#include <QSortFilterProxyModel>
+
 #include "ui_SensorsFilterDialog.h"
 
 //////////////////////////////////////////////////////////////////////////
@@ -32,8 +35,10 @@ void MeasurementsWidget::init(DB& db)
     m_sortingModel.setSourceModel(m_model.get());
     m_sortingModel.setSortRole(Qt::UserRole + 5);
 
+    m_delegate.reset(new MeasurementsDelegate(*m_model, m_sortingModel));
+
     m_ui.list->setModel(&m_sortingModel);
-    m_ui.list->setItemDelegate(m_model.get());
+    m_ui.list->setItemDelegate(m_delegate.get());
 
     m_ui.list->setUniformRowHeights(true);
 
@@ -67,27 +72,27 @@ void MeasurementsWidget::init(DB& db)
 
     refreshFromDB();
 
-    QObject::connect(m_ui.apply, &QPushButton::released, this, &MeasurementsWidget::refreshFromDB);
-    QObject::connect(m_ui.minDateTimeNow, &QPushButton::released, this, &MeasurementsWidget::setMinDateTimeNow);
-    QObject::connect(m_ui.maxDateTimeNow, &QPushButton::released, this, &MeasurementsWidget::setMaxDateTimeNow);
-    QObject::connect(m_ui.thisDay, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisDay);
-    QObject::connect(m_ui.thisWeek, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisWeek);
-    QObject::connect(m_ui.thisMonth, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisMonth);
-    QObject::connect(m_ui.selectSensors, &QPushButton::released, this, &MeasurementsWidget::selectSensors);
+    connect(m_ui.apply, &QPushButton::released, this, &MeasurementsWidget::refreshFromDB);
+    connect(m_ui.minDateTimeNow, &QPushButton::released, this, &MeasurementsWidget::setMinDateTimeNow);
+    connect(m_ui.maxDateTimeNow, &QPushButton::released, this, &MeasurementsWidget::setMaxDateTimeNow);
+    connect(m_ui.thisDay, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisDay);
+    connect(m_ui.thisWeek, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisWeek);
+    connect(m_ui.thisMonth, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisMonth);
+    connect(m_ui.selectSensors, &QPushButton::released, this, &MeasurementsWidget::selectSensors);
 
-    QObject::connect(m_ui.minDateTime, &QDateTimeEdit::dateTimeChanged, this, &MeasurementsWidget::minDateTimeChanged);
-    QObject::connect(m_ui.maxDateTime, &QDateTimeEdit::dateTimeChanged, this, &MeasurementsWidget::maxDateTimeChanged);
+    connect(m_ui.minDateTime, &QDateTimeEdit::dateTimeChanged, this, &MeasurementsWidget::minDateTimeChanged);
+    connect(m_ui.maxDateTime, &QDateTimeEdit::dateTimeChanged, this, &MeasurementsWidget::maxDateTimeChanged);
 
-    QObject::connect(m_ui.minTemperature, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::minTemperatureChanged);
-    QObject::connect(m_ui.maxTemperature, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::maxTemperatureChanged);
+    connect(m_ui.minTemperature, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::minTemperatureChanged);
+    connect(m_ui.maxTemperature, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::maxTemperatureChanged);
 
-    QObject::connect(m_ui.minHumidity, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::minHumidityChanged);
-    QObject::connect(m_ui.maxHumidity, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::maxHumidityChanged);
-//    QObject::connect(m_ui.minTemperature, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &MeasurementsWidget::minTemperatureChanged);
-//    QObject::connect(m_ui.maxTemperature, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &MeasurementsWidget::maxTemperatureChanged);
+    connect(m_ui.minHumidity, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::minHumidityChanged);
+    connect(m_ui.maxHumidity, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::maxHumidityChanged);
+//    connect(m_ui.minTemperature, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &MeasurementsWidget::minTemperatureChanged);
+//    connect(m_ui.maxTemperature, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &MeasurementsWidget::maxTemperatureChanged);
 
-//    QObject::connect(m_ui.minHumidity, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &MeasurementsWidget::minHumidityChanged);
-//    QObject::connect(m_ui.maxHumidity, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &MeasurementsWidget::maxHumidityChanged);
+//    connect(m_ui.minHumidity, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &MeasurementsWidget::minHumidityChanged);
+//    connect(m_ui.maxHumidity, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &MeasurementsWidget::maxHumidityChanged);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -99,6 +104,7 @@ void MeasurementsWidget::shutdown()
     m_ui.list->setItemDelegate(nullptr);
     m_sortingModel.setSourceModel(nullptr);
     m_model.reset();
+    m_delegate.reset();
     m_db = nullptr;
 }
 
@@ -288,6 +294,11 @@ void MeasurementsWidget::selectSensors()
     SensorsModel model(*m_db);
     model.setShowCheckboxes(true);
 
+    QSortFilterProxyModel sortingModel;
+    sortingModel.setSourceModel(&model);
+
+    SensorsDelegate delegate(sortingModel);
+
     size_t sensorCount = m_db->getSensorCount();
     if (m_selectedSensorIds.empty())
     {
@@ -305,7 +316,13 @@ void MeasurementsWidget::selectSensors()
     }
 
     ui.list->setModel(&model);
-    ui.list->setItemDelegate(&model);
+    ui.list->setItemDelegate(&delegate);
+
+    for (int i = 0; i < model.columnCount(); i++)
+    {
+        ui.list->header()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
+    }
+    ui.list->header()->setStretchLastSection(true);
 
     int result = dialog.exec();
     if (result == QDialog::Accepted)

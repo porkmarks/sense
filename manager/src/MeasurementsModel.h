@@ -7,7 +7,7 @@
 
 #include "DB.h"
 
-class MeasurementsModel : public QAbstractItemModel, public QStyledItemDelegate
+class MeasurementsModel : public QAbstractItemModel
 {
 public:
 
@@ -16,11 +16,25 @@ public:
 
     void setFilter(DB::Filter const& filter);
     void refresh();
+
     size_t getMeasurementCount() const;
+    DB::Measurement const& getMeasurement(size_t index) const;
 
+    enum class Column
+    {
+        Sensor,
+        Index,
+        Timestamp,
+        Temperature,
+        Humidity,
+        Battery,
+        Signal,
+        SensorErrors,
+        Alarms
+    };
+
+public:
     virtual QModelIndex parent(QModelIndex const& index) const;
-
-public: //signals
     virtual QModelIndex index(int row, int column, QModelIndex const& parent = QModelIndex()) const;
 
     virtual int rowCount(QModelIndex const& parent = QModelIndex()) const;
@@ -41,9 +55,6 @@ protected:
     virtual bool removeRows(int position, int rows, QModelIndex const& parent = QModelIndex());
 
 private:
-    void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
-    QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override;
-
     DB& m_db;
     DB::Filter m_filter;
     std::vector<DB::Measurement> m_measurements;

@@ -25,10 +25,10 @@ SensorsWidget::SensorsWidget(QWidget *parent)
 //    m_ui.list->header()->setSectionResizeMode(8, QHeaderView::ResizeToContents);
 //    m_ui.list->header()->setSectionResizeMode(9, QHeaderView::Stretch);
 
-    //QObject::connect(m_ui.list, &QTreeView::doubleClicked, this, &BaseStationsWidget::activateBaseStation);
+    //connect(m_ui.list, &QTreeView::doubleClicked, this, &BaseStationsWidget::activateBaseStation);
 
-    QObject::connect(m_ui.add, &QPushButton::released, this, &SensorsWidget::bindSensor);
-    QObject::connect(m_ui.remove, &QPushButton::released, this, &SensorsWidget::unbindSensor);
+    connect(m_ui.add, &QPushButton::released, this, &SensorsWidget::bindSensor);
+    connect(m_ui.remove, &QPushButton::released, this, &SensorsWidget::unbindSensor);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -45,8 +45,11 @@ void SensorsWidget::init(DB& db)
     setEnabled(true);
     m_db = &db;
     m_model.reset(new SensorsModel(db));
-    m_ui.list->setModel(m_model.get());
-    m_ui.list->setItemDelegate(m_model.get());
+    m_sortingModel.setSourceModel(m_model.get());
+    m_delegate.reset(new SensorsDelegate(m_sortingModel));
+
+    m_ui.list->setModel(&m_sortingModel);
+    m_ui.list->setItemDelegate(m_delegate.get());
 
     for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
     {
@@ -61,7 +64,9 @@ void SensorsWidget::shutdown()
     setEnabled(false);
     m_ui.list->setModel(nullptr);
     m_ui.list->setItemDelegate(nullptr);
+    m_sortingModel.setSourceModel(nullptr);
     m_model.reset();
+    m_delegate.reset();
 }
 
 //////////////////////////////////////////////////////////////////////////

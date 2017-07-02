@@ -17,7 +17,7 @@ BaseStationsWidget::BaseStationsWidget(QWidget *parent)
     m_ui.list->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
     m_ui.list->header()->setSectionResizeMode(2, QHeaderView::Stretch);
 
-    QObject::connect(m_ui.list, &QTreeView::doubleClicked, this, &BaseStationsWidget::activateBaseStation);
+    connect(m_ui.list, &QTreeView::doubleClicked, this, &BaseStationsWidget::activateBaseStation);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -35,8 +35,8 @@ void BaseStationsWidget::init(Comms& comms)
 {
     m_comms = &comms;
 
-    QObject::connect(m_comms, &Comms::baseStationDiscovered, this, &BaseStationsWidget::baseStationDiscovered);
-    QObject::connect(m_comms, &Comms::baseStationDisconnected, this, &BaseStationsWidget::baseStationDisconnected);
+    connect(m_comms, &Comms::baseStationDiscovered, this, &BaseStationsWidget::baseStationDiscovered);
+    connect(m_comms, &Comms::baseStationDisconnected, this, &BaseStationsWidget::baseStationDisconnected);
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -14,7 +14,7 @@ Comms::Comms()
 {
     m_broadcastSocket.bind(5555, QUdpSocket::ShareAddress);
 
-    QObject::connect(&m_broadcastSocket, &QUdpSocket::readyRead, this, &Comms::broadcastReceived);
+    connect(&m_broadcastSocket, &QUdpSocket::readyRead, this, &Comms::broadcastReceived);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -69,13 +69,13 @@ bool Comms::connectToBaseStation(DB& db, QHostAddress const& address)
     std::unique_ptr<ConnectedBaseStation> cbs(cbsPtr);
     m_connectedBaseStations.push_back(std::move(cbs));
 
-    QObject::connect(&cbsPtr->socketAdapter.getSocket(), &QTcpSocket::connected, [this, cbsPtr]() { connectedToBaseStation(cbsPtr); });
-    QObject::connect(&cbsPtr->socketAdapter.getSocket(), &QTcpSocket::disconnected, [this, cbsPtr]() { disconnectedFromBaseStation(cbsPtr); });
+    connect(&cbsPtr->socketAdapter.getSocket(), &QTcpSocket::connected, [this, cbsPtr]() { connectedToBaseStation(cbsPtr); });
+    connect(&cbsPtr->socketAdapter.getSocket(), &QTcpSocket::disconnected, [this, cbsPtr]() { disconnectedFromBaseStation(cbsPtr); });
 
-    QObject::connect(&db, &DB::configChanged, [this, cbsPtr]() { sendConfig(*cbsPtr); });
-    QObject::connect(&db, &DB::sensorAdded, [this, cbsPtr](DB::SensorId id) { requestBindSensor(*cbsPtr, id); });
-    QObject::connect(&db, &DB::sensorChanged, [this, cbsPtr](DB::SensorId) { sendSensors(*cbsPtr); });
-    QObject::connect(&db, &DB::sensorRemoved, [this, cbsPtr](DB::SensorId) { sendSensors(*cbsPtr); });
+    connect(&db, &DB::configChanged, [this, cbsPtr]() { sendConfig(*cbsPtr); });
+    connect(&db, &DB::sensorAdded, [this, cbsPtr](DB::SensorId id) { requestBindSensor(*cbsPtr, id); });
+    connect(&db, &DB::sensorChanged, [this, cbsPtr](DB::SensorId) { sendSensors(*cbsPtr); });
+    connect(&db, &DB::sensorRemoved, [this, cbsPtr](DB::SensorId) { sendSensors(*cbsPtr); });
 
     cbsPtr->socketAdapter.getSocket().disconnectFromHost();
     cbsPtr->socketAdapter.getSocket().connectToHost(address, 4444);

@@ -7,7 +7,7 @@
 
 #include "DB.h"
 
-class SensorsModel : public QAbstractItemModel, public QStyledItemDelegate
+class SensorsModel : public QAbstractItemModel
 {
 public:
     SensorsModel(DB& db);
@@ -17,9 +17,27 @@ public:
     void setSensorChecked(DB::SensorId id, bool checked);
     bool isSensorChecked(DB::SensorId id) const;
 
-    virtual QModelIndex parent(QModelIndex const& index) const;
+    enum class Column
+    {
+        Name,
+        Id,
+        Address,
+        Temperature,
+        Humidity,
+        Battery,
+        Signal,
+        State,
+        NextMeasurement,
+        NextComms,
+        SensorErrors,
+        Alarms
+    };
 
-public: //signals
+    size_t getSensorCount() const;
+    DB::Sensor const& getSensor(size_t index) const;
+
+public:
+    virtual QModelIndex parent(QModelIndex const& index) const;
     virtual QModelIndex index(int row, int column, QModelIndex const& parent = QModelIndex()) const;
 
     virtual int rowCount(QModelIndex const& parent = QModelIndex()) const;
@@ -48,9 +66,6 @@ protected:
     virtual bool removeRows(int position, int rows, QModelIndex const& parent = QModelIndex());
 
 private:
-    void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
-    QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override;
-
     DB& m_db;
 
     bool m_showCheckboxes = false;

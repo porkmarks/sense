@@ -219,6 +219,7 @@ bool DB::open(std::string const& name)
                 }
                 sensor.nextCommsTimePoint = Clock::time_point(std::chrono::seconds(it->value.GetUint64()));
 
+                data.lastSensorId = std::max(data.lastSensorId, sensor.id);
                 data.sensors.push_back(sensor);
             }
         }
@@ -389,6 +390,7 @@ bool DB::open(std::string const& name)
                 }
                 alarm.descriptor.emailRecipient = it->value.GetString();
 
+                data.lastAlarmId = std::max(data.lastAlarmId, alarm.id);
                 data.alarms.push_back(alarm);
             }
         }
@@ -622,7 +624,7 @@ bool DB::addSensor(SensorDescriptor const& descriptor)
     {
         Sensor sensor;
         sensor.descriptor.name = descriptor.name;
-        sensor.id = ++m_lastSensorId;
+        sensor.id = ++m_mainData.lastSensorId;
         sensor.state = Sensor::State::Unbound;
 
         emit sensorWillBeAdded(sensor.id);
@@ -809,7 +811,7 @@ bool DB::addAlarm(AlarmDescriptor const& descriptor)
         alarm.descriptor.sensors.clear();
     }
 
-    alarm.id = ++m_lastAlarmId;
+    alarm.id = ++m_mainData.lastAlarmId;
 
     emit alarmWillBeAdded(alarm.id);
     m_mainData.alarms.push_back(alarm);

@@ -246,9 +246,6 @@ signals:
 private:
     Clock::time_point computeBaselineTimePoint(Config const& oldConfig, ConfigDescriptor const& newDescriptor);
 
-    SensorId m_lastSensorId = 0;
-    AlarmId m_lastAlarmId = 0;
-
     bool cull(Measurement const& measurement, Filter const& filter) const;
 
 #pragma pack(push, 1) // exact fit - no padding
@@ -284,6 +281,8 @@ private:
         std::vector<Sensor> sensors;
         std::vector<Alarm> alarms;
         std::map<SensorId, StoredMeasurements> measurements;
+        SensorId lastSensorId = 0;
+        AlarmId lastAlarmId = 0;
     };
 
     Data m_mainData;

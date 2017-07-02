@@ -1,6 +1,9 @@
 #include "AlarmsWidget.h"
 #include "ui_NewAlarmDialog.h"
+
 #include "SensorsModel.h"
+#include "SensorsDelegate.h"
+#include <QSortFilterProxyModel>
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -11,8 +14,8 @@ AlarmsWidget::AlarmsWidget(QWidget *parent)
     m_ui.setupUi(this);
     setEnabled(false);
 
-    QObject::connect(m_ui.add, &QPushButton::released, this, &AlarmsWidget::addAlarm);
-    QObject::connect(m_ui.remove, &QPushButton::released, this, &AlarmsWidget::removeAlarms);
+    connect(m_ui.add, &QPushButton::released, this, &AlarmsWidget::addAlarm);
+    connect(m_ui.remove, &QPushButton::released, this, &AlarmsWidget::removeAlarms);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -60,14 +63,26 @@ void AlarmsWidget::addAlarm()
     SensorsModel model(*m_db);
     model.setShowCheckboxes(true);
 
+    QSortFilterProxyModel sortingModel;
+    sortingModel.setSourceModel(&model);
+
+    SensorsDelegate delegate(sortingModel);
+
     size_t sensorCount = m_db->getSensorCount();
     for (size_t i = 0; i < sensorCount; i++)
     {
         model.setSensorChecked(m_db->getSensor(i).id, true);
     }
 
-    ui.sensorList->setModel(&model);
-    ui.sensorList->setItemDelegate(&model);
+    ui.sensorList->setModel(&sortingModel);
+    ui.sensorList->setItemDelegate(&delegate);
+
+    for (int i = 0; i < model.columnCount(); i++)
+    {
+        ui.sensorList->header()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
+    }
+    ui.sensorList->header()->setStretchLastSection(true);
+
 
     ui.name->setText(QString("Alarm %1").arg(m_db->getAlarmCount()));
 

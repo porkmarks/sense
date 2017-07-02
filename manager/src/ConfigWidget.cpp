@@ -8,8 +8,8 @@ ConfigWidget::ConfigWidget(QWidget *parent)
     m_ui.setupUi(this);
     setEnabled(false);
 
-    QObject::connect(m_ui.reset, &QPushButton::released, this, &ConfigWidget::resetConfig);
-    QObject::connect(m_ui.apply, &QPushButton::released, this, &ConfigWidget::applyConfig);
+    connect(m_ui.reset, &QPushButton::released, this, &ConfigWidget::resetConfig);
+    connect(m_ui.apply, &QPushButton::released, this, &ConfigWidget::applyConfig);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -29,7 +29,7 @@ void ConfigWidget::init(DB& db)
     m_receivedConfig = m_db->getConfig();
     showConfig(m_receivedConfig);
 
-    QObject::connect(m_db, &DB::configChanged, this, &ConfigWidget::configChanged);
+    connect(m_db, &DB::configChanged, this, &ConfigWidget::configChanged);
 }
 
 //////////////////////////////////////////////////////////////////////////
