@@ -136,21 +136,17 @@ static_assert(sizeof(Pair_Response) == 4, "");
 
 enum class Server_Message
 {
-    GET_CONFIG_REQ,
-    GET_CONFIG_RES,
-    SET_CONFIG_REQ,
-    SET_CONFIG_RES,
-    GET_SENSORS_REQ,
-    GET_SENSORS_RES,
-    ADD_SENSOR_REQ,
-    ADD_SENSOR_RES,
-    REMOVE_SENSOR_REQ,
-    REMOVE_SENSOR_RES,
-    REPORT_MEASUREMENT_REQ,
-    REPORT_MEASUREMENT_RES,
-    SENSOR_BOUND_REQ,
-    SENSOR_BOUND_RES,
-    POWER_OFF_REQ,
+    SET_CONFIG_REQ,         //manager
+    SET_CONFIG_RES,         //base station
+    SET_SENSORS_REQ,        //manager
+    SET_SENSORS_RES,        //base station
+    ADD_SENSOR_REQ,         //manager
+    ADD_SENSOR_RES,         //base station
+    REPORT_MEASUREMENT_REQ, //base station
+    REPORT_MEASUREMENT_RES, //manager
+    SENSOR_BOUND_REQ,       //base station
+    SENSOR_BOUND_RES,       //manager
+    POWER_OFF_REQ,          //manager
 };
 
 
