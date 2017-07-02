@@ -467,7 +467,7 @@ bool DB::open(std::string const& name)
             {
                 StoredMeasurement const& sm = *it;
                 Measurement measurement = unpack(sensorId, sm);
-                PrimaryKey pk = computePrimaryKey(measurement);
+                PrimaryKey pk = computePrimaryKey(measurement.descriptor);
 
                 //check for duplicates
                 auto lbit = std::lower_bound(m_sortedPrimaryKeys.begin(), m_sortedPrimaryKeys.end(), pk);
@@ -490,19 +490,6 @@ bool DB::open(std::string const& name)
     }
 
     m_mainData = data;
-
-    //refresh the sensor triggered alarms
-    for (Sensor& sensor: m_mainData.sensors)
-    {
-        if (sensor.isLastMeasurementValid)
-        {
-            sensor.triggeredAlarms = computeTriggeredAlarm(sensor.lastMeasurement);
-        }
-        else
-        {
-            sensor.triggeredAlarms = 0;
-        }
-    }
 
     std::cout << "Time to load DB:" << std::chrono::duration<float>(Clock::now() - start).count() << "s\n";
     std::cout.flush();
@@ -591,7 +578,7 @@ DB::Clock::time_point DB::computeBaselineTimePoint(Config const& oldconfig, Conf
         }
 
         Measurement m = unpack(pair.first, pair.second.back());
-        Clock::time_point tp = m.timePoint - m.index * newDescriptor.measurementPeriod;
+        Clock::time_point tp = m.descriptor.timePoint - m.descriptor.index * newDescriptor.measurementPeriod;
         if (!found)
         {
             found = true;
@@ -861,48 +848,48 @@ int32_t DB::findAlarmIndexByName(std::string const& name) const
 
 //////////////////////////////////////////////////////////////////////////
 
-uint8_t DB::computeTriggeredAlarm(Measurement const& measurement) const
+uint8_t DB::computeTriggeredAlarm(MeasurementDescriptor const& md) const
 {
     uint8_t triggered = 0;
 
     for (Alarm const& alarm: m_mainData.alarms)
     {
-        AlarmDescriptor const& descriptor = alarm.descriptor;
-        if (descriptor.filterSensors)
+        AlarmDescriptor const& ad = alarm.descriptor;
+        if (ad.filterSensors)
         {
-            if (std::find(descriptor.sensors.begin(), descriptor.sensors.end(), measurement.sensorId) == descriptor.sensors.end())
+            if (std::find(ad.sensors.begin(), ad.sensors.end(), md.sensorId) == ad.sensors.end())
             {
                 continue;
             }
         }
 
-        if (descriptor.highTemperatureWatch && measurement.temperature > descriptor.highTemperature)
+        if (ad.highTemperatureWatch && md.temperature > ad.highTemperature)
         {
             triggered |= TriggeredAlarm::Temperature;
         }
-        if (descriptor.lowTemperatureWatch && measurement.temperature < descriptor.lowTemperature)
+        if (ad.lowTemperatureWatch && md.temperature < ad.lowTemperature)
         {
             triggered |= TriggeredAlarm::Temperature;
         }
 
-        if (descriptor.highHumidityWatch && measurement.humidity > descriptor.highHumidity)
+        if (ad.highHumidityWatch && md.humidity > ad.highHumidity)
         {
             triggered |= TriggeredAlarm::Humidity;
         }
-        if (descriptor.lowHumidityWatch && measurement.humidity < descriptor.lowHumidity)
+        if (ad.lowHumidityWatch && md.humidity < ad.lowHumidity)
         {
             triggered |= TriggeredAlarm::Humidity;
         }
 
-        if (descriptor.lowVccWatch && measurement.vcc <= k_alertVcc)
+        if (ad.lowVccWatch && md.vcc <= k_alertVcc)
         {
             triggered |= TriggeredAlarm::LowVcc;
         }
-        if (descriptor.sensorErrorsWatch && measurement.sensorErrors != 0)
+        if (ad.sensorErrorsWatch && md.sensorErrors != 0)
         {
             triggered |= TriggeredAlarm::SensorErrors;
         }
-        if (descriptor.lowSignalWatch && std::min(measurement.s2b, measurement.b2s) <= k_alertSignal)
+        if (ad.lowSignalWatch && std::min(md.s2b, md.b2s) <= k_alertSignal)
         {
             triggered |= TriggeredAlarm::LowSignal;
         }
@@ -913,41 +900,16 @@ uint8_t DB::computeTriggeredAlarm(Measurement const& measurement) const
 
 //////////////////////////////////////////////////////////////////////////
 
-uint8_t DB::computeTriggeredAlarm(SensorId sensorId) const
+bool DB::addMeasurement(MeasurementDescriptor const& md)
 {
-    uint8_t triggered = 0;
-
-    auto it = m_mainData.measurements.find(sensorId);
-    if (it == m_mainData.measurements.end())
-    {
-        return triggered;
-    }
-
-    for (StoredMeasurement const& sm: it->second)
-    {
-        Measurement m = unpack(sensorId, sm);
-        triggered |= computeTriggeredAlarm(m);
-        if ((triggered & TriggeredAlarm::All) == TriggeredAlarm::All)
-        {
-            return triggered;
-        }
-    }
-
-    return triggered;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-bool DB::addMeasurement(Measurement const& measurement)
-{
-    int32_t sensorIndex = findSensorIndexById(measurement.sensorId);
+    int32_t sensorIndex = findSensorIndexById(md.sensorId);
     if (sensorIndex < 0)
     {
         assert(false);
         return false;
     }
 
-    PrimaryKey pk = computePrimaryKey(measurement);
+    PrimaryKey pk = computePrimaryKey(md);
 
     //check for duplicates
     auto it = std::lower_bound(m_sortedPrimaryKeys.begin(), m_sortedPrimaryKeys.end(), pk);
@@ -956,15 +918,18 @@ bool DB::addMeasurement(Measurement const& measurement)
         return true;
     }
 
-    emit measurementsWillBeAdded(measurement.sensorId);
-    m_mainData.measurements[measurement.sensorId].push_back(pack(measurement));
+    Measurement measurement;
+    measurement.descriptor = md;
+    measurement.triggeredAlarms = computeTriggeredAlarm(md);
+
+    emit measurementsWillBeAdded(md.sensorId);
+    m_mainData.measurements[md.sensorId].push_back(pack(measurement));
     m_sortedPrimaryKeys.insert(it, pk);
-    emit measurementsAdded(measurement.sensorId);
+    emit measurementsAdded(md.sensorId);
 
     Sensor& sensor = m_mainData.sensors[sensorIndex];
     sensor.isLastMeasurementValid = true;
     sensor.lastMeasurement = measurement;
-    sensor.triggeredAlarms = computeTriggeredAlarm(measurement);
 
     emit sensorDataChanged(sensor.id);
 
@@ -1057,10 +1022,10 @@ bool DB::getLastMeasurementForSensor(SensorId sensor_id, Measurement& measuremen
     for (StoredMeasurement const& sm: it->second)
     {
         Measurement m = unpack(sensor_id, sm);
-        if (m.timePoint > best_time_point)
+        if (m.descriptor.timePoint > best_time_point)
         {
             measurement = m;
-            best_time_point = m.timePoint;
+            best_time_point = m.descriptor.timePoint;
         }
     }
 
@@ -1069,67 +1034,67 @@ bool DB::getLastMeasurementForSensor(SensorId sensor_id, Measurement& measuremen
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::cull(Measurement const& measurement, Filter const& filter) const
+bool DB::cull(Measurement const& m, Filter const& filter) const
 {
     if (filter.useSensorFilter)
     {
-        if (std::find(filter.sensorIds.begin(), filter.sensorIds.end(), measurement.sensorId) == filter.sensorIds.end())
+        if (std::find(filter.sensorIds.begin(), filter.sensorIds.end(), m.descriptor.sensorId) == filter.sensorIds.end())
         {
             return false;
         }
     }
     if (filter.useIndexFilter)
     {
-        if (measurement.index < filter.indexFilter.min || measurement.index > filter.indexFilter.max)
+        if (m.descriptor.index < filter.indexFilter.min || m.descriptor.index > filter.indexFilter.max)
         {
             return false;
         }
     }
     if (filter.useTimePointFilter)
     {
-        if (measurement.timePoint < filter.timePointFilter.min || measurement.timePoint > filter.timePointFilter.max)
+        if (m.descriptor.timePoint < filter.timePointFilter.min || m.descriptor.timePoint > filter.timePointFilter.max)
         {
             return false;
         }
     }
     if (filter.useTemperatureFilter)
     {
-        if (measurement.temperature < filter.temperatureFilter.min || measurement.temperature > filter.temperatureFilter.max)
+        if (m.descriptor.temperature < filter.temperatureFilter.min || m.descriptor.temperature > filter.temperatureFilter.max)
         {
             return false;
         }
     }
     if (filter.useHumidityFilter)
     {
-        if (measurement.humidity < filter.humidityFilter.min || measurement.humidity > filter.humidityFilter.max)
+        if (m.descriptor.humidity < filter.humidityFilter.min || m.descriptor.humidity > filter.humidityFilter.max)
         {
             return false;
         }
     }
     if (filter.useVccFilter)
     {
-        if (measurement.vcc < filter.vccFilter.min || measurement.vcc > filter.vccFilter.max)
+        if (m.descriptor.vcc < filter.vccFilter.min || m.descriptor.vcc > filter.vccFilter.max)
         {
             return false;
         }
     }
     if (filter.useB2SFilter)
     {
-        if (measurement.b2s < filter.b2sFilter.min || measurement.b2s > filter.b2sFilter.max)
+        if (m.descriptor.b2s < filter.b2sFilter.min || m.descriptor.b2s > filter.b2sFilter.max)
         {
             return false;
         }
     }
     if (filter.useS2BFilter)
     {
-        if (measurement.s2b < filter.s2bFilter.min || measurement.s2b > filter.s2bFilter.max)
+        if (m.descriptor.s2b < filter.s2bFilter.min || m.descriptor.s2b > filter.s2bFilter.max)
         {
             return false;
         }
     }
     if (filter.useSensorErrorsFilter)
     {
-        bool has_errors = measurement.sensorErrors != 0;
+        bool has_errors = m.descriptor.sensorErrors != 0;
         if (has_errors != filter.sensorErrorsFilter)
         {
             return false;
@@ -1144,14 +1109,15 @@ bool DB::cull(Measurement const& measurement, Filter const& filter) const
 inline DB::StoredMeasurement DB::pack(Measurement const& m)
 {
     StoredMeasurement sm;
-    sm.index = m.index;
-    sm.timePoint = Clock::to_time_t(m.timePoint);
-    sm.temperature = static_cast<int16_t>(std::max(std::min(m.temperature, 320.f), -320.f) * 100.f);
-    sm.humidity = static_cast<int16_t>(std::max(std::min(m.humidity, 320.f), -320.f) * 100.f);
-    sm.vcc = static_cast<uint8_t>(std::max(std::min((m.vcc - 2.f), 2.55f), 0.f) * 100.f);
-    sm.b2s = m.b2s;
-    sm.s2b = m.s2b;
-    sm.sensorErrors = m.sensorErrors;
+    sm.index = m.descriptor.index;
+    sm.timePoint = Clock::to_time_t(m.descriptor.timePoint);
+    sm.temperature = static_cast<int16_t>(std::max(std::min(m.descriptor.temperature, 320.f), -320.f) * 100.f);
+    sm.humidity = static_cast<int16_t>(std::max(std::min(m.descriptor.humidity, 320.f), -320.f) * 100.f);
+    sm.vcc = static_cast<uint8_t>(std::max(std::min((m.descriptor.vcc - 2.f), 2.55f), 0.f) * 100.f);
+    sm.b2s = m.descriptor.b2s;
+    sm.s2b = m.descriptor.s2b;
+    sm.sensorErrors = m.descriptor.sensorErrors;
+    sm.triggeredAlarms = m.triggeredAlarms;
     return sm;
 }
 
@@ -1160,23 +1126,24 @@ inline DB::StoredMeasurement DB::pack(Measurement const& m)
 inline DB::Measurement DB::unpack(SensorId sensor_id, StoredMeasurement const& sm)
 {
     Measurement m;
-    m.sensorId = sensor_id;
-    m.index = sm.index;
-    m.timePoint = Clock::from_time_t(sm.timePoint);
-    m.temperature = static_cast<float>(sm.temperature) / 100.f;
-    m.humidity = static_cast<float>(sm.humidity) / 100.f;
-    m.vcc = static_cast<float>(sm.vcc) / 100.f + 2.f;
-    m.b2s = sm.b2s;
-    m.s2b = sm.s2b;
-    m.sensorErrors = sm.sensorErrors;
+    m.descriptor.sensorId = sensor_id;
+    m.descriptor.index = sm.index;
+    m.descriptor.timePoint = Clock::from_time_t(sm.timePoint);
+    m.descriptor.temperature = static_cast<float>(sm.temperature) / 100.f;
+    m.descriptor.humidity = static_cast<float>(sm.humidity) / 100.f;
+    m.descriptor.vcc = static_cast<float>(sm.vcc) / 100.f + 2.f;
+    m.descriptor.b2s = sm.b2s;
+    m.descriptor.s2b = sm.s2b;
+    m.descriptor.sensorErrors = sm.sensorErrors;
+    m.triggeredAlarms = sm.triggeredAlarms;
     return m;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-inline DB::PrimaryKey DB::computePrimaryKey(Measurement const& m)
+inline DB::PrimaryKey DB::computePrimaryKey(MeasurementDescriptor const& md)
 {
-    return (PrimaryKey(m.sensorId) << 32) | PrimaryKey(m.index);
+    return (PrimaryKey(md.sensorId) << 32) | PrimaryKey(md.index);
 }
 
 //////////////////////////////////////////////////////////////////////////

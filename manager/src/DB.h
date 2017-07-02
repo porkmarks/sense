@@ -62,7 +62,7 @@ public:
     typedef uint32_t SensorId;
     typedef uint32_t SensorAddress;
 
-    struct Measurement
+    struct MeasurementDescriptor
     {
         SensorId sensorId = 0;
         uint32_t index = 0;
@@ -73,6 +73,12 @@ public:
         int8_t b2s = 0;
         int8_t s2b = 0;
         uint8_t sensorErrors = 0;
+        uint8_t triggeredAlarms = 0;
+    };
+    struct Measurement
+    {
+        MeasurementDescriptor descriptor;
+        uint8_t triggeredAlarms = 0;
     };
 
     struct SensorDescriptor
@@ -96,7 +102,6 @@ public:
         Clock::time_point nextCommsTimePoint = Clock::time_point(Clock::duration::zero());
         Clock::time_point nextMeasurementTimePoint = Clock::time_point(Clock::duration::zero());
 
-        uint8_t triggeredAlarms = 0;
         bool isLastMeasurementValid = false;
         Measurement lastMeasurement;
     };
@@ -166,11 +171,9 @@ public:
         };
     };
 
-    uint8_t computeTriggeredAlarm(Measurement const& measurement) const;
-    uint8_t computeTriggeredAlarm(SensorId sensorId) const;
+    uint8_t computeTriggeredAlarm(MeasurementDescriptor const& descriptor) const;
 
-
-    bool addMeasurement(Measurement const& measurement);
+    bool addMeasurement(MeasurementDescriptor const& descriptor);
 
     template <typename T>
     struct Range
@@ -260,6 +263,7 @@ private:
         int8_t b2s;
         int8_t s2b;
         uint8_t sensorErrors;
+        uint8_t triggeredAlarms;
     };
 
 #pragma pack(push, 0) // exact fit - no padding
@@ -269,7 +273,7 @@ private:
 
     static inline StoredMeasurement pack(Measurement const& m);
     static inline Measurement unpack(SensorId sensor_id, StoredMeasurement const& m);
-    static inline PrimaryKey computePrimaryKey(Measurement const& m);
+    static inline PrimaryKey computePrimaryKey(MeasurementDescriptor const& md);
     static inline PrimaryKey computePrimaryKey(SensorId sensor_id, StoredMeasurement const& m);
 
     std::vector<PrimaryKey> m_sortedPrimaryKeys;

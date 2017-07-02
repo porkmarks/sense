@@ -30,6 +30,7 @@ void MeasurementsWidget::init(DB& db)
 
     m_model.reset(new MeasurementsModel(*m_db));
     m_sortingModel.setSourceModel(m_model.get());
+    m_sortingModel.setSortRole(Qt::UserRole + 5);
 
     m_ui.list->setModel(&m_sortingModel);
     m_ui.list->setItemDelegate(m_model.get());

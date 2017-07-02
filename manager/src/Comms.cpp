@@ -279,7 +279,7 @@ void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
     std::vector<uint8_t> buffer;
     cbs.channel.unpack(buffer);
 
-    DB::Measurement measurement;
+    DB::MeasurementDescriptor descriptor;
     bool ok = false;
 
     {
@@ -302,7 +302,7 @@ void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
             std::cerr << "Cannot deserialize request: Missing sensor_id.\n";
             goto end;
         }
-        measurement.sensorId = it->value.GetUint();
+        descriptor.sensorId = it->value.GetUint();
 
         it = document.FindMember("index");
         if (it == document.MemberEnd() || !it->value.IsUint())
@@ -310,7 +310,7 @@ void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
             std::cerr << "Cannot deserialize request: Missing index.\n";
             goto end;
         }
-        measurement.index = it->value.GetUint();
+        descriptor.index = it->value.GetUint();
 
         it = document.FindMember("time_point");
         if (it == document.MemberEnd() || !it->value.IsInt64())
@@ -318,7 +318,7 @@ void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
             std::cerr << "Cannot deserialize request: Missing time_point.\n";
             goto end;
         }
-        measurement.timePoint = DB::Clock::time_point(std::chrono::seconds(it->value.GetInt64()));
+        descriptor.timePoint = DB::Clock::time_point(std::chrono::seconds(it->value.GetInt64()));
 
         it = document.FindMember("temperature");
         if (it == document.MemberEnd() || !it->value.IsNumber())
@@ -326,7 +326,7 @@ void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
             std::cerr << "Cannot deserialize request: Missing temperature.\n";
             goto end;
         }
-        measurement.temperature = static_cast<float>(it->value.GetDouble());
+        descriptor.temperature = static_cast<float>(it->value.GetDouble());
 
         it = document.FindMember("humidity");
         if (it == document.MemberEnd() || !it->value.IsNumber())
@@ -334,7 +334,7 @@ void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
             std::cerr << "Cannot deserialize request: Missing humidity.\n";
             goto end;
         }
-        measurement.humidity = static_cast<float>(it->value.GetDouble());
+        descriptor.humidity = static_cast<float>(it->value.GetDouble());
 
         it = document.FindMember("vcc");
         if (it == document.MemberEnd() || !it->value.IsNumber())
@@ -342,7 +342,7 @@ void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
             std::cerr << "Cannot deserialize request: Missing vcc.\n";
             goto end;
         }
-        measurement.vcc = static_cast<float>(it->value.GetDouble());
+        descriptor.vcc = static_cast<float>(it->value.GetDouble());
 
         it = document.FindMember("b2s");
         if (it == document.MemberEnd() || !it->value.IsInt())
@@ -350,7 +350,7 @@ void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
             std::cerr << "Cannot deserialize request: Missing b2s.\n";
             goto end;
         }
-        measurement.b2s = static_cast<int8_t>(it->value.GetInt());
+        descriptor.b2s = static_cast<int8_t>(it->value.GetInt());
 
         it = document.FindMember("s2b");
         if (it == document.MemberEnd() || !it->value.IsInt())
@@ -358,7 +358,7 @@ void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
             std::cerr << "Cannot deserialize request: Missing s2b.\n";
             goto end;
         }
-        measurement.s2b = static_cast<int8_t>(it->value.GetInt());
+        descriptor.s2b = static_cast<int8_t>(it->value.GetInt());
 
         it = document.FindMember("sensor_errors");
         if (it == document.MemberEnd() || !it->value.IsUint())
@@ -366,9 +366,9 @@ void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
             std::cerr << "Cannot deserialize request: Missing sensor_errors.\n";
             goto end;
         }
-        measurement.sensorErrors = static_cast<uint8_t>(it->value.GetUint());
+        descriptor.sensorErrors = static_cast<uint8_t>(it->value.GetUint());
 
-        if (!cbs.baseStation.db.addMeasurement(measurement))
+        if (!cbs.baseStation.db.addMeasurement(descriptor))
         {
             std::cerr << "Cannot deserialize request: Adding measurement failed.\n";
             goto end;
@@ -383,8 +383,8 @@ end:
 
         rapidjson::Document document;
         document.SetObject();
-        document.AddMember("sensor_id", measurement.sensorId, document.GetAllocator());
-        document.AddMember("index", measurement.index, document.GetAllocator());
+        document.AddMember("sensor_id", descriptor.sensorId, document.GetAllocator());
+        document.AddMember("index", descriptor.index, document.GetAllocator());
         document.AddMember("ok", ok, document.GetAllocator());
 
         rapidjson::StringBuffer buffer;

@@ -2,6 +2,7 @@
 
 #include <QWidget>
 #include <QIcon>
+#include <bitset>
 
 static std::array<const char*, 9> s_headerNames = {"Sensor", "Index", "Timestamp", "Temperature", "Humidity", "Battery", "Signal", "Sensor Errors", "Alarms"};
 enum class Column
@@ -17,6 +18,14 @@ enum class Column
     Alarms
 };
 
+float getBatteryLevel(float vcc)
+{
+    constexpr float max = 3.2f;
+    constexpr float min = 2.f;
+    float level = std::max(std::min(vcc, max) - min, 0.f) / (max - min);
+    return level;
+}
+
 QIcon getBatteryIcon(float vcc)
 {
     static std::array<QIcon, 5> s_batteryIconNames =
@@ -28,11 +37,21 @@ QIcon getBatteryIcon(float vcc)
         QIcon(":/icons/ui/battery-100.png")
     };
 
-    constexpr float max = 3.2f;
-    constexpr float min = 2.f;
-    float percentage = std::max(std::min(vcc, max) - min, 0.f) / (max - min);
-    size_t index = std::floor(percentage * (s_batteryIconNames.size() - 1) + 0.5f);
+    float level = getBatteryLevel(vcc);
+    size_t index = std::floor(level * (s_batteryIconNames.size() - 1) + 0.5f);
     return s_batteryIconNames[index];
+}
+
+float getSignalLevel(int8_t dBm)
+{
+    if (dBm == 0)
+    {
+        return 0.f;
+    }
+    constexpr float max = -40.f;
+    constexpr float min = -110.f;
+    float level = std::max(std::min(static_cast<float>(dBm), max) - min, 0.f) / (max - min);
+    return level;
 }
 
 QIcon getSignalIcon(int8_t dBm)
@@ -47,10 +66,8 @@ QIcon getSignalIcon(int8_t dBm)
         QIcon(":/icons/ui/signal-100.png")
     };
 
-    constexpr float max = -50.f;
-    constexpr float min = -110.f;
-    float percentage = std::max(std::min(static_cast<float>(dBm), max) - min, 0.f) / (max - min);
-    size_t index = std::floor(percentage * (s_signalIconNames.size() - 1) + 0.5f);
+    float level = getSignalLevel(dBm);
+    size_t index = std::floor(level * (s_signalIconNames.size() - 1) + 0.5f);
     return s_signalIconNames[index];
 }
 
@@ -142,7 +159,37 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
     DB::Measurement const& measurement = m_measurements[index.row()];
 
     Column column = static_cast<Column>(index.column());
-    if (role == Qt::DecorationRole)
+
+    if (role == Qt::UserRole + 5) // sorting
+    {
+        if (column == Column::Temperature)
+        {
+            return measurement.descriptor.temperature;
+        }
+        else if (column == Column::Humidity)
+        {
+            return measurement.descriptor.humidity;
+        }
+        else if (column == Column::Battery)
+        {
+            return getBatteryLevel(measurement.descriptor.vcc);
+        }
+        else if (column == Column::Signal)
+        {
+            return getSignalLevel(std::min(measurement.descriptor.b2s, measurement.descriptor.s2b));
+        }
+        else if (column == Column::SensorErrors)
+        {
+            return static_cast<uint32_t>(std::bitset<8>(measurement.descriptor.sensorErrors).count());
+        }
+        else if (column == Column::Alarms)
+        {
+            return static_cast<uint32_t>(std::bitset<8>(measurement.triggeredAlarms).count());
+        }
+
+        return data(index, Qt::DisplayRole);
+    }
+    else if (role == Qt::DecorationRole)
     {
         if (column == Column::Sensor)
         {
@@ -161,18 +208,18 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Battery)
         {
-            return getBatteryIcon(measurement.vcc);
+            return getBatteryIcon(measurement.descriptor.vcc);
         }
         else if (column == Column::Signal)
         {
-            return getSignalIcon(std::min(measurement.b2s, measurement.s2b));
+            return getSignalIcon(std::min(measurement.descriptor.b2s, measurement.descriptor.s2b));
         }
     }
     else if (role == Qt::DisplayRole)
     {
         if (column == Column::Sensor)
         {
-            int32_t sensorIndex = m_db.findSensorIndexById(measurement.sensorId);
+            int32_t sensorIndex = m_db.findSensorIndexById(measurement.descriptor.sensorId);
             if (sensorIndex < 0)
             {
                 return "N/A";
@@ -184,33 +231,41 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Index)
         {
-            return measurement.index;
+            return measurement.descriptor.index;
         }
         else if (column == Column::Timestamp)
         {
             QDateTime dt;
-            dt.setTime_t(DB::Clock::to_time_t(measurement.timePoint));
+            dt.setTime_t(DB::Clock::to_time_t(measurement.descriptor.timePoint));
             return dt;
         }
         else if (column == Column::Temperature)
         {
-            return QString("%1 °C").arg(measurement.temperature);
+            return QString("%1 °C").arg(measurement.descriptor.temperature, 0, 'f', 1);
         }
         else if (column == Column::Humidity)
         {
-            return QString("%1 % RH").arg(measurement.humidity);
+            return QString("%1 % RH").arg(measurement.descriptor.humidity, 0, 'f', 1);
+        }
+        else if (column == Column::Battery)
+        {
+            return QString("%1 %").arg(static_cast<int>(getBatteryLevel(measurement.descriptor.vcc) * 100.f));
+        }
+        else if (column == Column::Signal)
+        {
+            return QString("%1 %").arg(static_cast<int>(getSignalLevel(std::min(measurement.descriptor.b2s, measurement.descriptor.s2b)) * 100.f));
+            //return QString("%1 %").arg(std::min(measurement.descriptor.b2s, measurement.descriptor.s2b));
         }
         else if (column == Column::SensorErrors)
         {
-            if (measurement.sensorErrors == 0)
+            if (measurement.descriptor.sensorErrors == 0)
             {
                 return "<none>";
             }
         }
         else if (column == Column::Alarms)
         {
-            uint8_t triggeredAlarms = m_db.computeTriggeredAlarm(measurement);
-            if (triggeredAlarms == 0)
+            if (measurement.triggeredAlarms == 0)
             {
                 return "<none>";
             }
@@ -305,7 +360,7 @@ void MeasurementsModel::paint(QPainter* painter, const QStyleOptionViewItem& opt
     Column column = static_cast<Column>(index.column());
     if (column == Column::Alarms)
     {
-        uint8_t triggeredAlarms = m_db.computeTriggeredAlarm(measurement);
+        uint8_t triggeredAlarms = measurement.triggeredAlarms;
         if (triggeredAlarms == 0)
         {
             return QStyledItemDelegate::paint(painter, option, index);
@@ -353,7 +408,8 @@ void MeasurementsModel::paint(QPainter* painter, const QStyleOptionViewItem& opt
     }
     else if (column == Column::SensorErrors)
     {
-        if (measurement.sensorErrors == 0)
+        uint8_t sensorErrors = measurement.descriptor.sensorErrors;
+        if (sensorErrors == 0)
         {
             return QStyledItemDelegate::paint(painter, option, index);
         }
@@ -364,13 +420,13 @@ void MeasurementsModel::paint(QPainter* painter, const QStyleOptionViewItem& opt
 
         QPoint pos = option.rect.topLeft();
 
-        if (measurement.sensorErrors & DB::SensorErrors::Comms)
+        if (sensorErrors & DB::SensorErrors::Comms)
         {
             static QIcon icon(":/icons/ui/comms-error.png");
             painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
             pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
         }
-        if (measurement.sensorErrors & DB::SensorErrors::Hardware)
+        if (sensorErrors & DB::SensorErrors::Hardware)
         {
             static QIcon icon(":/icons/ui/hardware-error.png");
             painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
@@ -398,7 +454,7 @@ QSize MeasurementsModel::sizeHint(const QStyleOptionViewItem& option, const QMod
     Column column = static_cast<Column>(index.column());
     if (column == Column::Alarms)
     {
-        uint8_t triggeredAlarms = m_db.computeTriggeredAlarm(measurement);
+        uint8_t triggeredAlarms = measurement.triggeredAlarms;
         if (triggeredAlarms == 0)
         {
             return QStyledItemDelegate::sizeHint(option, index);
@@ -430,17 +486,18 @@ QSize MeasurementsModel::sizeHint(const QStyleOptionViewItem& option, const QMod
     }
     else if (column == Column::SensorErrors)
     {
-        if (measurement.sensorErrors == 0)
+        uint8_t sensorErrors = measurement.descriptor.sensorErrors;
+        if (sensorErrors == 0)
         {
             return QStyledItemDelegate::sizeHint(option, index);
         }
 
         int32_t width = 0;
-        if (measurement.sensorErrors & DB::SensorErrors::Comms)
+        if (sensorErrors & DB::SensorErrors::Comms)
         {
             width += k_iconSize.width() + k_iconMargin;
         }
-        if (measurement.sensorErrors & DB::SensorErrors::Hardware)
+        if (sensorErrors & DB::SensorErrors::Hardware)
         {
             width += k_iconSize.width() + k_iconMargin;
         }

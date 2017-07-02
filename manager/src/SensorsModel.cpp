@@ -23,7 +23,9 @@ enum class Column
     Alarms
 };
 
+extern float getBatteryLevel(float vcc);
 extern QIcon getBatteryIcon(float vcc);
+extern float getSignalLevel(int8_t dBm);
 extern QIcon getSignalIcon(int8_t dBm);
 
 //////////////////////////////////////////////////////////////////////////
@@ -264,11 +266,11 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
             {
                 if (column == Column::Battery)
                 {
-                    return getBatteryIcon(sensor.lastMeasurement.vcc);
+                    return getBatteryIcon(sensor.lastMeasurement.descriptor.vcc);
                 }
                 else if (column == Column::Signal)
                 {
-                    return getSignalIcon(std::min(sensor.lastMeasurement.b2s, sensor.lastMeasurement.s2b));
+                    return getSignalIcon(std::min(sensor.lastMeasurement.descriptor.b2s, sensor.lastMeasurement.descriptor.s2b));
                 }
                 else if (column == Column::Temperature)
                 {
@@ -343,14 +345,14 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Alarms)
         {
-            if (sensor.triggeredAlarms == 0)
+            if (sensor.isLastMeasurementValid && sensor.lastMeasurement.triggeredAlarms == 0)
             {
                 return "<none>";
             }
         }
         else if (column == Column::SensorErrors)
         {
-            if (sensor.isLastMeasurementValid && sensor.lastMeasurement.sensorErrors == 0)
+            if (sensor.isLastMeasurementValid && sensor.lastMeasurement.descriptor.sensorErrors == 0)
             {
                 return "<none>";
             }
@@ -361,11 +363,19 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
             {
                 if (column == Column::Temperature)
                 {
-                    return QString("%1 °C").arg(sensor.lastMeasurement.temperature);
+                    return QString("%1 °C").arg(sensor.lastMeasurement.descriptor.temperature, 0, 'f', 1);
                 }
                 else if (column == Column::Humidity)
                 {
-                    return QString("%1 % RH").arg(sensor.lastMeasurement.humidity);
+                    return QString("%1 % RH").arg(sensor.lastMeasurement.descriptor.humidity, 0, 'f', 1);
+                }
+                else if (column == Column::Battery)
+                {
+                    return QString("%1 %").arg(static_cast<int>(getBatteryLevel(sensor.lastMeasurement.descriptor.vcc) * 100.f));
+                }
+                else if (column == Column::Signal)
+                {
+                    return QString("%1 %").arg(static_cast<int>(getSignalLevel(std::min(sensor.lastMeasurement.descriptor.b2s, sensor.lastMeasurement.descriptor.s2b)) * 100.f));
                 }
             }
         }
@@ -474,8 +484,8 @@ void SensorsModel::paint(QPainter* painter, const QStyleOptionViewItem& option, 
     Column column = static_cast<Column>(index.column());
     if (column == Column::Alarms)
     {
-        uint8_t triggeredAlarms = sensor.triggeredAlarms;
-        if (triggeredAlarms == 0)
+        uint8_t triggeredAlarms = sensor.lastMeasurement.triggeredAlarms;
+        if (!sensor.isLastMeasurementValid || triggeredAlarms == 0)
         {
             return QStyledItemDelegate::paint(painter, option, index);
         }
@@ -522,7 +532,8 @@ void SensorsModel::paint(QPainter* painter, const QStyleOptionViewItem& option, 
     }
     else if (column == Column::SensorErrors)
     {
-        if (!sensor.isLastMeasurementValid || sensor.lastMeasurement.sensorErrors == 0)
+        uint8_t sensorErrors = sensor.lastMeasurement.descriptor.sensorErrors;
+        if (!sensor.isLastMeasurementValid || sensorErrors == 0)
         {
             return QStyledItemDelegate::paint(painter, option, index);
         }
@@ -533,13 +544,13 @@ void SensorsModel::paint(QPainter* painter, const QStyleOptionViewItem& option, 
 
         QPoint pos = option.rect.topLeft();
 
-        if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::Comms)
+        if (sensorErrors & DB::SensorErrors::Comms)
         {
             static QIcon icon(":/icons/ui/comms-error.png");
             painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
             pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
         }
-        if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::Hardware)
+        if (sensorErrors & DB::SensorErrors::Hardware)
         {
             static QIcon icon(":/icons/ui/hardware-error.png");
             painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
@@ -574,8 +585,8 @@ QSize SensorsModel::sizeHint(const QStyleOptionViewItem& option, const QModelInd
     Column column = static_cast<Column>(index.column());
     if (column == Column::Alarms)
     {
-        uint8_t triggeredAlarms = sensor.triggeredAlarms;
-        if (triggeredAlarms == 0)
+        uint8_t triggeredAlarms = sensor.lastMeasurement.triggeredAlarms;
+        if (!sensor.isLastMeasurementValid || triggeredAlarms == 0)
         {
             return QStyledItemDelegate::sizeHint(option, index);
         }
@@ -606,17 +617,18 @@ QSize SensorsModel::sizeHint(const QStyleOptionViewItem& option, const QModelInd
     }
     else if (column == Column::SensorErrors)
     {
-        if (!sensor.isLastMeasurementValid)
+        uint8_t sensorErrors = sensor.lastMeasurement.descriptor.sensorErrors;
+        if (!sensor.isLastMeasurementValid || sensorErrors == 0)
         {
             return QStyledItemDelegate::sizeHint(option, index);
         }
 
         int32_t width = 0;
-        if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::Comms)
+        if (sensorErrors & DB::SensorErrors::Comms)
         {
             width += k_iconSize.width() + k_iconMargin;
         }
-        if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::Hardware)
+        if (sensorErrors & DB::SensorErrors::Hardware)
         {
             width += k_iconSize.width() + k_iconMargin;
         }
