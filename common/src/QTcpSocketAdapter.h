@@ -36,8 +36,8 @@ public:
 
     void start()
     {
-        QObject::connect(m_socket.get(), &QIODevice::readyRead, this, &QTcpSocketAdapter::handleReceive);
-        QObject::connect(m_socket.get(), &QIODevice::bytesWritten, this, &QTcpSocketAdapter::handleSend);
+        connect(m_socket.get(), &QIODevice::readyRead, this, &QTcpSocketAdapter::handleReceive);
+        connect(m_socket.get(), &QIODevice::bytesWritten, this, &QTcpSocketAdapter::handleSend);
     }
 
     template<class Container>

@@ -26,6 +26,7 @@ public:
 
     void start()
     {
+        m_is_sending = false;
         m_socket.async_read_some(boost::asio::buffer(m_rx_temp_buffer.data(), m_rx_temp_buffer.size()),
                                  boost::bind(&ASIO_Socket_Adapter<Socket_t>::handle_receive, this,
                                              boost::asio::placeholders::error,
@@ -84,12 +85,16 @@ private:
         if (error)
         {
             m_socket.close();
+            m_is_sending = false;
         }
         else
         {
             std::lock_guard<std::mutex> lg(m_tx_buffer_mutex);
 
-            assert(bytes_transferred <= m_tx_pending_buffer.size());
+            if (bytes_transferred > m_tx_pending_buffer.size())
+            {
+                int a = 0;
+            }
             bytes_transferred = std::min(bytes_transferred, m_tx_pending_buffer.size());
             m_pending_to_send_size -= bytes_transferred;
 
