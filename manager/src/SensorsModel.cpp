@@ -35,6 +35,7 @@ SensorsModel::SensorsModel(DB& db)
     QObject::connect(&m_db, &DB::sensorAdded, [this](DB::SensorId id) { sensorAdded(id); });
     QObject::connect(&m_db, &DB::sensorBound, [this](DB::SensorId id) { sensorChanged(id); });
     QObject::connect(&m_db, &DB::sensorChanged, [this](DB::SensorId id) { sensorChanged(id); });
+    QObject::connect(&m_db, &DB::sensorDataChanged, [this](DB::SensorId id) { sensorChanged(id); });
     QObject::connect(&m_db, &DB::sensorRemoved, [this](DB::SensorId id) { sensorRemoved(id); });
 
     size_t sensorCount = m_db.getSensorCount();
@@ -505,7 +506,7 @@ void SensorsModel::paint(QPainter* painter, const QStyleOptionViewItem& option, 
         }
         if (triggeredAlarms & DB::TriggeredAlarm::SensorErrors)
         {
-            static QIcon icon(":/icons/ui/sensor.png");
+            static QIcon icon(":/icons/ui/sensor-error.png");
             painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
             pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
         }
@@ -532,15 +533,15 @@ void SensorsModel::paint(QPainter* painter, const QStyleOptionViewItem& option, 
 
         QPoint pos = option.rect.topLeft();
 
-        if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::CommsError)
+        if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::Comms)
         {
-            static QIcon icon(":/icons/ui/signal-0.png");
+            static QIcon icon(":/icons/ui/comms-error.png");
             painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
             pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
         }
-        if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::SensorError)
+        if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::Hardware)
         {
-            static QIcon icon(":/icons/ui/sensor.png");
+            static QIcon icon(":/icons/ui/hardware-error.png");
             painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
             pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
         }
@@ -611,11 +612,11 @@ QSize SensorsModel::sizeHint(const QStyleOptionViewItem& option, const QModelInd
         }
 
         int32_t width = 0;
-        if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::CommsError)
+        if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::Comms)
         {
             width += k_iconSize.width() + k_iconMargin;
         }
-        if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::SensorError)
+        if (sensor.lastMeasurement.sensorErrors & DB::SensorErrors::Hardware)
         {
             width += k_iconSize.width() + k_iconMargin;
         }

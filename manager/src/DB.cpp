@@ -252,6 +252,39 @@ bool DB::open(std::string const& name)
                 }
                 alarm.id = it->value.GetUint();
 
+                it = alarmj.FindMember("filter_sensors");
+                if (it != alarmj.MemberEnd() && !it->value.IsBool())
+                {
+                    std::cerr << "Bad alarm filter_sensors\n";
+                    return false;
+                }
+                if (it != alarmj.MemberEnd())
+                {
+                    alarm.descriptor.filterSensors = it->value.GetBool();
+                }
+
+                if (alarm.descriptor.filterSensors)
+                {
+                    it = alarmj.FindMember("sensors");
+                    if (it == alarmj.MemberEnd() || !it->value.IsArray())
+                    {
+                        std::cerr << "Bad or missing alarm sensors\n";
+                        return false;
+                    }
+                    rapidjson::Value const& sensorsj = it->value;
+                    for (size_t si = 0; si < sensorsj.Size(); si++)
+                    {
+                        rapidjson::Value const& sensorj = sensorsj[si];
+                        if (!sensorj.IsUint())
+                        {
+                            std::cerr << "Bad or missing alarm sensor id\n";
+                            return false;
+                        }
+                        alarm.descriptor.sensors.push_back(sensorj.GetUint());
+                    }
+                }
+
+
                 it = alarmj.FindMember("low_temperature_watch");
                 if (it == alarmj.MemberEnd() || !it->value.IsBool())
                 {
@@ -430,11 +463,26 @@ bool DB::open(std::string const& name)
                 return false;
             }
 
-            for (StoredMeasurement const& sm: storedMeasurements)
+            for (auto it = storedMeasurements.begin(); it != storedMeasurements.end();)
             {
+                StoredMeasurement const& sm = *it;
                 Measurement measurement = unpack(sensorId, sm);
-                sensor.isLastMeasurementValid = true;
-                sensor.lastMeasurement = measurement;
+                PrimaryKey pk = computePrimaryKey(measurement);
+
+                //check for duplicates
+                auto lbit = std::lower_bound(m_sortedPrimaryKeys.begin(), m_sortedPrimaryKeys.end(), pk);
+                if (lbit != m_sortedPrimaryKeys.end() && *lbit == pk)
+                {
+                    std::cerr << "Duplicate measurement index " << std::to_string(sm.index) << " found. Deleting it\n";
+                    storedMeasurements.erase(it);
+                }
+                else
+                {
+                    m_sortedPrimaryKeys.insert(lbit, pk);
+                    sensor.isLastMeasurementValid = true;
+                    sensor.lastMeasurement = measurement;
+                    ++it;
+                }
             }
         }
 
@@ -446,7 +494,14 @@ bool DB::open(std::string const& name)
     //refresh the sensor triggered alarms
     for (Sensor& sensor: m_mainData.sensors)
     {
-        sensor.triggeredAlarms = computeTriggeredAlarm(sensor.id);
+        if (sensor.isLastMeasurementValid)
+        {
+            sensor.triggeredAlarms = computeTriggeredAlarm(sensor.lastMeasurement);
+        }
+        else
+        {
+            sensor.triggeredAlarms = 0;
+        }
     }
 
     std::cout << "Time to load DB:" << std::chrono::duration<float>(Clock::now() - start).count() << "s\n";
@@ -588,15 +643,6 @@ bool DB::addSensor(SensorDescriptor const& descriptor)
         emit sensorAdded(sensor.id);
     }
 
-    {
-        Sensor& sensor = m_mainData.sensors.back();
-        sensor.triggeredAlarms = computeTriggeredAlarm(sensor.id);
-        if (sensor.triggeredAlarms != 0)
-        {
-            emit sensorChanged(sensor.id);
-        }
-    }
-
     triggerSave();
 
     return true;
@@ -677,7 +723,7 @@ bool DB::setSensorNextTimePoints(SensorId id, Clock::time_point nextMeasurementT
     sensor.nextMeasurementTimePoint = nextMeasurementTimePoint;
     sensor.nextCommsTimePoint = nextCommsTimePoint;
 
-    emit sensorChanged(sensor.id);
+    emit sensorDataChanged(sensor.id);
 
     triggerSave();
 
@@ -768,8 +814,14 @@ bool DB::addAlarm(AlarmDescriptor const& descriptor)
         assert(false);
         return false;
     }
+
     Alarm alarm;
     alarm.descriptor = descriptor;
+    if (!alarm.descriptor.filterSensors)
+    {
+        alarm.descriptor.sensors.clear();
+    }
+
     alarm.id = ++m_lastAlarmId;
 
     emit alarmWillBeAdded(alarm.id);
@@ -816,6 +868,14 @@ uint8_t DB::computeTriggeredAlarm(Measurement const& measurement) const
     for (Alarm const& alarm: m_mainData.alarms)
     {
         AlarmDescriptor const& descriptor = alarm.descriptor;
+        if (descriptor.filterSensors)
+        {
+            if (std::find(descriptor.sensors.begin(), descriptor.sensors.end(), measurement.sensorId) == descriptor.sensors.end())
+            {
+                continue;
+            }
+        }
+
         if (descriptor.highTemperatureWatch && measurement.temperature > descriptor.highTemperature)
         {
             triggered |= TriggeredAlarm::Temperature;
@@ -893,8 +953,7 @@ bool DB::addMeasurement(Measurement const& measurement)
     auto it = std::lower_bound(m_sortedPrimaryKeys.begin(), m_sortedPrimaryKeys.end(), pk);
     if (it != m_sortedPrimaryKeys.end() && *it == pk)
     {
-        assert(false);
-        return false;
+        return true;
     }
 
     emit measurementsWillBeAdded(measurement.sensorId);
@@ -905,15 +964,9 @@ bool DB::addMeasurement(Measurement const& measurement)
     Sensor& sensor = m_mainData.sensors[sensorIndex];
     sensor.isLastMeasurementValid = true;
     sensor.lastMeasurement = measurement;
+    sensor.triggeredAlarms = computeTriggeredAlarm(measurement);
 
-    emit sensorChanged(sensor.id);
-
-    uint8_t triggeredAlarms = sensor.triggeredAlarms;
-    sensor.triggeredAlarms |= computeTriggeredAlarm(measurement);
-    if (sensor.triggeredAlarms != triggeredAlarms)
-    {
-        emit sensorChanged(sensor.id);
-    }
+    emit sensorDataChanged(sensor.id);
 
     triggerSave();
 
@@ -1192,8 +1245,19 @@ void DB::save(Data const& data) const
             {
                 rapidjson::Value alarmj;
                 alarmj.SetObject();
-                alarmj.AddMember("name", rapidjson::Value(alarm.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
                 alarmj.AddMember("id", alarm.id, document.GetAllocator());
+                alarmj.AddMember("name", rapidjson::Value(alarm.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
+                alarmj.AddMember("filter_sensors", alarm.descriptor.filterSensors, document.GetAllocator());
+                if (alarm.descriptor.filterSensors)
+                {
+                    rapidjson::Value sensorsj;
+                    sensorsj.SetArray();
+                    for (SensorId const& sensorId: alarm.descriptor.sensors)
+                    {
+                        sensorsj.PushBack(sensorId, document.GetAllocator());
+                    }
+                    alarmj.AddMember("sensors", sensorsj, document.GetAllocator());
+                }
                 alarmj.AddMember("low_temperature_watch", alarm.descriptor.lowTemperatureWatch, document.GetAllocator());
                 alarmj.AddMember("low_temperature", alarm.descriptor.lowTemperature, document.GetAllocator());
                 alarmj.AddMember("high_temperature_watch", alarm.descriptor.highTemperatureWatch, document.GetAllocator());

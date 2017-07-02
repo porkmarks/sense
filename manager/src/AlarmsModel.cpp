@@ -210,7 +210,7 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::SensorErrors && descriptor.sensorErrorsWatch)
         {
-            return QIcon(":/icons/ui/sensor.png");
+            return QIcon(":/icons/ui/sensor-error.png");
         }
         else if (column == Column::Action)
         {

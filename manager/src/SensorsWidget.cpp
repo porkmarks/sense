@@ -43,6 +43,7 @@ SensorsWidget::~SensorsWidget()
 void SensorsWidget::init(DB& db)
 {
     setEnabled(true);
+    m_db = &db;
     m_model.reset(new SensorsModel(db));
     m_ui.list->setModel(m_model.get());
     m_ui.list->setItemDelegate(m_model.get());
@@ -67,38 +68,35 @@ void SensorsWidget::shutdown()
 
 void SensorsWidget::bindSensor()
 {
-//    if (!m_comms)
-//    {
-//        return;
-//    }
+    if (!m_db)
+    {
+        return;
+    }
 
-//    while (1)
-//    {
-//        bool ok = false;
-//        QString text = QInputDialog::getText(this, tr("Input Sensor Name"), tr("Name:"), QLineEdit::Normal, "", &ok);
-//        if (!ok)
-//        {
-//            return;
-//        }
-//        std::string name = text.toUtf8().data();
+    while (1)
+    {
+        DB::SensorDescriptor descriptor;
+        bool ok = false;
+        QString text = QInputDialog::getText(this, tr("Input Sensor Name"), tr("Name:"), QLineEdit::Normal, "", &ok);
+        if (!ok)
+        {
+            return;
+        }
+        descriptor.name = text.toUtf8().data();
+        if (descriptor.name.empty())
+        {
+            QMessageBox::critical(this, "Error", "You need to specify a sensor name.");
+            continue;
+        }
 
-//        if (name.empty())
-//        {
-//            QMessageBox::critical(this, "Error", "You need to specify a sensor name.");
-//            continue;
-//        }
+        if (!m_db->addSensor(descriptor))
+        {
+            QMessageBox::critical(this, "Error", QString("Cannot add sensor '%1'").arg(text));
+            continue;
+        }
 
-//        std::vector<Comms::Sensor> const& sensors = m_comms->getLastSensors();
-//        auto it = std::find_if(sensors.begin(), sensors.end(), [&name](Comms::Sensor const& sensor) { return sensor.name == name; });
-//        if (it != sensors.end())
-//        {
-//            QMessageBox::critical(this, "Error", QString("There is already a sensor called '%1'").arg(text));
-//            continue;
-//        }
-
-//        m_comms->requestBindSensor(name);
-//        return;
-//    }
+        return;
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////

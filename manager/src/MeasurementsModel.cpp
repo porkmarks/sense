@@ -337,7 +337,7 @@ void MeasurementsModel::paint(QPainter* painter, const QStyleOptionViewItem& opt
         }
         if (triggeredAlarms & DB::TriggeredAlarm::SensorErrors)
         {
-            static QIcon icon(":/icons/ui/sensor.png");
+            static QIcon icon(":/icons/ui/sensor-error.png");
             painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
             pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
         }
@@ -364,15 +364,15 @@ void MeasurementsModel::paint(QPainter* painter, const QStyleOptionViewItem& opt
 
         QPoint pos = option.rect.topLeft();
 
-        if (measurement.sensorErrors & DB::SensorErrors::CommsError)
+        if (measurement.sensorErrors & DB::SensorErrors::Comms)
         {
-            static QIcon icon(":/icons/ui/signal-0.png");
+            static QIcon icon(":/icons/ui/comms-error.png");
             painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
             pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
         }
-        if (measurement.sensorErrors & DB::SensorErrors::SensorError)
+        if (measurement.sensorErrors & DB::SensorErrors::Hardware)
         {
-            static QIcon icon(":/icons/ui/sensor.png");
+            static QIcon icon(":/icons/ui/hardware-error.png");
             painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
             pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
         }
@@ -436,11 +436,11 @@ QSize MeasurementsModel::sizeHint(const QStyleOptionViewItem& option, const QMod
         }
 
         int32_t width = 0;
-        if (measurement.sensorErrors & DB::SensorErrors::CommsError)
+        if (measurement.sensorErrors & DB::SensorErrors::Comms)
         {
             width += k_iconSize.width() + k_iconMargin;
         }
-        if (measurement.sensorErrors & DB::SensorErrors::SensorError)
+        if (measurement.sensorErrors & DB::SensorErrors::Hardware)
         {
             width += k_iconSize.width() + k_iconMargin;
         }

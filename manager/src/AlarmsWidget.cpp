@@ -1,5 +1,6 @@
 #include "AlarmsWidget.h"
 #include "ui_NewAlarmDialog.h"
+#include "SensorsModel.h"
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -56,6 +57,18 @@ void AlarmsWidget::addAlarm()
     Ui::NewAlarmDialog ui;
     ui.setupUi(&dialog);
 
+    SensorsModel model(*m_db);
+    model.setShowCheckboxes(true);
+
+    size_t sensorCount = m_db->getSensorCount();
+    for (size_t i = 0; i < sensorCount; i++)
+    {
+        model.setSensorChecked(m_db->getSensor(i).id, true);
+    }
+
+    ui.sensorList->setModel(&model);
+    ui.sensorList->setItemDelegate(&model);
+
     ui.name->setText(QString("Alarm %1").arg(m_db->getAlarmCount()));
 
     while (1)
@@ -65,6 +78,26 @@ void AlarmsWidget::addAlarm()
         {
             DB::AlarmDescriptor alarm;
             alarm.name = ui.name->text().toUtf8().data();
+
+            alarm.filterSensors = ui.sensorGroup->isChecked();
+            alarm.sensors.clear();
+            if (alarm.filterSensors)
+            {
+                for (size_t i = 0; i < sensorCount; i++)
+                {
+                    DB::Sensor const& sensor = m_db->getSensor(i);
+                    if (model.isSensorChecked(sensor.id))
+                    {
+                        alarm.sensors.push_back(sensor.id);
+                    }
+                }
+            }
+
+            if (alarm.filterSensors && alarm.sensors.empty())
+            {
+                QMessageBox::critical(this, "Error", "You need to specify at least one sensor.");
+                continue;
+            }
 
             if (!ui.highTemperatureWatch->isChecked() && !ui.lowTemperatureWatch->isChecked() &&
                     !ui.highHumidityWatch->isChecked() && !ui.lowHumidityWatch->isChecked() &&

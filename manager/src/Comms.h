@@ -57,7 +57,6 @@ private:
             : baseStation(db)
             , channel(socketAdapter)
         {
-            socketAdapter.start();
         }
 
         BaseStation baseStation;
@@ -79,7 +78,7 @@ private:
 
     void sendConfig(ConnectedBaseStation& cbs);
     void sendSensors(ConnectedBaseStation& cbs);
-    void requestBindSensor(std::string const& name);
+    void requestBindSensor(ConnectedBaseStation& cbs, DB::SensorId sensorId);
 
     QUdpSocket m_broadcastSocket;
 

@@ -2,6 +2,7 @@
 
 #include <QWidget>
 #include <QStandardItemModel>
+#include <QSortFilterProxyModel>
 #include "ui_MeasurementsWidget.h"
 #include "DB.h"
 #include "MeasurementsModel.h"
@@ -43,6 +44,7 @@ private:
 
     DB* m_db = nullptr;
     std::unique_ptr<MeasurementsModel> m_model;
+    QSortFilterProxyModel m_sortingModel;
     std::vector<DB::SensorId> m_selectedSensorIds;
 };
 

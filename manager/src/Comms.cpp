@@ -72,6 +72,11 @@ bool Comms::connectToBaseStation(DB& db, QHostAddress const& address)
     QObject::connect(&cbsPtr->socketAdapter.getSocket(), &QTcpSocket::connected, [this, cbsPtr]() { connectedToBaseStation(cbsPtr); });
     QObject::connect(&cbsPtr->socketAdapter.getSocket(), &QTcpSocket::disconnected, [this, cbsPtr]() { disconnectedFromBaseStation(cbsPtr); });
 
+    QObject::connect(&db, &DB::configChanged, [this, cbsPtr]() { sendConfig(*cbsPtr); });
+    QObject::connect(&db, &DB::sensorAdded, [this, cbsPtr](DB::SensorId id) { requestBindSensor(*cbsPtr, id); });
+    QObject::connect(&db, &DB::sensorChanged, [this, cbsPtr](DB::SensorId) { sendSensors(*cbsPtr); });
+    QObject::connect(&db, &DB::sensorRemoved, [this, cbsPtr](DB::SensorId) { sendSensors(*cbsPtr); });
+
     cbsPtr->socketAdapter.getSocket().disconnectFromHost();
     cbsPtr->socketAdapter.getSocket().connectToHost(address, 4444);
 
@@ -85,6 +90,7 @@ void Comms::connectedToBaseStation(ConnectedBaseStation* cbs)
     if (cbs)
     {
         emit baseStationConnected(cbs->baseStation);
+        cbs->socketAdapter.start();
 
         sendConfig(*cbs);
         sendSensors(*cbs);
@@ -126,12 +132,11 @@ void Comms::sendConfig(ConnectedBaseStation& cbs)
 
     rapidjson::Document document;
     document.SetObject();
-    document.SetObject();
     document.AddMember("name", rapidjson::Value(config.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
     document.AddMember("sensors_sleeping", config.descriptor.sensorsSleeping, document.GetAllocator());
-    document.AddMember("measurement_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.measurementPeriod).count()), document.GetAllocator());
-    document.AddMember("comms_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.commsPeriod).count()), document.GetAllocator());
-    document.AddMember("baseline", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.baselineTimePoint.time_since_epoch()).count()), document.GetAllocator());
+    document.AddMember("measurement_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.measurementPeriod).count()), document.GetAllocator());
+    document.AddMember("comms_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.commsPeriod).count()), document.GetAllocator());
+    document.AddMember("baseline", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.baselineTimePoint.time_since_epoch()).count()), document.GetAllocator());
 
     rapidjson::StringBuffer buffer;
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
@@ -168,33 +173,34 @@ void Comms::sendSensors(ConnectedBaseStation& cbs)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::requestBindSensor(std::string const& name)
+void Comms::requestBindSensor(ConnectedBaseStation& cbs, DB::SensorId sensorId)
 {
-//    auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [&name](Comms::Sensor const& s) { return s.name == name; });
-//    if (it != m_sensors.end())
-//    {
-//        std::cerr << "Sensor already exists: " << name << "\n";
-//        return;
-//    }
+    DB& db = cbs.baseStation.db;
 
-//    m_sensorWaitingForBinding.name = name;
+    int32_t sensorIndex = db.findSensorIndexById(sensorId);
+    if (sensorIndex < 0)
+    {
+        std::cerr << "Cannot send bind request: Bad sensor id.\n";
+        return;
+    }
 
-//    try
-//    {
-//        std::stringstream ss;
-//        boost::property_tree::ptree pt;
+    DB::Sensor const& sensor = db.getSensor(sensorIndex);
+    if (sensor.state != DB::Sensor::State::Unbound)
+    {
+        std::cerr << "Cannot send bind request: Sensor in bad state.\n";
+        return;
+    }
 
-//        pt.add("unbound_sensor_name", name);
+    rapidjson::Document document;
+    document.SetObject();
+    document.AddMember("name", rapidjson::Value(sensor.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
+    document.AddMember("id", sensor.id, document.GetAllocator());
 
-//        boost::property_tree::write_json(ss, pt);
+    rapidjson::StringBuffer buffer;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    document.Accept(writer);
 
-//        std::string str = ss.str();
-//        m_bsChannel.send(data::Server_Message::ADD_SENSOR_REQ, str.data(), str.size());
-//    }
-//    catch (std::exception const& e)
-//    {
-//        std::cerr << "Cannot serialize request: " << e.what() << "\n";
-//    }
+    cbs.channel.send(data::Server_Message::ADD_SENSOR_REQ, buffer.GetString(), buffer.GetSize());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -247,7 +253,23 @@ void Comms::processSetConfigRes(ConnectedBaseStation& cbs)
 
 void Comms::processAddSensorRes(ConnectedBaseStation& cbs)
 {
+    std::vector<uint8_t> buffer;
+    cbs.channel.unpack(buffer);
 
+    if (buffer.size() != 1)
+    {
+        std::cerr << "Cannot deserialize request: Bad data.\n";
+        return;
+    }
+
+    bool ok = *reinterpret_cast<bool const*>(buffer.data());
+    if (!ok)
+    {
+        std::cerr << "Adding the sensor FAILED.\n";
+        return;
+    }
+
+    std::cout << "Adding the sensor succeded.\n";
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -257,6 +279,7 @@ void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
     std::vector<uint8_t> buffer;
     cbs.channel.unpack(buffer);
 
+    DB::Measurement measurement;
     bool ok = false;
 
     {
@@ -272,8 +295,6 @@ void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
             std::cerr << "Cannot deserialize request: Bad document.\n";
             goto end;
         }
-
-        DB::Measurement measurement;
 
         auto it = document.FindMember("sensor_id");
         if (it == document.MemberEnd() || !it->value.IsUint())
@@ -292,12 +313,12 @@ void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
         measurement.index = it->value.GetUint();
 
         it = document.FindMember("time_point");
-        if (it == document.MemberEnd() || !it->value.IsUint64())
+        if (it == document.MemberEnd() || !it->value.IsInt64())
         {
             std::cerr << "Cannot deserialize request: Missing time_point.\n";
             goto end;
         }
-        measurement.timePoint = DB::Clock::time_point(std::chrono::seconds(it->value.GetUint64()));
+        measurement.timePoint = DB::Clock::time_point(std::chrono::seconds(it->value.GetInt64()));
 
         it = document.FindMember("temperature");
         if (it == document.MemberEnd() || !it->value.IsNumber())
@@ -357,7 +378,21 @@ void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
     }
 
 end:
-    cbs.channel.send(data::Server_Message::REPORT_MEASUREMENT_RES, &ok, 1);
+    {
+        DB& db = cbs.baseStation.db;
+
+        rapidjson::Document document;
+        document.SetObject();
+        document.AddMember("sensor_id", measurement.sensorId, document.GetAllocator());
+        document.AddMember("index", measurement.index, document.GetAllocator());
+        document.AddMember("ok", ok, document.GetAllocator());
+
+        rapidjson::StringBuffer buffer;
+        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+        document.Accept(writer);
+
+        cbs.channel.send(data::Server_Message::REPORT_MEASUREMENT_RES, buffer.GetString(), buffer.GetSize());
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////

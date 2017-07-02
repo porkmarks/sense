@@ -1,5 +1,8 @@
 <RCC>
 <qresource prefix="/">
+<file>icons/ui/sensor-error.png</file>
+<file>icons/ui/hardware-error.png</file>
+<file>icons/ui/comms-error.png</file>
 <file>icons/ui/email.png</file>
 <file>icons/ui/humidity.png</file>
 <file>icons/ui/temperature.png</file>

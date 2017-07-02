@@ -24,5 +24,6 @@ private slots:
 private:
     Ui::SensorsWidget m_ui;
     std::unique_ptr<SensorsModel> m_model;
+    DB* m_db = nullptr;
 };
 

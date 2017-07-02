@@ -44,7 +44,7 @@ public:
         // config.baseline_time_point = m.time_point - m.index * config.measurement_period
         //
         //The reason for this is to keep the indices valid in all configs
-        Clock::time_point baselineTimePoint;
+        Clock::time_point baselineTimePoint = Clock::now();
     };
 
     bool setConfig(ConfigDescriptor const& descriptor);
@@ -54,8 +54,8 @@ public:
     {
         enum type : uint8_t
         {
-            SensorError   = 1 << 0,
-            CommsError    = 1 << 1
+            Hardware    = 1 << 0,
+            Comms       = 1 << 1
         };
     };
 
@@ -114,6 +114,9 @@ public:
     struct AlarmDescriptor
     {
         std::string name;
+
+        bool filterSensors = false;
+        std::vector<SensorId> sensors;
 
         bool lowTemperatureWatch = false;
         float lowTemperature = 0;
@@ -224,6 +227,7 @@ signals:
     void sensorWillBeRemoved(SensorId id);
     void sensorRemoved(SensorId id);
     void sensorChanged(SensorId id);
+    void sensorDataChanged(SensorId id);
 
     void alarmWillBeAdded(AlarmId id);
     void alarmAdded(AlarmId id);
