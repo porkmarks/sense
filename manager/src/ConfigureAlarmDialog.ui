@@ -468,7 +468,11 @@
           <number>2</number>
          </property>
          <item>
-          <widget class="QTreeView" name="sensorList"/>
+          <widget class="QTreeView" name="sensorList">
+           <property name="alternatingRowColors">
+            <bool>true</bool>
+           </property>
+          </widget>
          </item>
         </layout>
        </widget>
