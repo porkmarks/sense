@@ -157,6 +157,7 @@ public:
     int32_t findAlarmIndexByName(std::string const& name) const;
     int32_t findAlarmIndexById(AlarmId id) const;
     bool addAlarm(AlarmDescriptor const& descriptor);
+    bool setAlarm(AlarmId id, AlarmDescriptor const& descriptor);
     void removeAlarm(size_t index);
 
     struct TriggeredAlarm
@@ -238,6 +239,7 @@ signals:
     void alarmAdded(AlarmId id);
     void alarmWillBeRemoved(AlarmId id);
     void alarmRemoved(AlarmId id);
+    void alarmChanged(AlarmId id);
     void alarmTriggered(AlarmId id);
 
     void measurementsWillBeAdded(SensorId id);

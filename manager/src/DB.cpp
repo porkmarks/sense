@@ -831,6 +831,30 @@ bool DB::addAlarm(AlarmDescriptor const& descriptor)
 
 //////////////////////////////////////////////////////////////////////////
 
+bool DB::setAlarm(AlarmId id, AlarmDescriptor const& descriptor)
+{
+    int32_t index = findAlarmIndexByName(descriptor.name);
+    if (index >= 0 && getAlarm(index).id != id)
+    {
+        return false;
+    }
+
+    index = findAlarmIndexById(id);
+    if (index < 0)
+    {
+        return false;
+    }
+
+    m_mainData.alarms[index].descriptor = descriptor;
+    emit alarmChanged(id);
+
+    triggerSave();
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void DB::removeAlarm(size_t index)
 {
     assert(index < m_mainData.alarms.size());
@@ -848,6 +872,18 @@ void DB::removeAlarm(size_t index)
 int32_t DB::findAlarmIndexByName(std::string const& name) const
 {
     auto it = std::find_if(m_mainData.alarms.begin(), m_mainData.alarms.end(), [&name](Alarm const& alarm) { return alarm.descriptor.name == name; });
+    if (it == m_mainData.alarms.end())
+    {
+        return -1;
+    }
+    return std::distance(m_mainData.alarms.begin(), it);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+int32_t DB::findAlarmIndexById(AlarmId id) const
+{
+    auto it = std::find_if(m_mainData.alarms.begin(), m_mainData.alarms.end(), [id](Alarm const& alarm) { return alarm.id == id; });
     if (it == m_mainData.alarms.end())
     {
         return -1;

@@ -73,7 +73,9 @@ HEADERS += \
     ../../src/MeasurementsModel.h \
     ../../src/DB.h \
     ../../src/MeasurementsDelegate.h \
-    ../../src/SensorsDelegate.h
+    ../../src/SensorsDelegate.h \
+    ../../src/ExportDialog.h \
+    ../../src/ConfigureAlarmDialog.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -90,7 +92,9 @@ SOURCES += \
     ../../src/AlarmsModel.cpp \
     ../../src/MeasurementsModel.cpp \
     ../../src/MeasurementsDelegate.cpp \
-    ../../src/SensorsDelegate.cpp
+    ../../src/SensorsDelegate.cpp \
+    ../../src/ExportDialog.cpp \
+    ../../src/ConfigureAlarmDialog.cpp
 
 FORMS += \
     ../../src/Manager.ui \
@@ -100,8 +104,8 @@ FORMS += \
     ../../src/SensorsWidget.ui \
     ../../src/SensorsFilterDialog.ui \
     ../../src/AlarmsWidget.ui \
-    ../../src/AlarmDialog.ui \
-    ../../src/ExportDataDialog.ui
+    ../../src/ExportDialog.ui \
+    ../../src/ConfigureAlarmDialog.ui
 
 DISTFILES += \
 

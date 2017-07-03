@@ -1,5 +1,5 @@
 #include "AlarmsWidget.h"
-
+#include "ConfigureAlarmDialog.h"
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -11,6 +11,7 @@ AlarmsWidget::AlarmsWidget(QWidget *parent)
 
     connect(m_ui.add, &QPushButton::released, this, &AlarmsWidget::addAlarm);
     connect(m_ui.remove, &QPushButton::released, this, &AlarmsWidget::removeAlarms);
+    connect(m_ui.list, &QTreeView::activated, this, &AlarmsWidget::configureAlarm);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -49,168 +50,49 @@ void AlarmsWidget::shutdown()
 
 //////////////////////////////////////////////////////////////////////////
 
-void AlarmsWidget::prepareAlarmDialog(AlarmDialog& dialog)
+void AlarmsWidget::configureAlarm(QModelIndex const& index)
 {
-    dialog.ui.setupUi(&dialog.dialog);
-    dialog.model.setShowCheckboxes(true);
-    dialog.sortingModel.setSourceModel(&dialog.model);
-
-    size_t sensorCount = m_db->getSensorCount();
-    for (size_t i = 0; i < sensorCount; i++)
+    if (!index.isValid() || static_cast<size_t>(index.row()) >= m_db->getAlarmCount())
     {
-        dialog.model.setSensorChecked(m_db->getSensor(i).id, true);
+        return;
     }
 
-    dialog.ui.sensorList->setModel(&dialog.sortingModel);
-    dialog.ui.sensorList->setItemDelegate(&dialog.delegate);
+    DB::Alarm alarm = m_db->getAlarm(index.row());
 
-    for (int i = 0; i < dialog.model.columnCount(); i++)
+    ConfigureAlarmDialog dialog(*m_db);
+    dialog.setAlarm(alarm);
+
+    int result = dialog.exec();
+    if (result == QDialog::Accepted)
     {
-        dialog.ui.sensorList->header()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
-    }
-    dialog.ui.sensorList->header()->setStretchLastSection(true);
-}
+        alarm = dialog.getAlarm();
+        m_db->setAlarm(alarm.id, alarm.descriptor);
+        m_model->refresh();
 
-//////////////////////////////////////////////////////////////////////////
-
-void AlarmsWidget::getAlarmData(DB::AlarmDescriptor& alarm, AlarmDialog const& dialog)
-{
-    alarm.name = dialog.ui.name->text().toUtf8().data();
-
-    alarm.filterSensors = dialog.ui.sensorGroup->isChecked();
-    alarm.sensors.clear();
-    if (alarm.filterSensors)
-    {
-        size_t sensorCount = m_db->getSensorCount();
-        for (size_t i = 0; i < sensorCount; i++)
+        for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
         {
-            DB::Sensor const& sensor = m_db->getSensor(i);
-            if (dialog.model.isSensorChecked(sensor.id))
-            {
-                alarm.sensors.push_back(sensor.id);
-            }
+            m_ui.list->resizeColumnToContents(i);
         }
     }
-
-    alarm.highTemperatureWatch = dialog.ui.highTemperatureWatch->isChecked();
-    alarm.highTemperature = dialog.ui.highTemperature->value();
-    alarm.lowTemperatureWatch = dialog.ui.lowTemperatureWatch->isChecked();
-    alarm.lowTemperature = dialog.ui.lowTemperature->value();
-
-    alarm.highHumidityWatch = dialog.ui.highHumidityWatch->isChecked();
-    alarm.highHumidity = dialog.ui.highHumidity->value();
-    alarm.lowHumidityWatch = dialog.ui.lowHumidityWatch->isChecked();
-    alarm.lowHumidity = dialog.ui.lowHumidity->value();
-
-    alarm.sensorErrorsWatch = dialog.ui.sensorErrorsWatch->isChecked();
-    alarm.lowSignalWatch = dialog.ui.lowSignalWatch->isChecked();
-    alarm.lowVccWatch = dialog.ui.lowBatteryWatch->isChecked();
-
-    alarm.sendEmailAction = dialog.ui.sendEmailAction->isChecked();
-    alarm.emailRecipient = dialog.ui.emailRecipient->text().toUtf8().data();
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void AlarmsWidget::setAlarmData(AlarmDialog& dialog, DB::AlarmDescriptor const& alarm)
-{
-    dialog.ui.name->setText(alarm.name.c_str());
-
-    dialog.ui.sensorGroup->setChecked(alarm.filterSensors);
-    if (alarm.filterSensors)
-    {
-        size_t sensorCount = m_db->getSensorCount();
-        for (size_t i = 0; i < sensorCount; i++)
-        {
-            dialog.model.setSensorChecked(m_db->getSensor(i).id, false);
-        }
-
-        for (DB::SensorId id: alarm.sensors)
-        {
-            dialog.model.setSensorChecked(id, true);
-        }
-    }
-    else
-    {
-        size_t sensorCount = m_db->getSensorCount();
-        for (size_t i = 0; i < sensorCount; i++)
-        {
-            dialog.model.setSensorChecked(m_db->getSensor(i).id, true);
-        }
-    }
-
-    dialog.ui.highTemperatureWatch->setChecked(alarm.highTemperatureWatch);
-    dialog.ui.highTemperature->setValue(alarm.highTemperature);
-    dialog.ui.lowTemperatureWatch->setChecked(alarm.lowTemperatureWatch);
-    dialog.ui.lowTemperature->setValue(alarm.lowTemperature);
-
-    dialog.ui.highHumidityWatch->setChecked(alarm.highHumidityWatch);
-    dialog.ui.highHumidity->setValue(alarm.highHumidity);
-    dialog.ui.lowHumidityWatch->setChecked(alarm.lowHumidityWatch);
-    dialog.ui.lowHumidity->setValue(alarm.lowHumidity);
-
-    dialog.ui.sensorErrorsWatch->setChecked(alarm.sensorErrorsWatch);
-    dialog.ui.lowSignalWatch->setChecked(alarm.lowSignalWatch);
-    dialog.ui.lowBatteryWatch->setChecked(alarm.lowVccWatch);
-
-    dialog.ui.sendEmailAction->setChecked(alarm.sendEmailAction);
-    dialog.ui.emailRecipient->setText(alarm.emailRecipient.c_str());
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void AlarmsWidget::addAlarm()
 {
-    AlarmDialog dialog(*m_db);
+    ConfigureAlarmDialog dialog(*m_db);
 
-    prepareAlarmDialog(dialog);
-
-    dialog.ui.name->setText(QString("Alarm %1").arg(m_db->getAlarmCount()));
-
-    while (1)
+    int result = dialog.exec();
+    if (result == QDialog::Accepted)
     {
-        int result = dialog.dialog.exec();
-        if (result == QDialog::Accepted)
+        DB::Alarm alarm = dialog.getAlarm();
+        m_db->addAlarm(alarm.descriptor);
+        m_model->refresh();
+
+        for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
         {
-            DB::AlarmDescriptor alarm;
-            getAlarmData(alarm, dialog);
-
-            if (alarm.filterSensors && alarm.sensors.empty())
-            {
-                QMessageBox::critical(this, "Error", "You need to specify at least one sensor.");
-                continue;
-            }
-
-            if (!alarm.highTemperatureWatch && !alarm.lowTemperatureWatch &&
-                    !alarm.highHumidityWatch && !alarm.lowHumidityWatch &&
-                    !alarm.sensorErrorsWatch &&
-                    !alarm.lowSignalWatch &&
-                    !alarm.lowVccWatch)
-            {
-                QMessageBox::critical(this, "Error", "You need to specify at least a trigger condition.");
-                continue;
-            }
-            else if (m_db->findAlarmIndexByName(alarm.name) >= 0)
-            {
-                QMessageBox::critical(this, "Error", QString("Alarm '%1' already exists.").arg(alarm.name.c_str()));
-                continue;
-            }
-            else
-            {
-                m_db->addAlarm(alarm);
-                m_model->refresh();
-                break;
-            }
+            m_ui.list->resizeColumnToContents(i);
         }
-        else
-        {
-            break;
-        }
-    }
-
-    for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
-    {
-        m_ui.list->resizeColumnToContents(i);
     }
 }
 

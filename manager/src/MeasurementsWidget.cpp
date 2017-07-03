@@ -4,17 +4,12 @@
 #include <QFileDialog>
 #include <QMessageBox>
 
+#include "ExportDialog.h"
 #include "SensorsModel.h"
 #include "SensorsDelegate.h"
 #include <QSortFilterProxyModel>
 
 #include "ui_SensorsFilterDialog.h"
-#include "ui_ExportDataDialog.h"
-
-#include <fstream>
-#include <iostream>
-#include <iomanip>
-#include <cstring>
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -298,186 +293,12 @@ void MeasurementsWidget::maxHumidityChanged()
 
 void MeasurementsWidget::exportData()
 {
-    QDialog dialog;
-    Ui::ExportDataDialog ui;
-    ui.setupUi(&dialog);
-
+    ExportDialog dialog(*m_db, *m_model);
     int result = dialog.exec();
     if (result != QDialog::Accepted)
     {
         return;
     }
-
-    std::string separator = ui.separator->text().toUtf8().data();
-    QString extension = "Export Files (*.csv)";
-
-    QString fileName = QFileDialog::getSaveFileName(this, "Select export file", QString(), extension);
-    if (fileName.isEmpty())
-    {
-        return;
-    }
-
-    std::ofstream file(fileName.toUtf8().data());
-    if (!file.is_open())
-    {
-        QMessageBox::critical(this, "Error", QString("Cannot open file '%1' for writing:\n%2").arg(fileName).arg(std::strerror(errno)));
-        return;
-    }
-
-    enum class DateTimeFormat
-    {
-        YYYY_MM_DD_Slash,
-        YYYY_MM_DD_Dash,
-        DD_MM_YYYY_Dash,
-        MM_DD_YYYY_Slash
-    };
-
-    enum class UnitsFormat
-    {
-        None,
-        Embedded,
-        SeparateColumn
-    };
-
-    DateTimeFormat dateTimeFormat = static_cast<DateTimeFormat>(ui.dateFormat->currentIndex());
-    bool exportId = ui.exportId->isChecked();
-    bool exportIndex = ui.exportIndex->isChecked();
-    bool exportSensorName = ui.exportSensorName->isChecked();
-    bool exportTimePoint = ui.exportTimePoint->isChecked();
-    bool exportTemperature = ui.exportTemperature->isChecked();
-    bool exportHumidity = ui.exportHumidity->isChecked();
-    UnitsFormat unitsFormat = static_cast<UnitsFormat>(ui.units->currentIndex());
-    int decimalPlaces = ui.decimalPlaces->value();
-
-    //header
-    if (exportId)
-    {
-        file << "Id";
-        file << separator;
-    }
-    if (exportSensorName)
-    {
-        file << "Sensor Name";
-        file << separator;
-    }
-    if (exportIndex)
-    {
-        file << "Index";
-        file << separator;
-    }
-    if (exportTimePoint)
-    {
-        file << "Date/Time";
-        file << separator;
-    }
-    if (exportTemperature)
-    {
-        file << "Temperature";
-        file << separator;
-    }
-    if (unitsFormat == UnitsFormat::SeparateColumn)
-    {
-        file << "Temperature Unit";
-        file << separator;
-    }
-    if (exportHumidity)
-    {
-        file << "Humidity";
-        file << separator;
-    }
-    if (unitsFormat == UnitsFormat::SeparateColumn)
-    {
-        file << "Humidity Unit";
-        file << separator;
-    }
-    file << std::endl;
-
-    //data
-    size_t size = m_model->getMeasurementCount();
-    for (size_t i = 0; i < size; i++)
-    {
-        DB::Measurement const& m = m_model->getMeasurement(i);
-        if (exportId)
-        {
-            file << m.id;
-            file << separator;
-        }
-        if (exportSensorName)
-        {
-            int32_t sensorIndex = m_db->findSensorIndexById(m.descriptor.sensorId);
-            if (sensorIndex < 0)
-            {
-                file << "N/A";
-            }
-            else
-            {
-                file << m_db->getSensor(sensorIndex).descriptor.name;
-            }
-            file << separator;
-        }
-        if (exportIndex)
-        {
-            file << m.descriptor.index;
-            file << separator;
-        }
-        if (exportTimePoint)
-        {
-            char buf[128];
-            time_t t = DB::Clock::to_time_t(m.descriptor.timePoint);
-            if (dateTimeFormat == DateTimeFormat::YYYY_MM_DD_Slash)
-            {
-                strftime(buf, 128, "%Y/%m/%d %H:%M:%S", localtime(&t));
-            }
-            else if (dateTimeFormat == DateTimeFormat::YYYY_MM_DD_Dash)
-            {
-                strftime(buf, 128, "%Y-%m-%d %H:%M:%S", localtime(&t));
-            }
-            else if (dateTimeFormat == DateTimeFormat::DD_MM_YYYY_Dash)
-            {
-                strftime(buf, 128, "%d-%m-%Y %H:%M:%S", localtime(&t));
-            }
-            else
-            {
-                strftime(buf, 128, "%m/%d/%y %H:%M:%S", localtime(&t));
-            }
-
-            file << buf;
-            file << separator;
-        }
-        if (exportTemperature)
-        {
-            file << std::fixed << std::setprecision(decimalPlaces) << m.descriptor.temperature;
-            if (unitsFormat == UnitsFormat::Embedded)
-            {
-                file << u8" °C";
-            }
-            file << separator;
-        }
-        if (unitsFormat == UnitsFormat::SeparateColumn)
-        {
-            file << u8"°C";
-            file << separator;
-        }
-        if (exportHumidity)
-        {
-            file << std::fixed << std::setprecision(decimalPlaces) << m.descriptor.humidity;
-            if (unitsFormat == UnitsFormat::Embedded)
-            {
-                file << " % RH";
-            }
-            file << separator;
-        }
-        if (unitsFormat == UnitsFormat::SeparateColumn)
-        {
-            file << "% RH";
-            file << separator;
-        }
-        file << std::endl;
-    }
-
-    file.close();
-
-    QMessageBox::information(this, "Success", QString("Data was exported to file '%1'").arg(fileName));
 }
 
 //////////////////////////////////////////////////////////////////////////
