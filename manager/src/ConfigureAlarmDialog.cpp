@@ -1,5 +1,7 @@
 #include "ConfigureAlarmDialog.h"
 
+//////////////////////////////////////////////////////////////////////////
+
 ConfigureAlarmDialog::ConfigureAlarmDialog(DB& db)
     : m_db(db)
     , m_model(db)
@@ -26,10 +28,15 @@ ConfigureAlarmDialog::ConfigureAlarmDialog(DB& db)
     m_ui.sensorList->header()->setStretchLastSection(true);
 }
 
+//////////////////////////////////////////////////////////////////////////
+
 DB::Alarm const& ConfigureAlarmDialog::getAlarm() const
 {
     return m_alarm;
 }
+
+//////////////////////////////////////////////////////////////////////////
+
 void ConfigureAlarmDialog::setAlarm(DB::Alarm const& alarm)
 {
     m_alarm = alarm;
@@ -77,6 +84,8 @@ void ConfigureAlarmDialog::setAlarm(DB::Alarm const& alarm)
     m_ui.sendEmailAction->setChecked(descriptor.sendEmailAction);
     m_ui.emailRecipient->setText(descriptor.emailRecipient.c_str());
 }
+
+//////////////////////////////////////////////////////////////////////////
 
 void ConfigureAlarmDialog::accept()
 {
@@ -144,3 +153,6 @@ void ConfigureAlarmDialog::accept()
     m_alarm.descriptor = descriptor;
     QDialog::accept();
 }
+
+//////////////////////////////////////////////////////////////////////////
+

@@ -211,7 +211,7 @@
             <item row="2" column="1" colspan="2">
              <widget class="QSpinBox" name="decimalPlaces">
               <property name="maximum">
-               <number>4</number>
+               <number>2</number>
               </property>
               <property name="value">
                <number>2</number>
@@ -305,14 +305,24 @@
           <number>0</number>
          </property>
          <item>
-          <widget class="QPushButton" name="showPreview">
+          <widget class="QPushButton" name="preview">
+           <property name="font">
+            <font>
+             <family>Cantarell</family>
+            </font>
+           </property>
            <property name="text">
             <string>Preview</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QTextEdit" name="preview">
+          <widget class="QTextEdit" name="previewText">
+           <property name="font">
+            <font>
+             <family>Courier 10 Pitch</family>
+            </font>
+           </property>
            <property name="lineWrapMode">
             <enum>QTextEdit::NoWrap</enum>
            </property>

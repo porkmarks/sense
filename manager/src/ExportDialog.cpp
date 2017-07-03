@@ -12,7 +12,7 @@ ExportDialog::ExportDialog(DB& db, MeasurementsModel& model)
 {
     m_ui.setupUi(this);
 
-    connect(m_ui.showPreview, &QPushButton::released, this, &ExportDialog::showPreview);
+    connect(m_ui.preview, &QPushButton::released, this, &ExportDialog::showPreview);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -22,7 +22,7 @@ void ExportDialog::showPreview()
     std::stringstream stream;
     exportTo(stream, 100);
 
-    m_ui.preview->setText((stream.str() + "\n.....\n").c_str());
+    m_ui.previewText->setText((stream.str() + "\n.....\n").c_str());
 }
 
 //////////////////////////////////////////////////////////////////////////
