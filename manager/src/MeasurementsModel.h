@@ -22,6 +22,7 @@ public:
 
     enum class Column
     {
+        Id,
         Sensor,
         Index,
         Timestamp,

@@ -390,6 +390,16 @@
             </property>
            </spacer>
           </item>
+          <item row="2" column="0" colspan="2">
+           <widget class="QLabel" name="resultCount">
+            <property name="text">
+             <string>0 results</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
          </layout>
         </widget>
        </item>
@@ -450,12 +460,13 @@
            </spacer>
           </item>
           <item row="3" column="0">
-           <widget class="QLabel" name="resultCount">
+           <widget class="QPushButton" name="generateReport">
             <property name="text">
-             <string>0 results</string>
+             <string>Generate Report</string>
             </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
+            <property name="icon">
+             <iconset resource="../res/res.qrc">
+              <normaloff>:/icons/ui/report.png</normaloff>:/icons/ui/report.png</iconset>
             </property>
            </widget>
           </item>

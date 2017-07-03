@@ -467,24 +467,31 @@ bool DB::open(std::string const& name)
 
             for (auto it = storedMeasurements.begin(); it != storedMeasurements.end();)
             {
-                StoredMeasurement const& sm = *it;
+                StoredMeasurement& sm = *it;
                 Measurement measurement = unpack(sensorId, sm);
-                PrimaryKey pk = computePrimaryKey(measurement.descriptor);
+                MeasurementId id = computeMeasurementId(measurement.descriptor);
 
                 //check for duplicates
-                auto lbit = std::lower_bound(m_sortedPrimaryKeys.begin(), m_sortedPrimaryKeys.end(), pk);
-                if (lbit != m_sortedPrimaryKeys.end() && *lbit == pk)
+                auto lbit = std::lower_bound(data.sortedMeasurementIds.begin(), data.sortedMeasurementIds.end(), id);
+                if (lbit != data.sortedMeasurementIds.end() && *lbit == id)
                 {
                     std::cerr << "Duplicate measurement index " << std::to_string(sm.index) << " found. Deleting it\n";
                     storedMeasurements.erase(it);
                 }
                 else
                 {
-                    m_sortedPrimaryKeys.insert(lbit, pk);
+                    data.sortedMeasurementIds.insert(lbit, id);
                     sensor.isLastMeasurementValid = true;
                     sensor.lastMeasurement = measurement;
                     ++it;
                 }
+            }
+
+            if (!storedMeasurements.empty())
+            {
+                Measurement measurement = unpack(sensorId, storedMeasurements.back());
+                sensor.isLastMeasurementValid = true;
+                sensor.lastMeasurement = measurement;
             }
         }
 
@@ -725,32 +732,32 @@ void DB::removeSensor(size_t index)
 {
     assert(index < m_mainData.sensors.size());
 
-    SensorId id = m_mainData.sensors[index].id;
+    SensorId sensorId = m_mainData.sensors[index].id;
 
     {
-        auto it = m_mainData.measurements.find(id);
+        auto it = m_mainData.measurements.find(sensorId);
         if (it != m_mainData.measurements.end())
         {
-            emit measurementsWillBeRemoved(id);
+            emit measurementsWillBeRemoved(sensorId);
 
             for (StoredMeasurement const& sm: it->second)
             {
-                PrimaryKey pk = computePrimaryKey(id, sm);
-                auto sit = std::lower_bound(m_sortedPrimaryKeys.begin(), m_sortedPrimaryKeys.end(), pk);
-                if (sit != m_sortedPrimaryKeys.end() && *sit == pk)
+                MeasurementId id = computeMeasurementId(sensorId, sm);
+                auto sit = std::lower_bound(m_mainData.sortedMeasurementIds.begin(), m_mainData.sortedMeasurementIds.end(), id);
+                if (sit != m_mainData.sortedMeasurementIds.end() && *sit == id)
                 {
-                    m_sortedPrimaryKeys.erase(sit);
+                    m_mainData.sortedMeasurementIds.erase(sit);
                 }
             }
 
             m_mainData.measurements.erase(it);
-            emit measurementsRemoved(id);
+            emit measurementsRemoved(sensorId);
         }
     }
 
-    emit sensorWillBeRemoved(id);
+    emit sensorWillBeRemoved(sensorId);
     m_mainData.sensors.erase(m_mainData.sensors.begin() + index);
-    emit sensorRemoved(id);
+    emit sensorRemoved(sensorId);
 
     triggerSave();
 }
@@ -911,11 +918,11 @@ bool DB::addMeasurement(MeasurementDescriptor const& md)
         return false;
     }
 
-    PrimaryKey pk = computePrimaryKey(md);
+    MeasurementId id = computeMeasurementId(md);
 
     //check for duplicates
-    auto it = std::lower_bound(m_sortedPrimaryKeys.begin(), m_sortedPrimaryKeys.end(), pk);
-    if (it != m_sortedPrimaryKeys.end() && *it == pk)
+    auto it = std::lower_bound(m_mainData.sortedMeasurementIds.begin(), m_mainData.sortedMeasurementIds.end(), id);
+    if (it != m_mainData.sortedMeasurementIds.end() && *it == id)
     {
         return true;
     }
@@ -923,10 +930,11 @@ bool DB::addMeasurement(MeasurementDescriptor const& md)
     Measurement measurement;
     measurement.descriptor = md;
     measurement.triggeredAlarms = computeTriggeredAlarm(md);
+    measurement.id = id;
 
     emit measurementsWillBeAdded(md.sensorId);
     m_mainData.measurements[md.sensorId].push_back(pack(measurement));
-    m_sortedPrimaryKeys.insert(it, pk);
+    m_mainData.sortedMeasurementIds.insert(it, id);
     emit measurementsAdded(md.sensorId);
 
     Sensor& sensor = m_mainData.sensors[sensorIndex];
@@ -1125,10 +1133,11 @@ inline DB::StoredMeasurement DB::pack(Measurement const& m)
 
 //////////////////////////////////////////////////////////////////////////
 
-inline DB::Measurement DB::unpack(SensorId sensor_id, StoredMeasurement const& sm)
+inline DB::Measurement DB::unpack(SensorId sensorId, StoredMeasurement const& sm)
 {
     Measurement m;
-    m.descriptor.sensorId = sensor_id;
+    m.id = computeMeasurementId(sensorId, sm);
+    m.descriptor.sensorId = sensorId;
     m.descriptor.index = sm.index;
     m.descriptor.timePoint = Clock::from_time_t(sm.timePoint);
     m.descriptor.temperature = static_cast<float>(sm.temperature) / 100.f;
@@ -1143,16 +1152,16 @@ inline DB::Measurement DB::unpack(SensorId sensor_id, StoredMeasurement const& s
 
 //////////////////////////////////////////////////////////////////////////
 
-inline DB::PrimaryKey DB::computePrimaryKey(MeasurementDescriptor const& md)
+inline DB::MeasurementId DB::computeMeasurementId(MeasurementDescriptor const& md)
 {
-    return (PrimaryKey(md.sensorId) << 32) | PrimaryKey(md.index);
+    return (MeasurementId(md.sensorId) << 32) | MeasurementId(md.index);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-inline DB::PrimaryKey DB::computePrimaryKey(SensorId sensor_id, StoredMeasurement const& m)
+inline DB::MeasurementId DB::computeMeasurementId(SensorId sensor_id, StoredMeasurement const& m)
 {
-    return (PrimaryKey(sensor_id) << 32) | PrimaryKey(m.index);
+    return (MeasurementId(sensor_id) << 32) | MeasurementId(m.index);
 }
 
 //////////////////////////////////////////////////////////////////////////

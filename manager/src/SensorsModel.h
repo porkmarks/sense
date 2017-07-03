@@ -27,8 +27,6 @@ public:
         Battery,
         Signal,
         State,
-        NextMeasurement,
-        NextComms,
         SensorErrors,
         Alarms
     };

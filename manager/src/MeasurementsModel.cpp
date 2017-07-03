@@ -4,7 +4,7 @@
 #include <QIcon>
 #include <bitset>
 
-static std::array<const char*, 9> s_headerNames = {"Sensor", "Index", "Timestamp", "Temperature", "Humidity", "Battery", "Signal", "Sensor Errors", "Alarms"};
+static std::array<const char*, 10> s_headerNames = {"Id", "Sensor", "Index", "Timestamp", "Temperature", "Humidity", "Battery", "Signal", "Sensor Errors", "Alarms"};
 
 float getBatteryLevel(float vcc)
 {
@@ -178,7 +178,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
     }
     else if (role == Qt::DecorationRole)
     {
-        if (column == Column::Sensor)
+        if (column == Column::Id)
         {
             static QIcon icon(":/icons/ui/sensor.png");
             return icon;
@@ -204,7 +204,11 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
     }
     else if (role == Qt::DisplayRole)
     {
-        if (column == Column::Sensor)
+        if (column == Column::Id)
+        {
+            return static_cast<qulonglong>(measurement.id);
+        }
+        else if (column == Column::Sensor)
         {
             int32_t sensorIndex = m_db.findSensorIndexById(measurement.descriptor.sensorId);
             if (sensorIndex < 0)

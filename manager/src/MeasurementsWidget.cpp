@@ -340,28 +340,34 @@ void MeasurementsWidget::exportData()
     };
 
     DateTimeFormat dateTimeFormat = static_cast<DateTimeFormat>(ui.dateFormat->currentIndex());
+    bool exportId = ui.exportId->isChecked();
+    bool exportIndex = ui.exportIndex->isChecked();
     bool exportSensorName = ui.exportSensorName->isChecked();
     bool exportTimePoint = ui.exportTimePoint->isChecked();
-    bool exportIndex = ui.exportIndex->isChecked();
     bool exportTemperature = ui.exportTemperature->isChecked();
     bool exportHumidity = ui.exportHumidity->isChecked();
     UnitsFormat unitsFormat = static_cast<UnitsFormat>(ui.units->currentIndex());
     int decimalPlaces = ui.decimalPlaces->value();
 
     //header
+    if (exportId)
+    {
+        file << "Id";
+        file << separator;
+    }
     if (exportSensorName)
     {
         file << "Sensor Name";
         file << separator;
     }
-    if (exportTimePoint)
-    {
-        file << "Date/Time";
-        file << separator;
-    }
     if (exportIndex)
     {
         file << "Index";
+        file << separator;
+    }
+    if (exportTimePoint)
+    {
+        file << "Date/Time";
         file << separator;
     }
     if (exportTemperature)
@@ -391,6 +397,11 @@ void MeasurementsWidget::exportData()
     for (size_t i = 0; i < size; i++)
     {
         DB::Measurement const& m = m_model->getMeasurement(i);
+        if (exportId)
+        {
+            file << m.id;
+            file << separator;
+        }
         if (exportSensorName)
         {
             int32_t sensorIndex = m_db->findSensorIndexById(m.descriptor.sensorId);
@@ -402,6 +413,11 @@ void MeasurementsWidget::exportData()
             {
                 file << m_db->getSensor(sensorIndex).descriptor.name;
             }
+            file << separator;
+        }
+        if (exportIndex)
+        {
+            file << m.descriptor.index;
             file << separator;
         }
         if (exportTimePoint)
@@ -426,11 +442,6 @@ void MeasurementsWidget::exportData()
             }
 
             file << buf;
-            file << separator;
-        }
-        if (exportIndex)
-        {
-            file << m.descriptor.index;
             file << separator;
         }
         if (exportTemperature)

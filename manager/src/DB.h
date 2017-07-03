@@ -61,6 +61,7 @@ public:
 
     typedef uint32_t SensorId;
     typedef uint32_t SensorAddress;
+    typedef uint64_t MeasurementId;
 
     struct MeasurementDescriptor
     {
@@ -77,6 +78,7 @@ public:
     };
     struct Measurement
     {
+        MeasurementId id;
         MeasurementDescriptor descriptor;
         uint8_t triggeredAlarms = 0;
     };
@@ -266,14 +268,11 @@ private:
 #pragma pack(push, 0) // exact fit - no padding
 
     typedef std::vector<StoredMeasurement> StoredMeasurements;
-    typedef uint64_t PrimaryKey;
 
     static inline StoredMeasurement pack(Measurement const& m);
     static inline Measurement unpack(SensorId sensor_id, StoredMeasurement const& m);
-    static inline PrimaryKey computePrimaryKey(MeasurementDescriptor const& md);
-    static inline PrimaryKey computePrimaryKey(SensorId sensor_id, StoredMeasurement const& m);
-
-    std::vector<PrimaryKey> m_sortedPrimaryKeys;
+    static inline MeasurementId computeMeasurementId(MeasurementDescriptor const& md);
+    static inline MeasurementId computeMeasurementId(SensorId sensor_id, StoredMeasurement const& m);
 
     struct Data
     {
@@ -281,8 +280,10 @@ private:
         std::vector<Sensor> sensors;
         std::vector<Alarm> alarms;
         std::map<SensorId, StoredMeasurements> measurements;
+        std::vector<MeasurementId> sortedMeasurementIds;
         SensorId lastSensorId = 0;
         AlarmId lastAlarmId = 0;
+        MeasurementId lastMeasurementId = 0;
     };
 
     Data m_mainData;

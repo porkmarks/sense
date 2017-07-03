@@ -6,7 +6,7 @@
 #include <QDateTime>
 #include <cassert>
 
-static std::array<const char*, 12> s_headerNames = {"Name", "Id", "Address", "Temperature", "Humidity", "Battery", "Signal", "State", "Next Measurement", "Next Comms", "Sensor Errors", "Alarms"};
+static std::array<const char*, 10> s_headerNames = {"Name", "Id", "Address", "Temperature", "Humidity", "Battery", "Signal", "State", "Sensor Errors", "Alarms"};
 
 extern float getBatteryLevel(float vcc);
 extern QIcon getBatteryIcon(float vcc);
@@ -245,20 +245,20 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         {
             return QIcon(":/icons/ui/sensor.png");
         }
-        else if (column == Column::NextMeasurement)
-        {
-            if (sensor.nextMeasurementTimePoint.time_since_epoch().count() == 0)
-            {
-                return QIcon(":/icons/ui/question.png");
-            }
-        }
-        else if (column == Column::NextComms)
-        {
-            if (sensor.nextCommsTimePoint.time_since_epoch().count() == 0)
-            {
-                return QIcon(":/icons/ui/question.png");
-            }
-        }
+//        else if (column == Column::NextMeasurement)
+//        {
+//            if (sensor.nextMeasurementTimePoint.time_since_epoch().count() == 0)
+//            {
+//                return QIcon(":/icons/ui/question.png");
+//            }
+//        }
+//        else if (column == Column::NextComms)
+//        {
+//            if (sensor.nextCommsTimePoint.time_since_epoch().count() == 0)
+//            {
+//                return QIcon(":/icons/ui/question.png");
+//            }
+//        }
         else
         {
             if (sensor.isLastMeasurementValid)
@@ -321,26 +321,26 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                 return "Not bound";
             }
         }
-        else if (column == Column::NextMeasurement)
-        {
-            if (sensor.nextMeasurementTimePoint.time_since_epoch().count() != 0)
-            {
-                time_t next = DB::Clock::to_time_t(sensor.nextMeasurementTimePoint);
-                QDateTime dt;
-                dt.setTime_t(next);
-                return dt;
-            }
-        }
-        else if (column == Column::NextComms)
-        {
-            if (sensor.nextCommsTimePoint.time_since_epoch().count() != 0)
-            {
-                time_t next = DB::Clock::to_time_t(sensor.nextCommsTimePoint);
-                QDateTime dt;
-                dt.setTime_t(next);
-                return dt;
-            }
-        }
+//        else if (column == Column::NextMeasurement)
+//        {
+//            if (sensor.nextMeasurementTimePoint.time_since_epoch().count() != 0)
+//            {
+//                time_t next = DB::Clock::to_time_t(sensor.nextMeasurementTimePoint);
+//                QDateTime dt;
+//                dt.setTime_t(next);
+//                return dt;
+//            }
+//        }
+//        else if (column == Column::NextComms)
+//        {
+//            if (sensor.nextCommsTimePoint.time_since_epoch().count() != 0)
+//            {
+//                time_t next = DB::Clock::to_time_t(sensor.nextCommsTimePoint);
+//                QDateTime dt;
+//                dt.setTime_t(next);
+//                return dt;
+//            }
+//        }
         else if (column == Column::Alarms)
         {
             return sensor.isLastMeasurementValid ? sensor.lastMeasurement.triggeredAlarms : -1;

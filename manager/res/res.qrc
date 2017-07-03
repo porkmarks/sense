@@ -1,5 +1,6 @@
 <RCC>
 <qresource prefix="/">
+<file>icons/ui/report.png</file>
 <file>icons/ui/sensor-error.png</file>
 <file>icons/ui/hardware-error.png</file>
 <file>icons/ui/comms-error.png</file>
