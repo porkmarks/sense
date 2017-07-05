@@ -73,14 +73,17 @@ void MeasurementsWidget::init(DB& db)
 
     std::cout.flush();
 
+    setDateTimePresetThisWeek();
+
     refreshFromDB();
 
     connect(m_ui.apply, &QPushButton::released, this, &MeasurementsWidget::refreshFromDB);
-    connect(m_ui.minDateTimeNow, &QPushButton::released, this, &MeasurementsWidget::setMinDateTimeNow);
-    connect(m_ui.maxDateTimeNow, &QPushButton::released, this, &MeasurementsWidget::setMaxDateTimeNow);
-    connect(m_ui.thisDay, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisDay);
-    connect(m_ui.thisWeek, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisWeek);
-    connect(m_ui.thisMonth, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisMonth);
+    connect(m_ui.dateTimePreset, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &MeasurementsWidget::setDateTimePreset);
+    //connect(m_ui.minDateTimeNow, &QPushButton::released, this, &MeasurementsWidget::setMinDateTimeNow);
+    //connect(m_ui.maxDateTimeNow, &QPushButton::released, this, &MeasurementsWidget::setMaxDateTimeNow);
+    //connect(m_ui.thisDay, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisDay);
+    //connect(m_ui.thisWeek, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisWeek);
+    //connect(m_ui.thisMonth, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisMonth);
     connect(m_ui.selectSensors, &QPushButton::released, this, &MeasurementsWidget::selectSensors);
     connect(m_ui.exportData, &QPushButton::released, this, &MeasurementsWidget::exportData);
 
@@ -124,7 +127,8 @@ DB::Filter MeasurementsWidget::createFilter() const
         filter.sensorIds = m_selectedSensorIds;
     }
 
-    filter.useTimePointFilter = m_ui.dateTimeFilter->isChecked();
+    //filter.useTimePointFilter = m_ui.dateTimeFilter->isChecked();
+    filter.useTimePointFilter = true;
     filter.timePointFilter.min = DB::Clock::from_time_t(m_ui.minDateTime->dateTime().toTime_t());
     filter.timePointFilter.max = DB::Clock::from_time_t(m_ui.maxDateTime->dateTime().toTime_t());
 
@@ -154,15 +158,15 @@ void MeasurementsWidget::refreshFromDB()
     }
 
     m_ui.exportData->setEnabled(m_model->getMeasurementCount() > 0);
+
+    m_ui.plotWidget->refresh(*m_db, *m_model);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void MeasurementsWidget::setMinDateTimeNow()
 {
-    DB::Clock::time_point now = DB::Clock::now();
-    QDateTime dt;
-    dt.setTime_t(DB::Clock::to_time_t(now));
+    QDateTime dt = QDateTime::currentDateTime();
     m_ui.minDateTime->setDateTime(dt);
 }
 
@@ -170,19 +174,32 @@ void MeasurementsWidget::setMinDateTimeNow()
 
 void MeasurementsWidget::setMaxDateTimeNow()
 {
-    DB::Clock::time_point now = DB::Clock::now();
-    QDateTime dt;
-    dt.setTime_t(DB::Clock::to_time_t(now));
+    QDateTime dt = QDateTime::currentDateTime();
     m_ui.maxDateTime->setDateTime(dt);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void MeasurementsWidget::setDateTimeThisDay()
+void MeasurementsWidget::setDateTimePreset(int preset)
 {
-    DB::Clock::time_point now = DB::Clock::now();
-    QDateTime dt;
-    dt.setTime_t(DB::Clock::to_time_t(now));
+    switch (preset)
+    {
+    case 0: setDateTimePresetToday(); break;
+    case 1: setDateTimePresetYesterday(); break;
+    case 2: setDateTimePresetThisWeek(); break;
+    case 3: setDateTimePresetLastWeek(); break;
+    case 4: setDateTimePresetThisMonth(); break;
+    case 5: setDateTimePresetLastMonth(); break;
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsWidget::setDateTimePresetToday()
+{
+    QDateTime dt = QDateTime::currentDateTime();
+
+    dt.setTime(QTime(23, 59, 59, 999));
     m_ui.maxDateTime->setDateTime(dt);
 
     dt.setTime(QTime(0, 0));
@@ -191,30 +208,75 @@ void MeasurementsWidget::setDateTimeThisDay()
 
 //////////////////////////////////////////////////////////////////////////
 
-void MeasurementsWidget::setDateTimeThisWeek()
+void MeasurementsWidget::setDateTimePresetYesterday()
 {
-    DB::Clock::time_point now = DB::Clock::now();
-    QDateTime dt;
-    dt.setTime_t(DB::Clock::to_time_t(now));
+    QDateTime dt = QDateTime::currentDateTime();
+
+    dt.setDate(dt.date().addDays(-1));
+
+    dt.setTime(QTime(23, 59, 59, 999));
     m_ui.maxDateTime->setDateTime(dt);
+
+    dt.setTime(QTime(0, 0));
+    m_ui.minDateTime->setDateTime(dt);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsWidget::setDateTimePresetThisWeek()
+{
+    QDateTime dt = QDateTime::currentDateTime();
 
     dt.setDate(dt.date().addDays(-dt.date().dayOfWeek()));
     dt.setTime(QTime(0, 0));
     m_ui.minDateTime->setDateTime(dt);
+
+    dt.setDate(dt.date().addDays(6));
+    dt.setTime(QTime(23, 59, 59, 999));
+    m_ui.maxDateTime->setDateTime(dt);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void MeasurementsWidget::setDateTimeThisMonth()
+void MeasurementsWidget::setDateTimePresetLastWeek()
 {
-    DB::Clock::time_point now = DB::Clock::now();
-    QDateTime dt;
-    dt.setTime_t(DB::Clock::to_time_t(now));
-    m_ui.maxDateTime->setDateTime(dt);
+    QDateTime dt = QDateTime::currentDateTime();
 
-    dt.setDate(dt.date().addDays(-dt.date().daysInMonth()));
+    dt.setDate(dt.date().addDays(-dt.date().dayOfWeek()).addDays(-7));
     dt.setTime(QTime(0, 0));
     m_ui.minDateTime->setDateTime(dt);
+
+    dt.setDate(dt.date().addDays(6));
+    dt.setTime(QTime(23, 59, 59, 999));
+    m_ui.maxDateTime->setDateTime(dt);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsWidget::setDateTimePresetThisMonth()
+{
+    QDate date = QDate::currentDate();
+    date = QDate(date.year(), date.month(), 1);
+
+    QDateTime dt(date, QTime(0, 0));
+    m_ui.minDateTime->setDateTime(dt);
+
+    dt = QDateTime(date.addMonths(1).addDays(-1), QTime(23, 59, 59, 999));
+    m_ui.maxDateTime->setDateTime(dt);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsWidget::setDateTimePresetLastMonth()
+{
+    QDate date = QDate::currentDate();
+    date = QDate(date.year(), date.month(), 1).addMonths(-1);
+
+    QDateTime dt(date, QTime(0, 0));
+    m_ui.minDateTime->setDateTime(dt);
+
+    dt = QDateTime(date.addMonths(1).addDays(-1), QTime(23, 59, 59, 999));
+    m_ui.maxDateTime->setDateTime(dt);
 }
 
 //////////////////////////////////////////////////////////////////////////

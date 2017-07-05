@@ -75,7 +75,8 @@ HEADERS += \
     ../../src/MeasurementsDelegate.h \
     ../../src/SensorsDelegate.h \
     ../../src/ExportDialog.h \
-    ../../src/ConfigureAlarmDialog.h
+    ../../src/ConfigureAlarmDialog.h \
+    ../../src/PlotWidget.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -94,7 +95,8 @@ SOURCES += \
     ../../src/MeasurementsDelegate.cpp \
     ../../src/SensorsDelegate.cpp \
     ../../src/ExportDialog.cpp \
-    ../../src/ConfigureAlarmDialog.cpp
+    ../../src/ConfigureAlarmDialog.cpp \
+    ../../src/PlotWidget.cpp
 
 FORMS += \
     ../../src/Manager.ui \
@@ -105,7 +107,8 @@ FORMS += \
     ../../src/SensorsFilterDialog.ui \
     ../../src/AlarmsWidget.ui \
     ../../src/ExportDialog.ui \
-    ../../src/ConfigureAlarmDialog.ui
+    ../../src/ConfigureAlarmDialog.ui \
+    ../../src/PlotWidget.ui
 
 DISTFILES += \
 

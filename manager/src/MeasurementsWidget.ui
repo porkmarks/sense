@@ -6,14 +6,14 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1081</width>
-    <height>538</height>
+    <width>1137</width>
+    <height>781</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout" stretch="0">
+  <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="0">
    <property name="spacing">
     <number>0</number>
    </property>
@@ -87,108 +87,7 @@
           <property name="bottomMargin">
            <number>4</number>
           </property>
-          <item row="1" column="2">
-           <widget class="QDateTimeEdit" name="minDateTime">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="showGroupSeparator" stdset="0">
-             <bool>false</bool>
-            </property>
-            <property name="maximumDate">
-             <date>
-              <year>7930</year>
-              <month>12</month>
-              <day>31</day>
-             </date>
-            </property>
-            <property name="minimumDate">
-             <date>
-              <year>1780</year>
-              <month>9</month>
-              <day>14</day>
-             </date>
-            </property>
-            <property name="displayFormat">
-             <string>dd-MM-yyyy HH:mm</string>
-            </property>
-            <property name="calendarPopup">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="3">
-           <widget class="QPushButton" name="thisMonth">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="text">
-             <string>This Month</string>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="2">
-           <widget class="QPushButton" name="thisWeek">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="text">
-             <string>This Week</string>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="3">
-           <widget class="QPushButton" name="maxDateTimeNow">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="text">
-             <string>Now</string>
-            </property>
-            <property name="icon">
-             <iconset resource="../res/res.qrc">
-              <normaloff>:/icons/ui/today.png</normaloff>:/icons/ui/today.png</iconset>
-            </property>
-           </widget>
-          </item>
-          <item row="4" column="2">
-           <spacer name="verticalSpacer_3">
-            <property name="orientation">
-             <enum>Qt::Vertical</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>0</width>
-              <height>0</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
-          <item row="1" column="3">
-           <widget class="QPushButton" name="minDateTimeNow">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="text">
-             <string>Now</string>
-            </property>
-            <property name="icon">
-             <iconset resource="../res/res.qrc">
-              <normaloff>:/icons/ui/today.png</normaloff>:/icons/ui/today.png</iconset>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="0">
-           <widget class="QPushButton" name="thisDay">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="text">
-             <string>Today</string>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="2">
+          <item row="5" column="1">
            <widget class="QDateTimeEdit" name="maxDateTime">
             <property name="enabled">
              <bool>false</bool>
@@ -218,20 +117,97 @@
             </property>
            </widget>
           </item>
-          <item row="1" column="0">
-           <widget class="QCheckBox" name="dateTimeFilter">
+          <item row="1" column="1">
+           <widget class="QComboBox" name="dateTimePreset">
+            <item>
+             <property name="text">
+              <string>Today</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Yesterday</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>This Week</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Last Week</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>This Month</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Last Month</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="label_2">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
             <property name="text">
-             <string>Start Date</string>
+             <string>From</string>
             </property>
            </widget>
           </item>
-          <item row="2" column="0">
+          <item row="3" column="1">
+           <widget class="QDateTimeEdit" name="minDateTime">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="showGroupSeparator" stdset="0">
+             <bool>false</bool>
+            </property>
+            <property name="maximumDate">
+             <date>
+              <year>7930</year>
+              <month>12</month>
+              <day>31</day>
+             </date>
+            </property>
+            <property name="minimumDate">
+             <date>
+              <year>1780</year>
+              <month>9</month>
+              <day>14</day>
+             </date>
+            </property>
+            <property name="displayFormat">
+             <string>dd-MM-yyyy HH:mm</string>
+            </property>
+            <property name="calendarPopup">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="0">
            <widget class="QLabel" name="label">
             <property name="enabled">
              <bool>false</bool>
             </property>
             <property name="text">
-             <string>End Date</string>
+             <string>To</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QCheckBox" name="useDateTimePreset">
+            <property name="text">
+             <string>Preset</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
             </property>
            </widget>
           </item>
@@ -253,7 +229,37 @@
           <property name="bottomMargin">
            <number>4</number>
           </property>
+          <item row="0" column="1">
+           <widget class="QCheckBox" name="useTemperature">
+            <property name="text">
+             <string>Temperature Filter</string>
+            </property>
+            <property name="icon">
+             <iconset resource="../res/res.qrc">
+              <normaloff>:/icons/ui/temperature.png</normaloff>:/icons/ui/temperature.png</iconset>
+            </property>
+           </widget>
+          </item>
           <item row="1" column="2">
+           <widget class="QDoubleSpinBox" name="minHumidity">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="prefix">
+             <string>&gt;=  </string>
+            </property>
+            <property name="suffix">
+             <string> % RH</string>
+            </property>
+            <property name="decimals">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <double>99.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="3">
            <widget class="QDoubleSpinBox" name="maxHumidity">
             <property name="enabled">
              <bool>false</bool>
@@ -275,62 +281,7 @@
             </property>
            </widget>
           </item>
-          <item row="1" column="0">
-           <widget class="QCheckBox" name="useHumidity">
-            <property name="text">
-             <string>Humidity Filter</string>
-            </property>
-            <property name="icon">
-             <iconset resource="../res/res.qrc">
-              <normaloff>:/icons/ui/humidity.png</normaloff>:/icons/ui/humidity.png</iconset>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="0">
-           <widget class="QCheckBox" name="useTemperature">
-            <property name="text">
-             <string>Temperature Filter</string>
-            </property>
-            <property name="icon">
-             <iconset resource="../res/res.qrc">
-              <normaloff>:/icons/ui/temperature.png</normaloff>:/icons/ui/temperature.png</iconset>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <widget class="QDoubleSpinBox" name="minHumidity">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="prefix">
-             <string>&gt;=  </string>
-            </property>
-            <property name="suffix">
-             <string> % RH</string>
-            </property>
-            <property name="decimals">
-             <number>1</number>
-            </property>
-            <property name="maximum">
-             <double>99.000000000000000</double>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="2">
-           <widget class="QPushButton" name="apply">
-            <property name="text">
-             <string>Apply</string>
-            </property>
-            <property name="icon">
-             <iconset resource="../res/res.qrc">
-              <normaloff>:/icons/ui/filter.png</normaloff>:/icons/ui/filter.png</iconset>
-            </property>
-            <property name="shortcut">
-             <string>Return</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1">
+          <item row="0" column="2">
            <widget class="QDoubleSpinBox" name="minTemperature">
             <property name="enabled">
              <bool>false</bool>
@@ -352,7 +303,28 @@
             </property>
            </widget>
           </item>
-          <item row="0" column="2">
+          <item row="1" column="1">
+           <widget class="QCheckBox" name="useHumidity">
+            <property name="text">
+             <string>Humidity Filter</string>
+            </property>
+            <property name="icon">
+             <iconset resource="../res/res.qrc">
+              <normaloff>:/icons/ui/humidity.png</normaloff>:/icons/ui/humidity.png</iconset>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1" colspan="3">
+           <widget class="QLabel" name="resultCount">
+            <property name="text">
+             <string>0 results</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="3">
            <widget class="QDoubleSpinBox" name="maxTemperature">
             <property name="enabled">
              <bool>false</bool>
@@ -377,29 +349,6 @@
             </property>
            </widget>
           </item>
-          <item row="3" column="0">
-           <spacer name="verticalSpacer">
-            <property name="orientation">
-             <enum>Qt::Vertical</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>0</width>
-              <height>0</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
-          <item row="2" column="0" colspan="2">
-           <widget class="QLabel" name="resultCount">
-            <property name="text">
-             <string>0 results</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
-            </property>
-           </widget>
-          </item>
          </layout>
         </widget>
        </item>
@@ -413,29 +362,18 @@
          </property>
          <layout class="QGridLayout" name="gridLayout_2">
           <property name="leftMargin">
-           <number>2</number>
+           <number>9</number>
           </property>
           <property name="topMargin">
            <number>2</number>
           </property>
           <property name="rightMargin">
-           <number>2</number>
+           <number>9</number>
           </property>
           <property name="bottomMargin">
            <number>2</number>
           </property>
-          <item row="0" column="0">
-           <widget class="QPushButton" name="selectSensors">
-            <property name="text">
-             <string>Select Sensors</string>
-            </property>
-            <property name="icon">
-             <iconset resource="../res/res.qrc">
-              <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="0">
+          <item row="2" column="1">
            <widget class="QPushButton" name="exportData">
             <property name="text">
              <string>Export</string>
@@ -446,7 +384,18 @@
             </property>
            </widget>
           </item>
-          <item row="4" column="0">
+          <item row="0" column="1">
+           <widget class="QPushButton" name="selectSensors">
+            <property name="text">
+             <string>Select Sensors</string>
+            </property>
+            <property name="icon">
+             <iconset resource="../res/res.qrc">
+              <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
            <spacer name="verticalSpacer_2">
             <property name="orientation">
              <enum>Qt::Vertical</enum>
@@ -459,19 +408,35 @@
             </property>
            </spacer>
           </item>
-          <item row="3" column="0">
-           <widget class="QPushButton" name="generateReport">
+          <item row="3" column="1">
+           <widget class="QPushButton" name="apply">
             <property name="text">
-             <string>Generate Report</string>
+             <string>Apply</string>
             </property>
             <property name="icon">
              <iconset resource="../res/res.qrc">
-              <normaloff>:/icons/ui/report.png</normaloff>:/icons/ui/report.png</iconset>
+              <normaloff>:/icons/ui/filter.png</normaloff>:/icons/ui/filter.png</iconset>
+            </property>
+            <property name="shortcut">
+             <string>Return</string>
             </property>
            </widget>
           </item>
          </layout>
         </widget>
+       </item>
+       <item>
+        <spacer name="horizontalSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
        </item>
       </layout>
      </widget>
@@ -505,28 +470,108 @@
         <number>0</number>
        </property>
        <item>
-        <widget class="QSplitter" name="splitter_2">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
+        <widget class="QTabWidget" name="tabWidget">
+         <property name="currentIndex">
+          <number>0</number>
          </property>
-         <widget class="QTreeView" name="list">
-          <property name="alternatingRowColors">
-           <bool>true</bool>
-          </property>
-          <property name="uniformRowHeights">
-           <bool>true</bool>
-          </property>
-          <property name="sortingEnabled">
-           <bool>true</bool>
-          </property>
+         <widget class="QWidget" name="listTab">
+          <attribute name="title">
+           <string>Measurements</string>
+          </attribute>
+          <layout class="QVBoxLayout" name="verticalLayout_2">
+           <property name="spacing">
+            <number>0</number>
+           </property>
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <item>
+            <widget class="QWidget" name="widget_4" native="true">
+             <layout class="QVBoxLayout" name="verticalLayout">
+              <property name="spacing">
+               <number>0</number>
+              </property>
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <item>
+               <widget class="QTreeView" name="list">
+                <property name="alternatingRowColors">
+                 <bool>true</bool>
+                </property>
+                <property name="uniformRowHeights">
+                 <bool>true</bool>
+                </property>
+                <property name="sortingEnabled">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+          </layout>
          </widget>
-         <widget class="QWidget" name="plotWidget" native="true">
-          <property name="maximumSize">
-           <size>
-            <width>12</width>
-            <height>16777215</height>
-           </size>
-          </property>
+         <widget class="QWidget" name="plot">
+          <attribute name="title">
+           <string>Graphs</string>
+          </attribute>
+          <layout class="QVBoxLayout" name="verticalLayout_3">
+           <property name="spacing">
+            <number>0</number>
+           </property>
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <item>
+            <widget class="PlotWidget" name="plotWidget" native="true">
+             <layout class="QVBoxLayout" name="verticalLayout_4">
+              <property name="spacing">
+               <number>0</number>
+              </property>
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+             </layout>
+            </widget>
+           </item>
+          </layout>
          </widget>
         </widget>
        </item>
@@ -536,6 +581,14 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>PlotWidget</class>
+   <extends>QWidget</extends>
+   <header>PlotWidget.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources>
   <include location="../res/res.qrc"/>
  </resources>
@@ -567,8 +620,8 @@
      <y>17</y>
     </hint>
     <hint type="destinationlabel">
-     <x>830</x>
-     <y>27</y>
+     <x>796</x>
+     <y>32</y>
     </hint>
    </hints>
   </connection>
@@ -583,7 +636,7 @@
      <y>62</y>
     </hint>
     <hint type="destinationlabel">
-     <x>686</x>
+     <x>652</x>
      <y>70</y>
     </hint>
    </hints>
@@ -599,136 +652,88 @@
      <y>60</y>
     </hint>
     <hint type="destinationlabel">
-     <x>830</x>
+     <x>796</x>
      <y>70</y>
     </hint>
    </hints>
   </connection>
   <connection>
-   <sender>dateTimeFilter</sender>
+   <sender>useDateTimePreset</sender>
    <signal>toggled(bool)</signal>
-   <receiver>minDateTime</receiver>
+   <receiver>dateTimePreset</receiver>
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>67</x>
+     <x>57</x>
      <y>20</y>
     </hint>
     <hint type="destinationlabel">
-     <x>147</x>
-     <y>15</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>dateTimeFilter</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>minDateTimeNow</receiver>
-   <slot>setEnabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>92</x>
-     <y>24</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>308</x>
-     <y>15</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>dateTimeFilter</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>maxDateTime</receiver>
-   <slot>setEnabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>68</x>
+     <x>103</x>
      <y>18</y>
     </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>useDateTimePreset</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>label_2</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>50</x>
+     <y>16</y>
+    </hint>
     <hint type="destinationlabel">
-     <x>146</x>
-     <y>51</y>
+     <x>30</x>
+     <y>52</y>
     </hint>
    </hints>
   </connection>
   <connection>
-   <sender>dateTimeFilter</sender>
+   <sender>useDateTimePreset</sender>
    <signal>toggled(bool)</signal>
-   <receiver>maxDateTimeNow</receiver>
-   <slot>setEnabled(bool)</slot>
+   <receiver>minDateTime</receiver>
+   <slot>setDisabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>40</x>
-     <y>27</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>326</x>
-     <y>56</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>dateTimeFilter</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>label</receiver>
-   <slot>setEnabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>58</x>
+     <x>59</x>
      <y>22</y>
     </hint>
     <hint type="destinationlabel">
-     <x>54</x>
-     <y>60</y>
+     <x>117</x>
+     <y>55</y>
     </hint>
    </hints>
   </connection>
   <connection>
-   <sender>dateTimeFilter</sender>
+   <sender>useDateTimePreset</sender>
    <signal>toggled(bool)</signal>
-   <receiver>thisDay</receiver>
-   <slot>setEnabled(bool)</slot>
+   <receiver>label</receiver>
+   <slot>setDisabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>21</x>
-     <y>24</y>
-    </hint>
-    <hint type="destinationlabel">
      <x>36</x>
-     <y>89</y>
+     <y>27</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>37</x>
+     <y>87</y>
     </hint>
    </hints>
   </connection>
   <connection>
-   <sender>dateTimeFilter</sender>
+   <sender>useDateTimePreset</sender>
    <signal>toggled(bool)</signal>
-   <receiver>thisWeek</receiver>
-   <slot>setEnabled(bool)</slot>
+   <receiver>maxDateTime</receiver>
+   <slot>setDisabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>84</x>
-     <y>20</y>
+     <x>74</x>
+     <y>26</y>
     </hint>
     <hint type="destinationlabel">
-     <x>150</x>
-     <y>84</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>dateTimeFilter</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>thisMonth</receiver>
-   <slot>setEnabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>76</x>
-     <y>24</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>298</x>
-     <y>94</y>
+     <x>122</x>
+     <y>91</y>
     </hint>
    </hints>
   </connection>

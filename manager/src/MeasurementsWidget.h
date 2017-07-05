@@ -23,11 +23,16 @@ private slots:
     void refreshFromDB();
     void setMinDateTimeNow();
     void setMaxDateTimeNow();
-    void setDateTimeThisDay();
-    void setDateTimeThisWeek();
-    void setDateTimeThisMonth();
     void selectSensors();
     void exportData();
+
+    void setDateTimePreset(int preset);
+    void setDateTimePresetToday();
+    void setDateTimePresetYesterday();
+    void setDateTimePresetThisWeek();
+    void setDateTimePresetLastWeek();
+    void setDateTimePresetThisMonth();
+    void setDateTimePresetLastMonth();
 
     void minDateTimeChanged(QDateTime const& value);
     void maxDateTimeChanged(QDateTime const& value);

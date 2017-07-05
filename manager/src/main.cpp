@@ -1,6 +1,7 @@
 #include "Manager.h"
 #include <QtWidgets/QApplication>
 #include <QNetworkProxyFactory>
+#include <QLocale>
 
 /* This prints an "Assertion failed" message and aborts.  */
 void __assert_fail(const char *__assertion, const char *__file, unsigned int __line, const char *__function)
@@ -24,6 +25,8 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName("Sense");
     QCoreApplication::setOrganizationDomain("sense.com");
     QCoreApplication::setApplicationName("Sense");
+
+    QLocale::setDefault(QLocale(QLocale::English, QLocale::Romania));
 
     a.setQuitOnLastWindowClosed(true);
 
