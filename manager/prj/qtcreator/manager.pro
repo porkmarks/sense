@@ -76,6 +76,7 @@ HEADERS += \
     ../../src/SensorsDelegate.h \
     ../../src/ExportDialog.h \
     ../../src/ConfigureAlarmDialog.h \
+    ../../src/PlotToolTip.h \
     ../../src/PlotWidget.h
 
 SOURCES += \
@@ -96,6 +97,7 @@ SOURCES += \
     ../../src/SensorsDelegate.cpp \
     ../../src/ExportDialog.cpp \
     ../../src/ConfigureAlarmDialog.cpp \
+    ../../src/PlotToolTip.cpp \
     ../../src/PlotWidget.cpp
 
 FORMS += \

@@ -166,7 +166,7 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
             QString str;
             if (descriptor.lowHumidityWatch)
             {
-                str += QString("Below %1 % RH").arg(descriptor.lowHumidity, 0, 'f', 1);
+                str += QString("Below %1 %RH").arg(descriptor.lowHumidity, 0, 'f', 1);
             }
             if (descriptor.highHumidityWatch)
             {
@@ -174,7 +174,7 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
                 {
                     str += " and ";
                 }
-                str += QString("Above %1 % RH").arg(descriptor.highHumidity, 0, 'f', 1);
+                str += QString("Above %1 %RH").arg(descriptor.highHumidity, 0, 'f', 1);
             }
             return str;
         }

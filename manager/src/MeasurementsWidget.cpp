@@ -73,7 +73,7 @@ void MeasurementsWidget::init(DB& db)
 
     std::cout.flush();
 
-    setDateTimePresetThisWeek();
+    setDateTimePreset(m_ui.dateTimePreset->currentIndex());
 
     refreshFromDB();
 

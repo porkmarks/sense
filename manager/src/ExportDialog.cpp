@@ -202,13 +202,13 @@ void ExportDialog::exportTo(std::ostream& stream, size_t maxCount)
             stream << std::fixed << std::setprecision(decimalPlaces) << m.descriptor.humidity;
             if (unitsFormat == UnitsFormat::Embedded)
             {
-                stream << " % RH";
+                stream << " %RH";
             }
             stream << separator;
         }
         if (unitsFormat == UnitsFormat::SeparateColumn)
         {
-            stream << "% RH";
+            stream << "%RH";
             stream << separator;
         }
         stream << std::endl;
