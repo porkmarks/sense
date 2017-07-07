@@ -4,7 +4,8 @@
 #include <QFileDialog>
 #include <QMessageBox>
 
-#include "ExportDialog.h"
+#include "ExportDataDialog.h"
+#include "ExportPicDialog.h"
 #include "SensorsModel.h"
 #include "SensorsDelegate.h"
 #include <QSortFilterProxyModel>
@@ -44,6 +45,8 @@ void MeasurementsWidget::init(DB& db)
     m_ui.list->setItemDelegate(m_delegate.get());
 
     m_ui.list->setUniformRowHeights(true);
+
+    m_ui.plotWidget->init(db, *m_model);
 
 //    DB::SensorDescriptor sd;
 //    sd.name = "test1";
@@ -159,7 +162,7 @@ void MeasurementsWidget::refreshFromDB()
 
     m_ui.exportData->setEnabled(m_model->getMeasurementCount() > 0);
 
-    m_ui.plotWidget->refresh(*m_db, *m_model);
+    m_ui.plotWidget->refresh();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -355,11 +358,23 @@ void MeasurementsWidget::maxHumidityChanged()
 
 void MeasurementsWidget::exportData()
 {
-    ExportDialog dialog(*m_db, *m_model);
-    int result = dialog.exec();
-    if (result != QDialog::Accepted)
+    if (m_ui.sectionTab->currentIndex() == 0)
     {
-        return;
+        ExportDataDialog dialog(*m_db, *m_model);
+        int result = dialog.exec();
+        if (result != QDialog::Accepted)
+        {
+            return;
+        }
+    }
+    else if (m_ui.sectionTab->currentIndex() == 1)
+    {
+        ExportPicDialog dialog(*m_ui.plotWidget);
+        int result = dialog.exec();
+        if (result != QDialog::Accepted)
+        {
+            return;
+        }
     }
 }
 

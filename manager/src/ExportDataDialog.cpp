@@ -1,4 +1,4 @@
-#include "ExportDialog.h"
+#include "ExportDataDialog.h"
 
 #include <fstream>
 #include <iostream>
@@ -6,18 +6,18 @@
 #include <iomanip>
 #include <cstring>
 
-ExportDialog::ExportDialog(DB& db, MeasurementsModel& model)
+ExportDataDialog::ExportDataDialog(DB& db, MeasurementsModel& model)
     : m_db(db)
     , m_model(model)
 {
     m_ui.setupUi(this);
 
-    connect(m_ui.preview, &QPushButton::released, this, &ExportDialog::showPreview);
+    connect(m_ui.preview, &QPushButton::released, this, &ExportDataDialog::showPreview);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void ExportDialog::showPreview()
+void ExportDataDialog::showPreview()
 {
     std::stringstream stream;
     exportTo(stream, 100);
@@ -27,7 +27,7 @@ void ExportDialog::showPreview()
 
 //////////////////////////////////////////////////////////////////////////
 
-void ExportDialog::accept()
+void ExportDataDialog::accept()
 {
     QString extension = "Export Files (*.csv)";
 
@@ -55,7 +55,7 @@ void ExportDialog::accept()
 
 //////////////////////////////////////////////////////////////////////////
 
-void ExportDialog::exportTo(std::ostream& stream, size_t maxCount)
+void ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount)
 {
     std::string separator = m_ui.separator->text().toUtf8().data();
     if (m_ui.tabSeparator->isChecked())

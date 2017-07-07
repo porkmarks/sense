@@ -74,10 +74,12 @@ HEADERS += \
     ../../src/DB.h \
     ../../src/MeasurementsDelegate.h \
     ../../src/SensorsDelegate.h \
-    ../../src/ExportDialog.h \
     ../../src/ConfigureAlarmDialog.h \
     ../../src/PlotToolTip.h \
-    ../../src/PlotWidget.h
+    ../../src/PlotWidget.h \
+    ../../../common/src/Butterworth.h \
+    ../../src/ExportDataDialog.h \
+    ../../src/ExportPicDialog.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -95,10 +97,11 @@ SOURCES += \
     ../../src/MeasurementsModel.cpp \
     ../../src/MeasurementsDelegate.cpp \
     ../../src/SensorsDelegate.cpp \
-    ../../src/ExportDialog.cpp \
     ../../src/ConfigureAlarmDialog.cpp \
     ../../src/PlotToolTip.cpp \
-    ../../src/PlotWidget.cpp
+    ../../src/PlotWidget.cpp \
+    ../../src/ExportDataDialog.cpp \
+    ../../src/ExportPicDialog.cpp
 
 FORMS += \
     ../../src/Manager.ui \
@@ -108,9 +111,10 @@ FORMS += \
     ../../src/SensorsWidget.ui \
     ../../src/SensorsFilterDialog.ui \
     ../../src/AlarmsWidget.ui \
-    ../../src/ExportDialog.ui \
     ../../src/ConfigureAlarmDialog.ui \
-    ../../src/PlotWidget.ui
+    ../../src/PlotWidget.ui \
+    ../../src/ExportDataDialog.ui \
+    ../../src/ExportPicDialog.ui
 
 DISTFILES += \
 

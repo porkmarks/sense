@@ -1,16 +1,25 @@
 #include "PlotWidget.h"
 
+
 PlotWidget::PlotWidget(QWidget* parent)
     : QWidget(parent)
 {
     m_ui.setupUi(this);
 
+    setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(this, &QChartView::customContextMenuRequested, this, &PlotWidget::plotContextMenu);
+
     createPlotWidgets();
+}
+
+void PlotWidget::init(DB& db, MeasurementsModel& model)
+{
+    m_db = &db;
+    m_model = &model;
 }
 
 void PlotWidget::createPlotWidgets()
 {
-    m_ui.legend->clear();
     m_tooltip.reset();
     m_tooltips.clear();
 
@@ -33,9 +42,8 @@ void PlotWidget::createPlotWidgets()
 
     {
         QChart* chart = new QChart();
-        //chart->addSeries(m_series);
-        chart->legend()->hide();
-        //chart->setTitle("plot");
+        chart->legend()->setAlignment(Qt::AlignRight);
+
         m_chart = chart;
 
         QDateTimeAxis* axisX = new QDateTimeAxis(chart);
@@ -74,11 +82,17 @@ void PlotWidget::createPlotWidgets()
 
     //m_chartView->setMaximumHeight(m_ui.plot->height() - 100);
     m_ui.plot->layout()->addWidget(m_chartView);
+    //connect(m_chartView, &QChartView::customContextMenuRequested, this, &PlotWidget::plotContextMenu);
     //m_chartView->setMaximumHeight(999999);
 }
 
-void PlotWidget::refresh(DB& db, MeasurementsModel& model)
+void PlotWidget::refresh()
 {
+    foreach (QLegendMarker* marker, m_chart->legend()->markers())
+    {
+        QObject::disconnect(marker, SIGNAL(clicked()), this, SLOT(handleMarkerClicked()));
+    }
+
     createPlotWidgets();
 
     m_series.clear();
@@ -89,34 +103,56 @@ void PlotWidget::refresh(DB& db, MeasurementsModel& model)
     float maxT = std::numeric_limits<float>::lowest();
     float minH = std::numeric_limits<float>::max();
     float maxH = std::numeric_limits<float>::lowest();
-    for (size_t i = 0; i < model.getMeasurementCount(); i++)
+    for (size_t i = 0; i < m_model->getMeasurementCount(); i++)
     {
-        DB::Measurement const& m = model.getMeasurement(i);
-        int32_t sensorIndex = db.findSensorIndexById(m.descriptor.sensorId);
+        DB::Measurement const& m = m_model->getMeasurement(i);
+        int32_t sensorIndex = m_db->findSensorIndexById(m.descriptor.sensorId);
         if (sensorIndex < 0)
         {
             continue;
         }
-//        if (i & 1)
-//        {
-//            continue;
-//        }
+        //        if (i & 1)
+        //        {
+        //            continue;
+        //        }
 
         float millis = std::chrono::duration_cast<std::chrono::milliseconds>(m.descriptor.timePoint.time_since_epoch()).count();
         time_t tt = DB::Clock::to_time_t(m.descriptor.timePoint);
         minTS = std::min<uint64_t>(minTS, tt);
         maxTS = std::max<uint64_t>(maxTS, tt);
 
-        PlotData& plotData = m_series[m.descriptor.sensorId];
-        plotData.sensor = db.getSensor(sensorIndex);
-        plotData.temperaturePoints.append(QPointF(millis, m.descriptor.temperature));
-        plotData.humidityPoints.append(QPointF(millis, m.descriptor.humidity));
+        PlotData* plotData = nullptr;
+        auto it = m_series.find(m.descriptor.sensorId);
+        if (it == m_series.end())
+        {
+            plotData = &m_series[m.descriptor.sensorId];
+            plotData->temperatureLpf.setup(1, 1, 0.1f);
+            plotData->humidityLpf.setup(1, 1, 0.1f);
+        }
+        else
+        {
+            plotData = &it->second;
+        }
 
-        minT = std::min(minT, m.descriptor.temperature);
-        maxT = std::max(maxT, m.descriptor.temperature);
+        plotData->sensor = m_db->getSensor(sensorIndex);
 
-        minH = std::min(minH, m.descriptor.humidity);
-        maxH = std::max(maxH, m.descriptor.humidity);
+        float value = m.descriptor.temperature;
+        if (m_useFiltering)
+        {
+            plotData->temperatureLpf.process(value);
+        }
+        plotData->temperaturePoints.append(QPointF(millis, value));
+        minT = std::min(minT, value);
+        maxT = std::max(maxT, value);
+
+        value = m.descriptor.humidity;
+        if (m_useFiltering)
+        {
+            plotData->humidityLpf.process(value);
+        }
+        plotData->humidityPoints.append(QPointF(millis, value));
+        minH = std::min(minH, value);
+        maxH = std::max(maxH, value);
     }
 
     for (auto& pair : m_series)
@@ -125,6 +161,7 @@ void PlotWidget::refresh(DB& db, MeasurementsModel& model)
         {
             QLineSeries* series = new QLineSeries(m_chart);
             m_chart->addSeries(series);
+            series->setName(QString("%1 °C").arg(plotData.sensor.descriptor.name.c_str()));
             series->attachAxis(m_axisX);
             series->attachAxis(m_axisTY);
 
@@ -141,16 +178,11 @@ void PlotWidget::refresh(DB& db, MeasurementsModel& model)
             }
             series->append(points);
             plotData.temperatureSeries.reset(series);
-            {
-                QListWidgetItem* item = new QListWidgetItem(plotData.sensor.descriptor.name.c_str());
-                item->setIcon(QIcon(":/icons/ui/temperature.png"));
-                item->setBackgroundColor(series->color());
-                m_ui.legend->addItem(item);
-            }
         }
         {
             QLineSeries* series = new QLineSeries(m_chart);
             m_chart->addSeries(series);
+            series->setName(QString("%1 %RH").arg(plotData.sensor.descriptor.name.c_str()));
             series->attachAxis(m_axisX);
             series->attachAxis(m_axisHY);
 
@@ -167,22 +199,22 @@ void PlotWidget::refresh(DB& db, MeasurementsModel& model)
             }
             series->append(points);
             plotData.humiditySeries.reset(series);
-            {
-                QListWidgetItem* item = new QListWidgetItem(plotData.sensor.descriptor.name.c_str());
-                item->setIcon(QIcon(":/icons/ui/humidity.png"));
-                item->setBackgroundColor(series->color());
-                m_ui.legend->addItem(item);
-            }
         }
     }
 
+    foreach (QLegendMarker* marker, m_chart->legend()->markers())
+    {
+        // Disconnect possible existing connection to avoid multiple connections
+        QObject::disconnect(marker, SIGNAL(clicked()), this, SLOT(handleMarkerClicked()));
+        QObject::connect(marker, SIGNAL(clicked()), this, SLOT(handleMarkerClicked()));
+    }
 
     QDateTime minDT, maxDT;
     minDT.setTime_t(minTS);
     maxDT.setTime_t(maxTS);
     m_axisX->setRange(minDT, maxDT);
 
-    constexpr float minTemperatureRange = 10.f;
+    constexpr float minTemperatureRange = 5.f;
     if (std::abs(maxT - minT) < minTemperatureRange)
     {
         float center = (maxT + minT) / 2.f;
@@ -191,7 +223,7 @@ void PlotWidget::refresh(DB& db, MeasurementsModel& model)
     }
     m_axisTY->setRange(minT, maxT);
 
-    constexpr float minHumidityRange = 20.f;
+    constexpr float minHumidityRange = 10.f;
     if (std::abs(maxH - minH) < minHumidityRange)
     {
         float center = (maxH + minH) / 2.f;
@@ -241,7 +273,7 @@ void PlotWidget::tooltip(QLineSeries* series, QPointF point, bool state, DB::Sen
         }
         else
         {
-            m_tooltip->setText(QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Temperature: <b>%3 %RH</b>")
+            m_tooltip->setText(QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Humidity: <b>%3 %RH</b>")
                                .arg(sensor.descriptor.name.c_str())
                                .arg(dt.toString("dd-MM-yyyy h:mm"))
                                .arg(point.y(), 0, 'f', 1)
@@ -256,4 +288,101 @@ void PlotWidget::tooltip(QLineSeries* series, QPointF point, bool state, DB::Sen
     {
         m_tooltip->hide();
     }
+}
+
+void PlotWidget::plotContextMenu(QPoint const& position)
+{
+    QMenu menu;
+
+    QAction* action = menu.addAction(QIcon(":/icons/ui/smooth.png"), "Use Smoothing");
+    action->setCheckable(true);
+    action->setChecked(m_useFiltering);
+    connect(action, &QAction::toggled, [this](bool triggered)
+    {
+        m_useFiltering = triggered;
+        refresh();
+    });
+
+    action = menu.addAction(QIcon(":/icons/ui/remove.png"), "Remove Bubbles");
+    action->setEnabled(!m_tooltips.empty());
+    connect(action, &QAction::triggered, [this](bool triggered)
+    {
+        m_tooltips.clear();
+    });
+
+    menu.exec(mapToGlobal(position));
+}
+
+void PlotWidget::handleMarkerClicked()
+{
+    QLegendMarker* marker = qobject_cast<QLegendMarker*>(sender());
+    Q_ASSERT(marker);
+
+    switch (marker->type())
+    {
+    case QLegendMarker::LegendMarkerTypeXY:
+    {
+        // Toggle visibility of series
+        marker->series()->setVisible(!marker->series()->isVisible());
+
+        // Turn legend marker back to visible, since hiding series also hides the marker
+        // and we don't want it to happen now.
+        marker->setVisible(true);
+
+        // Dim the marker, if series is not visible
+        qreal alpha = 1.0;
+
+        if (!marker->series()->isVisible())
+        {
+            alpha = 0.5;
+        }
+
+        QColor color;
+        QBrush brush = marker->labelBrush();
+        color = brush.color();
+        color.setAlphaF(alpha);
+        brush.setColor(color);
+        marker->setLabelBrush(brush);
+
+        brush = marker->brush();
+        color = brush.color();
+        color.setAlphaF(alpha);
+        brush.setColor(color);
+        marker->setBrush(brush);
+
+        QPen pen = marker->pen();
+        color = pen.color();
+        color.setAlphaF(alpha);
+        pen.setColor(color);
+        marker->setPen(pen);
+
+        break;
+    }
+    default:
+    {
+        qDebug() << "Unknown marker type";
+        break;
+    }
+    }
+}
+
+QSize PlotWidget::getPlotSize() const
+{
+    return m_chartView->size();
+}
+
+QPixmap PlotWidget::grabPic(bool showLegend)
+{
+    QPixmap pixmap(m_chartView->size());
+    pixmap.fill();
+
+    QPainter painter(&pixmap);
+
+    m_chart->legend()->setVisible(showLegend);
+
+    m_chartView->render(&painter, QRectF(), QRect(), Qt::IgnoreAspectRatio);
+
+    m_chart->legend()->setVisible(true);
+
+    return pixmap;
 }

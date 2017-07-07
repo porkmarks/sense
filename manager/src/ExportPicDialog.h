@@ -1,15 +1,15 @@
 #pragma once
 
 #include <QDialog>
-#include "ui_ExportDataDialog.h"
-#include "MeasurementsModel.h"
+#include "ui_ExportPicDialog.h"
+#include "PlotWidget.h"
 
 #include <ostream>
 
-class ExportDataDialog : public QDialog
+class ExportPicDialog : public QDialog
 {
 public:
-    ExportDataDialog(DB& dm, MeasurementsModel& model);
+    ExportPicDialog(PlotWidget& plotWidget);
 
 private slots:
     void accept() override;
@@ -17,9 +17,8 @@ private slots:
 private:
 
     void showPreview();
-    void exportTo(std::ostream& stream, size_t maxCount);
+    void exportTo();
 
-    Ui::ExportDataDialog m_ui;
-    DB& m_db;
-    MeasurementsModel& m_model;
+    Ui::ExportPicDialog m_ui;
+    PlotWidget& m_plotWidget;
 };
