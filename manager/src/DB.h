@@ -176,6 +176,34 @@ public:
 
     uint8_t computeTriggeredAlarm(MeasurementDescriptor const& descriptor) const;
 
+
+    struct ReportDescriptor
+    {
+        std::string name;
+
+        bool filterSensors = false;
+        std::vector<SensorId> sensors;
+
+        bool sendEmailAction = false;
+        std::string emailRecipient;
+    };
+
+    typedef uint32_t ReportId;
+    struct Report
+    {
+        ReportDescriptor descriptor;
+        ReportId id;
+    };
+
+    size_t getReportCount() const;
+    Report const& getReport(size_t index) const;
+    int32_t findReportIndexByName(std::string const& name) const;
+    int32_t findReportIndexById(ReportId id) const;
+    bool addReport(ReportDescriptor const& descriptor);
+    bool setReport(ReportId id, ReportDescriptor const& descriptor);
+    void removeReport(size_t index);
+
+
     bool addMeasurement(MeasurementDescriptor const& descriptor);
 
     template <typename T>
@@ -242,6 +270,12 @@ signals:
     void alarmChanged(AlarmId id);
     void alarmTriggered(AlarmId id);
 
+    void reportWillBeAdded(ReportId id);
+    void reportAdded(ReportId id);
+    void reportWillBeRemoved(ReportId id);
+    void reportRemoved(ReportId id);
+    void reportChanged(ReportId id);
+
     void measurementsWillBeAdded(SensorId id);
     void measurementsAdded(SensorId id);
     void measurementsWillBeRemoved(SensorId id);
@@ -281,10 +315,12 @@ private:
         Config config;
         std::vector<Sensor> sensors;
         std::vector<Alarm> alarms;
+        std::vector<Report> reports;
         std::map<SensorId, StoredMeasurements> measurements;
         std::vector<MeasurementId> sortedMeasurementIds;
         SensorId lastSensorId = 0;
         AlarmId lastAlarmId = 0;
+        ReportId lastReportId = 0;
         MeasurementId lastMeasurementId = 0;
     };
 

@@ -99,10 +99,10 @@ void PlotWidget::refresh()
 
     uint64_t minTS = std::numeric_limits<uint64_t>::max();
     uint64_t maxTS = std::numeric_limits<uint64_t>::lowest();
-    float minT = std::numeric_limits<float>::max();
-    float maxT = std::numeric_limits<float>::lowest();
-    float minH = std::numeric_limits<float>::max();
-    float maxH = std::numeric_limits<float>::lowest();
+    qreal minT = std::numeric_limits<qreal>::max();
+    qreal maxT = std::numeric_limits<qreal>::lowest();
+    qreal minH = std::numeric_limits<qreal>::max();
+    qreal maxH = std::numeric_limits<qreal>::lowest();
     for (size_t i = 0; i < m_model->getMeasurementCount(); i++)
     {
         DB::Measurement const& m = m_model->getMeasurement(i);
@@ -116,7 +116,7 @@ void PlotWidget::refresh()
         //            continue;
         //        }
 
-        float millis = std::chrono::duration_cast<std::chrono::milliseconds>(m.descriptor.timePoint.time_since_epoch()).count();
+        qreal millis = std::chrono::duration_cast<std::chrono::milliseconds>(m.descriptor.timePoint.time_since_epoch()).count();
         time_t tt = DB::Clock::to_time_t(m.descriptor.timePoint);
         minTS = std::min<uint64_t>(minTS, tt);
         maxTS = std::max<uint64_t>(maxTS, tt);
@@ -126,8 +126,8 @@ void PlotWidget::refresh()
         if (it == m_series.end())
         {
             plotData = &m_series[m.descriptor.sensorId];
-            plotData->temperatureLpf.setup(1, 1, 0.1f);
-            plotData->humidityLpf.setup(1, 1, 0.1f);
+            plotData->temperatureLpf.setup(1, 1, 0.1);
+            plotData->humidityLpf.setup(1, 1, 0.1);
         }
         else
         {
@@ -136,7 +136,7 @@ void PlotWidget::refresh()
 
         plotData->sensor = m_db->getSensor(sensorIndex);
 
-        float value = m.descriptor.temperature;
+        qreal value = m.descriptor.temperature;
         if (m_useFiltering)
         {
             plotData->temperatureLpf.process(value);
@@ -161,6 +161,9 @@ void PlotWidget::refresh()
         {
             QLineSeries* series = new QLineSeries(m_chart);
             m_chart->addSeries(series);
+            QPen pen = series->pen();
+            //pen.setWidth(4);
+            series->setPen(pen);
             series->setName(QString("%1 °C").arg(plotData.sensor.descriptor.name.c_str()));
             series->attachAxis(m_axisX);
             series->attachAxis(m_axisTY);
@@ -182,6 +185,9 @@ void PlotWidget::refresh()
         {
             QLineSeries* series = new QLineSeries(m_chart);
             m_chart->addSeries(series);
+            QPen pen = series->pen();
+            //pen.setWidth(2);
+            series->setPen(pen);
             series->setName(QString("%1 %RH").arg(plotData.sensor.descriptor.name.c_str()));
             series->attachAxis(m_axisX);
             series->attachAxis(m_axisHY);
@@ -214,21 +220,21 @@ void PlotWidget::refresh()
     maxDT.setTime_t(maxTS);
     m_axisX->setRange(minDT, maxDT);
 
-    constexpr float minTemperatureRange = 5.f;
+    constexpr qreal minTemperatureRange = 5.0;
     if (std::abs(maxT - minT) < minTemperatureRange)
     {
-        float center = (maxT + minT) / 2.f;
-        minT = center - minTemperatureRange / 2.f;
-        maxT = center + minTemperatureRange / 2.f;
+        qreal center = (maxT + minT) / 2.0;
+        minT = center - minTemperatureRange / 2.0;
+        maxT = center + minTemperatureRange / 2.0;
     }
     m_axisTY->setRange(minT, maxT);
 
-    constexpr float minHumidityRange = 10.f;
+    constexpr qreal minHumidityRange = 10.0;
     if (std::abs(maxH - minH) < minHumidityRange)
     {
-        float center = (maxH + minH) / 2.f;
-        minH = center - minHumidityRange / 2.f;
-        maxH = center + minHumidityRange / 2.f;
+        qreal center = (maxH + minH) / 2.0;
+        minH = center - minHumidityRange / 2.0;
+        maxH = center + minHumidityRange / 2.0;
     }
     m_axisHY->setRange(minH, maxH);
 }
@@ -246,6 +252,7 @@ void PlotWidget::keepTooltip()
 {
     if (m_tooltip != nullptr)
     {
+        m_tooltip->setFixed(true);
         m_tooltips.push_back(std::move(m_tooltip));
         m_tooltip.reset(new PlotToolTip(m_chart));
     }

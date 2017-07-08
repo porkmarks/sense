@@ -79,7 +79,10 @@ HEADERS += \
     ../../src/PlotWidget.h \
     ../../../common/src/Butterworth.h \
     ../../src/ExportDataDialog.h \
-    ../../src/ExportPicDialog.h
+    ../../src/ExportPicDialog.h \
+    ../../src/ReportsModel.h \
+    ../../src/ReportsWidget.h \
+    ../../src/ConfigureReportDialog.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -101,7 +104,10 @@ SOURCES += \
     ../../src/PlotToolTip.cpp \
     ../../src/PlotWidget.cpp \
     ../../src/ExportDataDialog.cpp \
-    ../../src/ExportPicDialog.cpp
+    ../../src/ExportPicDialog.cpp \
+    ../../src/ReportsModel.cpp \
+    ../../src/ReportsWidget.cpp \
+    ../../src/ConfigureReportDialog.cpp
 
 FORMS += \
     ../../src/Manager.ui \
@@ -114,7 +120,9 @@ FORMS += \
     ../../src/ConfigureAlarmDialog.ui \
     ../../src/PlotWidget.ui \
     ../../src/ExportDataDialog.ui \
-    ../../src/ExportPicDialog.ui
+    ../../src/ExportPicDialog.ui \
+    ../../src/ReportsWidget.ui \
+    ../../src/ConfigureReportDialog.ui
 
 DISTFILES += \
 

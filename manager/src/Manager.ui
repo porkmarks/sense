@@ -103,6 +103,15 @@
         <string>Alarms</string>
        </attribute>
       </widget>
+      <widget class="ReportsWidget" name="reportsWidget">
+       <attribute name="icon">
+        <iconset resource="../res/res.qrc">
+         <normaloff>:/icons/ui/report.png</normaloff>:/icons/ui/report.png</iconset>
+       </attribute>
+       <attribute name="title">
+        <string>Reports</string>
+       </attribute>
+      </widget>
      </widget>
     </item>
    </layout>
@@ -171,6 +180,12 @@
    <class>SensorsWidget</class>
    <extends>QWidget</extends>
    <header>SensorsWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>ReportsWidget</class>
+   <extends>QWidget</extends>
+   <header>ReportsWidget.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

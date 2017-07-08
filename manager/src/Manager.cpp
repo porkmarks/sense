@@ -34,6 +34,7 @@ Manager::~Manager()
     delete m_ui.sensorsWidget;
     delete m_ui.measurementsWidget;
     delete m_ui.alarmsWidget;
+    delete m_ui.reportsWidget;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -44,6 +45,7 @@ void Manager::activateBaseStation(Comms::BaseStationDescriptor const& bs, DB& db
     m_ui.sensorsWidget->init(db);
     m_ui.measurementsWidget->init(db);
     m_ui.alarmsWidget->init(db);
+    m_ui.reportsWidget->init(db);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -54,6 +56,7 @@ void Manager::deactivateBaseStation(Comms::BaseStationDescriptor const& bs)
     m_ui.sensorsWidget->shutdown();
     m_ui.measurementsWidget->shutdown();
     m_ui.alarmsWidget->shutdown();
+    m_ui.reportsWidget->shutdown();
 }
 
 //////////////////////////////////////////////////////////////////////////

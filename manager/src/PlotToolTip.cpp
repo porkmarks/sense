@@ -67,6 +67,35 @@ void PlotToolTip::paint(QPainter* painter, const QStyleOptionGraphicsItem* optio
         path.lineTo(point2);
         path = path.simplified();
     }
+
+    if (m_isFixed)
+    {
+        constexpr float animationDurationS = 0.5f;
+        float d = std::chrono::duration<float>(std::chrono::high_resolution_clock::now() - m_animationStartTP).count();
+        if (d < animationDurationS)
+        {
+            float mu = d / animationDurationS;
+            float x = std::abs(std::sin(mu * M_PI));
+            QPen pen = painter->pen();
+            pen.setWidthF(1.f + x * 5.f);
+            painter->setPen(pen);
+            update();
+        }
+        else
+        {
+            QPen pen = painter->pen();
+            pen.setWidthF(1.f);
+            painter->setPen(pen);
+        }
+    }
+    else
+    {
+        QPen pen = painter->pen();
+        pen.setWidthF(1.f);
+        painter->setPen(pen);
+    }
+
+
     painter->setBrush(QColor(255, 255, 255));
     painter->drawPath(path);
 
@@ -92,6 +121,13 @@ void PlotToolTip::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
     {
         event->setAccepted(false);
     }
+}
+
+void PlotToolTip::setFixed(bool fixed)
+{
+    m_isFixed = fixed;
+    m_animationStartTP = std::chrono::high_resolution_clock::now();
+    update();
 }
 
 void PlotToolTip::setText(const QString& text)

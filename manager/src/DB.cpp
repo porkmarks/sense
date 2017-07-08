@@ -69,6 +69,9 @@ bool DB::create(std::string const& name)
     m_dataFilename = "sense-" + name + ".data";
     m_mainData.measurements.clear();
 
+    renameFile(m_dbFilename.c_str(), (m_dbFilename + ".old").c_str());
+    renameFile(m_dataFilename.c_str(), (m_dataFilename + ".old").c_str());
+
     remove(m_dbFilename.c_str());
     remove(m_dataFilename.c_str());
 
@@ -392,6 +395,89 @@ bool DB::open(std::string const& name)
 
                 data.lastAlarmId = std::max(data.lastAlarmId, alarm.id);
                 data.alarms.push_back(alarm);
+            }
+        }
+
+        it = document.FindMember("reports");
+//        if (it == document.MemberEnd() || !it->value.IsArray())
+//        {
+//            std::cerr << "Bad or missing reports array\n";
+//            return false;
+//        }
+
+        if (it != document.MemberEnd())
+        {
+            rapidjson::Value const& reportsj = it->value;
+            for (size_t i = 0; i < reportsj.Size(); i++)
+            {
+                Report report;
+                rapidjson::Value const& reportj = reportsj[i];
+                auto it = reportj.FindMember("name");
+                if (it == reportj.MemberEnd() || !it->value.IsString())
+                {
+                    std::cerr << "Bad or missing config name\n";
+                    return false;
+                }
+                report.descriptor.name = it->value.GetString();
+
+                it = reportj.FindMember("id");
+                if (it == reportj.MemberEnd() || !it->value.IsUint())
+                {
+                    std::cerr << "Bad or missing report id\n";
+                    return false;
+                }
+                report.id = it->value.GetUint();
+
+                it = reportj.FindMember("filter_sensors");
+                if (it != reportj.MemberEnd() && !it->value.IsBool())
+                {
+                    std::cerr << "Bad report filter_sensors\n";
+                    return false;
+                }
+                if (it != reportj.MemberEnd())
+                {
+                    report.descriptor.filterSensors = it->value.GetBool();
+                }
+
+                if (report.descriptor.filterSensors)
+                {
+                    it = reportj.FindMember("sensors");
+                    if (it == reportj.MemberEnd() || !it->value.IsArray())
+                    {
+                        std::cerr << "Bad or missing report sensors\n";
+                        return false;
+                    }
+                    rapidjson::Value const& sensorsj = it->value;
+                    for (size_t si = 0; si < sensorsj.Size(); si++)
+                    {
+                        rapidjson::Value const& sensorj = sensorsj[si];
+                        if (!sensorj.IsUint())
+                        {
+                            std::cerr << "Bad or missing report sensor id\n";
+                            return false;
+                        }
+                        report.descriptor.sensors.push_back(sensorj.GetUint());
+                    }
+                }
+
+                it = reportj.FindMember("send_email_action");
+                if (it == reportj.MemberEnd() || !it->value.IsBool())
+                {
+                    std::cerr << "Bad or missing report send_email_action\n";
+                    return false;
+                }
+                report.descriptor.sendEmailAction = it->value.GetBool();
+
+                it = reportj.FindMember("email_recipient");
+                if (it == reportj.MemberEnd() || !it->value.IsString())
+                {
+                    std::cerr << "Bad or missing config email_recipient\n";
+                    return false;
+                }
+                report.descriptor.emailRecipient = it->value.GetString();
+
+                data.lastReportId = std::max(data.lastReportId, report.id);
+                data.reports.push_back(report);
             }
         }
 
@@ -945,6 +1031,111 @@ uint8_t DB::computeTriggeredAlarm(MeasurementDescriptor const& md) const
 
 //////////////////////////////////////////////////////////////////////////
 
+size_t DB::getReportCount() const
+{
+    return m_mainData.reports.size();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+DB::Report const& DB::getReport(size_t index) const
+{
+    assert(index < m_mainData.reports.size());
+    return m_mainData.reports[index];
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool DB::addReport(ReportDescriptor const& descriptor)
+{
+    if (findReportIndexByName(descriptor.name) >= 0)
+    {
+        assert(false);
+        return false;
+    }
+
+    Report report;
+    report.descriptor = descriptor;
+    if (!report.descriptor.filterSensors)
+    {
+        report.descriptor.sensors.clear();
+    }
+
+    report.id = ++m_mainData.lastReportId;
+
+    emit reportWillBeAdded(report.id);
+    m_mainData.reports.push_back(report);
+    emit reportAdded(report.id);
+
+    triggerSave();
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool DB::setReport(ReportId id, ReportDescriptor const& descriptor)
+{
+    int32_t index = findReportIndexByName(descriptor.name);
+    if (index >= 0 && getReport(index).id != id)
+    {
+        return false;
+    }
+
+    index = findReportIndexById(id);
+    if (index < 0)
+    {
+        return false;
+    }
+
+    m_mainData.reports[index].descriptor = descriptor;
+    emit reportChanged(id);
+
+    triggerSave();
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void DB::removeReport(size_t index)
+{
+    assert(index < m_mainData.reports.size());
+    ReportId id = m_mainData.reports[index].id;
+
+    emit reportWillBeRemoved(id);
+    m_mainData.reports.erase(m_mainData.reports.begin() + index);
+    emit reportRemoved(id);
+
+    triggerSave();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+int32_t DB::findReportIndexByName(std::string const& name) const
+{
+    auto it = std::find_if(m_mainData.reports.begin(), m_mainData.reports.end(), [&name](Report const& report) { return report.descriptor.name == name; });
+    if (it == m_mainData.reports.end())
+    {
+        return -1;
+    }
+    return std::distance(m_mainData.reports.begin(), it);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+int32_t DB::findReportIndexById(ReportId id) const
+{
+    auto it = std::find_if(m_mainData.reports.begin(), m_mainData.reports.end(), [id](Report const& report) { return report.id == id; });
+    if (it == m_mainData.reports.end())
+    {
+        return -1;
+    }
+    return std::distance(m_mainData.reports.begin(), it);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 bool DB::addMeasurement(MeasurementDescriptor const& md)
 {
     int32_t sensorIndex = findSensorIndexById(md.sensorId);
@@ -1288,6 +1479,31 @@ void DB::save(Data const& data) const
                 alarmsj.PushBack(alarmj, document.GetAllocator());
             }
             document.AddMember("alarms", alarmsj, document.GetAllocator());
+        }
+
+        {
+            rapidjson::Value reportsj;
+            reportsj.SetArray();
+            for (Report const& report: data.reports)
+            {
+                rapidjson::Value reportj;
+                reportj.SetObject();
+                reportj.AddMember("id", report.id, document.GetAllocator());
+                reportj.AddMember("name", rapidjson::Value(report.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
+                reportj.AddMember("filter_sensors", report.descriptor.filterSensors, document.GetAllocator());
+                if (report.descriptor.filterSensors)
+                {
+                    rapidjson::Value sensorsj;
+                    sensorsj.SetArray();
+                    for (SensorId const& sensorId: report.descriptor.sensors)
+                    {
+                        sensorsj.PushBack(sensorId, document.GetAllocator());
+                    }
+                    reportj.AddMember("sensors", sensorsj, document.GetAllocator());
+                }
+                reportsj.PushBack(reportj, document.GetAllocator());
+            }
+            document.AddMember("reports", reportsj, document.GetAllocator());
         }
 
         std::string tempFileName = m_dataFilename + "_temp";

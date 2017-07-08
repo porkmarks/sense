@@ -4,6 +4,7 @@
 #include <QChartGlobal>
 #include <QGraphicsItem>
 #include <QFont>
+#include <chrono>
 
 class QGraphicsSceneMouseEvent;
 
@@ -12,6 +13,7 @@ class PlotToolTip : public QGraphicsItem
 public:
     PlotToolTip(QChart* parent);
 
+    void setFixed(bool fixed);
     void setText(const QString& text);
     void setAnchor(const QPointF& point, QAbstractSeries* series);
     void updateGeometry();
@@ -24,6 +26,9 @@ protected:
     void mouseMoveEvent(QGraphicsSceneMouseEvent* event);
 
 private:
+    bool m_isFixed = false;
+    std::chrono::high_resolution_clock::time_point m_animationStartTP;
+
     QString m_text;
     QRectF m_textRect;
     QRectF m_rect;

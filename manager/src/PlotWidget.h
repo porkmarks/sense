@@ -40,10 +40,10 @@ private:
     {
         DB::Sensor sensor;
         std::unique_ptr<QLineSeries> temperatureSeries;
-        util::Butterworth<float> temperatureLpf;
+        util::Butterworth<qreal> temperatureLpf;
         QList<QPointF> temperaturePoints;
         std::unique_ptr<QLineSeries> humiditySeries;
-        util::Butterworth<float> humidityLpf;
+        util::Butterworth<qreal> humidityLpf;
         QList<QPointF> humidityPoints;
     };
 
