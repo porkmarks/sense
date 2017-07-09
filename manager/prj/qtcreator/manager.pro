@@ -82,7 +82,9 @@ HEADERS += \
     ../../src/ExportPicDialog.h \
     ../../src/ReportsModel.h \
     ../../src/ReportsWidget.h \
-    ../../src/ConfigureReportDialog.h
+    ../../src/ConfigureReportDialog.h \
+    ../../src/Utils.h \
+    ../../../common/src/Crypt.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -107,7 +109,9 @@ SOURCES += \
     ../../src/ExportPicDialog.cpp \
     ../../src/ReportsModel.cpp \
     ../../src/ReportsWidget.cpp \
-    ../../src/ConfigureReportDialog.cpp
+    ../../src/ConfigureReportDialog.cpp \
+    ../../src/Utils.cpp \
+    ../../../common/src/Crypt.cpp
 
 FORMS += \
     ../../src/Manager.ui \

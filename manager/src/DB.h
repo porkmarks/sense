@@ -181,11 +181,28 @@ public:
     {
         std::string name;
 
+        enum class Period
+        {
+            Daily,
+            Weekly,
+            Monthly,
+            Custom
+        };
+
+        Period period = Period::Weekly;
+        Clock::duration customPeriod = std::chrono::hours(48);
+
         bool filterSensors = false;
         std::vector<SensorId> sensors;
 
         bool sendEmailAction = false;
         std::string emailRecipient;
+
+        bool uploadToFtpAction = false;
+        std::string ftpServer;
+        std::string ftpFolder;
+        std::string ftpUsername;
+        std::string ftpPassword;
     };
 
     typedef uint32_t ReportId;

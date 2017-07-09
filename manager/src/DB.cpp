@@ -4,6 +4,7 @@
 #include <cassert>
 #include <fstream>
 #include <iostream>
+#include <QApplication>
 
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
@@ -14,21 +15,15 @@
 #include "rapidjson/istreamwrapper.h"
 
 #include "CRC.h"
+#include "Utils.h"
+#include "Crypt.h"
+
+
+extern std::string s_programFolder;
 
 constexpr float k_alertVcc = 2.2f;
 constexpr int8_t k_alertSignal = -110;
-
-
-static bool renameFile(const char* oldName, const char* newName)
-{
-#ifdef _WIN32
-    //one on success
-    return MoveFile(_T(oldName), _T(newName)) != 0;
-#else
-    //zero on success
-    return rename(oldName, newName) == 0;
-#endif
-}
+constexpr uint64_t k_encryptionKey = 1735271834639209ULL;
 
 template <typename Stream, typename T>
 void write(Stream& s, T const& t)
@@ -69,8 +64,8 @@ bool DB::create(std::string const& name)
     m_dataFilename = "sense-" + name + ".data";
     m_mainData.measurements.clear();
 
-    renameFile(m_dbFilename.c_str(), (m_dbFilename + ".old").c_str());
-    renameFile(m_dataFilename.c_str(), (m_dataFilename + ".old").c_str());
+    moveToBackup(m_dbFilename, s_programFolder + "/backups");
+    moveToBackup(m_dataFilename, s_programFolder + "/backups");
 
     remove(m_dbFilename.c_str());
     remove(m_dataFilename.c_str());
@@ -405,6 +400,9 @@ bool DB::open(std::string const& name)
 //            return false;
 //        }
 
+        Crypt crypt;
+        crypt.setKey(k_encryptionKey);
+
         if (it != document.MemberEnd())
         {
             rapidjson::Value const& reportsj = it->value;
@@ -460,10 +458,26 @@ bool DB::open(std::string const& name)
                     }
                 }
 
+                it = reportj.FindMember("period");
+                if (it == reportj.MemberEnd() || !it->value.IsInt())
+                {
+                    std::cerr << "Bad or missing config period\n";
+                    return false;
+                }
+                report.descriptor.period = static_cast<DB::ReportDescriptor::Period>(it->value.GetInt());
+
+                it = reportj.FindMember("custom_period");
+                if (it == reportj.MemberEnd() || !it->value.IsUint64())
+                {
+                    std::cerr << "Bad or missing config custom_period\n";
+                    return false;
+                }
+                report.descriptor.customPeriod = std::chrono::seconds(it->value.GetUint64());
+
                 it = reportj.FindMember("send_email_action");
                 if (it == reportj.MemberEnd() || !it->value.IsBool())
                 {
-                    std::cerr << "Bad or missing report send_email_action\n";
+                    std::cerr << "Bad or missing alarm send_email_action\n";
                     return false;
                 }
                 report.descriptor.sendEmailAction = it->value.GetBool();
@@ -475,6 +489,46 @@ bool DB::open(std::string const& name)
                     return false;
                 }
                 report.descriptor.emailRecipient = it->value.GetString();
+
+                it = reportj.FindMember("upload_to_ftp_action");
+                if (it == reportj.MemberEnd() || !it->value.IsBool())
+                {
+                    std::cerr << "Bad or missing alarm upload_to_ftp_action\n";
+                    return false;
+                }
+                report.descriptor.uploadToFtpAction = it->value.GetBool();
+
+                it = reportj.FindMember("ftp_server");
+                if (it == reportj.MemberEnd() || !it->value.IsString())
+                {
+                    std::cerr << "Bad or missing config ftp_server\n";
+                    return false;
+                }
+                report.descriptor.ftpServer = it->value.GetString();
+
+                it = reportj.FindMember("ftp_folder");
+                if (it == reportj.MemberEnd() || !it->value.IsString())
+                {
+                    std::cerr << "Bad or missing config ftp_folder\n";
+                    return false;
+                }
+                report.descriptor.ftpFolder = it->value.GetString();
+
+                it = reportj.FindMember("ftp_username");
+                if (it == reportj.MemberEnd() || !it->value.IsString())
+                {
+                    std::cerr << "Bad or missing config ftp_username\n";
+                    return false;
+                }
+                report.descriptor.ftpUsername = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
+
+                it = reportj.FindMember("ftp_password");
+                if (it == reportj.MemberEnd() || !it->value.IsString())
+                {
+                    std::cerr << "Bad or missing config ftp_password\n";
+                    return false;
+                }
+                report.descriptor.ftpPassword = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
 
                 data.lastReportId = std::max(data.lastReportId, report.id);
                 data.reports.push_back(report);
@@ -893,7 +947,6 @@ bool DB::addAlarm(AlarmDescriptor const& descriptor)
 {
     if (findAlarmIndexByName(descriptor.name) >= 0)
     {
-        assert(false);
         return false;
     }
 
@@ -1050,7 +1103,6 @@ bool DB::addReport(ReportDescriptor const& descriptor)
 {
     if (findReportIndexByName(descriptor.name) >= 0)
     {
-        assert(false);
         return false;
     }
 
@@ -1141,7 +1193,6 @@ bool DB::addMeasurement(MeasurementDescriptor const& md)
     int32_t sensorIndex = findSensorIndexById(md.sensorId);
     if (sensorIndex < 0)
     {
-        assert(false);
         return false;
     }
 
@@ -1481,6 +1532,9 @@ void DB::save(Data const& data) const
             document.AddMember("alarms", alarmsj, document.GetAllocator());
         }
 
+        Crypt crypt;
+        crypt.setKey(k_encryptionKey);
+
         {
             rapidjson::Value reportsj;
             reportsj.SetArray();
@@ -1501,6 +1555,20 @@ void DB::save(Data const& data) const
                     }
                     reportj.AddMember("sensors", sensorsj, document.GetAllocator());
                 }
+                reportj.AddMember("period", static_cast<int32_t>(report.descriptor.period), document.GetAllocator());
+                reportj.AddMember("custom_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(report.descriptor.customPeriod).count()), document.GetAllocator());
+                reportj.AddMember("send_email_action", report.descriptor.sendEmailAction, document.GetAllocator());
+                reportj.AddMember("emailRecipient", rapidjson::Value(report.descriptor.emailRecipient.c_str(), document.GetAllocator()), document.GetAllocator());
+                reportj.AddMember("upload_to_ftp_action", report.descriptor.uploadToFtpAction, document.GetAllocator());
+                reportj.AddMember("ftp_server", rapidjson::Value(report.descriptor.ftpServer.c_str(), document.GetAllocator()), document.GetAllocator());
+                reportj.AddMember("ftp_folder", rapidjson::Value(report.descriptor.ftpFolder.c_str(), document.GetAllocator()), document.GetAllocator());
+
+                QString username(report.descriptor.ftpUsername.c_str());
+                reportj.AddMember("ftp_username", rapidjson::Value(crypt.encryptToString(username).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
+
+                QString password(report.descriptor.ftpPassword.c_str());
+                reportj.AddMember("ftp_password", rapidjson::Value(crypt.encryptToString(password).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
+
                 reportsj.PushBack(reportj, document.GetAllocator());
             }
             document.AddMember("reports", reportsj, document.GetAllocator());
@@ -1520,6 +1588,8 @@ void DB::save(Data const& data) const
             document.Accept(writer);
         }
         file.close();
+
+        copyToBackup(m_dataFilename, s_programFolder + "/backups");
 
         if (!renameFile(tempFileName.c_str(), m_dataFilename.c_str()))
         {
@@ -1598,6 +1668,8 @@ void DB::save(Data const& data) const
                 write(file, crc);
             }
             file.close();
+
+            copyToBackup(m_dbFilename, s_programFolder + "/backups");
 
             if (!renameFile(tempFileName.c_str(), m_dbFilename.c_str()))
             {

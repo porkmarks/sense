@@ -82,10 +82,14 @@ void ReportsWidget::addReport()
 {
     ConfigureReportDialog dialog(*m_db);
 
+    DB::Report report;
+    report.descriptor.name = "Report " + std::to_string(m_db->getReportCount());
+    dialog.setReport(report);
+
     int result = dialog.exec();
     if (result == QDialog::Accepted)
     {
-        DB::Report report = dialog.getReport();
+        report = dialog.getReport();
         m_db->addReport(report.descriptor);
         m_model->refresh();
 

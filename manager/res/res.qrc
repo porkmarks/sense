@@ -1,5 +1,6 @@
 <RCC>
 <qresource prefix="/">
+<file>icons/ui/ftp.png</file>
 <file>icons/ui/smooth.png</file>
 <file>icons/ui/report.png</file>
 <file>icons/ui/sensor-error.png</file>

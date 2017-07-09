@@ -129,8 +129,14 @@ void ConfigureAlarmDialog::accept()
         QMessageBox::critical(this, "Error", "You need to specify a name for this alarm.");
         return;
     }
+    if (descriptor.sendEmailAction && descriptor.emailRecipient.empty())
+    {
+        QMessageBox::critical(this, "Error", "You need to specify the email recipient.");
+        return;
+    }
+
     int32_t alarmIndex = m_db.findAlarmIndexByName(descriptor.name);
-    if (alarmIndex >= 0 && m_db.getAlarm(alarmIndex).id == m_alarm.id)
+    if (alarmIndex >= 0 && m_db.getAlarm(alarmIndex).id != m_alarm.id)
     {
         QMessageBox::critical(this, "Error", QString("Alarm '%1' already exists.").arg(descriptor.name.c_str()));
         return;

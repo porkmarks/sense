@@ -1,11 +1,7 @@
-#ifndef UTILS_H
-#define UTILS_H
+#pragma once
 
+#include <string>
 
-class Utils
-{
-public:
-    Utils();
-};
-
-#endif // UTILS_H
+void copyToBackup(std::string const& filename, std::string const& folder);
+void moveToBackup(std::string const& filename, std::string const& folder);
+bool renameFile(std::string const& oldName, std::string const& newName);

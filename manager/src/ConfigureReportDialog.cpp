@@ -67,22 +67,26 @@ void ConfigureReportDialog::setReport(DB::Report const& report)
         }
     }
 
-//    m_ui.highTemperatureWatch->setChecked(descriptor.highTemperatureWatch);
-//    m_ui.highTemperature->setValue(descriptor.highTemperature);
-//    m_ui.lowTemperatureWatch->setChecked(descriptor.lowTemperatureWatch);
-//    m_ui.lowTemperature->setValue(descriptor.lowTemperature);
-
-//    m_ui.highHumidityWatch->setChecked(descriptor.highHumidityWatch);
-//    m_ui.highHumidity->setValue(descriptor.highHumidity);
-//    m_ui.lowHumidityWatch->setChecked(descriptor.lowHumidityWatch);
-//    m_ui.lowHumidity->setValue(descriptor.lowHumidity);
-
-//    m_ui.sensorErrorsWatch->setChecked(descriptor.sensorErrorsWatch);
-//    m_ui.lowSignalWatch->setChecked(descriptor.lowSignalWatch);
-//    m_ui.lowBatteryWatch->setChecked(descriptor.lowVccWatch);
+    if (descriptor.period == DB::ReportDescriptor::Period::Custom)
+    {
+        m_ui.useCustomPeriod->setChecked(true);
+        size_t days = std::chrono::duration_cast<std::chrono::hours>(descriptor.customPeriod).count() / 24;
+        m_ui.customPeriod->setValue(days);
+    }
+    else
+    {
+        m_ui.period->setCurrentIndex(static_cast<int>(descriptor.period));
+        m_ui.useCustomPeriod->setChecked(false);
+    }
 
     m_ui.sendEmailAction->setChecked(descriptor.sendEmailAction);
     m_ui.emailRecipient->setText(descriptor.emailRecipient.c_str());
+
+    m_ui.uploadToFtpAction->setChecked(descriptor.uploadToFtpAction);
+    m_ui.ftpServer->setText(descriptor.ftpServer.c_str());
+    m_ui.ftpFolder->setText(descriptor.ftpFolder.c_str());
+    m_ui.ftpUsername->setText(descriptor.ftpUsername.c_str());
+    m_ui.ftpPassword->setText(descriptor.ftpPassword.c_str());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -107,30 +111,48 @@ void ConfigureReportDialog::accept()
         }
     }
 
-//    descriptor.highTemperatureWatch = m_ui.highTemperatureWatch->isChecked();
-//    descriptor.highTemperature = m_ui.highTemperature->value();
-//    descriptor.lowTemperatureWatch = m_ui.lowTemperatureWatch->isChecked();
-//    descriptor.lowTemperature = m_ui.lowTemperature->value();
-
-//    descriptor.highHumidityWatch = m_ui.highHumidityWatch->isChecked();
-//    descriptor.highHumidity = m_ui.highHumidity->value();
-//    descriptor.lowHumidityWatch = m_ui.lowHumidityWatch->isChecked();
-//    descriptor.lowHumidity = m_ui.lowHumidity->value();
-
-//    descriptor.sensorErrorsWatch = m_ui.sensorErrorsWatch->isChecked();
-//    descriptor.lowSignalWatch = m_ui.lowSignalWatch->isChecked();
-//    descriptor.lowVccWatch = m_ui.lowBatteryWatch->isChecked();
+    if (m_ui.useCustomPeriod->isChecked())
+    {
+        descriptor.period = DB::ReportDescriptor::Period::Custom;
+        descriptor.customPeriod = std::chrono::hours(m_ui.customPeriod->value());
+        size_t days = std::chrono::duration_cast<std::chrono::hours>(descriptor.customPeriod).count() / 24;
+        if (days == 0)
+        {
+            descriptor.customPeriod = std::chrono::hours(24);
+        }
+    }
+    else
+    {
+        descriptor.period = static_cast<DB::ReportDescriptor::Period>(m_ui.period->currentIndex());
+    }
 
     descriptor.sendEmailAction = m_ui.sendEmailAction->isChecked();
     descriptor.emailRecipient = m_ui.emailRecipient->text().toUtf8().data();
+
+    descriptor.uploadToFtpAction = m_ui.uploadToFtpAction->isChecked();
+    descriptor.ftpServer = m_ui.ftpServer->text().toUtf8().data();
+    descriptor.ftpFolder = m_ui.ftpFolder->text().toUtf8().data();
+    descriptor.ftpUsername = m_ui.ftpUsername->text().toUtf8().data();
+    descriptor.ftpPassword = m_ui.ftpPassword->text().toUtf8().data();
 
     if (descriptor.name.empty())
     {
         QMessageBox::critical(this, "Error", "You need to specify a name for this report.");
         return;
     }
+    if (descriptor.uploadToFtpAction && descriptor.ftpServer.empty())
+    {
+        QMessageBox::critical(this, "Error", "You need to specify the ftp server.");
+        return;
+    }
+    if (descriptor.sendEmailAction && descriptor.emailRecipient.empty())
+    {
+        QMessageBox::critical(this, "Error", "You need to specify the email recipient.");
+        return;
+    }
+
     int32_t reportIndex = m_db.findReportIndexByName(descriptor.name);
-    if (reportIndex >= 0 && m_db.getReport(reportIndex).id == m_report.id)
+    if (reportIndex >= 0 && m_db.getReport(reportIndex).id != m_report.id)
     {
         QMessageBox::critical(this, "Error", QString("Report '%1' already exists.").arg(descriptor.name.c_str()));
         return;
@@ -140,15 +162,11 @@ void ConfigureReportDialog::accept()
         QMessageBox::critical(this, "Error", "You need to specify at least one sensor.");
         return;
     }
-//    if (!descriptor.highTemperatureWatch && !descriptor.lowTemperatureWatch &&
-//            !descriptor.highHumidityWatch && !descriptor.lowHumidityWatch &&
-//            !descriptor.sensorErrorsWatch &&
-//            !descriptor.lowSignalWatch &&
-//            !descriptor.lowVccWatch)
-//    {
-//        QMessageBox::critical(this, "Error", "You need to specify at least a trigger condition.");
-//        return;
-//    }
+    if (!descriptor.sendEmailAction && !descriptor.uploadToFtpAction)
+    {
+        QMessageBox::critical(this, "Error", "You need to enable at least one action.");
+        return;
+    }
 
     m_report.descriptor = descriptor;
     QDialog::accept();

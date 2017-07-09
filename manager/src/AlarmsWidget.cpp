@@ -1,6 +1,8 @@
 #include "AlarmsWidget.h"
 #include "ConfigureAlarmDialog.h"
 
+#include "DB.h"
+
 //////////////////////////////////////////////////////////////////////////
 
 AlarmsWidget::AlarmsWidget(QWidget *parent)
@@ -82,10 +84,14 @@ void AlarmsWidget::addAlarm()
 {
     ConfigureAlarmDialog dialog(*m_db);
 
+    DB::Alarm alarm;
+    alarm.descriptor.name = "Alarm " + std::to_string(m_db->getAlarmCount());
+    dialog.setAlarm(alarm);
+
     int result = dialog.exec();
     if (result == QDialog::Accepted)
     {
-        DB::Alarm alarm = dialog.getAlarm();
+        alarm = dialog.getAlarm();
         m_db->addAlarm(alarm.descriptor);
         m_model->refresh();
 

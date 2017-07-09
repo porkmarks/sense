@@ -3,6 +3,8 @@
 #include <QNetworkProxyFactory>
 #include <QLocale>
 
+std::string s_programFolder;
+
 /* This prints an "Assertion failed" message and aborts.  */
 void __assert_fail(const char *__assertion, const char *__file, unsigned int __line, const char *__function)
 {
@@ -18,6 +20,9 @@ int main(int argc, char *argv[])
     Q_INIT_RESOURCE(res);
 
     QApplication a(argc, argv);
+
+    s_programFolder = a.applicationDirPath().toUtf8().data();
+
 //    QApplication::setStyle("fusion");
 
     QNetworkProxyFactory::setUseSystemConfiguration(true);

@@ -3,10 +3,11 @@
 #include <QWidget>
 #include <QIcon>
 
-static std::array<const char*, 2> s_headerNames = {"Name", "Action"};
+static std::array<const char*, 3> s_headerNames = {"Name", "Period", "Action"};
 enum class Column
 {
     Name,
+    Period,
     Action
 };
 
@@ -118,12 +119,42 @@ QVariant ReportsModel::data(QModelIndex const& index, int role) const
         {
             return descriptor.name.c_str();
         }
+        else if (column == Column::Period)
+        {
+            if (descriptor.period == DB::ReportDescriptor::Period::Daily)
+            {
+                return "Daily";
+            }
+            else if (descriptor.period == DB::ReportDescriptor::Period::Weekly)
+            {
+                return "Weekly";
+            }
+            else if (descriptor.period == DB::ReportDescriptor::Period::Monthly)
+            {
+                return "Monthly";
+            }
+            else
+            {
+                size_t days = std::chrono::duration_cast<std::chrono::hours>(descriptor.customPeriod).count() / 24;
+                return QString("Every %1 %2").arg(days).arg(days == 1 ? "day" : "days");
+            }
+        }
         else if (column == Column::Action)
         {
+            QString str;
             if (descriptor.sendEmailAction)
             {
-                return ("Email " + descriptor.emailRecipient).c_str();
+                str = ("Email " + descriptor.emailRecipient).c_str();
             }
+            if (descriptor.uploadToFtpAction)
+            {
+                if (!str.isEmpty())
+                {
+                    str += " and ";
+                }
+                str += ("Upload to " + descriptor.ftpServer + ":/" + descriptor.ftpFolder).c_str();
+            }
+            return str;
         }
     }
     else if (role == Qt::DecorationRole)
@@ -131,13 +162,6 @@ QVariant ReportsModel::data(QModelIndex const& index, int role) const
         if (column == Column::Name)
         {
             return QIcon(":/icons/ui/report.png");
-        }
-        else if (column == Column::Action)
-        {
-            if (descriptor.sendEmailAction)
-            {
-                return QIcon(":/icons/ui/email.png");
-            }
         }
     }
 
