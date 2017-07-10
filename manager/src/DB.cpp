@@ -64,8 +64,8 @@ bool DB::create(std::string const& name)
     m_dataFilename = "sense-" + name + ".data";
     m_mainData.measurements.clear();
 
-    moveToBackup(m_dbFilename, s_programFolder + "/backups");
-    moveToBackup(m_dataFilename, s_programFolder + "/backups");
+    moveToBackup(m_dbFilename, s_programFolder + "/backups/deleted");
+    moveToBackup(m_dataFilename, s_programFolder + "/backups/deleted");
 
     remove(m_dbFilename.c_str());
     remove(m_dataFilename.c_str());
@@ -75,7 +75,7 @@ bool DB::create(std::string const& name)
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::open(std::string const& name)
+bool DB::load(std::string const& name)
 {
     Clock::time_point start = Clock::now();
 
@@ -427,15 +427,12 @@ bool DB::open(std::string const& name)
                 report.id = it->value.GetUint();
 
                 it = reportj.FindMember("filter_sensors");
-                if (it != reportj.MemberEnd() && !it->value.IsBool())
+                if (it == reportj.MemberEnd() || !it->value.IsBool())
                 {
                     std::cerr << "Bad report filter_sensors\n";
                     return false;
                 }
-                if (it != reportj.MemberEnd())
-                {
-                    report.descriptor.filterSensors = it->value.GetBool();
-                }
+                report.descriptor.filterSensors = it->value.GetBool();
 
                 if (report.descriptor.filterSensors)
                 {
@@ -473,6 +470,14 @@ bool DB::open(std::string const& name)
                     return false;
                 }
                 report.descriptor.customPeriod = std::chrono::seconds(it->value.GetUint64());
+
+                it = reportj.FindMember("data");
+                if (it == reportj.MemberEnd() || !it->value.IsInt())
+                {
+                    std::cerr << "Bad or missing config data\n";
+                    return false;
+                }
+                report.descriptor.data = static_cast<DB::ReportDescriptor::Data>(it->value.GetInt());
 
                 it = reportj.FindMember("send_email_action");
                 if (it == reportj.MemberEnd() || !it->value.IsBool())
@@ -636,6 +641,25 @@ bool DB::open(std::string const& name)
         }
 
         file.close();
+    }
+
+    std::pair<std::string, time_t> bkf = getMostRecentBackup(m_dbFilename, s_programFolder + "/backups/daily");
+    if (bkf.first.empty())
+    {
+        m_lastDailyBackupTP = DB::Clock::now();
+    }
+    else
+    {
+        m_lastDailyBackupTP = DB::Clock::from_time_t(bkf.second);
+    }
+    bkf = getMostRecentBackup(m_dbFilename, s_programFolder + "/backups/weekly");
+    if (bkf.first.empty())
+    {
+        m_lastWeeklyBackupTP = DB::Clock::now();
+    }
+    else
+    {
+        m_lastWeeklyBackupTP = DB::Clock::from_time_t(bkf.second);
     }
 
     m_mainData = data;
@@ -1460,7 +1484,21 @@ void DB::triggerSave()
 
 void DB::save(Data const& data) const
 {
-    Clock::time_point start = Clock::now();
+    bool dailyBackup = false;
+    bool weeklyBackup = false;
+    Clock::time_point now = Clock::now();
+    if (now - m_lastDailyBackupTP >= std::chrono::hours(24))
+    {
+        m_lastDailyBackupTP = now;
+        dailyBackup = true;
+    }
+    if (now - m_lastWeeklyBackupTP >= std::chrono::hours(24 * 7))
+    {
+        m_lastWeeklyBackupTP = now;
+        weeklyBackup = true;
+    }
+
+    Clock::time_point start = now;
 
     {
         rapidjson::Document document;
@@ -1557,8 +1595,9 @@ void DB::save(Data const& data) const
                 }
                 reportj.AddMember("period", static_cast<int32_t>(report.descriptor.period), document.GetAllocator());
                 reportj.AddMember("custom_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(report.descriptor.customPeriod).count()), document.GetAllocator());
+                reportj.AddMember("data", static_cast<int32_t>(report.descriptor.data), document.GetAllocator());
                 reportj.AddMember("send_email_action", report.descriptor.sendEmailAction, document.GetAllocator());
-                reportj.AddMember("emailRecipient", rapidjson::Value(report.descriptor.emailRecipient.c_str(), document.GetAllocator()), document.GetAllocator());
+                reportj.AddMember("email_recipient", rapidjson::Value(report.descriptor.emailRecipient.c_str(), document.GetAllocator()), document.GetAllocator());
                 reportj.AddMember("upload_to_ftp_action", report.descriptor.uploadToFtpAction, document.GetAllocator());
                 reportj.AddMember("ftp_server", rapidjson::Value(report.descriptor.ftpServer.c_str(), document.GetAllocator()), document.GetAllocator());
                 reportj.AddMember("ftp_folder", rapidjson::Value(report.descriptor.ftpFolder.c_str(), document.GetAllocator()), document.GetAllocator());
@@ -1587,9 +1626,10 @@ void DB::save(Data const& data) const
             rapidjson::PrettyWriter<rapidjson::BasicOStreamWrapper<std::ofstream>> writer(buffer);
             document.Accept(writer);
         }
+        file.flush();
         file.close();
 
-        copyToBackup(m_dataFilename, s_programFolder + "/backups");
+        copyToBackup(m_dataFilename, s_programFolder + "/backups/incremental");
 
         if (!renameFile(tempFileName.c_str(), m_dataFilename.c_str()))
         {
@@ -1597,58 +1637,6 @@ void DB::save(Data const& data) const
         }
     }
 
-
-//    {
-//        rapidjson::Document document;
-//        document.SetArray();
-
-//        for (auto const& pair: data.measurements)
-//        {
-//            rapidjson::Value measurementsPerSensorj;
-//            measurementsPerSensorj.SetObject();
-
-//            rapidjson::Value measurementsj;
-//            measurementsj.SetArray();
-//            for (StoredMeasurement const& sm: pair.second)
-//            {
-//                rapidjson::Value mj;
-//                mj.SetArray();
-//                mj.PushBack(sm.index, document.GetAllocator());
-//                mj.PushBack(static_cast<uint64_t>(sm.timePoint), document.GetAllocator());
-//                mj.PushBack(sm.temperature, document.GetAllocator());
-//                mj.PushBack(sm.humidity, document.GetAllocator());
-//                mj.PushBack(sm.vcc, document.GetAllocator());
-//                mj.PushBack(sm.b2s, document.GetAllocator());
-//                mj.PushBack(sm.s2b, document.GetAllocator());
-//                mj.PushBack(sm.sensorErrors, document.GetAllocator());
-//                measurementsj.PushBack(mj, document.GetAllocator());
-//            }
-//            measurementsPerSensorj.AddMember("id", pair.first, document.GetAllocator());
-//            measurementsPerSensorj.AddMember("m", std::move(measurementsj), document.GetAllocator());
-
-//            document.PushBack(std::move(measurementsPerSensorj), document.GetAllocator());
-//        }
-
-//        std::string tempFileName = m_dbFilename + "_temp";
-//        std::ofstream file(tempFileName);
-//        if (!file.is_open())
-//        {
-//            std::cerr << "Failed to open " << tempFileName << " file: " << std::strerror(errno) << "\n";
-//        }
-//        else
-//        {
-//            rapidjson::BasicOStreamWrapper<std::ofstream> buffer{file};
-//            rapidjson::Writer<rapidjson::BasicOStreamWrapper<std::ofstream>> writer(buffer);
-//            //rapidjson::PrettyWriter<rapidjson::BasicOStreamWrapper<std::ofstream>> writer(buffer);
-//            document.Accept(writer);
-//        }
-//        file.close();
-
-//        if (!renameFile(tempFileName.c_str(), m_dbFilename.c_str()))
-//        {
-//            std::perror("Error renaming");
-//        }
-//    }
     {
         std::string tempFileName = m_dbFilename + "_temp";
         std::ofstream file(tempFileName, std::ios_base::binary);
@@ -1667,9 +1655,10 @@ void DB::save(Data const& data) const
                 uint32_t crc = crc32(pair.second.data(), pair.second.size() * sizeof(StoredMeasurement));
                 write(file, crc);
             }
+            file.flush();
             file.close();
 
-            copyToBackup(m_dbFilename, s_programFolder + "/backups");
+            copyToBackup(m_dbFilename, s_programFolder + "/backups/incremental");
 
             if (!renameFile(tempFileName.c_str(), m_dbFilename.c_str()))
             {
@@ -1680,6 +1669,17 @@ void DB::save(Data const& data) const
 
     std::cout << "Time to save DB:" << std::chrono::duration<float>(Clock::now() - start).count() << "s\n";
     std::cout.flush();
+
+    if (dailyBackup)
+    {
+        copyToBackup(m_dataFilename, s_programFolder + "/backups/daily");
+        copyToBackup(m_dbFilename, s_programFolder + "/backups/daily");
+    }
+    if (weeklyBackup)
+    {
+        copyToBackup(m_dataFilename, s_programFolder + "/backups/weekly");
+        copyToBackup(m_dbFilename, s_programFolder + "/backups/weekly");
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////

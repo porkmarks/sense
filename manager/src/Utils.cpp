@@ -8,9 +8,9 @@
 
 constexpr size_t k_maxBackups = 10;
 
-static void clipBackups(std::string const& filename, std::string const& folder)
+typedef std::pair<std::string, time_t> FD;
+static std::vector<FD> getBackupFiles(std::string const& filename, std::string const& folder)
 {
-    typedef std::pair<std::string, time_t> FD;
     std::vector<FD> bkFiles;
 
     QDirIterator it(folder.c_str(), QDirIterator::Subdirectories);
@@ -54,6 +54,12 @@ static void clipBackups(std::string const& filename, std::string const& folder)
         it.next();
     }
 
+    return bkFiles;
+}
+
+static void clipBackups(std::string const& filename, std::string const& folder)
+{
+    std::vector<FD> bkFiles = getBackupFiles(filename, folder);
     if (bkFiles.size() <= k_maxBackups)
     {
         std::cout << "File '" << filename << "' has " << std::to_string(bkFiles.size()) << " backups. Not trimming yet.\n";
@@ -69,12 +75,24 @@ static void clipBackups(std::string const& filename, std::string const& folder)
     }
 }
 
+std::pair<std::string, time_t> getMostRecentBackup(std::string const& filename, std::string const& folder)
+{
+    std::vector<FD> bkFiles = getBackupFiles(filename, folder);
+    if (bkFiles.empty())
+    {
+        return { std::string(), time_t() };
+    }
+
+    std::sort(bkFiles.begin(), bkFiles.end(), [](FD const& a, FD const& b) { return a.second > b.second; });
+    return bkFiles.front();
+}
+
 void copyToBackup(std::string const& filename, std::string const& folder)
 {
     time_t nowTT = QDateTime::currentDateTime().toTime_t();
     std::string newFilename = folder + "/" + filename + "_" + std::to_string(nowTT);
 
-    QDir().mkdir(folder.c_str());
+    QDir().mkpath(folder.c_str());
 
     if (!QFile::copy(filename.c_str(), newFilename.c_str()))
     {
@@ -89,7 +107,7 @@ void moveToBackup(std::string const& filename, std::string const& folder)
     time_t nowTT = QDateTime::currentDateTime().toTime_t();
     std::string newFilename = folder + "/" + filename + "_" + std::to_string(nowTT);
 
-    QDir().mkdir(folder.c_str());
+    QDir().mkpath(folder.c_str());
 
     if (!renameFile(filename, newFilename))
     {

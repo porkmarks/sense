@@ -126,8 +126,8 @@ void PlotWidget::refresh()
         if (it == m_series.end())
         {
             plotData = &m_series[m.descriptor.sensorId];
-            plotData->temperatureLpf.setup(1, 1, 0.1);
-            plotData->humidityLpf.setup(1, 1, 0.1);
+            plotData->temperatureLpf.setup(1, 1, 0.15);
+            plotData->humidityLpf.setup(1, 1, 0.15);
         }
         else
         {

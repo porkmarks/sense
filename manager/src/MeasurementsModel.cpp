@@ -149,7 +149,13 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
 
     if (role == Qt::UserRole + 5) // sorting
     {
-        if (column == Column::Temperature)
+        if (column == Column::Timestamp)
+        {
+            QDateTime dt;
+            dt.setTime_t(DB::Clock::to_time_t(measurement.descriptor.timePoint));
+            return dt;
+        }
+        else if (column == Column::Temperature)
         {
             return measurement.descriptor.temperature;
         }
@@ -228,7 +234,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         {
             QDateTime dt;
             dt.setTime_t(DB::Clock::to_time_t(measurement.descriptor.timePoint));
-            return dt;
+            return dt.toString("dd-MM-yyyy HH:mm");
         }
         else if (column == Column::Temperature)
         {

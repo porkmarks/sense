@@ -3,11 +3,12 @@
 #include <QWidget>
 #include <QIcon>
 
-static std::array<const char*, 3> s_headerNames = {"Name", "Period", "Action"};
+static std::array<const char*, 4> s_headerNames = {"Name", "Period", "Data", "Action"};
 enum class Column
 {
     Name,
     Period,
+    Data,
     Action
 };
 
@@ -137,6 +138,17 @@ QVariant ReportsModel::data(QModelIndex const& index, int role) const
             {
                 size_t days = std::chrono::duration_cast<std::chrono::hours>(descriptor.customPeriod).count() / 24;
                 return QString("Every %1 %2").arg(days).arg(days == 1 ? "day" : "days");
+            }
+        }
+        else if (column == Column::Data)
+        {
+            if (descriptor.data == DB::ReportDescriptor::Data::Summary)
+            {
+                return "Summary";
+            }
+            else
+            {
+                return "All";
             }
         }
         else if (column == Column::Action)

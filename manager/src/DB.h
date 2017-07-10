@@ -21,7 +21,7 @@ public:
     typedef std::chrono::high_resolution_clock Clock;
 
     bool create(std::string const& name);
-    bool open(std::string const& name);
+    bool load(std::string const& name);
 
     struct ConfigDescriptor
     {
@@ -192,6 +192,14 @@ public:
         Period period = Period::Weekly;
         Clock::duration customPeriod = std::chrono::hours(48);
 
+        enum class Data
+        {
+            Summary,
+            All
+        };
+
+        Data data = Data::Summary;
+
         bool filterSensors = false;
         std::vector<SensorId> sensors;
 
@@ -355,4 +363,7 @@ private:
 
     std::string m_dbFilename;
     std::string m_dataFilename;
+
+    mutable Clock::time_point m_lastDailyBackupTP = Clock::time_point(Clock::duration::zero());
+    mutable Clock::time_point m_lastWeeklyBackupTP = Clock::time_point(Clock::duration::zero());
 };

@@ -101,7 +101,7 @@ void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor cons
     std::string dbName = bs.name + "-" + macStr;
 
     std::unique_ptr<DB> db(new DB);
-    if (!db->open(dbName))
+    if (!db->load(dbName))
     {
         if (!db->create(dbName))
         {
