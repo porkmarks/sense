@@ -5,8 +5,6 @@
 #include <sstream>
 #include <cstring>
 #include <cassert>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
 
 constexpr std::chrono::seconds CONFIG_REFRESH_PERIOD(10);
 
@@ -69,8 +67,6 @@ std::string time_point_to_string(std::chrono::high_resolution_clock::time_point 
 const Sensors::Clock::duration Sensors::MEASUREMENT_JITTER = std::chrono::seconds(10);
 const Sensors::Clock::duration Sensors::COMMS_DURATION = std::chrono::seconds(10);
 
-static const std::string k_settings_file = "settings.json";
-
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 Sensors::Sensors()
@@ -88,17 +84,6 @@ Sensors::~Sensors()
 
 bool Sensors::init()
 {
-    if (!load_settings(k_settings_file))
-    {
-        m_config.measurement_period = std::chrono::minutes(5);
-        m_config.comms_period = std::chrono::minutes(5);
-        m_config.baseline_time_point = Clock::now();
-
-        m_sensors.clear();
-    }
-
-    save_settings(k_settings_file);
-
     std::cout << "Sensors initialized\n";
 
     m_is_initialized = true;
@@ -164,7 +149,7 @@ Sensors::Sensor const* Sensors::bind_sensor()
         return nullptr;
     }
 
-    Sensor const* sensor = add_sensor(++m_last_sensor_id, m_unbound_sensor_data_opt->name, ++m_last_address);
+    Sensor const* sensor = add_sensor(m_unbound_sensor_data_opt->id, m_unbound_sensor_data_opt->name, ++m_last_address);
     if (sensor)
     {
         cb_sensor_bound(sensor->name, sensor->id, sensor->address);
@@ -245,7 +230,7 @@ Sensors::Sensor const* Sensors::add_sensor(Sensor_Id id, std::string const& name
     sensor.address = address;
     m_sensors.emplace_back(std::move(sensor));
 
-    save_settings(k_settings_file);
+    m_last_address = std::max(m_last_address, sensor.address);
 
     return &m_sensors.back();
 }
@@ -274,8 +259,6 @@ void Sensors::set_config(Config const& config)
     }
 
     m_config = config;
-
-    save_settings(k_settings_file);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -342,7 +325,7 @@ uint32_t Sensors::compute_next_measurement_index(Sensor_Id id) const
     }
 
     uint32_t next_sensor_measurement_index = sensor->first_recorded_measurement_index + sensor->recorded_measurement_count;
-    return std::max(next_sensor_measurement_index, compute_next_measurement_index());
+    return next_sensor_measurement_index;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -419,7 +402,6 @@ bool Sensors::remove_sensor(Sensor_Id id)
         return false;
     }
 
-
     auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](Sensor const& sensor)
     {
         return sensor.id == id;
@@ -432,9 +414,20 @@ bool Sensors::remove_sensor(Sensor_Id id)
 
     m_sensors.erase(it);
 
-    save_settings(k_settings_file);
-
     return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+void Sensors::remove_all_sensors()
+{
+    if (!is_initialized())
+    {
+        std::cerr << "Sensors not initialized\n";
+        return;
+    }
+
+    m_sensors.clear();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -551,95 +544,4 @@ void Sensors::confirm_measurement(Sensor_Id id, uint32_t measurement_index)
     {
         sensor->max_confirmed_measurement_index = measurement_index;
     }
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////
-
-bool Sensors::load_settings(std::string const& filename)
-{
-    m_sensors.clear();
-    m_last_address = Sensor_Comms::SLAVE_ADDRESS_BEGIN;
-    m_last_sensor_id = 0;
-
-    {
-        std::ifstream f(filename);
-        if (!f.is_open())
-        {
-            return false;
-        }
-    }
-
-    std::vector<Sensor> sensors;
-    uint32_t last_address = Sensor_Comms::SLAVE_ADDRESS_BEGIN;
-    uint32_t last_sensor_id = 0;
-
-    try
-    {
-        boost::property_tree::ptree pt;
-        boost::property_tree::read_json(filename, pt);
-
-        if (pt.get_child_optional("sensors"))
-        {
-            for (auto const& node: pt.get_child("sensors"))
-            {
-                Sensor sensor;
-                sensor.name = node.first;
-                sensor.address = node.second.get<Sensor_Address>("address");
-                sensor.id = node.second.get<Sensor_Id>("id");
-                last_address = std::max(last_address, sensor.address);
-                last_sensor_id = std::max(last_sensor_id, sensor.id);
-                sensors.push_back(sensor);
-            }
-        }
-
-        m_config.sensors_sleeping = pt.get<bool>("sensors_sleeping");
-        m_config.measurement_period = std::chrono::seconds(pt.get<std::chrono::seconds::rep>("measurement_period"));
-        m_config.comms_period = std::chrono::seconds(pt.get<std::chrono::seconds::rep>("comms_period"));
-        m_config.baseline_time_point = Clock::time_point(std::chrono::seconds(pt.get<std::chrono::seconds::rep>("baseline_time_point")));
-    }
-    catch (std::exception const& e)
-    {
-        std::cerr << "Cannot deserialize settings: " << e.what() << "\n";
-        return false;
-    }
-
-    m_last_address = last_address;
-    m_last_sensor_id = last_sensor_id;
-    m_sensors = sensors;
-
-    return true;
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////
-
-bool Sensors::save_settings(std::string const& filename)
-{
-    try
-    {
-        boost::property_tree::ptree pt;
-
-        for (Sensor const& sensor: m_sensors)
-        {
-            boost::property_tree::ptree node;
-            node.add("address", sensor.address);
-            node.add("id", sensor.id);
-
-            pt.put_child("sensors." + sensor.name, node);
-        }
-
-        pt.add("sensors_sleeping", m_config.sensors_sleeping);
-        pt.add("measurement_period", std::chrono::duration_cast<std::chrono::seconds>(m_config.measurement_period).count());
-        pt.add("comms_period", std::chrono::duration_cast<std::chrono::seconds>(m_config.comms_period).count());
-        pt.add("baseline_time_point", std::chrono::duration_cast<std::chrono::seconds>(m_config.baseline_time_point.time_since_epoch()).count());
-
-        boost::property_tree::write_json(filename, pt);
-        sync();
-    }
-    catch (std::exception const& e)
-    {
-        std::cerr << "Cannot deserialize request: " << e.what() << "\n";
-        return false;
-    }
-
-    return true;
 }

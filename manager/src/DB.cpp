@@ -18,7 +18,6 @@
 #include "Utils.h"
 #include "Crypt.h"
 
-
 extern std::string s_programFolder;
 
 constexpr float k_alertVcc = 2.2f;
@@ -48,7 +47,8 @@ DB::DB()
 
 DB::~DB()
 {
-    m_storeThreadExit = true;
+    m_threadsExit = true;
+
     m_storeCV.notify_all();
     if (m_storeThread.joinable())
     {
@@ -77,6 +77,9 @@ bool DB::create(std::string const& name)
 
 bool DB::load(std::string const& name)
 {
+    Crypt crypt;
+    crypt.setKey(k_encryptionKey);
+
     Clock::time_point start = Clock::now();
 
     m_dbFilename = "sense-" + name + ".db";
@@ -106,7 +109,58 @@ bool DB::load(std::string const& name)
             return false;
         }
 
-        auto it = document.FindMember("config");
+        auto it = document.FindMember("email_settings");
+//        if (it == document.MemberEnd() || !it->value.IsObject())
+//        {
+//            std::cerr << "Bad or missing config email_settings\n";
+//            return false;
+//        }
+
+        if (it != document.MemberEnd())
+        {
+            rapidjson::Value const& esj = it->value;
+            auto it = esj.FindMember("host");
+            if (it == esj.MemberEnd() || !it->value.IsString())
+            {
+                std::cerr << "Bad or missing email settings host\n";
+                return false;
+            }
+            data.emailSettings.host = it->value.GetString();
+
+            it = esj.FindMember("port");
+            if (it == esj.MemberEnd() || !it->value.IsUint())
+            {
+                std::cerr << "Bad or missing email settings port\n";
+                return false;
+            }
+            data.emailSettings.port = it->value.GetUint();
+
+            it = esj.FindMember("username");
+            if (it == esj.MemberEnd() || !it->value.IsString())
+            {
+                std::cerr << "Bad or missing email settings username\n";
+                return false;
+            }
+            data.emailSettings.username = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
+
+            it = esj.FindMember("password");
+            if (it == esj.MemberEnd() || !it->value.IsString())
+            {
+                std::cerr << "Bad or missing email settings password\n";
+                return false;
+            }
+            data.emailSettings.password = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
+
+            it = esj.FindMember("from");
+            if (it == esj.MemberEnd() || !it->value.IsString())
+            {
+                std::cerr << "Bad or missing email settings from\n";
+                return false;
+            }
+            data.emailSettings.from = it->value.GetString();
+        }
+
+        it = document.FindMember("config");
         if (it == document.MemberEnd() || !it->value.IsObject())
         {
             std::cerr << "Bad or missing config object\n";
@@ -394,16 +448,14 @@ bool DB::load(std::string const& name)
         }
 
         it = document.FindMember("reports");
-//        if (it == document.MemberEnd() || !it->value.IsArray())
-//        {
-//            std::cerr << "Bad or missing reports array\n";
-//            return false;
-//        }
+        if (it == document.MemberEnd() || !it->value.IsArray())
+        {
+            std::cerr << "Bad or missing reports array\n";
+            return false;
+        }
 
-        Crypt crypt;
-        crypt.setKey(k_encryptionKey);
 
-        if (it != document.MemberEnd())
+//        if (it != document.MemberEnd())
         {
             rapidjson::Value const& reportsj = it->value;
             for (size_t i = 0; i < reportsj.Size(); i++)
@@ -683,6 +735,49 @@ DB::Sensor const& DB::getSensor(size_t index) const
 {
     assert(index < m_mainData.sensors.size());
     return m_mainData.sensors[index];
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool DB::setEmailSettings(EmailSettings const& emailSettings)
+{
+    if (emailSettings.from.empty())
+    {
+        return false;
+    }
+    if (emailSettings.username.empty())
+    {
+        return false;
+    }
+    if (emailSettings.password.empty())
+    {
+        return false;
+    }
+    if (emailSettings.host.empty())
+    {
+        return false;
+    }
+    if (emailSettings.port == 0)
+    {
+        return false;
+    }
+
+    emit emailSettingsWillBeChanged();
+
+    m_mainData.emailSettings = emailSettings;
+
+    emit emailSettingsChanged();
+
+    triggerSave();
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+DB::EmailSettings const& DB::getEmailSettings() const
+{
+    return m_mainData.emailSettings;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1056,11 +1151,11 @@ int32_t DB::findAlarmIndexById(AlarmId id) const
 
 //////////////////////////////////////////////////////////////////////////
 
-uint8_t DB::computeTriggeredAlarm(MeasurementDescriptor const& md) const
+uint8_t DB::computeTriggeredAlarm(MeasurementDescriptor const& md)
 {
-    uint8_t triggered = 0;
+    uint8_t allTriggered = 0;
 
-    for (Alarm const& alarm: m_mainData.alarms)
+    for (Alarm& alarm: m_mainData.alarms)
     {
         AlarmDescriptor const& ad = alarm.descriptor;
         if (ad.filterSensors)
@@ -1071,6 +1166,7 @@ uint8_t DB::computeTriggeredAlarm(MeasurementDescriptor const& md) const
             }
         }
 
+        uint8_t triggered = 0;
         if (ad.highTemperatureWatch && md.temperature > ad.highTemperature)
         {
             triggered |= TriggeredAlarm::Temperature;
@@ -1101,9 +1197,29 @@ uint8_t DB::computeTriggeredAlarm(MeasurementDescriptor const& md) const
         {
             triggered |= TriggeredAlarm::LowSignal;
         }
+
+        auto it = std::find(alarm.triggeringSensors.begin(), alarm.triggeringSensors.end(), md.sensorId);
+        if (triggered)
+        {
+            if (it == alarm.triggeringSensors.end())
+            {
+                alarm.triggeringSensors.push_back(md.sensorId);
+                emit alarmWasTriggered(alarm.id, md.sensorId, md);
+            }
+        }
+        else
+        {
+            if (it != alarm.triggeringSensors.end())
+            {
+                alarm.triggeringSensors.erase(it);
+                emit alarmWasUntriggered(alarm.id, md.sensorId, md);
+            }
+        }
+
+        allTriggered |= triggered;
     }
 
-    return triggered;
+    return allTriggered;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1230,9 +1346,9 @@ bool DB::addMeasurement(MeasurementDescriptor const& md)
     }
 
     Measurement measurement;
+    measurement.id = id;
     measurement.descriptor = md;
     measurement.triggeredAlarms = computeTriggeredAlarm(md);
-    measurement.id = id;
 
     emit measurementsWillBeAdded(md.sensorId);
     m_mainData.measurements[md.sensorId].push_back(pack(measurement));
@@ -1473,7 +1589,7 @@ void DB::triggerSave()
     {
         std::unique_lock<std::mutex> lg(m_storeMutex);
         m_storeData = m_mainData;
-        m_saveTriggered = true;
+        m_storeThreadTriggered = true;
     }
     m_storeCV.notify_all();
 
@@ -1498,11 +1614,27 @@ void DB::save(Data const& data) const
         weeklyBackup = true;
     }
 
+    Crypt crypt;
+    crypt.setKey(k_encryptionKey);
+
     Clock::time_point start = now;
 
     {
         rapidjson::Document document;
         document.SetObject();
+        {
+            rapidjson::Value esj;
+            esj.SetObject();
+            esj.AddMember("host", rapidjson::Value(data.emailSettings.host.c_str(), document.GetAllocator()), document.GetAllocator());
+            esj.AddMember("port", static_cast<uint32_t>(data.emailSettings.port), document.GetAllocator());
+            QString username(data.emailSettings.username.c_str());
+            esj.AddMember("username", rapidjson::Value(crypt.encryptToString(username).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
+            QString password(data.emailSettings.username.c_str());
+            esj.AddMember("password", rapidjson::Value(crypt.encryptToString(password).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
+            esj.AddMember("from", rapidjson::Value(data.emailSettings.from.c_str(), document.GetAllocator()), document.GetAllocator());
+            document.AddMember("email_settings", esj, document.GetAllocator());
+        }
+
         {
             rapidjson::Value configj;
             configj.SetObject();
@@ -1569,9 +1701,6 @@ void DB::save(Data const& data) const
             }
             document.AddMember("alarms", alarmsj, document.GetAllocator());
         }
-
-        Crypt crypt;
-        crypt.setKey(k_encryptionKey);
 
         {
             rapidjson::Value reportsj;
@@ -1686,30 +1815,30 @@ void DB::save(Data const& data) const
 
 void DB::storeThreadProc()
 {
-    while (!m_storeThreadExit)
+    while (!m_threadsExit)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         Data data;
         {
             //wait for data
             std::unique_lock<std::mutex> lg(m_storeMutex);
-            if (!m_saveTriggered)
+            if (!m_storeThreadTriggered)
             {
-                m_storeCV.wait(lg, [this]{ return m_saveTriggered || m_storeThreadExit; });
+                m_storeCV.wait(lg, [this]{ return m_storeThreadTriggered || m_threadsExit; });
             }
-            if (m_storeThreadExit)
+            if (m_threadsExit)
             {
                 break;
             }
 
             data = std::move(m_storeData);
             m_storeData = Data();
-            m_saveTriggered = false;
+            m_storeThreadTriggered = false;
         }
+
         save(data);
     }
 }
 
 //////////////////////////////////////////////////////////////////////////
-
 

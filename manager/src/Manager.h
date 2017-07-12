@@ -4,6 +4,7 @@
 #include "ui_Manager.h"
 
 #include "Comms.h"
+#include "Emailer.h"
 #include "DB.h"
 
 class Manager : public QMainWindow
@@ -24,6 +25,7 @@ private:
     void readSettings();
 
     Comms m_comms;
+    Emailer m_emailer;
 
     Ui::Manager m_ui;
 };

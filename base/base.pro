@@ -40,6 +40,7 @@ DESTDIR = ../../bin/$${DEST_FOLDER}
 
 INCLUDEPATH += ../common/src
 INCLUDEPATH += ../common/src/rfm22b
+INCLUDEPATH += ../common/src/rapidjson/include
 
 
 SOURCES += src/main.cpp \

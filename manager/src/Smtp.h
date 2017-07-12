@@ -1,17 +1,4 @@
-/*
-Copyright (c) 2013 Raivis Strogonovs
-
-http://morf.lv
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.*/
-
-#ifndef SMTP_H
-#define SMTP_H
-
+#pragma once
 
 #include <QtNetwork/QAbstractSocket>
 #include <QtNetwork/QSslSocket>
@@ -24,23 +11,20 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #include <QFileInfo>
 
 
-
 class Smtp : public QObject
 {
     Q_OBJECT
 
 
 public:
-    Smtp( const QString &user, const QString &pass,
-          const QString &host, int port = 465, int timeout = 30000 );
+    Smtp(const QString& user, const QString& pass, const QString& host, int port = 465, int timeout = 30000);
     ~Smtp();
 
-    void sendMail( const QString &from, const QString &to,
-                   const QString &subject, const QString &body,
-                   QStringList files = QStringList());
+    void sendTextMail(const QString& from, const QString& to, const QString& subject, const QString& body, const QStringList& files = QStringList());
+    void sendHtmlMail(const QString& from, const QString& to, const QString& subject, const QString& body, const QStringList& files = QStringList());
 
 signals:
-    void status( const QString &);
+    void status(const QString&);
 
 private slots:
     void stateChanged(QAbstractSocket::SocketState socketState);
@@ -50,19 +34,34 @@ private slots:
     void readyRead();
 
 private:
-    int timeout;
-    QString message;
-    QTextStream *t;
-    QSslSocket *socket;
-    QString from;
-    QString rcpt;
-    QString response;
-    QString user;
-    QString pass;
-    QString host;
-    int port;
-    enum states{Tls, HandShake ,Auth,User,Pass,Rcpt,Mail,Data,Init,Body,Quit,Close};
-    int state;
+    void _sendMail(const QString& from, const QString& to, const QString& subject, const QString& body, bool html, const QStringList& files);
 
+    int m_timeout = 0;
+    QString m_message;
+    QTextStream *m_stream = nullptr;
+    QSslSocket *m_socket;
+    QString m_from;
+    QString m_rcpt;
+    QString m_response;
+    QString m_user;
+    QString m_pass;
+    QString m_host;
+    int m_port = 0;
+
+    enum class State
+    {
+        Tls,
+        HandShake,
+        Auth,
+        User,
+        Pass,
+        Rcpt,
+        Mail,
+        Data,
+        Init,
+        Body,
+        Quit,
+        Close
+    };
+    State m_state = State::Tls;
 };
-#endif

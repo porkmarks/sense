@@ -23,6 +23,19 @@ public:
     bool create(std::string const& name);
     bool load(std::string const& name);
 
+    struct EmailSettings
+    {
+        std::string host;
+        uint16_t port = 0;
+        std::string username;
+        std::string password;
+        std::string from;
+    };
+
+    bool setEmailSettings(EmailSettings const& emailSettings);
+    EmailSettings const& getEmailSettings() const;
+
+
     struct ConfigDescriptor
     {
         std::string name = "Base Station";
@@ -150,6 +163,8 @@ public:
     {
         AlarmDescriptor descriptor;
         AlarmId id;
+
+        std::vector<SensorId> triggeringSensors;
     };
 
     size_t getAlarmCount() const;
@@ -173,9 +188,6 @@ public:
             All             = Temperature | Humidity | LowVcc | LowSignal | SensorErrors
         };
     };
-
-    uint8_t computeTriggeredAlarm(MeasurementDescriptor const& descriptor) const;
-
 
     struct ReportDescriptor
     {
@@ -280,6 +292,9 @@ signals:
     void configWillBeChanged();
     void configChanged();
 
+    void emailSettingsWillBeChanged();
+    void emailSettingsChanged();
+
     void sensorWillBeAdded(SensorId id);
     void sensorAdded(SensorId id);
     void sensorBound(SensorId id);
@@ -305,6 +320,9 @@ signals:
     void measurementsAdded(SensorId id);
     void measurementsWillBeRemoved(SensorId id);
     void measurementsRemoved(SensorId id);
+
+    void alarmWasTriggered(AlarmId alarmId, SensorId sensorId, MeasurementDescriptor const& md);
+    void alarmWasUntriggered(AlarmId alarmId, SensorId sensorId, MeasurementDescriptor const& md);
 
 private:
     Clock::time_point computeBaselineTimePoint(Config const& oldConfig, ConfigDescriptor const& newDescriptor);
@@ -335,8 +353,11 @@ private:
     static inline MeasurementId computeMeasurementId(MeasurementDescriptor const& md);
     static inline MeasurementId computeMeasurementId(SensorId sensor_id, StoredMeasurement const& m);
 
+    uint8_t computeTriggeredAlarm(MeasurementDescriptor const& md);
+
     struct Data
     {
+        EmailSettings emailSettings;
         Config config;
         std::vector<Sensor> sensors;
         std::vector<Alarm> alarms;
@@ -351,11 +372,12 @@ private:
 
     Data m_mainData;
 
+    std::atomic_bool m_threadsExit = { false };
+
     void triggerSave();
     void storeThreadProc();
     void save(Data const& data) const;
-    std::atomic_bool m_storeThreadExit = { false };
-    std::atomic_bool m_saveTriggered = { false };
+    std::atomic_bool m_storeThreadTriggered = { false };
     std::thread m_storeThread;
     std::condition_variable m_storeCV;
     std::mutex m_storeMutex;

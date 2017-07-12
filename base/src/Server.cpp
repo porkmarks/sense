@@ -1,6 +1,11 @@
 #include "Server.h"
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
+
+#include "rapidjson/document.h"
+#include "rapidjson/prettywriter.h"
+#include "rapidjson/writer.h"
+#include "rapidjson/reader.h"
+#include "rapidjson/stringbuffer.h"
+
 
 Server::Server(Sensors& sensors)
     : m_sensors(sensors)
@@ -120,7 +125,7 @@ bool Server::init(uint16_t port, uint16_t broadcast_port)
         return false;
     }
 
-    std::cout << "Server initialized!";
+    std::cout << "Server initialized!\n";
 
     return true;
 }
@@ -132,6 +137,7 @@ void Server::start_accept()
     try
     {
         m_is_accepting = true;
+        m_socket.close();
         m_acceptor->async_accept(m_socket, boost::bind(&Server::accept_func, this, boost::asio::placeholders::error));
     }
     catch (std::exception const& e)
@@ -151,6 +157,7 @@ void Server::accept_func(boost::system::error_code ec)
     }
     else
     {
+        std::cout << "Connected!\n";
         m_is_accepting = false;
         m_is_connected = true;
         m_socket_adapter.start();
@@ -218,83 +225,39 @@ void Server::broadcast_thread_func()
 
 void Server::report_measurement(Sensors::Sensor_Id sensor_id, Clock::time_point time_point, Sensors::Measurement const& measurement)
 {
-    try
-    {
-        std::stringstream ss;
-        boost::property_tree::ptree pt;
+    rapidjson::Document document;
+    document.SetObject();
+    document.AddMember("sensor_id", sensor_id, document.GetAllocator());
+    document.AddMember("index", measurement.index, document.GetAllocator());
+    document.AddMember("time_point", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(time_point.time_since_epoch()).count()), document.GetAllocator());
+    document.AddMember("temperature", measurement.temperature, document.GetAllocator());
+    document.AddMember("humidity", measurement.humidity, document.GetAllocator());
+    document.AddMember("vcc", measurement.vcc, document.GetAllocator());
+    document.AddMember("b2s", static_cast<int>(measurement.b2s_input_dBm), document.GetAllocator());
+    document.AddMember("s2b", static_cast<int>(measurement.s2b_input_dBm), document.GetAllocator());
+    document.AddMember("sensor_errors", static_cast<uint32_t>(measurement.flags), document.GetAllocator());
 
-        pt.add("sensor_id", sensor_id);
-        pt.add("time_point", std::chrono::duration_cast<std::chrono::seconds>(time_point.time_since_epoch()).count());
-        pt.add("measurement_index", measurement.index);
-        pt.add("measurement_temperature", measurement.temperature);
-        pt.add("measurement_humidity", measurement.humidity);
-        pt.add("measurement_vcc", measurement.vcc);
-        pt.add("measurement_b2s_input_dBm", measurement.b2s_input_dBm);
-        pt.add("measurement_s2b_input_dBm", measurement.s2b_input_dBm);
-        pt.add("measurement_flags", measurement.flags);
+    rapidjson::StringBuffer buffer;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    document.Accept(writer);
 
-        boost::property_tree::write_json(ss, pt);
-
-        std::string str = ss.str();
-        m_channel.send(data::Server_Message::REPORT_MEASUREMENT_REQ, str.data(), str.size());
-    }
-    catch (std::exception const& e)
-    {
-        std::cerr << "Cannot serialize request: " << e.what() << "\n";
-    }
+    m_channel.send(data::Server_Message::REPORT_MEASUREMENT_REQ, buffer.GetString(), buffer.GetSize());
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 void Server::sensor_bound(std::string const& name, Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address sensor_address)
 {
-    try
-    {
-        std::stringstream ss;
-        boost::property_tree::ptree pt;
+    rapidjson::Document document;
+    document.SetObject();
+    document.AddMember("id", sensor_id, document.GetAllocator());
+    document.AddMember("address", sensor_address, document.GetAllocator());
 
-        pt.add("name", name);
-        pt.add("id", sensor_id);
-        pt.add("address", sensor_address);
+    rapidjson::StringBuffer buffer;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    document.Accept(writer);
 
-        boost::property_tree::write_json(ss, pt);
-
-        std::string str = ss.str();
-        m_channel.send(data::Server_Message::SENSOR_BOUND_REQ, str.data(), str.size());
-    }
-    catch (std::exception const& e)
-    {
-        std::cerr << "Cannot serialize request: " << e.what() << "\n";
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////
-
-void Server::process_get_config_req()
-{
-    std::stringstream ss;
-
-    try
-    {
-        boost::property_tree::ptree pt;
-
-        Sensors::Config const& config = m_sensors.get_config();
-
-        pt.add("sensors_sleeping", config.sensors_sleeping);
-        pt.add("measurement_period", std::chrono::duration_cast<std::chrono::seconds>(config.measurement_period).count());
-        pt.add("comms_period", std::chrono::duration_cast<std::chrono::seconds>(config.comms_period).count());
-        pt.add("computed_comms_period", std::chrono::duration_cast<std::chrono::seconds>(m_sensors.compute_comms_period()).count());
-        pt.add("baseline_time_point", std::chrono::duration_cast<std::chrono::seconds>(config.baseline_time_point.time_since_epoch()).count());
-
-        boost::property_tree::write_json(ss, pt);
-    }
-    catch (std::exception const& e)
-    {
-        std::cerr << "Cannot serialize request: " << e.what() << "\n";
-    }
-
-    std::string str = ss.str();
-    m_channel.send(data::Server_Message::GET_CONFIG_RES, str.data(), str.size());
+    m_channel.send(data::Server_Message::SENSOR_BOUND_REQ, buffer.GetString(), buffer.GetSize());
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -304,68 +267,144 @@ void Server::process_set_config_req()
     std::vector<uint8_t> buffer;
     m_channel.unpack(buffer);
 
-    std::string str_buffer(reinterpret_cast<char*>(buffer.data()), reinterpret_cast<char*>(buffer.data()) + buffer.size());
-    std::stringstream ss(str_buffer);
-
     bool ok = false;
 
-    try
     {
-        boost::property_tree::ptree pt;
-        boost::property_tree::read_json(ss, pt);
-
         Sensors::Config config;
 
-        config.sensors_sleeping = pt.get<bool>("sensors_sleeping");
-        config.measurement_period = std::chrono::seconds(pt.get<std::chrono::seconds::rep>("measurement_period"));
-        config.comms_period = std::chrono::seconds(pt.get<std::chrono::seconds::rep>("comms_period"));
-        config.baseline_time_point = Clock::time_point(std::chrono::seconds(pt.get<std::chrono::seconds::rep>("baseline_time_point")));
+        rapidjson::Document document;
+        document.Parse(reinterpret_cast<const char*>(buffer.data()), buffer.size());
+        if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
+        {
+            std::cerr << "Cannot deserialize request: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
+            goto end;
+        }
+        if (!document.IsObject())
+        {
+            std::cerr << "Cannot deserialize request: Bad document.\n";
+            goto end;
+        }
+
+        auto it = document.FindMember("name");
+        if (it == document.MemberEnd() || !it->value.IsString())
+        {
+            std::cerr << "Cannot deserialize request: Missing name.\n";
+            goto end;
+        }
+        config.name = it->value.GetString();
+
+        it = document.FindMember("sensors_sleeping");
+        if (it == document.MemberEnd() || !it->value.IsBool())
+        {
+            std::cerr << "Cannot deserialize request: Missing sensors_sleeping.\n";
+            goto end;
+        }
+        config.sensors_sleeping = it->value.GetBool();
+
+        it = document.FindMember("measurement_period");
+        if (it == document.MemberEnd() || !it->value.IsInt64())
+        {
+            std::cerr << "Cannot deserialize request: Missing measurement_period.\n";
+            goto end;
+        }
+        config.measurement_period = std::chrono::seconds(it->value.GetInt64());
+
+        it = document.FindMember("comms_period");
+        if (it == document.MemberEnd() || !it->value.IsInt64())
+        {
+            std::cerr << "Cannot deserialize request: Missing comms_period.\n";
+            goto end;
+        }
+        config.comms_period = std::chrono::seconds(it->value.GetInt64());
+
+        it = document.FindMember("baseline");
+        if (it == document.MemberEnd() || !it->value.IsInt64())
+        {
+            std::cerr << "Cannot deserialize request: Missing baseline.\n";
+            goto end;
+        }
+        config.baseline_time_point = Clock::time_point(std::chrono::seconds(it->value.GetInt64()));
 
         m_sensors.set_config(config);
         if (!m_sensors.init())
         {
             std::cerr << "Cannot initialize sensors\n";
+            goto end;
         }
         else
         {
             ok = true;
         }
     }
-    catch (std::exception const& e)
-    {
-        std::cerr << "Cannot deserialize request: " << e.what() << "\n";
-    }
 
+end:
     m_channel.send(data::Server_Message::SET_CONFIG_RES, &ok, 1);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-void Server::process_get_sensors_req()
+void Server::process_set_sensors_req()
 {
-    std::stringstream ss;
+    std::vector<uint8_t> buffer;
+    m_channel.unpack(buffer);
 
-    try
+    bool ok = false;
+
     {
-        boost::property_tree::ptree pt;
-
-        for (Sensors::Sensor const& sensor: m_sensors.get_sensors())
+        rapidjson::Document document;
+        document.Parse(reinterpret_cast<const char*>(buffer.data()), buffer.size());
+        if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
         {
-            boost::property_tree::ptree node;
-            node.add("address", sensor.address);
-            node.add("id", sensor.id);
-
-            pt.put_child("sensors." + sensor.name, node);
+            std::cerr << "Cannot deserialize request: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
+            goto end;
         }
-        boost::property_tree::write_json(ss, pt);
-    }
-    catch (std::exception const& e)
-    {
-        std::cerr << "Cannot serialize request: " << e.what() << "\n";
+        if (!document.IsArray())
+        {
+            std::cerr << "Cannot deserialize request: Bad document.\n";
+            goto end;
+        }
+
+        m_sensors.remove_all_sensors();
+
+        for (size_t i = 0; i < document.Size(); i++)
+        {
+            rapidjson::Value const& sensorj = document[i];
+
+            auto it = sensorj.FindMember("name");
+            if (it == sensorj.MemberEnd() || !it->value.IsString())
+            {
+                std::cerr << "Cannot deserialize request: Missing name.\n";
+                goto end;
+            }
+            std::string name = it->value.GetString();
+
+            it = sensorj.FindMember("id");
+            if (it == sensorj.MemberEnd() || !it->value.IsUint())
+            {
+                std::cerr << "Cannot deserialize request: Missing id.\n";
+                goto end;
+            }
+            Sensors::Sensor_Id id = it->value.GetUint();
+
+            it = sensorj.FindMember("address");
+            if (it == sensorj.MemberEnd() || !it->value.IsUint())
+            {
+                std::cerr << "Cannot deserialize request: Missing address.\n";
+                goto end;
+            }
+            Sensors::Sensor_Address address = it->value.GetUint();
+
+            if (!m_sensors.add_sensor(id, name, address))
+            {
+                std::cerr << "Cannot add sensor\n";
+                goto end;
+            }
+        }
+        ok = true;
     }
 
-    std::string str = ss.str();
-    m_channel.send(data::Server_Message::GET_SENSORS_RES, str.data(), str.size());
+end:
+    m_channel.send(data::Server_Message::SET_SENSORS_RES, &ok, 1);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -375,55 +414,47 @@ void Server::process_add_sensor_req()
     std::vector<uint8_t> buffer;
     m_channel.unpack(buffer);
 
-    std::string str_buffer(reinterpret_cast<char*>(buffer.data()), reinterpret_cast<char*>(buffer.data()) + buffer.size());
-    std::stringstream ss(str_buffer);
-
     bool ok = false;
 
-    try
     {
-        boost::property_tree::ptree pt;
-        boost::property_tree::read_json(ss, pt);
-
         Sensors::Unbound_Sensor_Data data;
-        data.name = pt.get<std::string>("unbound_sensor_name");
+
+        rapidjson::Document document;
+        document.Parse(reinterpret_cast<const char*>(buffer.data()), buffer.size());
+        if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
+        {
+            std::cerr << "Cannot deserialize request: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
+            goto end;
+        }
+        if (!document.IsObject())
+        {
+            std::cerr << "Cannot deserialize request: Bad document.\n";
+            goto end;
+        }
+
+        auto it = document.FindMember("name");
+        if (it == document.MemberEnd() || !it->value.IsString())
+        {
+            std::cerr << "Cannot deserialize request: Missing name.\n";
+            goto end;
+        }
+        data.name = it->value.GetString();
+
+        it = document.FindMember("id");
+        if (it == document.MemberEnd() || !it->value.IsUint())
+        {
+            std::cerr << "Cannot deserialize request: Missing id.\n";
+            goto end;
+        }
+        data.id = it->value.GetUint();
+
         m_sensors.set_unbound_sensor_data(data);
+
         ok = true;
     }
-    catch (std::exception const& e)
-    {
-        std::cerr << "Cannot deserialize request: " << e.what() << "\n";
-    }
 
-    m_channel.send(data::Server_Message::ADD_SENSOR_RES, &ok, 1);
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////
-
-void Server::process_remove_sensor_req()
-{
-    std::vector<uint8_t> buffer;
-    m_channel.unpack(buffer);
-
-    std::string str_buffer(reinterpret_cast<char*>(buffer.data()), reinterpret_cast<char*>(buffer.data()) + buffer.size());
-    std::stringstream ss(str_buffer);
-
-    bool ok = false;
-
-    try
-    {
-        boost::property_tree::ptree pt;
-        boost::property_tree::read_json(ss, pt);
-
-        Sensors::Sensor_Id id = pt.get<Sensors::Sensor_Id>("id");
-        ok = m_sensors.remove_sensor(id);
-    }
-    catch (std::exception const& e)
-    {
-        std::cerr << "Cannot deserialize request: " << e.what() << "\n";
-    }
-
-    m_channel.send(data::Server_Message::REMOVE_SENSOR_RES, &ok, 1);
+end:
+    m_channel.send(data::Server_Message::SET_SENSORS_RES, &ok, 1);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -433,22 +464,57 @@ void Server::process_report_measurement_res()
     std::vector<uint8_t> buffer;
     m_channel.unpack(buffer);
 
-    std::string str_buffer(reinterpret_cast<char*>(buffer.data()), reinterpret_cast<char*>(buffer.data()) + buffer.size());
-    std::stringstream ss(str_buffer);
-
-    try
     {
-        boost::property_tree::ptree pt;
-        boost::property_tree::read_json(ss, pt);
+        rapidjson::Document document;
+        document.Parse(reinterpret_cast<const char*>(buffer.data()), buffer.size());
+        if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
+        {
+            std::cerr << "Cannot deserialize request: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
+            goto end;
+        }
+        if (!document.IsObject())
+        {
+            std::cerr << "Cannot deserialize request: Bad document.\n";
+            goto end;
+        }
 
-        Sensors::Sensor_Id id = pt.get<Sensors::Sensor_Id>("id");
-        uint32_t measurement_index = pt.get<uint32_t>("measurement_index");
-        m_sensors.confirm_measurement(id, measurement_index);
+        auto it = document.FindMember("sensor_id");
+        if (it == document.MemberEnd() || !it->value.IsUint())
+        {
+            std::cerr << "Cannot deserialize request: Missing sensor_id.\n";
+            goto end;
+        }
+        Sensors::Sensor_Id sensor_id = it->value.GetUint();
+
+        it = document.FindMember("index");
+        if (it == document.MemberEnd() || !it->value.IsUint())
+        {
+            std::cerr << "Cannot deserialize request: Missing index.\n";
+            goto end;
+        }
+        uint32_t index = it->value.GetUint();
+
+        it = document.FindMember("ok");
+        if (it == document.MemberEnd() || !it->value.IsBool())
+        {
+            std::cerr << "Cannot deserialize request: Missing ok.\n";
+            goto end;
+        }
+        bool ok = it->value.GetBool();
+
+        if (ok)
+        {
+            std::cout << "Measurement " << std::to_string(index) << " from sensor << " << std::to_string(sensor_id) << " confirmed.\n";
+            m_sensors.confirm_measurement(sensor_id, index);
+        }
+        else
+        {
+            std::cerr << "Measurement " << std::to_string(index) << " from sensor << " << std::to_string(sensor_id) << " not confirmed.\n";
+        }
     }
-    catch (std::exception const& e)
-    {
-        std::cerr << "Cannot deserialize request: " << e.what() << "\n";
-    }
+end:
+
+    return;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -458,22 +524,20 @@ void Server::process_sensor_bound_res()
     std::vector<uint8_t> buffer;
     m_channel.unpack(buffer);
 
-    std::string str_buffer(reinterpret_cast<char*>(buffer.data()), reinterpret_cast<char*>(buffer.data()) + buffer.size());
-    std::stringstream ss(str_buffer);
-
-    try
+    if (buffer.size() != 1)
     {
-        boost::property_tree::ptree pt;
-        boost::property_tree::read_json(ss, pt);
+        std::cerr << "Cannot deserialize request: Bad data.\n";
+        return;
+    }
 
-        Sensors::Sensor_Id id = pt.get<Sensors::Sensor_Id>("id");
-        bool confirmed = pt.get<bool>("confirmed");
-        m_sensors.confirm_sensor_binding(id, confirmed);
-    }
-    catch (std::exception const& e)
+    bool ok = *reinterpret_cast<bool const*>(buffer.data());
+    if (!ok)
     {
-        std::cerr << "Cannot deserialize request: " << e.what() << "\n";
+        std::cerr << "Binding the sensor FAILED.\n";
+        return;
     }
+
+    std::cout << "Binding the sensor succeded.\n";
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -492,6 +556,7 @@ void Server::process()
     {
         if (!m_is_accepting)
         {
+            std::cout << "Disconnected. Listening...\n";
             start_accept();
         }
         return;
@@ -502,20 +567,14 @@ void Server::process()
     {
         switch (message)
         {
-        case data::Server_Message::GET_CONFIG_REQ:
-            process_get_config_req();
-            break;
         case data::Server_Message::SET_CONFIG_REQ:
             process_set_config_req();
             break;
-        case data::Server_Message::GET_SENSORS_REQ:
-            process_get_sensors_req();
+        case data::Server_Message::SET_SENSORS_REQ:
+            process_set_sensors_req();
             break;
         case data::Server_Message::ADD_SENSOR_REQ:
             process_add_sensor_req();
-            break;
-        case data::Server_Message::REMOVE_SENSOR_REQ:
-            process_remove_sensor_req();
             break;
         case data::Server_Message::REPORT_MEASUREMENT_RES:
             process_report_measurement_res();

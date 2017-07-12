@@ -32,7 +32,7 @@ private:
 
     void process_get_config_req();
     void process_set_config_req();
-    void process_get_sensors_req();
+    void process_set_sensors_req();
     void process_add_sensor_req();
     void process_remove_sensor_req();
     void process_report_measurement_res();

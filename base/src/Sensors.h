@@ -62,6 +62,7 @@ public:
 
     struct Config
     {
+        std::string name;
         bool sensors_sleeping = false;
         Clock::duration measurement_period;
         Clock::duration comms_period;
@@ -91,6 +92,7 @@ public:
     //sensor manipulation
     struct Unbound_Sensor_Data
     {
+        Sensor_Id id;
         std::string name;
     };
 
@@ -103,6 +105,7 @@ public:
     Sensor const* bind_sensor();
     Sensor const* add_sensor(Sensor_Id id, std::string const& name, Sensor_Address address);
     bool remove_sensor(Sensor_Id id);
+    void remove_all_sensors();
     std::vector<Sensor> get_sensors() const;
 
     Sensor const* find_sensor_by_id(Sensor_Id id) const;
@@ -117,9 +120,6 @@ public:
 
 private:
     Sensor* _find_sensor_by_id(Sensor_Id id);
-
-    bool load_settings(std::string const& filename);
-    bool save_settings(std::string const& filename);
 
     Config m_config;
     bool m_is_initialized = false;

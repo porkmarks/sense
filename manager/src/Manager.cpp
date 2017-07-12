@@ -46,6 +46,7 @@ void Manager::activateBaseStation(Comms::BaseStationDescriptor const& bs, DB& db
     m_ui.measurementsWidget->init(db);
     m_ui.alarmsWidget->init(db);
     m_ui.reportsWidget->init(db);
+    m_emailer.init(db);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -57,6 +58,7 @@ void Manager::deactivateBaseStation(Comms::BaseStationDescriptor const& bs)
     m_ui.measurementsWidget->shutdown();
     m_ui.alarmsWidget->shutdown();
     m_ui.reportsWidget->shutdown();
+    m_emailer.shutdown();
 }
 
 //////////////////////////////////////////////////////////////////////////

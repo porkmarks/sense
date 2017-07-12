@@ -84,7 +84,9 @@ HEADERS += \
     ../../src/ReportsWidget.h \
     ../../src/ConfigureReportDialog.h \
     ../../src/Utils.h \
-    ../../../common/src/Crypt.h
+    ../../../common/src/Crypt.h \
+    ../../src/Smtp.h \
+    ../../src/Emailer.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -111,7 +113,9 @@ SOURCES += \
     ../../src/ReportsWidget.cpp \
     ../../src/ConfigureReportDialog.cpp \
     ../../src/Utils.cpp \
-    ../../../common/src/Crypt.cpp
+    ../../../common/src/Crypt.cpp \
+    ../../src/Smtp.cpp \
+    ../../src/Emailer.cpp
 
 FORMS += \
     ../../src/Manager.ui \

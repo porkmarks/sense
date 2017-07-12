@@ -150,6 +150,12 @@ DB::Filter MeasurementsWidget::createFilter() const
 
 void MeasurementsWidget::refreshFromDB()
 {
+    //in case the date changed, reapply it
+    if (m_ui.useDateTimePreset)
+    {
+        setDateTimePreset(m_ui.dateTimePreset->currentIndex());
+    }
+
     DB::Filter filter = createFilter();
     m_model->setFilter(filter);
 
