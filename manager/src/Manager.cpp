@@ -59,6 +59,8 @@ void Manager::activateBaseStation(Comms::BaseStationDescriptor const& bs, DB& db
     m_ui.actionSensorSettings->setEnabled(true);
 
     m_activeDB = &db;
+
+    //db.test();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -126,30 +128,6 @@ void Manager::openEmailSettingsDialog()
         {
             QMessageBox::critical(this, "Error", "Cannot set the email settings.");
             return;
-        }
-        else
-        {
-            result = QMessageBox::question(this, "Error", "Email settings successfully changed.\nDo you want to send a test email?.", QMessageBox::Yes, QMessageBox::No);
-            if (result == QMessageBox::Yes)
-            {
-                while (true)
-                {
-                    bool ok;
-                    QString recipient = QInputDialog::getText(this, "Test Email", "Recipient:", QLineEdit::Normal, "", &ok);
-                    if (ok)
-                    {
-                        if (!recipient.isEmpty())
-                        {
-                            m_emailer.sendTestEmail(recipient.toUtf8().data());
-                            break;
-                        }
-                        else
-                        {
-                            QMessageBox::critical(this, "Error", "Please enter a recipient.");
-                        }
-                    }
-                }
-            }
         }
     }
 }

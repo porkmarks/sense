@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>813</width>
-    <height>767</height>
+    <width>502</width>
+    <height>671</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -30,6 +30,9 @@
       <item row="2" column="1">
        <widget class="QLineEdit" name="host">
         <property name="text">
+         <string/>
+        </property>
+        <property name="placeholderText">
          <string>smtp.gmail.com</string>
         </property>
        </widget>
@@ -106,7 +109,11 @@
        </widget>
       </item>
       <item row="9" column="1">
-       <widget class="QLineEdit" name="username"/>
+       <widget class="QLineEdit" name="username">
+        <property name="placeholderText">
+         <string>you@company.com</string>
+        </property>
+       </widget>
       </item>
       <item row="10" column="0" colspan="2">
        <widget class="QLabel" name="label_6">
@@ -232,6 +239,20 @@
         </property>
        </widget>
       </item>
+      <item row="18" column="1">
+       <widget class="QLineEdit" name="testEmailTo">
+        <property name="placeholderText">
+         <string>Test Recipient</string>
+        </property>
+       </widget>
+      </item>
+      <item row="18" column="0">
+       <widget class="QPushButton" name="sendTestEmail">
+        <property name="text">
+         <string>Send Test Email</string>
+        </property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>
@@ -252,6 +273,9 @@
     <widget class="QDialogButtonBox" name="buttonBox">
      <property name="standardButtons">
       <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+     </property>
+     <property name="centerButtons">
+      <bool>false</bool>
      </property>
     </widget>
    </item>

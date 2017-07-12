@@ -1,7 +1,7 @@
 #include "Emailer.h"
 #include <iostream>
 #include <cassert>
-#include "Smtp.h"
+#include "Smtp/SmtpMime"
 
 extern float getBatteryLevel(float vcc);
 
@@ -38,32 +38,6 @@ void Emailer::init(DB& db)
 void Emailer::shutdown()
 {
     m_db = nullptr;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Emailer::sendTestEmail(std::string const& recipient)
-{
-    Email email;
-    email.settings = m_db->getEmailSettings();
-    email.to = recipient;
-    email.subject = "Test Email: Sensor 'Sensor1' triggered alarm 'Alarm1'";
-
-    email.body =
-    "<p><span style=\"color: #ff0000; font-size: 12pt;\">&lt;&lt;&lt; This is a test email! &gt;&gt;&gt;</span></p>"
-    "<p>Alarm '<strong>Alarm1</strong>' was triggered by sensor '<strong>Sensor1</strong>.</p>"
-    "<p>Measurement:</p>"
-    "<ul>"
-    "<li>Temperature: <strong>23 &deg;C</strong></li>"
-    "<li>Humidity: <strong>77 %RH</strong></li>"
-    "<li>Sensor Errors: <strong>None</strong></li>"
-    "<li>Battery: 55<strong>&nbsp;%</strong></li>"
-    "</ul>"
-    "<p>Timestamp: <strong>12-23-2017 12:00</strong> <span style=\"font-size: 8pt;\"><em>(dd-mm-yyyy hh:mm)</em></span></p>"
-    "<p><span style=\"font-size: 12pt; color: #ff0000;\">&lt;&lt;&lt; This is a test email! &gt;&gt;&gt;</span></p>"
-    "<p><span style=\"font-size: 10pt;\"><em>- Sense -</em></span></p>";
-
-    sendEmail(email);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -113,55 +87,10 @@ void Emailer::alarmUntriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::M
 void Emailer::sendAlarmTriggeredEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::MeasurementDescriptor const& md)
 {
     Email email;
-    email.settings = m_db->getEmailSettings();
-    email.to = alarm.descriptor.emailRecipient;
     email.subject = "Sensor '" + sensor.descriptor.name + "' triggered alarm '" + alarm.descriptor.name + "'";
-    QDateTime dt;
-    dt.setTime_t(DB::Clock::to_time_t(md.timePoint));
+    email.body = "<p>Sensor '<strong>" + sensor.descriptor.name + "</strong>' triggered alarm '<strong>" + alarm.descriptor.name + "</strong>'.</p>";
 
-    char buf[128];
-    sprintf(buf, "%.2f", md.temperature);
-    std::string temperature = buf;
-
-    sprintf(buf, "%.2f", md.humidity);
-    std::string humidity = buf;
-
-    sprintf(buf, "%.0f", getBatteryLevel(md.vcc) * 100.f);
-    std::string battery = buf;
-
-    std::string sensorErrors;
-    if (md.sensorErrors & DB::SensorErrors::Comms)
-    {
-        sensorErrors += "Comms";
-    }
-    if (md.sensorErrors & DB::SensorErrors::Hardware)
-    {
-        if (!sensorErrors.empty())
-        {
-            sensorErrors += ", ";
-        }
-        sensorErrors += "Hardware";
-    }
-    if (sensorErrors.empty())
-    {
-        sensorErrors = "None";
-    }
-
-
-    email.body =
-    "<p>Sensor '<strong>" + sensor.descriptor.name + "</strong>' triggered alarm '<strong>" + alarm.descriptor.name + "</strong>'.</p>"
-    "<p>Measurement:</p>"
-    "<ul>"
-    "<li>Temperature: <strong>" + temperature + " &deg;C</strong></li>"
-    "<li>Humidity: <strong>" + humidity + " %RH</strong></li>"
-    "<li>Sensor Errors: <strong>" + sensorErrors + "</strong></li>"
-    "<li>Battery: <strong>" + battery + " %</strong></li>"
-    "</ul>"
-    "<p>Timestamp: <strong>" + std::string(dt.toString("dd-MM-yyyy HH:mm").toUtf8().data()) + "</strong> <span style=\"font-size: 8pt;\"><em>(dd-mm-yyyy hh:mm)</em></span></p>"
-    "<p>&nbsp;</p>"
-    "<p><span style=\"font-size: 10pt;\"><em>- Sense -</em></span></p>";
-
-    sendEmail(email);
+    sendAlarmEmail(email, alarm, sensor, md);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -169,9 +98,19 @@ void Emailer::sendAlarmTriggeredEmail(DB::Alarm const& alarm, DB::Sensor const& 
 void Emailer::sendAlarmUntriggeredEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::MeasurementDescriptor const& md)
 {
     Email email;
+    email.subject = "Sensor '" + sensor.descriptor.name + "' stopped triggering alarm '" + alarm.descriptor.name + "'";
+    email.body = "<p>Sensor '<strong>" + sensor.descriptor.name + "</strong>' stopped triggering alarm '<strong>" + alarm.descriptor.name + "</strong>'.</p>";
+
+    sendAlarmEmail(email, alarm, sensor, md);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Emailer::sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor const& sensor, DB::MeasurementDescriptor const& md)
+{
     email.settings = m_db->getEmailSettings();
     email.to = alarm.descriptor.emailRecipient;
-    email.subject = "Sensor '" + sensor.descriptor.name + "' stopped triggering alarm '" + alarm.descriptor.name + "'";
+
     QDateTime dt;
     dt.setTime_t(DB::Clock::to_time_t(md.timePoint));
 
@@ -203,9 +142,7 @@ void Emailer::sendAlarmUntriggeredEmail(DB::Alarm const& alarm, DB::Sensor const
         sensorErrors = "None";
     }
 
-
-    email.body =
-    "<p>Sensor '<strong>" + sensor.descriptor.name + "</strong>' stopped triggering alarm '<strong>" + alarm.descriptor.name + "</strong>'.</p>"
+    email.body +=
     "<p>Measurement:</p>"
     "<ul>"
     "<li>Temperature: <strong>" + temperature + " &deg;C</strong></li>"
@@ -247,21 +184,57 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
 {
     for (Email const& email: emails)
     {
-        Smtp smtp(QString::fromUtf8(email.settings.username.c_str()),
-                  QString::fromUtf8(email.settings.password.c_str()),
-                  QString::fromUtf8(email.settings.host.c_str()),
-                  email.settings.port);
+        SmtpClient smtp(QString::fromUtf8(email.settings.host.c_str()), email.settings.port, SmtpClient::SslConnection);
 
-        QStringList files;
-        for (std::string const& f: email.files)
+        std::string errorMsg;
+        connect(&smtp, &SmtpClient::smtpError, [&errorMsg](SmtpClient::SmtpError error)
         {
-            files.append(QString::fromUtf8(f.c_str()));
+            switch (error)
+            {
+            case SmtpClient::ConnectionTimeoutError: errorMsg = "Connection timeout."; break;
+            case SmtpClient::ResponseTimeoutError: errorMsg = "Response timeout."; break;
+            case SmtpClient::SendDataTimeoutError: errorMsg = "Send data timeout."; break;
+            case SmtpClient::AuthenticationFailedError: errorMsg = "Authentication failed."; break;
+            case SmtpClient::ServerError: errorMsg = "Server error."; break;
+            case SmtpClient::ClientError: errorMsg = "Client error."; break;
+            default: errorMsg = "Unknown error."; break;
+            }
+        });
+
+        smtp.setUser(QString::fromUtf8(email.settings.username.c_str()));
+        smtp.setPassword(QString::fromUtf8(email.settings.password.c_str()));
+
+        MimeMessage message;
+
+        message.setSender(new EmailAddress(QString::fromUtf8(email.settings.from.c_str())));
+        message.addRecipient(new EmailAddress(QString::fromUtf8(email.to.c_str())));
+        message.setSubject(QString::fromUtf8(email.subject.c_str()));
+
+        MimeHtml body;
+        body.setHtml(QString::fromUtf8(email.body.c_str()));
+
+        message.addPart(&body);
+
+        if (smtp.connectToHost() && smtp.login() && smtp.sendMail(message))
+        {
+            std::cout << "Sent email\n";
         }
-        smtp.sendHtmlMail(QString::fromUtf8(email.settings.from.c_str()),
-                          QString::fromUtf8(email.to.c_str()),
-                          QString::fromUtf8(email.subject.c_str()),
-                          QString::fromUtf8(email.body.c_str()),
-                          files);
+        else
+        {
+            std::cout << "Failed to send email: " << errorMsg << "\n";
+        }
+        smtp.quit();
+
+//        QStringList files;
+//        for (std::string const& f: email.files)
+//        {
+//            files.append(QString::fromUtf8(f.c_str()));
+//        }
+//        smtp.sendHtmlMail(QString::fromUtf8(email.settings.from.c_str()),
+//                          QString::fromUtf8(email.to.c_str()),
+//                          QString::fromUtf8(email.subject.c_str()),
+//                          QString::fromUtf8(email.body.c_str()),
+//                          files);
     }
 }
 

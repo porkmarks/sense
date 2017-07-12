@@ -744,6 +744,15 @@ bool DB::load(std::string const& name)
     return true;
 }
 
+//void DB::test()
+//{
+//    for (StoredMeasurement const& sm: m_mainData.measurements.begin()->second)
+//    {
+//        Measurement measurement = unpack(m_mainData.measurements.begin()->first, sm);
+//        computeTriggeredAlarm(measurement.descriptor);
+//    }
+//}
+
 //////////////////////////////////////////////////////////////////////////
 
 size_t DB::getSensorCount() const

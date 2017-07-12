@@ -17,6 +17,7 @@ CONFIG += console
 CONFIG += c++11
 
 INCLUDEPATH += ../../src
+INCLUDEPATH += ../../src/Smtp
 INCLUDEPATH += ../../../common/src
 INCLUDEPATH += ../../../common/src/rapidjson/include
 
@@ -84,11 +85,23 @@ HEADERS += \
     ../../src/ConfigureReportDialog.h \
     ../../src/Utils.h \
     ../../../common/src/Crypt.h \
-    ../../src/Smtp.h \
     ../../src/Emailer.h \
     ../../src/SensorSettingsDialog.h \
     ../../src/EmailSettingsDialog.h \
-    ../../src/FtpSettingsDialog.h
+    ../../src/FtpSettingsDialog.h \
+    ../../src/Smtp/emailaddress.h \
+    ../../src/Smtp/mimeattachment.h \
+    ../../src/Smtp/mimecontentformatter.h \
+    ../../src/Smtp/mimefile.h \
+    ../../src/Smtp/mimehtml.h \
+    ../../src/Smtp/mimeinlinefile.h \
+    ../../src/Smtp/mimemessage.h \
+    ../../src/Smtp/mimemultipart.h \
+    ../../src/Smtp/mimepart.h \
+    ../../src/Smtp/mimetext.h \
+    ../../src/Smtp/quotedprintable.h \
+    ../../src/Smtp/smtpclient.h \
+    ../../src/Smtp/smtpexports.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -115,11 +128,22 @@ SOURCES += \
     ../../src/ConfigureReportDialog.cpp \
     ../../src/Utils.cpp \
     ../../../common/src/Crypt.cpp \
-    ../../src/Smtp.cpp \
     ../../src/Emailer.cpp \
     ../../src/SensorSettingsDialog.cpp \
     ../../src/EmailSettingsDialog.cpp \
-    ../../src/FtpSettingsDialog.cpp
+    ../../src/FtpSettingsDialog.cpp \
+    ../../src/Smtp/emailaddress.cpp \
+    ../../src/Smtp/mimeattachment.cpp \
+    ../../src/Smtp/mimecontentformatter.cpp \
+    ../../src/Smtp/mimefile.cpp \
+    ../../src/Smtp/mimehtml.cpp \
+    ../../src/Smtp/mimeinlinefile.cpp \
+    ../../src/Smtp/mimemessage.cpp \
+    ../../src/Smtp/mimemultipart.cpp \
+    ../../src/Smtp/mimepart.cpp \
+    ../../src/Smtp/mimetext.cpp \
+    ../../src/Smtp/quotedprintable.cpp \
+    ../../src/Smtp/smtpclient.cpp
 
 FORMS += \
     ../../src/Manager.ui \

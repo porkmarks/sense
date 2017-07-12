@@ -17,9 +17,12 @@ public:
 signals:
 
 private slots:
+    void sendTestEmail();
     void accept() override;
 
 private:
+    bool getSettings(DB::EmailSettings& settings);
+
     Ui::EmailSettingsDialog m_ui;
     mutable DB::EmailSettings m_settings;
 };

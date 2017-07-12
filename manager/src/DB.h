@@ -20,6 +20,8 @@ public:
 
     typedef std::chrono::high_resolution_clock Clock;
 
+    void test();
+
     bool create(std::string const& name);
     bool load(std::string const& name);
 

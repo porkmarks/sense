@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>813</width>
-    <height>767</height>
+    <width>485</width>
+    <height>719</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -66,18 +66,6 @@
         </property>
        </widget>
       </item>
-      <item row="5" column="1">
-       <widget class="QLabel" name="label_6">
-        <property name="font">
-         <font>
-          <pointsize>8</pointsize>
-         </font>
-        </property>
-        <property name="text">
-         <string>* Measurements will be done continuously after the configured time has passed.</string>
-        </property>
-       </widget>
-      </item>
       <item row="6" column="1">
        <spacer name="verticalSpacer_3">
         <property name="orientation">
@@ -114,18 +102,6 @@
         </property>
        </widget>
       </item>
-      <item row="8" column="1">
-       <widget class="QLabel" name="label_7">
-        <property name="font">
-         <font>
-          <pointsize>8</pointsize>
-         </font>
-        </property>
-        <property name="text">
-         <string>* Sensors will send data to the base station after the configured time has passed.</string>
-        </property>
-       </widget>
-      </item>
       <item row="9" column="0">
        <widget class="QLabel" name="label_8">
         <property name="text">
@@ -149,18 +125,6 @@
         </property>
        </widget>
       </item>
-      <item row="10" column="1">
-       <widget class="QLabel" name="label_9">
-        <property name="font">
-         <font>
-          <pointsize>8</pointsize>
-         </font>
-        </property>
-        <property name="text">
-         <string>* Computed comms period based on the number of sensors and the measurement period</string>
-        </property>
-       </widget>
-      </item>
       <item row="11" column="1">
        <spacer name="verticalSpacer">
         <property name="orientation">
@@ -177,14 +141,50 @@
         </property>
        </spacer>
       </item>
-      <item row="12" column="1">
+      <item row="5" column="0" colspan="2">
+       <widget class="QLabel" name="label_6">
+        <property name="font">
+         <font>
+          <pointsize>8</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>Measurements will be done continuously after the configured time has passed.</string>
+        </property>
+       </widget>
+      </item>
+      <item row="8" column="0" colspan="2">
+       <widget class="QLabel" name="label_7">
+        <property name="font">
+         <font>
+          <pointsize>8</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>Sensors will send data to the base station after the configured time has passed.</string>
+        </property>
+       </widget>
+      </item>
+      <item row="10" column="0" colspan="2">
+       <widget class="QLabel" name="label_9">
+        <property name="font">
+         <font>
+          <pointsize>8</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>Computed comms period based on the number of sensors and the measurement period</string>
+        </property>
+       </widget>
+      </item>
+      <item row="12" column="0" colspan="2">
        <widget class="QCheckBox" name="sensorsSleeping">
         <property name="text">
          <string>Put Sensors To Sleep</string>
         </property>
        </widget>
       </item>
-      <item row="13" column="1">
+      <item row="13" column="0" colspan="2">
        <widget class="QLabel" name="label_4">
         <property name="font">
          <font>
@@ -192,11 +192,11 @@
          </font>
         </property>
         <property name="text">
-         <string>* To put them to sleep, check the box and press the sensor button briefly</string>
+         <string>To put them to sleep, check the box and press the sensor button briefly</string>
         </property>
        </widget>
       </item>
-      <item row="14" column="1">
+      <item row="14" column="0" colspan="2">
        <widget class="QLabel" name="label_5">
         <property name="font">
          <font>
@@ -204,7 +204,7 @@
          </font>
         </property>
         <property name="text">
-         <string>* To wake them up, uncheck the box and press the sensor button briefly</string>
+         <string>To wake them up, uncheck the box and press the sensor button briefly</string>
         </property>
        </widget>
       </item>
