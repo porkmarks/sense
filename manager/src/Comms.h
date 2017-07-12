@@ -76,7 +76,7 @@ private:
     void processReportMeasurementReq(ConnectedBaseStation& cbs);
     void processSensorBoundReq(ConnectedBaseStation& cbs);
 
-    void sendConfig(ConnectedBaseStation& cbs);
+    void sendSensorSettings(ConnectedBaseStation& cbs);
     void sendSensors(ConnectedBaseStation& cbs);
     void requestBindSensor(ConnectedBaseStation& cbs, DB::SensorId sensorId);
 

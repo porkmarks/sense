@@ -42,6 +42,32 @@ void Emailer::shutdown()
 
 //////////////////////////////////////////////////////////////////////////
 
+void Emailer::sendTestEmail(std::string const& recipient)
+{
+    Email email;
+    email.settings = m_db->getEmailSettings();
+    email.to = recipient;
+    email.subject = "Test Email: Sensor 'Sensor1' triggered alarm 'Alarm1'";
+
+    email.body =
+    "<p><span style=\"color: #ff0000; font-size: 12pt;\">&lt;&lt;&lt; This is a test email! &gt;&gt;&gt;</span></p>"
+    "<p>Alarm '<strong>Alarm1</strong>' was triggered by sensor '<strong>Sensor1</strong>.</p>"
+    "<p>Measurement:</p>"
+    "<ul>"
+    "<li>Temperature: <strong>23 &deg;C</strong></li>"
+    "<li>Humidity: <strong>77 %RH</strong></li>"
+    "<li>Sensor Errors: <strong>None</strong></li>"
+    "<li>Battery: 55<strong>&nbsp;%</strong></li>"
+    "</ul>"
+    "<p>Timestamp: <strong>12-23-2017 12:00</strong> <span style=\"font-size: 8pt;\"><em>(dd-mm-yyyy hh:mm)</em></span></p>"
+    "<p><span style=\"font-size: 12pt; color: #ff0000;\">&lt;&lt;&lt; This is a test email! &gt;&gt;&gt;</span></p>"
+    "<p><span style=\"font-size: 10pt;\"><em>- Sense -</em></span></p>";
+
+    sendEmail(email);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void Emailer::alarmTriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::MeasurementDescriptor const& md)
 {
     int32_t alarmIndex = m_db->findAlarmIndexById(alarmId);

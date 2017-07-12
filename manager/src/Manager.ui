@@ -67,15 +67,6 @@
         </property>
        </layout>
       </widget>
-      <widget class="ConfigWidget" name="configWidget">
-       <attribute name="icon">
-        <iconset resource="../res/res.qrc">
-         <normaloff>:/icons/ui/setup.png</normaloff>:/icons/ui/setup.png</iconset>
-       </attribute>
-       <attribute name="title">
-        <string>Config</string>
-       </attribute>
-      </widget>
       <widget class="SensorsWidget" name="sensorsWidget">
        <attribute name="icon">
         <iconset resource="../res/res.qrc">
@@ -129,6 +120,15 @@
    <property name="nativeMenuBar">
     <bool>true</bool>
    </property>
+   <widget class="QMenu" name="menuOptions">
+    <property name="title">
+     <string>Options</string>
+    </property>
+    <addaction name="actionEmailSettings"/>
+    <addaction name="actionFtpSettings"/>
+    <addaction name="actionSensorSettings"/>
+   </widget>
+   <addaction name="menuOptions"/>
   </widget>
   <widget class="QToolBar" name="toolbar">
    <property name="windowTitle">
@@ -150,18 +150,48 @@
     <string>Connect</string>
    </property>
   </action>
+  <action name="actionEmailSettings">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../res/res.qrc">
+     <normaloff>:/icons/ui/email.png</normaloff>:/icons/ui/email.png</iconset>
+   </property>
+   <property name="text">
+    <string>Email Settings</string>
+   </property>
+  </action>
+  <action name="actionFtpSettings">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../res/res.qrc">
+     <normaloff>:/icons/ui/ftp.png</normaloff>:/icons/ui/ftp.png</iconset>
+   </property>
+   <property name="text">
+    <string>FTP Settings</string>
+   </property>
+  </action>
+  <action name="actionSensorSettings">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../res/res.qrc">
+     <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
+   </property>
+   <property name="text">
+    <string>Sensor Settings</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>
    <class>BaseStationsWidget</class>
    <extends>QWidget</extends>
    <header>BaseStationsWidget.h</header>
-   <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>ConfigWidget</class>
-   <extends>QWidget</extends>
-   <header>ConfigWidget.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>

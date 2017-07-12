@@ -23,6 +23,9 @@ public:
     void init(DB& db);
     void shutdown();
 
+public slots:
+    void sendTestEmail(std::string const& recipient);
+
 private slots:
     void alarmTriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::MeasurementDescriptor const& md);
     void alarmUntriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::MeasurementDescriptor const& md);

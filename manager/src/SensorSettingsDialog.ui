@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>ConfigWidget</class>
- <widget class="QWidget" name="ConfigWidget">
+ <class>SensorSettingsDialog</class>
+ <widget class="QDialog" name="SensorSettingsDialog">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -208,67 +208,64 @@
         </property>
        </widget>
       </item>
-      <item row="15" column="1">
-       <spacer name="verticalSpacer_2">
-        <property name="orientation">
-         <enum>Qt::Vertical</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>20</width>
-          <height>40</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
      </layout>
     </widget>
    </item>
    <item>
-    <widget class="QWidget" name="widget_2" native="true">
-     <layout class="QHBoxLayout" name="horizontalLayout">
-      <item>
-       <spacer name="horizontalSpacer">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item>
-       <widget class="QPushButton" name="reset">
-        <property name="text">
-         <string>Reset</string>
-        </property>
-        <property name="icon">
-         <iconset resource="../res/res.qrc">
-          <normaloff>:/icons/ui/reload.png</normaloff>:/icons/ui/reload.png</iconset>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="apply">
-        <property name="text">
-         <string>Apply</string>
-        </property>
-        <property name="icon">
-         <iconset>
-          <normaloff>:/icons/ui/upload.png</normaloff>:/icons/ui/upload.png</iconset>
-        </property>
-       </widget>
-      </item>
-     </layout>
+    <spacer name="verticalSpacer_2">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>40</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item>
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+     </property>
     </widget>
    </item>
   </layout>
  </widget>
- <resources>
-  <include location="../res/res.qrc"/>
- </resources>
- <connections/>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>accepted()</signal>
+   <receiver>SensorSettingsDialog</receiver>
+   <slot>accept()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>692</x>
+     <y>753</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>769</x>
+     <y>673</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>rejected()</signal>
+   <receiver>SensorSettingsDialog</receiver>
+   <slot>reject()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>580</x>
+     <y>744</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>591</x>
+     <y>684</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>

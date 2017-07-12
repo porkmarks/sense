@@ -32,11 +32,21 @@ public:
         std::string from;
     };
 
-    bool setEmailSettings(EmailSettings const& emailSettings);
+    bool setEmailSettings(EmailSettings const& settings);
     EmailSettings const& getEmailSettings() const;
 
+    struct FtpSettings
+    {
+        std::string host;
+        uint16_t port = 0;
+        std::string username;
+        std::string password;
+    };
 
-    struct ConfigDescriptor
+    bool setFtpSettings(FtpSettings const& settings);
+    FtpSettings const& getFtpSettings() const;
+
+    struct SensorSettingsDescriptor
     {
         std::string name = "Base Station";
         bool sensorsSleeping = false;
@@ -44,9 +54,9 @@ public:
         Clock::duration commsPeriod = std::chrono::minutes(10);
     };
 
-    struct Config
+    struct SensorSettings
     {
-        ConfigDescriptor descriptor;
+        SensorSettingsDescriptor descriptor;
         Clock::duration computedCommsPeriod;
 
         //This is computed when creating the config so that this equation holds for any config:
@@ -60,8 +70,8 @@ public:
         Clock::time_point baselineTimePoint = Clock::now();
     };
 
-    bool setConfig(ConfigDescriptor const& descriptor);
-    Config const& getConfig() const;
+    bool setSensorSettings(SensorSettingsDescriptor const& descriptor);
+    SensorSettings const& getSensorSettings() const;
 
     struct SensorErrors
     {
@@ -219,10 +229,7 @@ public:
         std::string emailRecipient;
 
         bool uploadToFtpAction = false;
-        std::string ftpServer;
         std::string ftpFolder;
-        std::string ftpUsername;
-        std::string ftpPassword;
     };
 
     typedef uint32_t ReportId;
@@ -289,11 +296,14 @@ public:
     bool getLastMeasurementForSensor(SensorId sensor_id, Measurement& measurement) const;
 
 signals:
-    void configWillBeChanged();
-    void configChanged();
+    void sensorSettingsWillBeChanged();
+    void sensorSettingsChanged();
 
     void emailSettingsWillBeChanged();
     void emailSettingsChanged();
+
+    void ftpSettingsWillBeChanged();
+    void ftpSettingsChanged();
 
     void sensorWillBeAdded(SensorId id);
     void sensorAdded(SensorId id);
@@ -325,7 +335,7 @@ signals:
     void alarmWasUntriggered(AlarmId alarmId, SensorId sensorId, MeasurementDescriptor const& md);
 
 private:
-    Clock::time_point computeBaselineTimePoint(Config const& oldConfig, ConfigDescriptor const& newDescriptor);
+    Clock::time_point computeBaselineTimePoint(SensorSettings const& oldSensorSettings, SensorSettingsDescriptor const& newDescriptor);
 
     bool cull(Measurement const& measurement, Filter const& filter) const;
 
@@ -358,7 +368,8 @@ private:
     struct Data
     {
         EmailSettings emailSettings;
-        Config config;
+        FtpSettings ftpSettings;
+        SensorSettings sensorSettings;
         std::vector<Sensor> sensors;
         std::vector<Alarm> alarms;
         std::vector<Report> reports;

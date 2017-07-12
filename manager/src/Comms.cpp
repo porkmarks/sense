@@ -72,7 +72,7 @@ bool Comms::connectToBaseStation(DB& db, QHostAddress const& address)
     connect(&cbsPtr->socketAdapter.getSocket(), &QTcpSocket::connected, [this, cbsPtr]() { connectedToBaseStation(cbsPtr); });
     connect(&cbsPtr->socketAdapter.getSocket(), &QTcpSocket::disconnected, [this, cbsPtr]() { disconnectedFromBaseStation(cbsPtr); });
 
-    connect(&db, &DB::configChanged, [this, cbsPtr]() { sendConfig(*cbsPtr); });
+    connect(&db, &DB::sensorSettingsChanged, [this, cbsPtr]() { sendSensorSettings(*cbsPtr); });
     connect(&db, &DB::sensorAdded, [this, cbsPtr](DB::SensorId id) { requestBindSensor(*cbsPtr, id); });
     connect(&db, &DB::sensorChanged, [this, cbsPtr](DB::SensorId) { sendSensors(*cbsPtr); });
     connect(&db, &DB::sensorRemoved, [this, cbsPtr](DB::SensorId) { sendSensors(*cbsPtr); });
@@ -92,7 +92,7 @@ void Comms::connectedToBaseStation(ConnectedBaseStation* cbs)
         emit baseStationConnected(cbs->baseStation);
         cbs->socketAdapter.start();
 
-        sendConfig(*cbs);
+        sendSensorSettings(*cbs);
         sendSensors(*cbs);
     }
 }
@@ -126,17 +126,17 @@ std::vector<Comms::BaseStationDescriptor> const& Comms::getDiscoveredBaseStation
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::sendConfig(ConnectedBaseStation& cbs)
+void Comms::sendSensorSettings(ConnectedBaseStation& cbs)
 {
-    DB::Config const& config = cbs.baseStation.db.getConfig();
+    DB::SensorSettings const& sensorSettings = cbs.baseStation.db.getSensorSettings();
 
     rapidjson::Document document;
     document.SetObject();
-    document.AddMember("name", rapidjson::Value(config.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
-    document.AddMember("sensors_sleeping", config.descriptor.sensorsSleeping, document.GetAllocator());
-    document.AddMember("measurement_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.measurementPeriod).count()), document.GetAllocator());
-    document.AddMember("comms_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.commsPeriod).count()), document.GetAllocator());
-    document.AddMember("baseline", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.baselineTimePoint.time_since_epoch()).count()), document.GetAllocator());
+    document.AddMember("name", rapidjson::Value(sensorSettings.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
+    document.AddMember("sensors_sleeping", sensorSettings.descriptor.sensorsSleeping, document.GetAllocator());
+    document.AddMember("measurement_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(sensorSettings.descriptor.measurementPeriod).count()), document.GetAllocator());
+    document.AddMember("comms_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(sensorSettings.descriptor.commsPeriod).count()), document.GetAllocator());
+    document.AddMember("baseline", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(sensorSettings.baselineTimePoint.time_since_epoch()).count()), document.GetAllocator());
 
     rapidjson::StringBuffer buffer;
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);

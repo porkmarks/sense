@@ -83,10 +83,7 @@ void ConfigureReportDialog::setReport(DB::Report const& report)
     m_ui.emailRecipient->setText(descriptor.emailRecipient.c_str());
 
     m_ui.uploadToFtpAction->setChecked(descriptor.uploadToFtpAction);
-    m_ui.ftpServer->setText(descriptor.ftpServer.c_str());
     m_ui.ftpFolder->setText(descriptor.ftpFolder.c_str());
-    m_ui.ftpUsername->setText(descriptor.ftpUsername.c_str());
-    m_ui.ftpPassword->setText(descriptor.ftpPassword.c_str());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -130,19 +127,16 @@ void ConfigureReportDialog::accept()
     descriptor.emailRecipient = m_ui.emailRecipient->text().toUtf8().data();
 
     descriptor.uploadToFtpAction = m_ui.uploadToFtpAction->isChecked();
-    descriptor.ftpServer = m_ui.ftpServer->text().toUtf8().data();
     descriptor.ftpFolder = m_ui.ftpFolder->text().toUtf8().data();
-    descriptor.ftpUsername = m_ui.ftpUsername->text().toUtf8().data();
-    descriptor.ftpPassword = m_ui.ftpPassword->text().toUtf8().data();
 
     if (descriptor.name.empty())
     {
         QMessageBox::critical(this, "Error", "You need to specify a name for this report.");
         return;
     }
-    if (descriptor.uploadToFtpAction && descriptor.ftpServer.empty())
+    if (descriptor.uploadToFtpAction && descriptor.ftpFolder.empty())
     {
-        QMessageBox::critical(this, "Error", "You need to specify the ftp server.");
+        QMessageBox::critical(this, "Error", "You need to specify the ftp folder.");
         return;
     }
     if (descriptor.sendEmailAction && descriptor.emailRecipient.empty())

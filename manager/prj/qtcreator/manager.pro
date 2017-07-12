@@ -61,7 +61,6 @@ HEADERS += \
     ../../src/stdafx.h \
     ../../src/Comms.h \
     ../../src/BaseStationsWidget.h \
-    ../../src/ConfigWidget.h \
     ../../src/MeasurementsWidget.h \
     ../../src/AlarmsWidget.h \
     ../../../common/src/Channel.h \
@@ -86,14 +85,16 @@ HEADERS += \
     ../../src/Utils.h \
     ../../../common/src/Crypt.h \
     ../../src/Smtp.h \
-    ../../src/Emailer.h
+    ../../src/Emailer.h \
+    ../../src/SensorSettingsDialog.h \
+    ../../src/EmailSettingsDialog.h \
+    ../../src/FtpSettingsDialog.h
 
 SOURCES += \
     ../../src/Manager.cpp \
     ../../src/main.cpp \
     ../../src/Comms.cpp \
     ../../src/BaseStationsWidget.cpp \
-    ../../src/ConfigWidget.cpp \
     ../../src/MeasurementsWidget.cpp \
     ../../src/AlarmsWidget.cpp \
     ../../../common/src/CRC.cpp \
@@ -115,12 +116,14 @@ SOURCES += \
     ../../src/Utils.cpp \
     ../../../common/src/Crypt.cpp \
     ../../src/Smtp.cpp \
-    ../../src/Emailer.cpp
+    ../../src/Emailer.cpp \
+    ../../src/SensorSettingsDialog.cpp \
+    ../../src/EmailSettingsDialog.cpp \
+    ../../src/FtpSettingsDialog.cpp
 
 FORMS += \
     ../../src/Manager.ui \
     ../../src/BaseStationsWidget.ui \
-    ../../src/ConfigWidget.ui \
     ../../src/MeasurementsWidget.ui \
     ../../src/SensorsWidget.ui \
     ../../src/SensorsFilterDialog.ui \
@@ -130,7 +133,10 @@ FORMS += \
     ../../src/ExportDataDialog.ui \
     ../../src/ExportPicDialog.ui \
     ../../src/ReportsWidget.ui \
-    ../../src/ConfigureReportDialog.ui
+    ../../src/ConfigureReportDialog.ui \
+    ../../src/SensorSettingsDialog.ui \
+    ../../src/EmailSettingsDialog.ui \
+    ../../src/FtpSettingsDialog.ui
 
 DISTFILES += \
 

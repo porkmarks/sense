@@ -164,7 +164,7 @@ QVariant ReportsModel::data(QModelIndex const& index, int role) const
                 {
                     str += " and ";
                 }
-                str += ("Upload to " + descriptor.ftpServer + ":/" + descriptor.ftpFolder).c_str();
+                str += ("Upload to FTP folder: " + descriptor.ftpFolder).c_str();
             }
             return str;
         }

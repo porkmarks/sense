@@ -16,6 +16,9 @@ public:
 private slots:
     void activateBaseStation(Comms::BaseStationDescriptor const& bs, DB& db);
     void deactivateBaseStation(Comms::BaseStationDescriptor const& bs);
+    void openSensorSettingsDialog();
+    void openEmailSettingsDialog();
+    void openFtpSettingsDialog();
 
 private:
     void process();
@@ -26,6 +29,7 @@ private:
 
     Comms m_comms;
     Emailer m_emailer;
+    DB* m_activeDB = nullptr;
 
     Ui::Manager m_ui;
 };

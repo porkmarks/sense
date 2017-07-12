@@ -22,7 +22,9 @@ extern std::string s_programFolder;
 
 constexpr float k_alertVcc = 2.2f;
 constexpr int8_t k_alertSignal = -110;
-constexpr uint64_t k_encryptionKey = 1735271834639209ULL;
+
+constexpr uint64_t k_emailEncryptionKey = 1735271834639209ULL;
+constexpr uint64_t k_ftpEncryptionKey = 45235321231234ULL;
 
 template <typename Stream, typename T>
 void write(Stream& s, T const& t)
@@ -77,9 +79,6 @@ bool DB::create(std::string const& name)
 
 bool DB::load(std::string const& name)
 {
-    Crypt crypt;
-    crypt.setKey(k_encryptionKey);
-
     Clock::time_point start = Clock::now();
 
     m_dbFilename = "sense-" + name + ".db";
@@ -110,14 +109,16 @@ bool DB::load(std::string const& name)
         }
 
         auto it = document.FindMember("email_settings");
-//        if (it == document.MemberEnd() || !it->value.IsObject())
-//        {
-//            std::cerr << "Bad or missing config email_settings\n";
-//            return false;
-//        }
-
-        if (it != document.MemberEnd())
+        if (it == document.MemberEnd() || !it->value.IsObject())
         {
+            std::cerr << "Bad or missing email_settings\n";
+            return false;
+        }
+
+        {
+            Crypt crypt;
+            crypt.setKey(k_emailEncryptionKey);
+
             rapidjson::Value const& esj = it->value;
             auto it = esj.FindMember("host");
             if (it == esj.MemberEnd() || !it->value.IsString())
@@ -160,54 +161,99 @@ bool DB::load(std::string const& name)
             data.emailSettings.from = it->value.GetString();
         }
 
-        it = document.FindMember("config");
+        it = document.FindMember("ftp_settings");
         if (it == document.MemberEnd() || !it->value.IsObject())
         {
-            std::cerr << "Bad or missing config object\n";
+            std::cerr << "Bad or missing ftp_settings\n";
             return false;
         }
 
         {
-            rapidjson::Value const& configj = it->value;
-            auto it = configj.FindMember("name");
-            if (it == configj.MemberEnd() || !it->value.IsString())
-            {
-                std::cerr << "Bad or missing config name\n";
-                return false;
-            }
-            data.config.descriptor.name = it->value.GetString();
+            Crypt crypt;
+            crypt.setKey(k_ftpEncryptionKey);
 
-            it = configj.FindMember("sensors_sleeping");
-            if (it == configj.MemberEnd() || !it->value.IsBool())
+            rapidjson::Value const& esj = it->value;
+            auto it = esj.FindMember("host");
+            if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                std::cerr << "Bad or missing config sensors_sleeping\n";
+                std::cerr << "Bad or missing ftp settings host\n";
                 return false;
             }
-            data.config.descriptor.sensorsSleeping = it->value.GetBool();
+            data.ftpSettings.host = it->value.GetString();
 
-            it = configj.FindMember("measurement_period");
-            if (it == configj.MemberEnd() || !it->value.IsUint64())
+            it = esj.FindMember("port");
+            if (it == esj.MemberEnd() || !it->value.IsUint())
             {
-                std::cerr << "Bad or missing config measurement_period\n";
+                std::cerr << "Bad or missing ftp settings port\n";
                 return false;
             }
-            data.config.descriptor.measurementPeriod = std::chrono::seconds(it->value.GetUint64());
+            data.ftpSettings.port = it->value.GetUint();
 
-            it = configj.FindMember("comms_period");
-            if (it == configj.MemberEnd() || !it->value.IsUint64())
+            it = esj.FindMember("username");
+            if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                std::cerr << "Bad or missing config comms_period\n";
+                std::cerr << "Bad or missing ftp settings username\n";
                 return false;
             }
-            data.config.descriptor.commsPeriod = std::chrono::seconds(it->value.GetUint64());
+            data.ftpSettings.username = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
 
-            it = configj.FindMember("baseline");
-            if (it == configj.MemberEnd() || !it->value.IsUint64())
+            it = esj.FindMember("password");
+            if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                std::cerr << "Bad or missing config baseline\n";
+                std::cerr << "Bad or missing ftp settings password\n";
                 return false;
             }
-            data.config.baselineTimePoint = Clock::time_point(std::chrono::seconds(it->value.GetUint64()));
+            data.ftpSettings.password = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
+        }
+
+        it = document.FindMember("sensor_settings");
+        if (it == document.MemberEnd() || !it->value.IsObject())
+        {
+            std::cerr << "Bad or missing sensor settings object\n";
+            return false;
+        }
+
+        {
+            rapidjson::Value const& ssj = it->value;
+            auto it = ssj.FindMember("name");
+            if (it == ssj.MemberEnd() || !it->value.IsString())
+            {
+                std::cerr << "Bad or missing sensor settings name\n";
+                return false;
+            }
+            data.sensorSettings.descriptor.name = it->value.GetString();
+
+            it = ssj.FindMember("sensors_sleeping");
+            if (it == ssj.MemberEnd() || !it->value.IsBool())
+            {
+                std::cerr << "Bad or missing sensor settings sensors_sleeping\n";
+                return false;
+            }
+            data.sensorSettings.descriptor.sensorsSleeping = it->value.GetBool();
+
+            it = ssj.FindMember("measurement_period");
+            if (it == ssj.MemberEnd() || !it->value.IsUint64())
+            {
+                std::cerr << "Bad or missing sensor settings measurement_period\n";
+                return false;
+            }
+            data.sensorSettings.descriptor.measurementPeriod = std::chrono::seconds(it->value.GetUint64());
+
+            it = ssj.FindMember("comms_period");
+            if (it == ssj.MemberEnd() || !it->value.IsUint64())
+            {
+                std::cerr << "Bad or missing sensor settings comms_period\n";
+                return false;
+            }
+            data.sensorSettings.descriptor.commsPeriod = std::chrono::seconds(it->value.GetUint64());
+
+            it = ssj.FindMember("baseline");
+            if (it == ssj.MemberEnd() || !it->value.IsUint64())
+            {
+                std::cerr << "Bad or missing sensor settings baseline\n";
+                return false;
+            }
+            data.sensorSettings.baselineTimePoint = Clock::time_point(std::chrono::seconds(it->value.GetUint64()));
         }
 
         it = document.FindMember("sensors");
@@ -226,7 +272,7 @@ bool DB::load(std::string const& name)
                 auto it = sensorj.FindMember("name");
                 if (it == sensorj.MemberEnd() || !it->value.IsString())
                 {
-                    std::cerr << "Bad or missing config name\n";
+                    std::cerr << "Bad or missing sensor name\n";
                     return false;
                 }
                 sensor.descriptor.name = it->value.GetString();
@@ -292,7 +338,7 @@ bool DB::load(std::string const& name)
                 auto it = alarmj.FindMember("name");
                 if (it == alarmj.MemberEnd() || !it->value.IsString())
                 {
-                    std::cerr << "Bad or missing config name\n";
+                    std::cerr << "Bad or missing alarm name\n";
                     return false;
                 }
                 alarm.descriptor.name = it->value.GetString();
@@ -437,7 +483,7 @@ bool DB::load(std::string const& name)
                 it = alarmj.FindMember("email_recipient");
                 if (it == alarmj.MemberEnd() || !it->value.IsString())
                 {
-                    std::cerr << "Bad or missing config email_recipient\n";
+                    std::cerr << "Bad or missing alarm email_recipient\n";
                     return false;
                 }
                 alarm.descriptor.emailRecipient = it->value.GetString();
@@ -465,7 +511,7 @@ bool DB::load(std::string const& name)
                 auto it = reportj.FindMember("name");
                 if (it == reportj.MemberEnd() || !it->value.IsString())
                 {
-                    std::cerr << "Bad or missing config name\n";
+                    std::cerr << "Bad or missing report name\n";
                     return false;
                 }
                 report.descriptor.name = it->value.GetString();
@@ -510,7 +556,7 @@ bool DB::load(std::string const& name)
                 it = reportj.FindMember("period");
                 if (it == reportj.MemberEnd() || !it->value.IsInt())
                 {
-                    std::cerr << "Bad or missing config period\n";
+                    std::cerr << "Bad or missing report period\n";
                     return false;
                 }
                 report.descriptor.period = static_cast<DB::ReportDescriptor::Period>(it->value.GetInt());
@@ -518,7 +564,7 @@ bool DB::load(std::string const& name)
                 it = reportj.FindMember("custom_period");
                 if (it == reportj.MemberEnd() || !it->value.IsUint64())
                 {
-                    std::cerr << "Bad or missing config custom_period\n";
+                    std::cerr << "Bad or missing report custom_period\n";
                     return false;
                 }
                 report.descriptor.customPeriod = std::chrono::seconds(it->value.GetUint64());
@@ -526,7 +572,7 @@ bool DB::load(std::string const& name)
                 it = reportj.FindMember("data");
                 if (it == reportj.MemberEnd() || !it->value.IsInt())
                 {
-                    std::cerr << "Bad or missing config data\n";
+                    std::cerr << "Bad or missing report data\n";
                     return false;
                 }
                 report.descriptor.data = static_cast<DB::ReportDescriptor::Data>(it->value.GetInt());
@@ -542,7 +588,7 @@ bool DB::load(std::string const& name)
                 it = reportj.FindMember("email_recipient");
                 if (it == reportj.MemberEnd() || !it->value.IsString())
                 {
-                    std::cerr << "Bad or missing config email_recipient\n";
+                    std::cerr << "Bad or missing report email_recipient\n";
                     return false;
                 }
                 report.descriptor.emailRecipient = it->value.GetString();
@@ -555,37 +601,13 @@ bool DB::load(std::string const& name)
                 }
                 report.descriptor.uploadToFtpAction = it->value.GetBool();
 
-                it = reportj.FindMember("ftp_server");
-                if (it == reportj.MemberEnd() || !it->value.IsString())
-                {
-                    std::cerr << "Bad or missing config ftp_server\n";
-                    return false;
-                }
-                report.descriptor.ftpServer = it->value.GetString();
-
                 it = reportj.FindMember("ftp_folder");
                 if (it == reportj.MemberEnd() || !it->value.IsString())
                 {
-                    std::cerr << "Bad or missing config ftp_folder\n";
+                    std::cerr << "Bad or missing report ftp_folder\n";
                     return false;
                 }
                 report.descriptor.ftpFolder = it->value.GetString();
-
-                it = reportj.FindMember("ftp_username");
-                if (it == reportj.MemberEnd() || !it->value.IsString())
-                {
-                    std::cerr << "Bad or missing config ftp_username\n";
-                    return false;
-                }
-                report.descriptor.ftpUsername = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
-
-                it = reportj.FindMember("ftp_password");
-                if (it == reportj.MemberEnd() || !it->value.IsString())
-                {
-                    std::cerr << "Bad or missing config ftp_password\n";
-                    return false;
-                }
-                report.descriptor.ftpPassword = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
 
                 data.lastReportId = std::max(data.lastReportId, report.id);
                 data.reports.push_back(report);
@@ -739,32 +761,32 @@ DB::Sensor const& DB::getSensor(size_t index) const
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::setEmailSettings(EmailSettings const& emailSettings)
+bool DB::setEmailSettings(EmailSettings const& settings)
 {
-    if (emailSettings.from.empty())
+    if (settings.from.empty())
     {
         return false;
     }
-    if (emailSettings.username.empty())
+    if (settings.username.empty())
     {
         return false;
     }
-    if (emailSettings.password.empty())
+    if (settings.password.empty())
     {
         return false;
     }
-    if (emailSettings.host.empty())
+    if (settings.host.empty())
     {
         return false;
     }
-    if (emailSettings.port == 0)
+    if (settings.port == 0)
     {
         return false;
     }
 
     emit emailSettingsWillBeChanged();
 
-    m_mainData.emailSettings = emailSettings;
+    m_mainData.emailSettings = settings;
 
     emit emailSettingsChanged();
 
@@ -782,7 +804,46 @@ DB::EmailSettings const& DB::getEmailSettings() const
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::setConfig(ConfigDescriptor const& descriptor)
+bool DB::setFtpSettings(FtpSettings const& settings)
+{
+    if (settings.username.empty())
+    {
+        return false;
+    }
+    if (settings.password.empty())
+    {
+        return false;
+    }
+    if (settings.host.empty())
+    {
+        return false;
+    }
+    if (settings.port == 0)
+    {
+        return false;
+    }
+
+    emit ftpSettingsWillBeChanged();
+
+    m_mainData.ftpSettings = settings;
+
+    emit ftpSettingsChanged();
+
+    triggerSave();
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+DB::FtpSettings const& DB::getFtpSettings() const
+{
+    return m_mainData.ftpSettings;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool DB::setSensorSettings(SensorSettingsDescriptor const& descriptor)
 {
     if (descriptor.name.empty())
     {
@@ -801,14 +862,14 @@ bool DB::setConfig(ConfigDescriptor const& descriptor)
         return false;
     }
 
-    Clock::time_point baselineTimePoint = computeBaselineTimePoint(m_mainData.config, descriptor);
+    Clock::time_point baselineTimePoint = computeBaselineTimePoint(m_mainData.sensorSettings, descriptor);
 
-    emit configWillBeChanged();
+    emit sensorSettingsWillBeChanged();
 
-    m_mainData.config.descriptor = descriptor;
-    m_mainData.config.baselineTimePoint = baselineTimePoint;
+    m_mainData.sensorSettings.descriptor = descriptor;
+    m_mainData.sensorSettings.baselineTimePoint = baselineTimePoint;
 
-    emit configChanged();
+    emit sensorSettingsChanged();
 
     triggerSave();
 
@@ -817,14 +878,14 @@ bool DB::setConfig(ConfigDescriptor const& descriptor)
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::Config const& DB::getConfig() const
+DB::SensorSettings const& DB::getSensorSettings() const
 {
-    return m_mainData.config;
+    return m_mainData.sensorSettings;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::Clock::time_point DB::computeBaselineTimePoint(Config const& oldconfig, ConfigDescriptor const& newDescriptor)
+DB::Clock::time_point DB::computeBaselineTimePoint(SensorSettings const& oldSensorSettings, SensorSettingsDescriptor const& newDescriptor)
 {
     //This is computed when creating the config so that this equation holds for any config:
     // measurement_time_point = config.baseline_time_point + measurement_index * config.measurement_period
@@ -870,7 +931,7 @@ DB::Clock::time_point DB::computeBaselineTimePoint(Config const& oldconfig, Conf
         newBaseline = tp;
     }
 
-    return found ? newBaseline : oldconfig.baselineTimePoint;
+    return found ? newBaseline : oldSensorSettings.baselineTimePoint;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1614,36 +1675,48 @@ void DB::save(Data const& data) const
         weeklyBackup = true;
     }
 
-    Crypt crypt;
-    crypt.setKey(k_encryptionKey);
-
     Clock::time_point start = now;
 
     {
         rapidjson::Document document;
         document.SetObject();
         {
+            Crypt crypt;
+            crypt.setKey(k_emailEncryptionKey);
             rapidjson::Value esj;
             esj.SetObject();
             esj.AddMember("host", rapidjson::Value(data.emailSettings.host.c_str(), document.GetAllocator()), document.GetAllocator());
             esj.AddMember("port", static_cast<uint32_t>(data.emailSettings.port), document.GetAllocator());
             QString username(data.emailSettings.username.c_str());
             esj.AddMember("username", rapidjson::Value(crypt.encryptToString(username).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
-            QString password(data.emailSettings.username.c_str());
+            QString password(data.emailSettings.password.c_str());
             esj.AddMember("password", rapidjson::Value(crypt.encryptToString(password).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
             esj.AddMember("from", rapidjson::Value(data.emailSettings.from.c_str(), document.GetAllocator()), document.GetAllocator());
             document.AddMember("email_settings", esj, document.GetAllocator());
         }
+        {
+            Crypt crypt;
+            crypt.setKey(k_ftpEncryptionKey);
+            rapidjson::Value fsj;
+            fsj.SetObject();
+            fsj.AddMember("host", rapidjson::Value(data.ftpSettings.host.c_str(), document.GetAllocator()), document.GetAllocator());
+            fsj.AddMember("port", static_cast<uint32_t>(data.ftpSettings.port), document.GetAllocator());
+            QString username(data.ftpSettings.username.c_str());
+            fsj.AddMember("username", rapidjson::Value(crypt.encryptToString(username).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
+            QString password(data.ftpSettings.password.c_str());
+            fsj.AddMember("password", rapidjson::Value(crypt.encryptToString(password).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
+            document.AddMember("ftp_settings", fsj, document.GetAllocator());
+        }
 
         {
-            rapidjson::Value configj;
-            configj.SetObject();
-            configj.AddMember("name", rapidjson::Value(data.config.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
-            configj.AddMember("sensors_sleeping", data.config.descriptor.sensorsSleeping, document.GetAllocator());
-            configj.AddMember("measurement_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.config.descriptor.measurementPeriod).count()), document.GetAllocator());
-            configj.AddMember("comms_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.config.descriptor.commsPeriod).count()), document.GetAllocator());
-            configj.AddMember("baseline", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.config.baselineTimePoint.time_since_epoch()).count()), document.GetAllocator());
-            document.AddMember("config", configj, document.GetAllocator());
+            rapidjson::Value ssj;
+            ssj.SetObject();
+            ssj.AddMember("name", rapidjson::Value(data.sensorSettings.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
+            ssj.AddMember("sensors_sleeping", data.sensorSettings.descriptor.sensorsSleeping, document.GetAllocator());
+            ssj.AddMember("measurement_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.sensorSettings.descriptor.measurementPeriod).count()), document.GetAllocator());
+            ssj.AddMember("comms_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.sensorSettings.descriptor.commsPeriod).count()), document.GetAllocator());
+            ssj.AddMember("baseline", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.sensorSettings.baselineTimePoint.time_since_epoch()).count()), document.GetAllocator());
+            document.AddMember("sensor_settings", ssj, document.GetAllocator());
         }
 
         {
@@ -1728,15 +1801,7 @@ void DB::save(Data const& data) const
                 reportj.AddMember("send_email_action", report.descriptor.sendEmailAction, document.GetAllocator());
                 reportj.AddMember("email_recipient", rapidjson::Value(report.descriptor.emailRecipient.c_str(), document.GetAllocator()), document.GetAllocator());
                 reportj.AddMember("upload_to_ftp_action", report.descriptor.uploadToFtpAction, document.GetAllocator());
-                reportj.AddMember("ftp_server", rapidjson::Value(report.descriptor.ftpServer.c_str(), document.GetAllocator()), document.GetAllocator());
                 reportj.AddMember("ftp_folder", rapidjson::Value(report.descriptor.ftpFolder.c_str(), document.GetAllocator()), document.GetAllocator());
-
-                QString username(report.descriptor.ftpUsername.c_str());
-                reportj.AddMember("ftp_username", rapidjson::Value(crypt.encryptToString(username).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
-
-                QString password(report.descriptor.ftpPassword.c_str());
-                reportj.AddMember("ftp_password", rapidjson::Value(crypt.encryptToString(password).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
-
                 reportsj.PushBack(reportj, document.GetAllocator());
             }
             document.AddMember("reports", reportsj, document.GetAllocator());
