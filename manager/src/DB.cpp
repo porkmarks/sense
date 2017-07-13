@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include <QApplication>
+#include <QDateTime>
 
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
@@ -523,6 +524,14 @@ bool DB::load(std::string const& name)
                     return false;
                 }
                 report.id = it->value.GetUint();
+
+                it = reportj.FindMember("last_triggered");
+                if (it == reportj.MemberEnd() || !it->value.IsUint64())
+                {
+                    std::cerr << "Bad or missing sensor report last_triggered\n";
+                    return false;
+                }
+                report.lastTriggeredTimePoint = Clock::time_point(std::chrono::seconds(it->value.GetUint64()));
 
                 it = reportj.FindMember("filter_sensors");
                 if (it == reportj.MemberEnd() || !it->value.IsBool())
@@ -1398,6 +1407,77 @@ int32_t DB::findReportIndexById(ReportId id) const
 
 //////////////////////////////////////////////////////////////////////////
 
+bool DB::isReportTriggered(ReportId id) const
+{
+    int32_t index = findReportIndexById(id);
+    if (index < 0)
+    {
+        return false;
+    }
+
+    Report const& report = m_mainData.reports[index];
+
+    if (report.descriptor.period == ReportDescriptor::Period::Daily)
+    {
+        QDateTime dt = QDateTime::currentDateTime();
+        dt.setTime(QTime(9, 0));
+        if (Clock::to_time_t(report.lastTriggeredTimePoint) < dt.toTime_t() && Clock::to_time_t(Clock::now()) >= dt.toTime_t())
+        {
+            return true;
+        }
+    }
+    else if (report.descriptor.period == ReportDescriptor::Period::Weekly)
+    {
+        QDateTime dt = QDateTime::currentDateTime();
+        dt.setDate(dt.date().addDays(-dt.date().dayOfWeek()));
+        dt.setTime(QTime(9, 0));
+        if (Clock::to_time_t(report.lastTriggeredTimePoint) < dt.toTime_t() && Clock::to_time_t(Clock::now()) >= dt.toTime_t())
+        {
+            return true;
+        }
+    }
+    else if (report.descriptor.period == ReportDescriptor::Period::Weekly)
+    {
+        QDate date = QDate::currentDate();
+        date = QDate(date.year(), date.month(), 1);
+        QDateTime dt(date, QTime(9, 0));
+
+        if (Clock::to_time_t(report.lastTriggeredTimePoint) < dt.toTime_t() && Clock::to_time_t(Clock::now()) >= dt.toTime_t())
+        {
+            return true;
+        }
+    }
+    else if (report.descriptor.period == ReportDescriptor::Period::Custom)
+    {
+        Clock::time_point now = Clock::now();
+        Clock::duration d = now - report.lastTriggeredTimePoint;
+        if (d >= report.descriptor.customPeriod)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void DB::setReportExecuted(ReportId id)
+{
+    int32_t index = findReportIndexById(id);
+    if (index < 0)
+    {
+        return;
+    }
+
+    Report& report = m_mainData.reports[index];
+    report.lastTriggeredTimePoint = Clock::now();
+
+    triggerSave();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 bool DB::addMeasurement(MeasurementDescriptor const& md)
 {
     int32_t sensorIndex = findSensorIndexById(md.sensorId);
@@ -1792,6 +1872,7 @@ void DB::save(Data const& data) const
                 rapidjson::Value reportj;
                 reportj.SetObject();
                 reportj.AddMember("id", report.id, document.GetAllocator());
+                reportj.AddMember("last_triggered", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(report.lastTriggeredTimePoint.time_since_epoch()).count()), document.GetAllocator());
                 reportj.AddMember("name", rapidjson::Value(report.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
                 reportj.AddMember("filter_sensors", report.descriptor.filterSensors, document.GetAllocator());
                 if (report.descriptor.filterSensors)

@@ -31,6 +31,11 @@ void Emailer::init(DB& db)
 
     connect(m_db, &DB::alarmWasTriggered, this, &Emailer::alarmTriggered);
     connect(m_db, &DB::alarmWasUntriggered, this, &Emailer::alarmUntriggered);
+
+    m_timer.setSingleShot(false);
+    m_timer.setInterval(60 * 1000); //every minute
+    m_timer.start(1);
+    connect(&m_timer, &QTimer::timeout, this, &Emailer::checkReports);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -38,6 +43,25 @@ void Emailer::init(DB& db)
 void Emailer::shutdown()
 {
     m_db = nullptr;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Emailer::checkReports()
+{
+    size_t count = m_db->getReportCount();
+    for (size_t i = 0; i < count; i++)
+    {
+        DB::Report const& report = m_db->getReport(i);
+        if (m_db->isReportTriggered(report.id))
+        {
+            if (report.descriptor.sendEmailAction && !report.descriptor.emailRecipient.empty())
+            {
+                sendReportEmail(report);
+            }
+            m_db->setReportExecuted(report.id);
+        }
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -161,7 +185,125 @@ void Emailer::sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor co
 
 void Emailer::sendReportEmail(DB::Report const& report)
 {
+    Email email;
+    email.settings = m_db->getEmailSettings();
+    email.to = report.descriptor.emailRecipient;
 
+    switch (report.descriptor.period)
+    {
+    case DB::ReportDescriptor::Period::Daily:
+        email.subject = "Daily report: " + report.descriptor.name + "";
+        break;
+    case DB::ReportDescriptor::Period::Weekly:
+        email.subject = "Weekly report: " + report.descriptor.name + "";
+        break;
+    case DB::ReportDescriptor::Period::Monthly:
+        email.subject = "Monthly report: " + report.descriptor.name + "";
+        break;
+    case DB::ReportDescriptor::Period::Custom:
+        email.subject = "Custom report: " + report.descriptor.name + "";
+        break;
+    }
+
+    QDateTime startDt;
+    startDt.setTime_t(DB::Clock::to_time_t(report.lastTriggeredTimePoint));
+    QDateTime endDt = QDateTime::currentDateTime();
+
+    email.body = QString(R"X(
+<html>
+<head>
+<style type="text/css">
+body
+{
+    line-height: 1.6em;
+}
+
+#hor-minimalist-a
+{
+    font-family: "Lucida Sans Unicode", "Lucida Grande", Sans-Serif;
+    font-size: 12px;
+    background: #fff;
+    margin: 45px;
+    width: 480px;
+    border-collapse: collapse;
+    text-align: left;
+}
+#hor-minimalist-a th
+{
+    font-size: 14px;
+    font-weight: normal;
+    color: #039;
+    padding: 10px 8px;
+    border-bottom: 2px solid #6678b1;
+}
+#hor-minimalist-a td
+{
+    color: #669;
+    padding: 9px 8px 0px 8px;
+}
+#hor-minimalist-a tbody tr:hover td
+{
+    color: #009;
+}
+</style>
+</head>
+<body>
+<p>This is an automated daily report of the <strong>%1</strong> base station.</p>
+<p>Measurements between <strong>%2</strong> and&nbsp;<strong>%3</strong></p>
+<table id="hor-minimalist-a">
+<tbody>
+<tr>
+<th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Sensor</strong></th>
+<th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Timestamp</strong></th>
+<th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Temperature</strong></th>
+<th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Humidity</strong></th>
+<th style="width: 81.3333px; text-align: center; white-space: nowrap;"><strong>Alerts</strong></th>
+</tr>)X").arg(m_db->getSensorSettings().descriptor.name.c_str())
+         .arg(startDt.toString("dd-MM-yyyy HH:mm"))
+         .arg(endDt.toString("dd-MM-yyyy HH:mm"))
+         .toUtf8().data();
+
+    DB::Filter filter;
+    filter.useTimePointFilter = true;
+    filter.timePointFilter.min = report.lastTriggeredTimePoint;
+    filter.timePointFilter.max = DB::Clock::now();
+    std::vector<DB::Measurement> measurements = m_db->getFilteredMeasurements(filter);
+    std::sort(measurements.begin(), measurements.end(), [](DB::Measurement const& a, DB::Measurement const& b) { return a.descriptor.timePoint > b.descriptor.timePoint; });
+
+    for (DB::Measurement const& m: measurements)
+    {
+        QDateTime dt;
+        dt.setTime_t(DB::Clock::to_time_t(m.descriptor.timePoint));
+        std::string sensorName = "N/A";
+        int32_t sensorIndex = m_db->findSensorIndexById(m.descriptor.sensorId);
+        if (sensorIndex >= 0)
+        {
+            sensorName = m_db->getSensor(sensorIndex).descriptor.name;
+        }
+        email.body += QString(R"X(
+<tr>
+<td style="width: 80.6667px;">%1</td>
+<td style="width: 80.6667px; text-align: right; white-space: nowrap;">%2</td>
+<td style="width: 80.6667px; text-align: right; white-space: nowrap;">%3&nbsp;&deg;C</td>
+<td style="width: 80.6667px; text-align: right; white-space: nowrap;">%4 %RH</td>
+<td style="width: 81.3333px; text-align: right; white-space: nowrap;">%5</td>
+</tr>)X").arg(sensorName.c_str())
+         .arg(dt.toString("dd-MM-yyyy HH:mm"))
+         .arg(m.descriptor.temperature, 0, 'f', 1)
+         .arg(m.descriptor.humidity, 0, 'f', 1)
+         .arg(m.triggeredAlarms == 0 ? "no" : "yes")
+         .toUtf8().data();
+    }
+    email.body += R"X(
+</tbody>
+</table>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><em>- Sense -</em></p>
+</body>
+</html>)X";
+
+    sendEmail(email);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -223,6 +365,7 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
         {
             std::cout << "Failed to send email: " << errorMsg << "\n";
         }
+        std::cout.flush();
         smtp.quit();
 
 //        QStringList files;

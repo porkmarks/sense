@@ -9,6 +9,7 @@
 #include <thread>
 #include <atomic>
 #include <condition_variable>
+#include <QTimer>
 
 #include "DB.h"
 
@@ -28,8 +29,10 @@ private slots:
     void alarmUntriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::MeasurementDescriptor const& md);
 
 private:
+    void checkReports();
 
     DB* m_db = nullptr;
+    QTimer m_timer;
 
     struct Email
     {

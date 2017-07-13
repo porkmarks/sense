@@ -119,6 +119,8 @@ void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor cons
     BaseStationData bsd;
     bsd.descriptor = bs;
     bsd.db = std::move(db);
+    bsd.emailer.reset(new Emailer());
+    bsd.emailer->init(*bsd.db);
     m_baseStations.push_back(std::move(bsd));
 
     QStandardItem* nameItem = new QStandardItem();

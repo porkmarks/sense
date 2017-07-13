@@ -239,6 +239,7 @@ public:
     {
         ReportDescriptor descriptor;
         ReportId id;
+        Clock::time_point lastTriggeredTimePoint = Clock::time_point(Clock::duration::zero());
     };
 
     size_t getReportCount() const;
@@ -248,6 +249,8 @@ public:
     bool addReport(ReportDescriptor const& descriptor);
     bool setReport(ReportId id, ReportDescriptor const& descriptor);
     void removeReport(size_t index);
+    bool isReportTriggered(ReportId id) const;
+    void setReportExecuted(ReportId id);
 
 
     bool addMeasurement(MeasurementDescriptor const& descriptor);

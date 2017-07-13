@@ -52,7 +52,6 @@ void Manager::activateBaseStation(Comms::BaseStationDescriptor const& bs, DB& db
     m_ui.measurementsWidget->init(db);
     m_ui.alarmsWidget->init(db);
     m_ui.reportsWidget->init(db);
-    m_emailer.init(db);
 
     m_ui.actionEmailSettings->setEnabled(true);
     m_ui.actionFtpSettings->setEnabled(true);
@@ -71,7 +70,6 @@ void Manager::deactivateBaseStation(Comms::BaseStationDescriptor const& bs)
     m_ui.measurementsWidget->shutdown();
     m_ui.alarmsWidget->shutdown();
     m_ui.reportsWidget->shutdown();
-    m_emailer.shutdown();
 
     m_ui.actionEmailSettings->setEnabled(false);
     m_ui.actionFtpSettings->setEnabled(false);

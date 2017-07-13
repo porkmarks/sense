@@ -5,6 +5,7 @@
 #include <QStandardItemModel>
 #include "ui_BaseStationsWidget.h"
 #include "Comms.h"
+#include "Emailer.h"
 
 class BaseStationsWidget : public QWidget
 {
@@ -34,6 +35,7 @@ private:
     {
         Comms::BaseStationDescriptor descriptor;
         std::unique_ptr<DB> db;
+        std::unique_ptr<Emailer> emailer;
     };
 
     std::vector<BaseStationData> m_baseStations;

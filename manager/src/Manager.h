@@ -4,7 +4,6 @@
 #include "ui_Manager.h"
 
 #include "Comms.h"
-#include "Emailer.h"
 #include "DB.h"
 
 class Manager : public QMainWindow
@@ -28,7 +27,6 @@ private:
     void readSettings();
 
     Comms m_comms;
-    Emailer m_emailer;
     DB* m_activeDB = nullptr;
 
     Ui::Manager m_ui;
