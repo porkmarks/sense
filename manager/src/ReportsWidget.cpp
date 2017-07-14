@@ -104,6 +104,32 @@ void ReportsWidget::addReport()
 
 void ReportsWidget::removeReports()
 {
+    QModelIndexList selected = m_ui.list->selectionModel()->selectedIndexes();
+    if (selected.isEmpty())
+    {
+        QMessageBox::critical(this, "Error", "Please select the report you want to remove.");
+        return;
+    }
+
+    QModelIndex mi = m_model->index(selected.at(0).row(), static_cast<int>(ReportsModel::Column::Id));
+    DB::ReportId id = m_model->data(mi).toUInt();
+    int32_t index = m_db->findReportIndexById(id);
+    if (index < 0)
+    {
+        QMessageBox::critical(this, "Error", "Invalid report selected.");
+        return;
+    }
+
+    DB::Report const& report = m_db->getReport(index);
+
+    int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete report '%1'").arg(report.descriptor.name.c_str()));
+    if (response != QMessageBox::Yes)
+    {
+        return;
+    }
+
+    m_db->removeReport(index);
+
     for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
     {
         m_ui.list->resizeColumnToContents(i);

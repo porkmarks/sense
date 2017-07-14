@@ -11,6 +11,15 @@ public:
     ReportsModel(DB& db);
     ~ReportsModel();
 
+    enum class Column
+    {
+        Id,
+        Name,
+        Period,
+        Data,
+        Action
+    };
+
     void refresh();
 
 

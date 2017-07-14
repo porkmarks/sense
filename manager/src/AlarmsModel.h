@@ -11,6 +11,18 @@ public:
     AlarmsModel(DB& db);
     ~AlarmsModel();
 
+    enum class Column
+    {
+        Id,
+        Name,
+        Temperature,
+        Humidity,
+        LowBattery,
+        SensorErrors,
+        LowSignal,
+        Action
+    };
+
     void refresh();
 
 

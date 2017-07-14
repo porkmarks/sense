@@ -3,14 +3,7 @@
 #include <QWidget>
 #include <QIcon>
 
-static std::array<const char*, 4> s_headerNames = {"Name", "Period", "Data", "Action"};
-enum class Column
-{
-    Name,
-    Period,
-    Data,
-    Action
-};
+static std::array<const char*, 5> s_headerNames = {"Id", "Name", "Period", "Data", "Action"};
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -116,7 +109,11 @@ QVariant ReportsModel::data(QModelIndex const& index, int role) const
     }
     else if (role == Qt::DisplayRole)
     {
-        if (column == Column::Name)
+        if (column == Column::Id)
+        {
+            return report.id;
+        }
+        else if (column == Column::Name)
         {
             return descriptor.name.c_str();
         }
@@ -171,7 +168,7 @@ QVariant ReportsModel::data(QModelIndex const& index, int role) const
     }
     else if (role == Qt::DecorationRole)
     {
-        if (column == Column::Name)
+        if (column == Column::Id)
         {
             return QIcon(":/icons/ui/report.png");
         }

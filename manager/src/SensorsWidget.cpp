@@ -108,7 +108,36 @@ void SensorsWidget::bindSensor()
 
 void SensorsWidget::unbindSensor()
 {
+    QModelIndexList selected = m_ui.list->selectionModel()->selectedIndexes();
+    if (selected.isEmpty())
+    {
+        QMessageBox::critical(this, "Error", "Please select the sensor you want to remove.");
+        return;
+    }
 
+    QModelIndex mi = m_sortingModel.index(selected.at(0).row(), static_cast<int>(SensorsModel::Column::Id));
+    DB::SensorId id = m_sortingModel.data(mi).toUInt();
+    int32_t index = m_db->findSensorIndexById(id);
+    if (index < 0)
+    {
+        QMessageBox::critical(this, "Error", "Invalid sensor selected.");
+        return;
+    }
+
+    DB::Sensor const& sensor = m_db->getSensor(index);
+
+    int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete sensor '%1'").arg(sensor.descriptor.name.c_str()));
+    if (response != QMessageBox::Yes)
+    {
+        return;
+    }
+
+    m_db->removeSensor(index);
+
+    for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
+    {
+        m_ui.list->resizeColumnToContents(i);
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////

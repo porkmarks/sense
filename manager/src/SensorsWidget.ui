@@ -64,23 +64,6 @@
        </widget>
       </item>
       <item>
-       <widget class="QPushButton" name="reload">
-        <property name="text">
-         <string/>
-        </property>
-        <property name="icon">
-         <iconset resource="../res/res.qrc">
-          <normaloff>:/icons/ui/reload.png</normaloff>:/icons/ui/reload.png</iconset>
-        </property>
-        <property name="iconSize">
-         <size>
-          <width>24</width>
-          <height>24</height>
-         </size>
-        </property>
-       </widget>
-      </item>
-      <item>
        <spacer name="horizontalSpacer">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>

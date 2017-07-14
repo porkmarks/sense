@@ -3,17 +3,7 @@
 #include <QWidget>
 #include <QIcon>
 
-static std::array<const char*, 8> s_headerNames = {"Name", "Temperature", "Humidity", "Low Battery", "Sensor Errors", "Low Signal", "Action"};
-enum class Column
-{
-    Name,
-    Temperature,
-    Humidity,
-    LowBattery,
-    SensorErrors,
-    LowSignal,
-    Action
-};
+static std::array<const char*, 8> s_headerNames = {"Id", "Name", "Temperature", "Humidity", "Low Battery", "Sensor Errors", "Low Signal", "Action"};
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -140,7 +130,11 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
     }
     else if (role == Qt::DisplayRole)
     {
-        if (column == Column::Name)
+        if (column == Column::Id)
+        {
+            return alarm.id;
+        }
+        else if (column == Column::Name)
         {
             return descriptor.name.c_str();
         }
@@ -188,7 +182,7 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
     }
     else if (role == Qt::DecorationRole)
     {
-        if (column == Column::Name)
+        if (column == Column::Id)
         {
             return QIcon(":/icons/ui/alarm.png");
         }

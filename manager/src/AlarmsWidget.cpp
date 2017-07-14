@@ -1,5 +1,6 @@
 #include "AlarmsWidget.h"
 #include "ConfigureAlarmDialog.h"
+#include <QMessageBox>
 
 #include "DB.h"
 
@@ -106,6 +107,32 @@ void AlarmsWidget::addAlarm()
 
 void AlarmsWidget::removeAlarms()
 {
+    QModelIndexList selected = m_ui.list->selectionModel()->selectedIndexes();
+    if (selected.isEmpty())
+    {
+        QMessageBox::critical(this, "Error", "Please select the alarm you want to remove.");
+        return;
+    }
+
+    QModelIndex mi = m_model->index(selected.at(0).row(), static_cast<int>(AlarmsModel::Column::Id));
+    DB::AlarmId id = m_model->data(mi).toUInt();
+    int32_t index = m_db->findAlarmIndexById(id);
+    if (index < 0)
+    {
+        QMessageBox::critical(this, "Error", "Invalid alarm selected.");
+        return;
+    }
+
+    DB::Alarm const& alarm = m_db->getAlarm(index);
+
+    int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete alarm '%1'").arg(alarm.descriptor.name.c_str()));
+    if (response != QMessageBox::Yes)
+    {
+        return;
+    }
+
+    m_db->removeAlarm(index);
+
     for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
     {
         m_ui.list->resizeColumnToContents(i);
