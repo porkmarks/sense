@@ -39,7 +39,7 @@
        <enum>QTabWidget::Rounded</enum>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>3</number>
       </property>
       <widget class="BaseStationsWidget" name="baseStationsWidget">
        <attribute name="icon">
@@ -79,10 +79,19 @@
       <widget class="MeasurementsWidget" name="measurementsWidget">
        <attribute name="icon">
         <iconset resource="../res/res.qrc">
-         <normaloff>:/icons/ui/fft.png</normaloff>:/icons/ui/fft.png</iconset>
+         <normaloff>:/icons/ui/measurements.png</normaloff>:/icons/ui/measurements.png</iconset>
        </attribute>
        <attribute name="title">
         <string>Measurements</string>
+       </attribute>
+      </widget>
+      <widget class="PlotWidget" name="plotWidget">
+       <attribute name="icon">
+        <iconset resource="../res/res.qrc">
+         <normaloff>:/icons/ui/graph.png</normaloff>:/icons/ui/graph.png</iconset>
+       </attribute>
+       <attribute name="title">
+        <string>Graph</string>
        </attribute>
       </widget>
       <widget class="AlarmsWidget" name="alarmsWidget">
@@ -216,6 +225,12 @@
    <class>ReportsWidget</class>
    <extends>QWidget</extends>
    <header>ReportsWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>PlotWidget</class>
+   <extends>QWidget</extends>
+   <header>PlotWidget.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

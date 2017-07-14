@@ -7,7 +7,6 @@
 
 #include "PlotToolTip.h"
 #include "DB.h"
-#include "MeasurementsModel.h"
 #include "Butterworth.h"
 #include "ui_PlotWidget.h"
 
@@ -19,8 +18,9 @@ class PlotWidget : public QWidget
 public:
     PlotWidget(QWidget* parent = 0);
 
-    void init(DB& db, MeasurementsModel& model);
-    void refresh();
+    void init(DB& db);
+    void shutdown();
+    void refresh(DB::Filter const& filter);
 
     QSize getPlotSize() const;
     QPixmap grabPic(bool showLegend);
@@ -31,10 +31,27 @@ private slots:
     void tooltip(QLineSeries* series, QPointF point, bool state, DB::Sensor const& sensor, bool temeprature);
     void plotContextMenu(QPoint const& position);
     void handleMarkerClicked();
+    void refreshFromDB();
+    void selectSensors();
+    void exportData();
+
+    void setDateTimePreset(int preset);
+    void setDateTimePresetToday();
+    void setDateTimePresetYesterday();
+    void setDateTimePresetThisWeek();
+    void setDateTimePresetLastWeek();
+    void setDateTimePresetThisMonth();
+    void setDateTimePresetLastMonth();
+
+    void minDateTimeChanged(QDateTime const& value);
+    void maxDateTimeChanged(QDateTime const& value);
 
 private:
+    DB::Filter createFilter() const;
+    void setMarkerVisible(QLegendMarker* marker, bool visible);
+
     DB* m_db = nullptr;
-    MeasurementsModel* m_model = nullptr;
+    DB::Filter m_filter;
 
     struct PlotData
     {
@@ -60,6 +77,7 @@ private:
     QChartView* m_chartView = nullptr;
 
     bool m_useFiltering = true;
+    std::vector<DB::SensorId> m_selectedSensorIds;
 
     Ui::PlotWidget m_ui;
 };

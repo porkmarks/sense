@@ -5,7 +5,6 @@
 #include <QMessageBox>
 
 #include "ExportDataDialog.h"
-#include "ExportPicDialog.h"
 #include "SensorsModel.h"
 #include "SensorsDelegate.h"
 #include <QSortFilterProxyModel>
@@ -46,8 +45,6 @@ void MeasurementsWidget::init(DB& db)
 
     m_ui.list->setUniformRowHeights(true);
 
-    m_ui.plotWidget->init(db, *m_model);
-
 //    DB::SensorDescriptor sd;
 //    sd.name = "test1";
 //    m_db->addSensor(sd);
@@ -82,11 +79,6 @@ void MeasurementsWidget::init(DB& db)
 
     connect(m_ui.apply, &QPushButton::released, this, &MeasurementsWidget::refreshFromDB);
     connect(m_ui.dateTimePreset, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &MeasurementsWidget::setDateTimePreset);
-    //connect(m_ui.minDateTimeNow, &QPushButton::released, this, &MeasurementsWidget::setMinDateTimeNow);
-    //connect(m_ui.maxDateTimeNow, &QPushButton::released, this, &MeasurementsWidget::setMaxDateTimeNow);
-    //connect(m_ui.thisDay, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisDay);
-    //connect(m_ui.thisWeek, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisWeek);
-    //connect(m_ui.thisMonth, &QPushButton::released, this, &MeasurementsWidget::setDateTimeThisMonth);
     connect(m_ui.selectSensors, &QPushButton::released, this, &MeasurementsWidget::selectSensors);
     connect(m_ui.exportData, &QPushButton::released, this, &MeasurementsWidget::exportData);
 
@@ -167,8 +159,6 @@ void MeasurementsWidget::refreshFromDB()
     }
 
     m_ui.exportData->setEnabled(m_model->getMeasurementCount() > 0);
-
-    m_ui.plotWidget->refresh();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -364,23 +354,11 @@ void MeasurementsWidget::maxHumidityChanged()
 
 void MeasurementsWidget::exportData()
 {
-    if (m_ui.sectionTab->currentIndex() == 0)
+    ExportDataDialog dialog(*m_db, *m_model);
+    int result = dialog.exec();
+    if (result != QDialog::Accepted)
     {
-        ExportDataDialog dialog(*m_db, *m_model);
-        int result = dialog.exec();
-        if (result != QDialog::Accepted)
-        {
-            return;
-        }
-    }
-    else if (m_ui.sectionTab->currentIndex() == 1)
-    {
-        ExportPicDialog dialog(*m_ui.plotWidget);
-        int result = dialog.exec();
-        if (result != QDialog::Accepted)
-        {
-            return;
-        }
+        return;
     }
 }
 

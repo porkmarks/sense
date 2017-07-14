@@ -1,5 +1,12 @@
 #include "PlotWidget.h"
 
+#include "ExportPicDialog.h"
+#include "ExportDataDialog.h"
+#include "SensorsModel.h"
+#include "SensorsDelegate.h"
+#include "ui_SensorsFilterDialog.h"
+
+//////////////////////////////////////////////////////////////////////////
 
 PlotWidget::PlotWidget(QWidget* parent)
     : QWidget(parent)
@@ -12,11 +19,259 @@ PlotWidget::PlotWidget(QWidget* parent)
     createPlotWidgets();
 }
 
-void PlotWidget::init(DB& db, MeasurementsModel& model)
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::init(DB& db)
 {
+    setEnabled(true);
     m_db = &db;
-    m_model = &model;
+
+    connect(m_ui.apply, &QPushButton::released, this, &PlotWidget::refreshFromDB);
+    connect(m_ui.dateTimePreset, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &PlotWidget::setDateTimePreset);
+    connect(m_ui.selectSensors, &QPushButton::released, this, &PlotWidget::selectSensors);
+    connect(m_ui.exportData, &QPushButton::released, this, &PlotWidget::exportData);
+
+    connect(m_ui.minDateTime, &QDateTimeEdit::dateTimeChanged, this, &PlotWidget::minDateTimeChanged);
+    connect(m_ui.maxDateTime, &QDateTimeEdit::dateTimeChanged, this, &PlotWidget::maxDateTimeChanged);
 }
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::shutdown()
+{
+    setEnabled(false);
+    m_series.clear();
+    m_db = nullptr;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+DB::Filter PlotWidget::createFilter() const
+{
+    DB::Filter filter;
+
+    if (!m_selectedSensorIds.empty())
+    {
+        filter.useSensorFilter = true;
+        filter.sensorIds = m_selectedSensorIds;
+    }
+
+    //filter.useTimePointFilter = m_ui.dateTimeFilter->isChecked();
+    filter.useTimePointFilter = true;
+    filter.timePointFilter.min = DB::Clock::from_time_t(m_ui.minDateTime->dateTime().toTime_t());
+    filter.timePointFilter.max = DB::Clock::from_time_t(m_ui.maxDateTime->dateTime().toTime_t());
+
+    return filter;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::refreshFromDB()
+{
+    //in case the date changed, reapply it
+    if (m_ui.useDateTimePreset)
+    {
+        setDateTimePreset(m_ui.dateTimePreset->currentIndex());
+    }
+
+    DB::Filter filter = createFilter();
+    refresh(filter);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::setDateTimePreset(int preset)
+{
+    switch (preset)
+    {
+    case 0: setDateTimePresetToday(); break;
+    case 1: setDateTimePresetYesterday(); break;
+    case 2: setDateTimePresetThisWeek(); break;
+    case 3: setDateTimePresetLastWeek(); break;
+    case 4: setDateTimePresetThisMonth(); break;
+    case 5: setDateTimePresetLastMonth(); break;
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::setDateTimePresetToday()
+{
+    QDateTime dt = QDateTime::currentDateTime();
+
+    dt.setTime(QTime(23, 59, 59, 999));
+    m_ui.maxDateTime->setDateTime(dt);
+
+    dt.setTime(QTime(0, 0));
+    m_ui.minDateTime->setDateTime(dt);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::setDateTimePresetYesterday()
+{
+    QDateTime dt = QDateTime::currentDateTime();
+
+    dt.setDate(dt.date().addDays(-1));
+
+    dt.setTime(QTime(23, 59, 59, 999));
+    m_ui.maxDateTime->setDateTime(dt);
+
+    dt.setTime(QTime(0, 0));
+    m_ui.minDateTime->setDateTime(dt);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::setDateTimePresetThisWeek()
+{
+    QDateTime dt = QDateTime::currentDateTime();
+
+    dt.setDate(dt.date().addDays(-dt.date().dayOfWeek()));
+    dt.setTime(QTime(0, 0));
+    m_ui.minDateTime->setDateTime(dt);
+
+    dt.setDate(dt.date().addDays(6));
+    dt.setTime(QTime(23, 59, 59, 999));
+    m_ui.maxDateTime->setDateTime(dt);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::setDateTimePresetLastWeek()
+{
+    QDateTime dt = QDateTime::currentDateTime();
+
+    dt.setDate(dt.date().addDays(-dt.date().dayOfWeek()).addDays(-7));
+    dt.setTime(QTime(0, 0));
+    m_ui.minDateTime->setDateTime(dt);
+
+    dt.setDate(dt.date().addDays(6));
+    dt.setTime(QTime(23, 59, 59, 999));
+    m_ui.maxDateTime->setDateTime(dt);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::setDateTimePresetThisMonth()
+{
+    QDate date = QDate::currentDate();
+    date = QDate(date.year(), date.month(), 1);
+
+    QDateTime dt(date, QTime(0, 0));
+    m_ui.minDateTime->setDateTime(dt);
+
+    dt = QDateTime(date.addMonths(1).addDays(-1), QTime(23, 59, 59, 999));
+    m_ui.maxDateTime->setDateTime(dt);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::setDateTimePresetLastMonth()
+{
+    QDate date = QDate::currentDate();
+    date = QDate(date.year(), date.month(), 1).addMonths(-1);
+
+    QDateTime dt(date, QTime(0, 0));
+    m_ui.minDateTime->setDateTime(dt);
+
+    dt = QDateTime(date.addMonths(1).addDays(-1), QTime(23, 59, 59, 999));
+    m_ui.maxDateTime->setDateTime(dt);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::minDateTimeChanged(QDateTime const& value)
+{
+    if (value >= m_ui.maxDateTime->dateTime())
+    {
+        QDateTime dt = value;
+        dt.setTime(dt.time().addSecs(3600));
+        m_ui.maxDateTime->setDateTime(dt);
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::maxDateTimeChanged(QDateTime const& value)
+{
+    if (value <= m_ui.minDateTime->dateTime())
+    {
+        QDateTime dt = value;
+        dt.setTime(dt.time().addSecs(-3600));
+        m_ui.minDateTime->setDateTime(dt);
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::exportData()
+{
+    ExportPicDialog dialog(*this);
+    int result = dialog.exec();
+    if (result != QDialog::Accepted)
+    {
+        return;
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::selectSensors()
+{
+    QDialog dialog;
+    Ui::SensorsFilterDialog ui;
+    ui.setupUi(&dialog);
+
+    SensorsModel model(*m_db);
+    model.setShowCheckboxes(true);
+
+    QSortFilterProxyModel sortingModel;
+    sortingModel.setSourceModel(&model);
+
+    SensorsDelegate delegate(sortingModel);
+
+    size_t sensorCount = m_db->getSensorCount();
+    if (m_selectedSensorIds.empty())
+    {
+        for (size_t i = 0; i < sensorCount; i++)
+        {
+            model.setSensorChecked(m_db->getSensor(i).id, true);
+        }
+    }
+    else
+    {
+        for (DB::SensorId id: m_selectedSensorIds)
+        {
+            model.setSensorChecked(id, true);
+        }
+    }
+
+    ui.list->setModel(&sortingModel);
+    ui.list->setItemDelegate(&delegate);
+
+    for (int i = 0; i < model.columnCount(); i++)
+    {
+        ui.list->header()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
+    }
+    ui.list->header()->setStretchLastSection(true);
+
+    int result = dialog.exec();
+    if (result == QDialog::Accepted)
+    {
+        m_selectedSensorIds.clear();
+        for (size_t i = 0; i < sensorCount; i++)
+        {
+            DB::Sensor const& sensor = m_db->getSensor(i);
+            if (model.isSensorChecked(sensor.id))
+            {
+                m_selectedSensorIds.push_back(sensor.id);
+            }
+        }
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
 
 void PlotWidget::createPlotWidgets()
 {
@@ -86,11 +341,21 @@ void PlotWidget::createPlotWidgets()
     //m_chartView->setMaximumHeight(999999);
 }
 
-void PlotWidget::refresh()
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::refresh(DB::Filter const& filter)
 {
+    m_filter = filter;
     foreach (QLegendMarker* marker, m_chart->legend()->markers())
     {
         QObject::disconnect(marker, SIGNAL(clicked()), this, SLOT(handleMarkerClicked()));
+    }
+
+    //save the visibilities
+    std::vector<bool> markersVisible;
+    foreach (QLegendMarker* marker, m_chart->legend()->markers())
+    {
+        markersVisible.push_back(marker->series()->isVisible());
     }
 
     createPlotWidgets();
@@ -103,54 +368,58 @@ void PlotWidget::refresh()
     qreal maxT = std::numeric_limits<qreal>::lowest();
     qreal minH = std::numeric_limits<qreal>::max();
     qreal maxH = std::numeric_limits<qreal>::lowest();
-    for (size_t i = 0; i < m_model->getMeasurementCount(); i++)
+
+    std::vector<DB::Measurement> measurements = m_db->getFilteredMeasurements(m_filter);
+
+    m_ui.resultCount->setText(QString("%1 out of %2 results.").arg(measurements.size()).arg(m_db->getAllMeasurementCount()));
+    m_ui.exportData->setEnabled(!measurements.empty());
+
+    std::sort(measurements.begin(), measurements.end(), [](DB::Measurement const& a, DB::Measurement const& b) { return a.descriptor.timePoint < b.descriptor.timePoint; });
+
+    for (size_t i = 0; i < m_db->getSensorCount(); i++)
     {
-        DB::Measurement const& m = m_model->getMeasurement(i);
+        DB::Sensor const& sensor = m_db->getSensor(i);
+        PlotData& plotData = m_series[sensor.id];
+        plotData.sensor = sensor;
+        plotData.temperatureLpf.setup(1, 1, 0.15);
+        plotData.humidityLpf.setup(1, 1, 0.15);
+    }
+
+    for (DB::Measurement const& m : measurements)
+    {
         int32_t sensorIndex = m_db->findSensorIndexById(m.descriptor.sensorId);
         if (sensorIndex < 0)
         {
             continue;
         }
-        //        if (i & 1)
-        //        {
-        //            continue;
-        //        }
 
         qreal millis = std::chrono::duration_cast<std::chrono::milliseconds>(m.descriptor.timePoint.time_since_epoch()).count();
         time_t tt = DB::Clock::to_time_t(m.descriptor.timePoint);
         minTS = std::min<uint64_t>(minTS, tt);
         maxTS = std::max<uint64_t>(maxTS, tt);
 
-        PlotData* plotData = nullptr;
         auto it = m_series.find(m.descriptor.sensorId);
         if (it == m_series.end())
         {
-            plotData = &m_series[m.descriptor.sensorId];
-            plotData->temperatureLpf.setup(1, 1, 0.15);
-            plotData->humidityLpf.setup(1, 1, 0.15);
+            continue;
         }
-        else
-        {
-            plotData = &it->second;
-        }
-
-        plotData->sensor = m_db->getSensor(sensorIndex);
+        PlotData& plotData = m_series[m.descriptor.sensorId];
 
         qreal value = m.descriptor.temperature;
         if (m_useFiltering)
         {
-            plotData->temperatureLpf.process(value);
+            plotData.temperatureLpf.process(value);
         }
-        plotData->temperaturePoints.append(QPointF(millis, value));
+        plotData.temperaturePoints.append(QPointF(millis, value));
         minT = std::min(minT, value);
         maxT = std::max(maxT, value);
 
         value = m.descriptor.humidity;
         if (m_useFiltering)
         {
-            plotData->humidityLpf.process(value);
+            plotData.humidityLpf.process(value);
         }
-        plotData->humidityPoints.append(QPointF(millis, value));
+        plotData.humidityPoints.append(QPointF(millis, value));
         minH = std::min(minH, value);
         maxH = std::max(maxH, value);
     }
@@ -208,11 +477,17 @@ void PlotWidget::refresh()
         }
     }
 
+    size_t index = 0;
     foreach (QLegendMarker* marker, m_chart->legend()->markers())
     {
         // Disconnect possible existing connection to avoid multiple connections
         QObject::disconnect(marker, SIGNAL(clicked()), this, SLOT(handleMarkerClicked()));
         QObject::connect(marker, SIGNAL(clicked()), this, SLOT(handleMarkerClicked()));
+        if (index < markersVisible.size())
+        {
+            setMarkerVisible(marker, markersVisible[index]);
+        }
+        index++;
     }
 
     QDateTime minDT, maxDT;
@@ -239,6 +514,8 @@ void PlotWidget::refresh()
     m_axisHY->setRange(minH, maxH);
 }
 
+//////////////////////////////////////////////////////////////////////////
+
 void PlotWidget::resizeEvent(QResizeEvent *event)
 {
     for (std::unique_ptr<PlotToolTip>& p: m_tooltips)
@@ -247,6 +524,8 @@ void PlotWidget::resizeEvent(QResizeEvent *event)
     }
     QWidget::resizeEvent(event);
 }
+
+//////////////////////////////////////////////////////////////////////////
 
 void PlotWidget::keepTooltip()
 {
@@ -257,6 +536,8 @@ void PlotWidget::keepTooltip()
         m_tooltip.reset(new PlotToolTip(m_chart));
     }
 }
+
+//////////////////////////////////////////////////////////////////////////
 
 void PlotWidget::tooltip(QLineSeries* series, QPointF point, bool state, DB::Sensor const& sensor, bool temperature)
 {
@@ -297,6 +578,8 @@ void PlotWidget::tooltip(QLineSeries* series, QPointF point, bool state, DB::Sen
     }
 }
 
+//////////////////////////////////////////////////////////////////////////
+
 void PlotWidget::plotContextMenu(QPoint const& position)
 {
     QMenu menu;
@@ -307,7 +590,7 @@ void PlotWidget::plotContextMenu(QPoint const& position)
     connect(action, &QAction::toggled, [this](bool triggered)
     {
         m_useFiltering = triggered;
-        refresh();
+        refresh(m_filter);
     });
 
     action = menu.addAction(QIcon(":/icons/ui/remove.png"), "Remove Bubbles");
@@ -320,17 +603,26 @@ void PlotWidget::plotContextMenu(QPoint const& position)
     menu.exec(mapToGlobal(position));
 }
 
+//////////////////////////////////////////////////////////////////////////
+
 void PlotWidget::handleMarkerClicked()
 {
     QLegendMarker* marker = qobject_cast<QLegendMarker*>(sender());
     Q_ASSERT(marker);
 
+    setMarkerVisible(marker, !marker->series()->isVisible());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::setMarkerVisible(QLegendMarker* marker, bool visible)
+{
     switch (marker->type())
     {
     case QLegendMarker::LegendMarkerTypeXY:
     {
         // Toggle visibility of series
-        marker->series()->setVisible(!marker->series()->isVisible());
+        marker->series()->setVisible(visible);
 
         // Turn legend marker back to visible, since hiding series also hides the marker
         // and we don't want it to happen now.
@@ -373,10 +665,14 @@ void PlotWidget::handleMarkerClicked()
     }
 }
 
+//////////////////////////////////////////////////////////////////////////
+
 QSize PlotWidget::getPlotSize() const
 {
     return m_chartView->size();
 }
+
+//////////////////////////////////////////////////////////////////////////
 
 QPixmap PlotWidget::grabPic(bool showLegend)
 {
@@ -393,3 +689,6 @@ QPixmap PlotWidget::grabPic(bool showLegend)
 
     return pixmap;
 }
+
+//////////////////////////////////////////////////////////////////////////
+

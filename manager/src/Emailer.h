@@ -24,6 +24,8 @@ public:
     void init(DB& db);
     void shutdown();
 
+    void sendReportEmail(DB::Report const& report);
+
 private slots:
     void alarmTriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::MeasurementDescriptor const& md);
     void alarmUntriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::MeasurementDescriptor const& md);
@@ -48,7 +50,6 @@ private:
     void sendAlarmTriggeredEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::MeasurementDescriptor const& md);
     void sendAlarmUntriggeredEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::MeasurementDescriptor const& md);
     void sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor const& sensor, DB::MeasurementDescriptor const& md);
-    void sendReportEmail(DB::Report const& report);
     void sendEmail(Email const& email);
     void emailThreadProc();
     static void sendEmails(std::vector<Email> const& emails);

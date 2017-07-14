@@ -47,10 +47,35 @@
          <property name="bottomMargin">
           <number>2</number>
          </property>
-         <item row="4" column="0">
-          <widget class="QCheckBox" name="useCustomPeriod">
+         <item row="7" column="0" colspan="2">
+          <widget class="QRadioButton" name="summaryData">
            <property name="text">
-            <string>Custom Period</string>
+            <string>Summary Data</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="8" column="0" colspan="2">
+          <widget class="QRadioButton" name="allData">
+           <property name="text">
+            <string>All Data</string>
+           </property>
+          </widget>
+         </item>
+         <item row="11" column="0" colspan="2">
+          <widget class="QLabel" name="label_9">
+           <property name="font">
+            <font>
+             <pointsize>8</pointsize>
+            </font>
+           </property>
+           <property name="text">
+            <string>Sends an email report to this address. The email settings are in the application settings.</string>
+           </property>
+           <property name="wordWrap">
+            <bool>true</bool>
            </property>
           </widget>
          </item>
@@ -67,6 +92,22 @@
             <bool>false</bool>
            </property>
           </widget>
+         </item>
+         <item row="12" column="0">
+          <spacer name="verticalSpacer_3">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeType">
+            <enum>QSizePolicy::Fixed</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>1</width>
+             <height>16</height>
+            </size>
+           </property>
+          </spacer>
          </item>
          <item row="9" column="0">
           <spacer name="verticalSpacer_5">
@@ -100,10 +141,26 @@
            </property>
           </spacer>
          </item>
-         <item row="0" column="1">
-          <widget class="QLineEdit" name="name">
+         <item row="1" column="0" colspan="2">
+          <widget class="QLabel" name="label_7">
+           <property name="font">
+            <font>
+             <pointsize>8</pointsize>
+            </font>
+           </property>
            <property name="text">
-            <string>Report</string>
+            <string>Enter a unique name for this report</string>
+           </property>
+          </widget>
+         </item>
+         <item row="10" column="0">
+          <widget class="QCheckBox" name="sendEmailAction">
+           <property name="text">
+            <string>Send Email To</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/email.png</normaloff>:/icons/ui/email.png</iconset>
            </property>
           </widget>
          </item>
@@ -137,32 +194,12 @@
            </property>
           </widget>
          </item>
-         <item row="10" column="0">
-          <widget class="QCheckBox" name="sendEmailAction">
+         <item row="4" column="0">
+          <widget class="QCheckBox" name="useCustomPeriod">
            <property name="text">
-            <string>Send Email To</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/email.png</normaloff>:/icons/ui/email.png</iconset>
+            <string>Custom Period</string>
            </property>
           </widget>
-         </item>
-         <item row="6" column="0">
-          <spacer name="verticalSpacer_2">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
-           </property>
-           <property name="sizeType">
-            <enum>QSizePolicy::Fixed</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>1</width>
-             <height>16</height>
-            </size>
-           </property>
-          </spacer>
          </item>
          <item row="4" column="1">
           <widget class="QSpinBox" name="customPeriod">
@@ -180,31 +217,10 @@
            </property>
           </widget>
          </item>
-         <item row="12" column="0">
-          <spacer name="verticalSpacer_3">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
-           </property>
-           <property name="sizeType">
-            <enum>QSizePolicy::Fixed</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>1</width>
-             <height>16</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-         <item row="1" column="0" colspan="2">
-          <widget class="QLabel" name="label_7">
-           <property name="font">
-            <font>
-             <pointsize>8</pointsize>
-            </font>
-           </property>
+         <item row="0" column="0">
+          <widget class="QLabel" name="label">
            <property name="text">
-            <string>Enter a unique name for this report</string>
+            <string>Name</string>
            </property>
           </widget>
          </item>
@@ -236,13 +252,6 @@
            </property>
           </spacer>
          </item>
-         <item row="0" column="0">
-          <widget class="QLabel" name="label">
-           <property name="text">
-            <string>Name</string>
-           </property>
-          </widget>
-         </item>
          <item row="10" column="1">
           <widget class="QLineEdit" name="emailRecipient">
            <property name="enabled">
@@ -262,35 +271,33 @@
            </property>
           </widget>
          </item>
-         <item row="7" column="0" colspan="2">
-          <widget class="QRadioButton" name="summaryData">
-           <property name="text">
-            <string>Summary Data</string>
+         <item row="6" column="0">
+          <spacer name="verticalSpacer_2">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
            </property>
-           <property name="checked">
-            <bool>true</bool>
+           <property name="sizeType">
+            <enum>QSizePolicy::Fixed</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>1</width>
+             <height>16</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item row="0" column="1">
+          <widget class="QLineEdit" name="name">
+           <property name="text">
+            <string>Report</string>
            </property>
           </widget>
          </item>
-         <item row="8" column="0" colspan="2">
-          <widget class="QRadioButton" name="allData">
+         <item row="16" column="0">
+          <widget class="QPushButton" name="sendNow">
            <property name="text">
-            <string>All Data</string>
-           </property>
-          </widget>
-         </item>
-         <item row="11" column="0" colspan="2">
-          <widget class="QLabel" name="label_9">
-           <property name="font">
-            <font>
-             <pointsize>8</pointsize>
-            </font>
-           </property>
-           <property name="text">
-            <string>Sends an email report to this address. The email settings are in the application settings.</string>
-           </property>
-           <property name="wordWrap">
-            <bool>true</bool>
+            <string>Send Report Now</string>
            </property>
           </widget>
          </item>

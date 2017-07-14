@@ -17,9 +17,12 @@ public:
     void setReport(DB::Report const& report);
 
 private slots:
+    void sendReportNow();
     void accept() override;
 
 private:
+    bool getDescriptor(DB::ReportDescriptor& descriptor);
+
     Ui::ConfigureReportDialog m_ui;
 
     DB& m_db;

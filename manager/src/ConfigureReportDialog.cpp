@@ -1,4 +1,5 @@
 #include "ConfigureReportDialog.h"
+#include "Emailer.h"
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -26,6 +27,30 @@ ConfigureReportDialog::ConfigureReportDialog(DB& db)
         m_ui.sensorList->header()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
     }
     m_ui.sensorList->header()->setStretchLastSection(true);
+
+    connect(m_ui.sendNow, &QPushButton::released, this, &ConfigureReportDialog::sendReportNow);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void ConfigureReportDialog::sendReportNow()
+{
+    DB::Report report = m_report;
+    if (getDescriptor(report.descriptor))
+    {
+        if (!report.descriptor.sendEmailAction || report.descriptor.emailRecipient.empty())
+        {
+            QMessageBox::critical(this, "Error", "You need to specify an email recipient to send a test email.");
+        }
+        else
+        {
+            Emailer emailer;
+            emailer.init(m_db);
+
+            emailer.sendReportEmail(report);
+            QMessageBox::information(this, "Success", QString("Report sent to %1.").arg(report.descriptor.emailRecipient.c_str()));
+        }
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -88,10 +113,10 @@ void ConfigureReportDialog::setReport(DB::Report const& report)
 
 //////////////////////////////////////////////////////////////////////////
 
-void ConfigureReportDialog::accept()
+bool ConfigureReportDialog::getDescriptor(DB::ReportDescriptor& descriptor)
 {
-    DB::ReportDescriptor descriptor;
     descriptor.name = m_ui.name->text().toUtf8().data();
+    descriptor.data = m_ui.allData->isChecked() ? DB::ReportDescriptor::Data::All : DB::ReportDescriptor::Data::Summary;
 
     descriptor.filterSensors = m_ui.sensorGroup->isChecked();
     descriptor.sensors.clear();
@@ -132,33 +157,46 @@ void ConfigureReportDialog::accept()
     if (descriptor.name.empty())
     {
         QMessageBox::critical(this, "Error", "You need to specify a name for this report.");
-        return;
+        return false;
     }
     if (descriptor.uploadToFtpAction && descriptor.ftpFolder.empty())
     {
         QMessageBox::critical(this, "Error", "You need to specify the ftp folder.");
-        return;
+        return false;
     }
     if (descriptor.sendEmailAction && descriptor.emailRecipient.empty())
     {
         QMessageBox::critical(this, "Error", "You need to specify the email recipient.");
-        return;
+        return false;
     }
 
     int32_t reportIndex = m_db.findReportIndexByName(descriptor.name);
     if (reportIndex >= 0 && m_db.getReport(reportIndex).id != m_report.id)
     {
         QMessageBox::critical(this, "Error", QString("Report '%1' already exists.").arg(descriptor.name.c_str()));
-        return;
+        return false;
     }
     if (descriptor.filterSensors && descriptor.sensors.empty())
     {
         QMessageBox::critical(this, "Error", "You need to specify at least one sensor.");
-        return;
+        return false;
     }
     if (!descriptor.sendEmailAction && !descriptor.uploadToFtpAction)
     {
         QMessageBox::critical(this, "Error", "You need to enable at least one action.");
+        return false;
+    }
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void ConfigureReportDialog::accept()
+{
+    DB::ReportDescriptor descriptor;
+    if (!getDescriptor(descriptor))
+    {
         return;
     }
 

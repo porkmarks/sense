@@ -5,6 +5,30 @@
 
 extern float getBatteryLevel(float vcc);
 
+
+
+static std::string getSensorErrors(uint8_t errors)
+{
+    std::string sensorErrors;
+    if (errors & DB::SensorErrors::Comms)
+    {
+        sensorErrors += "Comms";
+    }
+    if (errors & DB::SensorErrors::Hardware)
+    {
+        if (!sensorErrors.empty())
+        {
+            sensorErrors += ", ";
+        }
+        sensorErrors += "Hardware";
+    }
+    if (sensorErrors.empty())
+    {
+        sensorErrors = "None";
+    }
+    return sensorErrors;
+}
+
 //////////////////////////////////////////////////////////////////////////
 
 Emailer::Emailer()
@@ -16,6 +40,7 @@ Emailer::Emailer()
 
 Emailer::~Emailer()
 {
+    m_threadsExit = true;
     m_emailCV.notify_all();
     if (m_emailThread.joinable())
     {
@@ -138,45 +163,23 @@ void Emailer::sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor co
     QDateTime dt;
     dt.setTime_t(DB::Clock::to_time_t(md.timePoint));
 
-    char buf[128];
-    sprintf(buf, "%.2f", md.temperature);
-    std::string temperature = buf;
-
-    sprintf(buf, "%.2f", md.humidity);
-    std::string humidity = buf;
-
-    sprintf(buf, "%.0f", getBatteryLevel(md.vcc) * 100.f);
-    std::string battery = buf;
-
-    std::string sensorErrors;
-    if (md.sensorErrors & DB::SensorErrors::Comms)
-    {
-        sensorErrors += "Comms";
-    }
-    if (md.sensorErrors & DB::SensorErrors::Hardware)
-    {
-        if (!sensorErrors.empty())
-        {
-            sensorErrors += ", ";
-        }
-        sensorErrors += "Hardware";
-    }
-    if (sensorErrors.empty())
-    {
-        sensorErrors = "None";
-    }
-
-    email.body +=
-    "<p>Measurement:</p>"
-    "<ul>"
-    "<li>Temperature: <strong>" + temperature + " &deg;C</strong></li>"
-    "<li>Humidity: <strong>" + humidity + " %RH</strong></li>"
-    "<li>Sensor Errors: <strong>" + sensorErrors + "</strong></li>"
-    "<li>Battery: <strong>" + battery + " %</strong></li>"
-    "</ul>"
-    "<p>Timestamp: <strong>" + std::string(dt.toString("dd-MM-yyyy HH:mm").toUtf8().data()) + "</strong> <span style=\"font-size: 8pt;\"><em>(dd-mm-yyyy hh:mm)</em></span></p>"
-    "<p>&nbsp;</p>"
-    "<p><span style=\"font-size: 10pt;\"><em>- Sense -</em></span></p>";
+    email.body += QString(R"X(
+                          <p>Measurement:</p>
+                          <ul>
+                          <li>Temperature: <strong>%1 &deg;C</strong></li>
+                          <li>Humidity: <strong>%2 %RH</strong></li>
+                          <li>Sensor Errors: <strong>%3</strong></li>
+                          <li>Battery: <strong>%4 %</strong></li>
+                          </ul>
+                          <p>Timestamp: <strong>%5</strong> <span style="font-size: 8pt;"><em>(dd-mm-yyyy hh:mm)</em></span></p>
+                          <p>&nbsp;</p>
+                          <p><span style="font-size: 10pt;"><em>- Sense -</em></span></p>)X")
+            .arg(md.temperature, 0, 'f', 1)
+            .arg(md.humidity, 0, 'f', 1)
+            .arg(getSensorErrors(md.sensorErrors).c_str())
+            .arg(static_cast<int>(getBatteryLevel(md.vcc)*100.f))
+            .arg(dt.toString("dd-MM-yyyy HH:mm"))
+            .toUtf8().data();
 
     sendEmail(email);
 }
@@ -209,60 +212,6 @@ void Emailer::sendReportEmail(DB::Report const& report)
     startDt.setTime_t(DB::Clock::to_time_t(report.lastTriggeredTimePoint));
     QDateTime endDt = QDateTime::currentDateTime();
 
-    email.body = QString(R"X(
-<html>
-<head>
-<style type="text/css">
-body
-{
-    line-height: 1.6em;
-}
-
-#hor-minimalist-a
-{
-    font-family: "Lucida Sans Unicode", "Lucida Grande", Sans-Serif;
-    font-size: 12px;
-    background: #fff;
-    margin: 45px;
-    width: 480px;
-    border-collapse: collapse;
-    text-align: left;
-}
-#hor-minimalist-a th
-{
-    font-size: 14px;
-    font-weight: normal;
-    color: #039;
-    padding: 10px 8px;
-    border-bottom: 2px solid #6678b1;
-}
-#hor-minimalist-a td
-{
-    color: #669;
-    padding: 9px 8px 0px 8px;
-}
-#hor-minimalist-a tbody tr:hover td
-{
-    color: #009;
-}
-</style>
-</head>
-<body>
-<p>This is an automated daily report of the <strong>%1</strong> base station.</p>
-<p>Measurements between <strong>%2</strong> and&nbsp;<strong>%3</strong></p>
-<table id="hor-minimalist-a">
-<tbody>
-<tr>
-<th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Sensor</strong></th>
-<th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Timestamp</strong></th>
-<th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Temperature</strong></th>
-<th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Humidity</strong></th>
-<th style="width: 81.3333px; text-align: center; white-space: nowrap;"><strong>Alerts</strong></th>
-</tr>)X").arg(m_db->getSensorSettings().descriptor.name.c_str())
-         .arg(startDt.toString("dd-MM-yyyy HH:mm"))
-         .arg(endDt.toString("dd-MM-yyyy HH:mm"))
-         .toUtf8().data();
-
     DB::Filter filter;
     filter.useTimePointFilter = true;
     filter.timePointFilter.min = report.lastTriggeredTimePoint;
@@ -270,38 +219,172 @@ body
     std::vector<DB::Measurement> measurements = m_db->getFilteredMeasurements(filter);
     std::sort(measurements.begin(), measurements.end(), [](DB::Measurement const& a, DB::Measurement const& b) { return a.descriptor.timePoint > b.descriptor.timePoint; });
 
-    for (DB::Measurement const& m: measurements)
+    email.body += QString(R"X(
+                          <html>
+                          <head>
+                          <style type="text/css">
+                          body
+                          {
+                            line-height: 1.6em;
+                          }
+
+                          #hor-minimalist-a
+                          {
+                              font-family: "Lucida Sans Unicode", "Lucida Grande", Sans-Serif;
+                              font-size: 12px;
+                              background: #fff;
+                              margin: 45px;
+                              width: 480px;
+                              border-collapse: collapse;
+                              text-align: left;
+                          }
+                          #hor-minimalist-a th
+                          {
+                              font-size: 14px;
+                              font-weight: normal;
+                              color: #039;
+                              padding: 10px 8px;
+                              border-bottom: 2px solid #6678b1;
+                          }
+                          #hor-minimalist-a td
+                          {
+                              color: #669;
+                              padding: 9px 8px 0px 8px;
+                          }
+                          #hor-minimalist-a tbody tr:hover td
+                          {
+                              color: #009;
+                          }
+                          </style>
+                          </head>
+                          <body>
+                          <p>This is an automated daily report of the <strong>%1</strong> base station.</p>
+                          <p>Measurements between <strong>%2</strong> and&nbsp;<strong>%3</strong></p>)X")
+                            .arg(m_db->getSensorSettings().descriptor.name.c_str())
+                            .arg(startDt.toString("dd-MM-yyyy HH:mm"))
+                            .arg(endDt.toString("dd-MM-yyyy HH:mm"))
+                            .toUtf8().data();
+
+
+    if (report.descriptor.data == DB::ReportDescriptor::Data::Summary ||
+            report.descriptor.data == DB::ReportDescriptor::Data::All)
     {
-        QDateTime dt;
-        dt.setTime_t(DB::Clock::to_time_t(m.descriptor.timePoint));
-        std::string sensorName = "N/A";
-        int32_t sensorIndex = m_db->findSensorIndexById(m.descriptor.sensorId);
-        if (sensorIndex >= 0)
-        {
-            sensorName = m_db->getSensor(sensorIndex).descriptor.name;
-        }
         email.body += QString(R"X(
-<tr>
-<td style="width: 80.6667px;">%1</td>
-<td style="width: 80.6667px; text-align: right; white-space: nowrap;">%2</td>
-<td style="width: 80.6667px; text-align: right; white-space: nowrap;">%3&nbsp;&deg;C</td>
-<td style="width: 80.6667px; text-align: right; white-space: nowrap;">%4 %RH</td>
-<td style="width: 81.3333px; text-align: right; white-space: nowrap;">%5</td>
-</tr>)X").arg(sensorName.c_str())
-         .arg(dt.toString("dd-MM-yyyy HH:mm"))
-         .arg(m.descriptor.temperature, 0, 'f', 1)
-         .arg(m.descriptor.humidity, 0, 'f', 1)
-         .arg(m.triggeredAlarms == 0 ? "no" : "yes")
-         .toUtf8().data();
+                              <table id="hor-minimalist-a">
+                              <tbody>
+                                  <tr>
+                                      <th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Sensor</strong></th>
+                                      <th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Min Temperature</strong></th>
+                                      <th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Max Temperature</strong></th>
+                                      <th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Min Humidity</strong></th>
+                                      <th style="width: 81.3333px; text-align: center; white-space: nowrap;"><strong>Max Humidity</strong></th>
+                                      <th style="width: 81.3333px; text-align: center; white-space: nowrap;"><strong>Alerts</strong></th>
+                                  </tr>)X").toUtf8().data();
+
+                struct SensorData
+        {
+                std::string name;
+                float minTemperature = std::numeric_limits<float>::max();
+                float maxTemperature = std::numeric_limits<float>::lowest();
+                float minHumidity = std::numeric_limits<float>::max();
+                float maxHumidity = std::numeric_limits<float>::lowest();
+                uint8_t sensorErrors = 0;
+    };
+
+        std::vector<SensorData> sensorDatas;
+        for (DB::Measurement const& m: measurements)
+        {
+            QDateTime dt;
+            dt.setTime_t(DB::Clock::to_time_t(m.descriptor.timePoint));
+            std::string sensorName = "N/A";
+            int32_t sensorIndex = m_db->findSensorIndexById(m.descriptor.sensorId);
+            if (sensorIndex < 0)
+            {
+                continue;
+            }
+            if (static_cast<size_t>(sensorIndex) >= sensorDatas.size())
+            {
+                sensorDatas.resize(sensorIndex + 1);
+            }
+            SensorData& sd = sensorDatas[sensorIndex];
+            sd.name = m_db->getSensor(sensorIndex).descriptor.name;
+            sd.maxTemperature = std::max(sd.maxTemperature, m.descriptor.temperature);
+            sd.minTemperature = std::min(sd.minTemperature, m.descriptor.temperature);
+            sd.maxHumidity = std::max(sd.maxHumidity, m.descriptor.humidity);
+            sd.minHumidity = std::min(sd.minHumidity, m.descriptor.humidity);
+            sd.sensorErrors |= m.descriptor.sensorErrors;
+        }
+
+        for (SensorData const& sd: sensorDatas)
+        {
+            email.body += QString(R"X(
+                                  <tr>
+                                      <td style="width: 80.6667px;">%1</td>
+                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%2 &deg;C</td>
+                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%3 &deg;C</td>
+                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%4 %RH</td>
+                                      <td style="width: 81.3333px; text-align: right; white-space: nowrap;">%5 %RH</td>
+                                      <td style="width: 81.3333px; text-align: right; white-space: nowrap;">%6</td>
+                                  </tr>
+                                  )X")
+                    .arg(sd.name.c_str())
+                    .arg(sd.minTemperature, 0, 'f', 1)
+                    .arg(sd.maxTemperature, 0, 'f', 1)
+                    .arg(sd.minHumidity, 0, 'f', 1)
+                    .arg(sd.maxHumidity, 0, 'f', 1)
+                    .arg(getSensorErrors(sd.sensorErrors).c_str())
+                    .toUtf8().data();
+        }
+
+        email.body += "</tbody>"
+                      "</table>";
     }
-    email.body += R"X(
-</tbody>
-</table>
-<p>&nbsp;</p>
-<p>&nbsp;</p>
-<p><em>- Sense -</em></p>
-</body>
-</html>)X";
+
+    if (report.descriptor.data == DB::ReportDescriptor::Data::All)
+    {
+        email.body += QString(R"X(
+                              <table id="hor-minimalist-a">
+                              <tbody>
+                                  <tr>
+                                      <th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Sensor</strong></th>
+                                      <th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Timestamp</strong></th>
+                                      <th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Temperature</strong></th>
+                                      <th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Humidity</strong></th>
+                                      <th style="width: 81.3333px; text-align: center; white-space: nowrap;"><strong>Alerts</strong></th>
+                                  </tr>)X").toUtf8().data();
+
+        for (DB::Measurement const& m: measurements)
+        {
+            QDateTime dt;
+            dt.setTime_t(DB::Clock::to_time_t(m.descriptor.timePoint));
+            std::string sensorName = "N/A";
+            int32_t sensorIndex = m_db->findSensorIndexById(m.descriptor.sensorId);
+            if (sensorIndex >= 0)
+            {
+                sensorName = m_db->getSensor(sensorIndex).descriptor.name;
+            }
+            email.body += QString(R"X(
+                                  <tr>
+                                      <td style="width: 80.6667px;">%1</td>
+                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%2</td>
+                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%3&nbsp;&deg;C</td>
+                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%4 %RH</td>
+                                      <td style="width: 81.3333px; text-align: right; white-space: nowrap;">%5</td>
+                                  </tr>)X").arg(sensorName.c_str())
+                    .arg(dt.toString("dd-MM-yyyy HH:mm"))
+                    .arg(m.descriptor.temperature, 0, 'f', 1)
+                    .arg(m.descriptor.humidity, 0, 'f', 1)
+                    .arg(m.triggeredAlarms == 0 ? "no" : "yes")
+                    .toUtf8().data();
+        }
+        email.body += R"X(
+                      </tbody>
+                      </table>
+                      <p>&nbsp;</p>
+                      <p><em>- Sense -</em></p>
+                      </body>
+                      </html>)X";
+    }
 
     sendEmail(email);
 }
@@ -368,16 +451,16 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
         std::cout.flush();
         smtp.quit();
 
-//        QStringList files;
-//        for (std::string const& f: email.files)
-//        {
-//            files.append(QString::fromUtf8(f.c_str()));
-//        }
-//        smtp.sendHtmlMail(QString::fromUtf8(email.settings.from.c_str()),
-//                          QString::fromUtf8(email.to.c_str()),
-//                          QString::fromUtf8(email.subject.c_str()),
-//                          QString::fromUtf8(email.body.c_str()),
-//                          files);
+        //        QStringList files;
+        //        for (std::string const& f: email.files)
+        //        {
+        //            files.append(QString::fromUtf8(f.c_str()));
+        //        }
+        //        smtp.sendHtmlMail(QString::fromUtf8(email.settings.from.c_str()),
+        //                          QString::fromUtf8(email.to.c_str()),
+        //                          QString::fromUtf8(email.subject.c_str()),
+        //                          QString::fromUtf8(email.body.c_str()),
+        //                          files);
     }
 }
 

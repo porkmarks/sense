@@ -50,6 +50,7 @@ void Manager::activateBaseStation(Comms::BaseStationDescriptor const& bs, DB& db
 {
     m_ui.sensorsWidget->init(db);
     m_ui.measurementsWidget->init(db);
+    m_ui.plotWidget->init(db);
     m_ui.alarmsWidget->init(db);
     m_ui.reportsWidget->init(db);
 
@@ -68,6 +69,7 @@ void Manager::deactivateBaseStation(Comms::BaseStationDescriptor const& bs)
 {
     m_ui.sensorsWidget->shutdown();
     m_ui.measurementsWidget->shutdown();
+    m_ui.plotWidget->shutdown();
     m_ui.alarmsWidget->shutdown();
     m_ui.reportsWidget->shutdown();
 
