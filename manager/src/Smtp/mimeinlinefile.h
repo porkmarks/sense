@@ -23,7 +23,7 @@
 
 #include "smtpexports.h"
 
-class SMTP_EXPORT MimeInlineFile : public MimeFile
+class MimeInlineFile : public MimeFile
 {
 public:
 

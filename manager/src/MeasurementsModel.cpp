@@ -100,7 +100,7 @@ int MeasurementsModel::rowCount(QModelIndex const& index) const
 {
     if (!index.isValid())
     {
-        return m_measurements.size();
+        return static_cast<int>(m_measurements.size());
     }
     else
     {
@@ -112,7 +112,7 @@ int MeasurementsModel::rowCount(QModelIndex const& index) const
 
 int MeasurementsModel::columnCount(QModelIndex const& index) const
 {
-    return s_headerNames.size();
+    return static_cast<int>(s_headerNames.size());
 }
 
 //////////////////////////////////////////////////////////////////////////

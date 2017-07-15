@@ -21,8 +21,8 @@ INCLUDEPATH += ../../src/Smtp
 INCLUDEPATH += ../../../common/src
 INCLUDEPATH += ../../../common/src/rapidjson/include
 
-QMAKE_CXXFLAGS += -Wno-unused-variable -Wno-unused-parameter -B$HOME/dev/bin/gold
-QMAKE_CFLAGS += -Wno-unused-variable -Wno-unused-parameter -B$HOME/dev/bin/gold
+QMAKE_CXXFLAGS += -Wno-unused-variable -Wno-unused-parameter
+QMAKE_CFLAGS += -Wno-unused-variable -Wno-unused-parameter
 
 PRECOMPILED_HEADER = ../../src/stdafx.h
 CONFIG *= precompile_header

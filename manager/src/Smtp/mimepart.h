@@ -24,7 +24,7 @@
 
 #include "smtpexports.h"
 
-class SMTP_EXPORT MimePart : public QObject
+class  MimePart : public QObject
 {
     Q_OBJECT
 public:

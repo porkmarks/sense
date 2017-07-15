@@ -63,7 +63,7 @@ void SensorsModel::sensorAdded(DB::SensorId id)
         return;
     }
 
-    DB::Sensor const& sensor = m_db.getSensor(sensorIndex);
+    //DB::Sensor const& sensor = m_db.getSensor(sensorIndex);
 
     emit beginInsertRows(QModelIndex(), m_sensors.size(), m_sensors.size());
     SensorData sd;
@@ -179,7 +179,7 @@ int SensorsModel::rowCount(QModelIndex const& index) const
 {
     if (!index.isValid())
     {
-        return m_sensors.size();
+        return static_cast<int>(m_sensors.size());
     }
     else
     {
@@ -191,7 +191,7 @@ int SensorsModel::rowCount(QModelIndex const& index) const
 
 int SensorsModel::columnCount(QModelIndex const& index) const
 {
-    return s_headerNames.size();
+    return static_cast<int>(s_headerNames.size());
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -359,7 +359,7 @@ private:
         uint8_t triggeredAlarms;
     };
 
-#pragma pack(push, 0) // exact fit - no padding
+#pragma pack(pop) // exact fit - no padding
 
     typedef std::vector<StoredMeasurement> StoredMeasurements;
 

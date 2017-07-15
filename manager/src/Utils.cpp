@@ -32,7 +32,7 @@ static std::vector<FD> getBackupFiles(std::string const& filename, std::string c
             continue;
         }
 
-        QString tsStr = fn.mid(filename.size() + 1);
+        QString tsStr = fn.mid(static_cast<int>(filename.size()) + 1);
         if (tsStr.isEmpty())
         {
             std::cout << "Skipping unrecognized file '" << fn.toUtf8().data() << "'.\n";
@@ -121,7 +121,7 @@ bool renameFile(std::string const& oldName, std::string const& newName)
 {
 #ifdef _WIN32
     //one on success
-    return MoveFile(_T(oldName.c_str()), _T(newName.c_str())) != 0;
+    return MoveFileA(oldName.c_str(), newName.c_str()) != 0;
 #else
     //zero on success
     return rename(oldName.c_str(), newName.c_str()) == 0;

@@ -23,7 +23,7 @@
 
 #include "smtpexports.h"
 
-class SMTP_EXPORT MimeText : public MimePart
+class  MimeText : public MimePart
 {
 public:
 

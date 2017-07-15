@@ -57,7 +57,7 @@ int ReportsModel::rowCount(QModelIndex const& index) const
 {
     if (!index.isValid())
     {
-        return m_db.getReportCount();
+        return static_cast<int>(m_db.getReportCount());
     }
     else
     {
@@ -69,7 +69,7 @@ int ReportsModel::rowCount(QModelIndex const& index) const
 
 int ReportsModel::columnCount(QModelIndex const& index) const
 {
-    return s_headerNames.size();
+    return static_cast<int>(s_headerNames.size());
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -74,7 +74,7 @@ void BaseStationsWidget::baseStationDisconnected(Comms::BaseStation const& bs)
     }
 
     size_t bsIndex = std::distance(m_baseStations.begin(), it);
-    m_model.removeRow(bsIndex);
+    m_model.removeRow(static_cast<int>(bsIndex));
 
     m_baseStations.erase(it);
 }
@@ -96,7 +96,7 @@ void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor cons
     }
 
     char macStr[128];
-    sprintf(macStr, "%X:%X:%X:%X:%X:%X", bs.mac[0]&0xFF, bs.mac[1]&0xFF, bs.mac[2]&0xFF, bs.mac[3]&0xFF, bs.mac[4]&0xFF, bs.mac[5]&0xFF);
+    sprintf(macStr, "%X_%X_%X_%X_%X_%X", bs.mac[0]&0xFF, bs.mac[1]&0xFF, bs.mac[2]&0xFF, bs.mac[3]&0xFF, bs.mac[4]&0xFF, bs.mac[5]&0xFF);
 
     std::string dbName = macStr;
 

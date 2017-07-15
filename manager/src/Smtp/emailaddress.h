@@ -23,7 +23,7 @@
 
 #include "smtpexports.h"
 
-class SMTP_EXPORT EmailAddress : public QObject
+class EmailAddress : public QObject
 {
     Q_OBJECT
 public:

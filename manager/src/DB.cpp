@@ -6,6 +6,7 @@
 #include <iostream>
 #include <QApplication>
 #include <QDateTime>
+#include <QDir>
 
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
@@ -67,11 +68,13 @@ bool DB::create(std::string const& name)
     m_dataName = "sense-" + name + ".data";
     m_mainData.measurements.clear();
 
-    moveToBackup(s_programFolder + "/" + m_dbName, s_programFolder + "/backups/deleted");
-    moveToBackup(s_programFolder + "/" + m_dataName, s_programFolder + "/backups/deleted");
+    QDir().mkpath((s_programFolder + "/db").c_str());
 
-    remove((s_programFolder + "/" + m_dbName).c_str());
-    remove((s_programFolder + "/" + m_dataName).c_str());
+    moveToBackup(s_programFolder + "/db/" + m_dbName, s_programFolder + "/backups/deleted");
+    moveToBackup(s_programFolder + "/db/" + m_dataName, s_programFolder + "/backups/deleted");
+
+    remove((s_programFolder + "/db/" + m_dbName).c_str());
+    remove((s_programFolder + "/db/" + m_dataName).c_str());
 
     return true;
 }
@@ -85,8 +88,8 @@ bool DB::load(std::string const& name)
     m_dbName = "sense-" + name + ".db";
     m_dataName = "sense-" + name + ".data";
 
-    std::string dataFilename = (s_programFolder + "/" + m_dataName);
-    std::string dbFilename = (s_programFolder + "/" + m_dbName);
+    std::string dataFilename = (s_programFolder + "/db/" + m_dataName);
+    std::string dbFilename = (s_programFolder + "/db/" + m_dbName);
 
     Data data;
 
@@ -631,7 +634,7 @@ bool DB::load(std::string const& name)
 
 
     {
-        std::ifstream file(dbFilename);
+        std::ifstream file(dbFilename, std::ios_base::binary);
         if (!file.is_open())
         {
             std::cerr << "Failed to open " << dbFilename << " file: " << std::strerror(errno) << "\n";
@@ -675,8 +678,9 @@ bool DB::load(std::string const& name)
 
             StoredMeasurements& storedMeasurements = data.measurements[sensorId];
 
+            size_t recordSize = sizeof(StoredMeasurement);
             storedMeasurements.resize(measurementsCount);
-            if (file.read(reinterpret_cast<char*>(storedMeasurements.data()), storedMeasurements.size() * sizeof(StoredMeasurement)).bad())
+            if (file.read(reinterpret_cast<char*>(storedMeasurements.data()), storedMeasurements.size() * recordSize).bad())
             {
                 std::cerr << "Failed to read the DB: " << std::strerror(errno) << "\n";
                 return false;
@@ -689,7 +693,7 @@ bool DB::load(std::string const& name)
                 return false;
             }
 
-            uint32_t computedCrc = crc32(storedMeasurements.data(), storedMeasurements.size() * sizeof(StoredMeasurement));
+            uint32_t computedCrc = crc32(storedMeasurements.data(), storedMeasurements.size() * recordSize);
             if (computedCrc != crc)
             {
                 std::cerr << "DB crc failed\n";
@@ -1767,8 +1771,8 @@ void DB::save(Data const& data) const
         weeklyBackup = true;
     }
 
-    std::string dataFilename = (s_programFolder + "/" + m_dataName);
-    std::string dbFilename = (s_programFolder + "/" + m_dbName);
+    std::string dataFilename = (s_programFolder + "/db/" + m_dataName);
+    std::string dbFilename = (s_programFolder + "/db/" + m_dbName);
 
     Clock::time_point start = now;
 
@@ -1903,7 +1907,7 @@ void DB::save(Data const& data) const
             document.AddMember("reports", reportsj, document.GetAllocator());
         }
 
-        std::string tempFilename = (s_programFolder + "/" + m_dataName + "_temp");
+        std::string tempFilename = (s_programFolder + "/db/" + m_dataName + "_temp");
         std::ofstream file(tempFilename);
         if (!file.is_open())
         {
@@ -1928,7 +1932,7 @@ void DB::save(Data const& data) const
     }
 
     {
-        std::string tempFilename = (s_programFolder + "/" + m_dbName + "_temp");
+        std::string tempFilename = (s_programFolder + "/db/" + m_dbName + "_temp");
         std::ofstream file(tempFilename, std::ios_base::binary);
         if (!file.is_open())
         {

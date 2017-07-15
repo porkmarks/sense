@@ -96,7 +96,7 @@ void ConfigureReportDialog::setReport(DB::Report const& report)
     {
         m_ui.useCustomPeriod->setChecked(true);
         size_t days = std::chrono::duration_cast<std::chrono::hours>(descriptor.customPeriod).count() / 24;
-        m_ui.customPeriod->setValue(days);
+        m_ui.customPeriod->setValue(static_cast<int>(days));
     }
     else
     {
