@@ -74,10 +74,8 @@ void MeasurementsWidget::init(DB& db)
     std::cout.flush();
 
     setDateTimePreset(m_ui.dateTimePreset->currentIndex());
-
     refresh();
 
-    connect(m_ui.apply, &QPushButton::released, this, &MeasurementsWidget::refresh);
     connect(m_ui.dateTimePreset, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &MeasurementsWidget::setDateTimePreset);
     connect(m_ui.selectSensors, &QPushButton::released, this, &MeasurementsWidget::selectSensors);
     connect(m_ui.exportData, &QPushButton::released, this, &MeasurementsWidget::exportData);

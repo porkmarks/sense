@@ -363,29 +363,7 @@
          <property name="bottomMargin">
           <number>2</number>
          </property>
-         <item row="2" column="1">
-          <widget class="QPushButton" name="exportData">
-           <property name="text">
-            <string>Export</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/export.png</normaloff>:/icons/ui/export.png</iconset>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="1">
-          <widget class="QPushButton" name="selectSensors">
-           <property name="text">
-            <string>Select Sensors</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="1">
+         <item row="3" column="1">
           <spacer name="verticalSpacer_2">
            <property name="orientation">
             <enum>Qt::Vertical</enum>
@@ -398,17 +376,25 @@
            </property>
           </spacer>
          </item>
-         <item row="3" column="1">
-          <widget class="QPushButton" name="apply">
+         <item row="0" column="1">
+          <widget class="QPushButton" name="selectSensors">
            <property name="text">
-            <string>Apply</string>
+            <string>Select Sensors</string>
            </property>
            <property name="icon">
             <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/filter.png</normaloff>:/icons/ui/filter.png</iconset>
+             <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
            </property>
-           <property name="shortcut">
-            <string>Return</string>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QPushButton" name="exportData">
+           <property name="text">
+            <string>Export</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/export.png</normaloff>:/icons/ui/export.png</iconset>
            </property>
           </widget>
          </item>

@@ -399,8 +399,8 @@ private:
     std::mutex m_storeMutex;
     Data m_storeData;
 
-    std::string m_dbFilename;
-    std::string m_dataFilename;
+    std::string m_dbName;
+    std::string m_dataName;
 
     mutable Clock::time_point m_lastDailyBackupTP = Clock::time_point(Clock::duration::zero());
     mutable Clock::time_point m_lastWeeklyBackupTP = Clock::time_point(Clock::duration::zero());

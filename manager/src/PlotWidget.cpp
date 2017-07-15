@@ -41,6 +41,7 @@ void PlotWidget::init(DB& db)
     connect(m_ui.minDateTime, &QDateTimeEdit::editingFinished, this, &PlotWidget::refresh);
     connect(m_ui.maxDateTime, &QDateTimeEdit::dateTimeChanged, this, &PlotWidget::refresh);
 
+    setDateTimePreset(m_ui.dateTimePreset->currentIndex());
     refresh();
 }
 

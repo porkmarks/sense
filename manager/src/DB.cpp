@@ -63,15 +63,15 @@ DB::~DB()
 
 bool DB::create(std::string const& name)
 {
-    m_dbFilename = "sense-" + name + ".db";
-    m_dataFilename = "sense-" + name + ".data";
+    m_dbName = "sense-" + name + ".db";
+    m_dataName = "sense-" + name + ".data";
     m_mainData.measurements.clear();
 
-    moveToBackup(m_dbFilename, s_programFolder + "/backups/deleted");
-    moveToBackup(m_dataFilename, s_programFolder + "/backups/deleted");
+    moveToBackup(s_programFolder + "/" + m_dbName, s_programFolder + "/backups/deleted");
+    moveToBackup(s_programFolder + "/" + m_dataName, s_programFolder + "/backups/deleted");
 
-    remove(m_dbFilename.c_str());
-    remove(m_dataFilename.c_str());
+    remove((s_programFolder + "/" + m_dbName).c_str());
+    remove((s_programFolder + "/" + m_dataName).c_str());
 
     return true;
 }
@@ -82,16 +82,19 @@ bool DB::load(std::string const& name)
 {
     Clock::time_point start = Clock::now();
 
-    m_dbFilename = "sense-" + name + ".db";
-    m_dataFilename = "sense-" + name + ".data";
+    m_dbName = "sense-" + name + ".db";
+    m_dataName = "sense-" + name + ".data";
+
+    std::string dataFilename = (s_programFolder + "/" + m_dataName);
+    std::string dbFilename = (s_programFolder + "/" + m_dbName);
 
     Data data;
 
     {
-        std::ifstream file(m_dataFilename);
+        std::ifstream file(dataFilename);
         if (!file.is_open())
         {
-            std::cerr << "Failed to open " << m_dataFilename << " file: " << std::strerror(errno) << "\n";
+            std::cerr << "Failed to open " << dataFilename << " file: " << std::strerror(errno) << "\n";
             return false;
         }
 
@@ -100,7 +103,7 @@ bool DB::load(std::string const& name)
         document.ParseStream(reader);
         if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
         {
-            std::cerr << "Failed to open " << m_dataFilename << " file: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
+            std::cerr << "Failed to open " << dataFilename << " file: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
             return false;
         }
         if (!document.IsObject())
@@ -628,10 +631,10 @@ bool DB::load(std::string const& name)
 
 
     {
-        std::ifstream file(m_dbFilename);
+        std::ifstream file(dbFilename);
         if (!file.is_open())
         {
-            std::cerr << "Failed to open " << m_dbFilename << " file: " << std::strerror(errno) << "\n";
+            std::cerr << "Failed to open " << dbFilename << " file: " << std::strerror(errno) << "\n";
             return false;
         }
 
@@ -726,7 +729,7 @@ bool DB::load(std::string const& name)
         file.close();
     }
 
-    std::pair<std::string, time_t> bkf = getMostRecentBackup(m_dbFilename, s_programFolder + "/backups/daily");
+    std::pair<std::string, time_t> bkf = getMostRecentBackup(dbFilename, s_programFolder + "/backups/daily");
     if (bkf.first.empty())
     {
         m_lastDailyBackupTP = DB::Clock::now();
@@ -735,7 +738,7 @@ bool DB::load(std::string const& name)
     {
         m_lastDailyBackupTP = DB::Clock::from_time_t(bkf.second);
     }
-    bkf = getMostRecentBackup(m_dbFilename, s_programFolder + "/backups/weekly");
+    bkf = getMostRecentBackup(dbFilename, s_programFolder + "/backups/weekly");
     if (bkf.first.empty())
     {
         m_lastWeeklyBackupTP = DB::Clock::now();
@@ -1764,6 +1767,9 @@ void DB::save(Data const& data) const
         weeklyBackup = true;
     }
 
+    std::string dataFilename = (s_programFolder + "/" + m_dataName);
+    std::string dbFilename = (s_programFolder + "/" + m_dbName);
+
     Clock::time_point start = now;
 
     {
@@ -1897,11 +1903,11 @@ void DB::save(Data const& data) const
             document.AddMember("reports", reportsj, document.GetAllocator());
         }
 
-        std::string tempFileName = m_dataFilename + "_temp";
-        std::ofstream file(tempFileName);
+        std::string tempFilename = (s_programFolder + "/" + m_dataName + "_temp");
+        std::ofstream file(tempFilename);
         if (!file.is_open())
         {
-            std::cerr << "Failed to open " << tempFileName << " file: " << std::strerror(errno) << "\n";
+            std::cerr << "Failed to open " << tempFilename << " file: " << std::strerror(errno) << "\n";
         }
         else
         {
@@ -1913,20 +1919,20 @@ void DB::save(Data const& data) const
         file.flush();
         file.close();
 
-        copyToBackup(m_dataFilename, s_programFolder + "/backups/incremental");
+        copyToBackup(dataFilename, s_programFolder + "/backups/incremental");
 
-        if (!renameFile(tempFileName.c_str(), m_dataFilename.c_str()))
+        if (!renameFile(tempFilename.c_str(), dataFilename.c_str()))
         {
             std::perror("Error renaming");
         }
     }
 
     {
-        std::string tempFileName = m_dbFilename + "_temp";
-        std::ofstream file(tempFileName, std::ios_base::binary);
+        std::string tempFilename = (s_programFolder + "/" + m_dbName + "_temp");
+        std::ofstream file(tempFilename, std::ios_base::binary);
         if (!file.is_open())
         {
-            std::cerr << "Failed to open " << tempFileName << " file: " << std::strerror(errno) << "\n";
+            std::cerr << "Failed to open " << tempFilename << " file: " << std::strerror(errno) << "\n";
         }
         else
         {
@@ -1942,9 +1948,9 @@ void DB::save(Data const& data) const
             file.flush();
             file.close();
 
-            copyToBackup(m_dbFilename, s_programFolder + "/backups/incremental");
+            copyToBackup(dbFilename, s_programFolder + "/backups/incremental");
 
-            if (!renameFile(tempFileName.c_str(), m_dbFilename.c_str()))
+            if (!renameFile(tempFilename.c_str(), dbFilename.c_str()))
             {
                 std::perror("Error renaming");
             }
@@ -1956,13 +1962,13 @@ void DB::save(Data const& data) const
 
     if (dailyBackup)
     {
-        copyToBackup(m_dataFilename, s_programFolder + "/backups/daily");
-        copyToBackup(m_dbFilename, s_programFolder + "/backups/daily");
+        copyToBackup(dataFilename, s_programFolder + "/backups/daily");
+        copyToBackup(dbFilename, s_programFolder + "/backups/daily");
     }
     if (weeklyBackup)
     {
-        copyToBackup(m_dataFilename, s_programFolder + "/backups/weekly");
-        copyToBackup(m_dbFilename, s_programFolder + "/backups/weekly");
+        copyToBackup(dataFilename, s_programFolder + "/backups/weekly");
+        copyToBackup(dbFilename, s_programFolder + "/backups/weekly");
     }
 }
 
