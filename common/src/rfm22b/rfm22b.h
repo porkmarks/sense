@@ -100,6 +100,7 @@ public:
     2E - SLICER_PEAK_HOLD
 
     30 - DATA_ACCESS_CONTROL
+    32 - HEADER_CONTROL_1
     33 - HEADER_CONTROL_2
     34 - PREAMBLE_LENGTH
     35 - PREAMBLE_DETECTION_CONTROL
@@ -107,6 +108,20 @@ public:
     37 - SYNC_WORD_2
     38 - SYNC_WORD_1
     39 - SYNC_WORD_0
+
+    3A - TRANSMIT_HEADER_3_3A
+    3B - TRANSMIT_HEADER_2_3B
+    3C - TRANSMIT_HEADER_1_3C
+    3D - TRANSMIT_HEADER_0_3D
+    3E - TRANSMIT_PACKET_LENGTH_3E
+    3F - CHECK_HEADER_3_3F
+    40 - CHECK_HEADER_2_40
+    41 - CHECK_HEADER_1_41
+    42 - CHECK_HEADER_0_42
+    42 - HEADER_ENABLE_3_43
+    44 - HEADER_ENABLE_2_44
+    45 - HEADER_ENABLE_1_45
+    46 - HEADER_ENABLE_0_46
 
     6E - TX_DATA_RATE_1
     6F - TX_DATA_RATE_0
@@ -119,7 +134,7 @@ public:
     76 - NOMINAL_CARRIER_FREQUENCY_1
     77 - NOMINAL_CARRIER_FREQUENCY_0
 */
-    void set_modem_configuration(uint8_t data[28]);
+    void set_modem_configuration(uint8_t data[42]);
 
     // Set or get the transmission power
     void set_transmission_power(uint8_t power);

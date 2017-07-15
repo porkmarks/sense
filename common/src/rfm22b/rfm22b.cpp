@@ -63,7 +63,7 @@ bool RFM22B::init()
     return true;
 }
 
-void RFM22B::set_modem_configuration(uint8_t data[28])
+void RFM22B::set_modem_configuration(uint8_t data[42])
 {
     uint8_t const* ptr = data;
     set_register(Register::IF_FILTER_BANDWIDTH_1C, *ptr++);
@@ -83,6 +83,7 @@ void RFM22B::set_modem_configuration(uint8_t data[28])
     set_register(Register::SLICER_PEAK_HOLD_2E, *ptr++);
 
     set_register(Register::DATA_ACCESS_CONTROL_30, *ptr++);
+    set_register(Register::HEADER_CONTROL_1_32, *ptr++);
     set_register(Register::HEADER_CONTROL_2_33, *ptr++);
     set_register(Register::PREAMBLE_LENGTH_34, *ptr++);
     set_register(Register::PREAMBLE_DETECTION_CONTROL_35, *ptr++);
@@ -90,6 +91,20 @@ void RFM22B::set_modem_configuration(uint8_t data[28])
     set_register(Register::SYNC_WORD_2_37, *ptr++);
     set_register(Register::SYNC_WORD_1_38, *ptr++);
     set_register(Register::SYNC_WORD_0_39, *ptr++);
+
+    set_register(Register::TRANSMIT_HEADER_3_3A, *ptr++);
+    set_register(Register::TRANSMIT_HEADER_2_3B, *ptr++);
+    set_register(Register::TRANSMIT_HEADER_1_3C, *ptr++);
+    set_register(Register::TRANSMIT_HEADER_0_3D, *ptr++);
+    set_register(Register::TRANSMIT_PACKET_LENGTH_3E, *ptr++);
+    set_register(Register::CHECK_HEADER_3_3F, *ptr++);
+    set_register(Register::CHECK_HEADER_2_40, *ptr++);
+    set_register(Register::CHECK_HEADER_1_41, *ptr++);
+    set_register(Register::CHECK_HEADER_0_42, *ptr++);
+    set_register(Register::HEADER_ENABLE_3_43, *ptr++);
+    set_register(Register::HEADER_ENABLE_2_44, *ptr++);
+    set_register(Register::HEADER_ENABLE_1_45, *ptr++);
+    set_register(Register::HEADER_ENABLE_0_46, *ptr++);
 
     set_register(Register::TX_DATA_RATE_1_6E, *ptr++);
     set_register(Register::TX_DATA_RATE_0_6F, *ptr++);

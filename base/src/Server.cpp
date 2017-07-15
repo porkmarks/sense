@@ -394,7 +394,14 @@ void Server::process_set_sensors_req()
             }
             Sensors::Sensor_Address address = it->value.GetUint();
 
-            if (!m_sensors.add_sensor(id, name, address))
+            if (address == 0)
+            {
+                Sensors::Unbound_Sensor_Data data;
+                data.name = name;
+                data.id = id;
+                m_sensors.set_unbound_sensor_data(data);
+            }
+            else if (!m_sensors.add_sensor(id, name, address))
             {
                 std::cerr << "Cannot add sensor\n";
                 goto end;

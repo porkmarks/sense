@@ -34,7 +34,7 @@ public:
     static constexpr uint32_t SLAVE_ADDRESS_BEGIN = PAIR_ADDRESS_END + 1;
     static constexpr uint32_t SLAVE_ADDRESS_END = BASE_ADDRESS - 1;
 
-    bool init(uint8_t retries);
+    bool init(uint8_t retries, uint8_t power);
 
     void set_address(uint32_t address);
     void set_destination_address(uint32_t address);

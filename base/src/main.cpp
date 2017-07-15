@@ -240,7 +240,7 @@ int main(int, const char**)
     }
 
     size_t tries = 0;
-    while (!s_sensor_comms.init(1))
+    while (!s_sensor_comms.init(1, 20))
     {
         tries++;
         std::cerr << "comms init failed. Trying again: " << tries << "\n";

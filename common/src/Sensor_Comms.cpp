@@ -20,7 +20,7 @@ Sensor_Comms::Sensor_Comms()
 
 }
 
-bool Sensor_Comms::init(uint8_t retries)
+bool Sensor_Comms::init(uint8_t retries, uint8_t power)
 {
     if (retries == 0)
     {
@@ -44,51 +44,64 @@ bool Sensor_Comms::init(uint8_t retries)
     m_rf22.set_gpio_function(RFM22B::GPIO::GPIO0, RFM22B::GPIO_Function::TX_STATE);
     m_rf22.set_gpio_function(RFM22B::GPIO::GPIO1, RFM22B::GPIO_Function::RX_STATE);
 
-//    uint8_t modem_config[28] =
-//    {
-//        0x0B,
-//        0x40,
-//        0x64,
-//        0x01,
-//        0x47,
-//        0x9F,
-//        0x02,
-//        0x0E,
-//        0x2C,
-//        0x28,
-//        0x1F,
-//        0x29,
-//        0x61,
-//        0x0A,
-//        0x04,
-//        0x22,
-//        0x2D,
-//        0xD4,
-//        0x00,
-//        0x00,
-//        0x0A,
-//        0x3D,
-//        0x04,
-//        0x22,
-//        0x50,
-//        0x53,
-//        0x64,
-//        0x00,
-//    };
+    uint8_t modem_config[42] =
+    {
+        0x15,
+        0x40,
+        0xC8,
+        0x00,
+        0xA3,
+        0xD7,
+        0x02,
+        0x91,
+        0x2B,
+        0x28,
+        0x7D,
+        0x29,
+        0xCD,
+        0x00,
+        0x02,
+        0x08,
+        0x22,
+        0x2D,
+        0xD4,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x01,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,
+        0x51,
+        0xEC,
+        0x2C,
+        0x23,
+        0x08,
+        0x53,
+        0x75,
+        0x80,
+    };
 
-//    m_rf22.set_modem_configuration(modem_config);
+    m_rf22.set_modem_configuration(modem_config);
 
-    m_rf22.set_carrier_frequency(433.f);
-    m_rf22.set_frequency_deviation(20000);
-    m_rf22.set_modulation_type(RFM22B::Modulation_Type::FSK);
-    m_rf22.set_modulation_data_source(RFM22B::Modulation_Data_Source::FIFO);
-    m_rf22.set_data_clock_configuration(RFM22B::Data_Clock_Configuration::NONE);
-    m_rf22.set_transmission_power(1);
-    m_rf22.set_preamble_length(8);
-    //m_rf22.set_data_rate(39993);
+//    m_rf22.set_carrier_frequency(434.7f);
+//    m_rf22.set_frequency_deviation(5000);
+//    m_rf22.set_data_rate(2400);
+//    m_rf22.set_modulation_type(RFM22B::Modulation_Type::FSK);
+//    m_rf22.set_modulation_data_source(RFM22B::Modulation_Data_Source::FIFO);
+//    m_rf22.set_data_clock_configuration(RFM22B::Data_Clock_Configuration::NONE);
+//    m_rf22.set_preamble_length(8);
+//    m_rf22.set_sync_words({ 0x2d, 0xd4 }, 2);
 
-    uint8_t syncwords[] = { 0x2d, 0xd4 };
-    m_rf22.set_sync_words(syncwords, sizeof(syncwords));
+    m_rf22.set_transmission_power(power);
 
     printf_P(PSTR("Frequency is %f\n"), m_rf22.get_carrier_frequency());
     printf_P(PSTR("FH Step is %lu\n"), m_rf22.get_frequency_hopping_step_size());
@@ -99,6 +112,16 @@ bool Sensor_Comms::init(uint8_t retries)
     printf_P(PSTR("Modulation Data Source %d\n"), (int)m_rf22.get_modulation_data_source());
     printf_P(PSTR("Data Clock Configuration %d\n"), (int)m_rf22.get_data_clock_configuration());
     printf_P(PSTR("Transmission Power is %d\n"), (int)m_rf22.get_transmission_power());
+
+//    Starting rfm22b setup...Frequency is 432.999850
+//    FH Step is 0
+//    Channel is 0
+//    Frequency deviation is 20000
+//    Data rate is 39993
+//    Modulation Type 2
+//    Modulation Data Source 2
+//    Data Clock Configuration 0
+//    Transmission Power is 1
 
     m_rf22.stand_by_mode();
 
