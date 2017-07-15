@@ -20,18 +20,18 @@ public:
 
     void init(DB& db);
     void shutdown();
-    void refresh(DB::Filter const& filter);
+    void applyFilter(DB::Filter const& filter);
 
     QSize getPlotSize() const;
     QPixmap grabPic(bool showLegend);
 
 private slots:
     void resizeEvent(QResizeEvent* event);
-    void keepTooltip();
-    void tooltip(QLineSeries* series, QPointF point, bool state, DB::Sensor const& sensor, bool temeprature);
+    void keepAnnotation();
+    void createAnnotation(QLineSeries* series, QPointF point, bool state, DB::Sensor const& sensor, bool temeprature);
     void plotContextMenu(QPoint const& position);
     void handleMarkerClicked();
-    void refreshFromDB();
+    void refresh();
     void selectSensors();
     void exportData();
 
@@ -48,6 +48,7 @@ private slots:
 
 private:
     DB::Filter createFilter() const;
+    void clearAnnotations();
     void setMarkerVisible(QLegendMarker* marker, bool visible);
 
     DB* m_db = nullptr;
@@ -66,8 +67,8 @@ private:
 
     void createPlotWidgets();
 
-    std::unique_ptr<PlotToolTip> m_tooltip;
-    std::vector<std::unique_ptr<PlotToolTip>> m_tooltips;
+    std::unique_ptr<PlotToolTip> m_annotation;
+    std::vector<std::unique_ptr<PlotToolTip>> m_annotations;
 
     QChart* m_chart = nullptr;
     QDateTimeAxis* m_axisX = nullptr;
@@ -76,7 +77,8 @@ private:
     std::map<DB::SensorId, PlotData> m_series;
     QChartView* m_chartView = nullptr;
 
-    bool m_useFiltering = true;
+    bool m_useSmoothing = true;
+    bool m_fitMeasurements = true;
     std::vector<DB::SensorId> m_selectedSensorIds;
 
     Ui::PlotWidget m_ui;

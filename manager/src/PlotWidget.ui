@@ -243,41 +243,14 @@
          <property name="bottomMargin">
           <number>2</number>
          </property>
-         <item row="5" column="1">
-          <spacer name="verticalSpacer_2">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>0</width>
-             <height>0</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-         <item row="0" column="1">
-          <widget class="QPushButton" name="selectSensors">
-           <property name="text">
-            <string>Select Sensors</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
-           </property>
-          </widget>
-         </item>
          <item row="3" column="1">
-          <widget class="QPushButton" name="apply">
+          <widget class="QPushButton" name="clearAnnotations">
            <property name="text">
-            <string>Apply</string>
+            <string>Clear Annotations</string>
            </property>
            <property name="icon">
             <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/filter.png</normaloff>:/icons/ui/filter.png</iconset>
-           </property>
-           <property name="shortcut">
-            <string>Return</string>
+             <normaloff>:/icons/ui/remove.png</normaloff>:/icons/ui/remove.png</iconset>
            </property>
           </widget>
          </item>
@@ -292,31 +265,94 @@
            </property>
           </widget>
          </item>
+         <item row="2" column="2">
+          <widget class="QCheckBox" name="fitMeasurements">
+           <property name="text">
+            <string>Fit Measurements</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="2">
+          <widget class="QCheckBox" name="useSmoothing">
+           <property name="text">
+            <string>Smooth Results</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QPushButton" name="selectSensors">
+           <property name="text">
+            <string>Select Sensors</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="1">
+          <spacer name="verticalSpacer_2">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>0</width>
+             <height>0</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item row="2" column="3">
+          <spacer name="horizontalSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
         </layout>
        </widget>
       </item>
       <item>
-       <widget class="QLabel" name="resultCount">
-        <property name="text">
-         <string>0 results</string>
-        </property>
-        <property name="alignment">
-         <set>Qt::AlignCenter</set>
-        </property>
+       <widget class="QWidget" name="widget" native="true">
+        <layout class="QVBoxLayout" name="verticalLayout_3">
+         <item>
+          <spacer name="verticalSpacer">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>40</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QLabel" name="resultCount">
+           <property name="text">
+            <string>0 results</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </widget>
-      </item>
-      <item>
-       <spacer name="horizontalSpacer">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
       </item>
      </layout>
     </widget>
@@ -353,5 +389,86 @@
  <resources>
   <include location="../res/res.qrc"/>
  </resources>
- <connections/>
+ <connections>
+  <connection>
+   <sender>useDateTimePreset</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>dateTimePreset</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>50</x>
+     <y>18</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>114</x>
+     <y>10</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>useDateTimePreset</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>label_2</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>44</x>
+     <y>23</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>47</x>
+     <y>50</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>useDateTimePreset</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>label</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>27</x>
+     <y>21</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>21</x>
+     <y>92</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>useDateTimePreset</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>minDateTime</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>44</x>
+     <y>29</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>101</x>
+     <y>56</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>useDateTimePreset</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>maxDateTime</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>67</x>
+     <y>21</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>90</x>
+     <y>88</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>

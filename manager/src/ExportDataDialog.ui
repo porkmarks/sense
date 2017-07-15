@@ -52,20 +52,6 @@
            <layout class="QHBoxLayout" name="horizontalLayout">
             <item>
              <layout class="QGridLayout" name="gridLayout">
-              <item row="5" column="0" colspan="2">
-               <widget class="QCheckBox" name="exportTemperature">
-                <property name="text">
-                 <string>Temperature</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/temperature.png</normaloff>:/icons/ui/temperature.png</iconset>
-                </property>
-                <property name="checked">
-                 <bool>true</bool>
-                </property>
-               </widget>
-              </item>
               <item row="3" column="0" colspan="2">
                <widget class="QCheckBox" name="exportTimePoint">
                 <property name="text">
@@ -74,6 +60,20 @@
                 <property name="icon">
                  <iconset resource="../res/res.qrc">
                   <normaloff>:/icons/ui/today.png</normaloff>:/icons/ui/today.png</iconset>
+                </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="0" colspan="2">
+               <widget class="QCheckBox" name="exportTemperature">
+                <property name="text">
+                 <string>Temperature</string>
+                </property>
+                <property name="icon">
+                 <iconset resource="../res/res.qrc">
+                  <normaloff>:/icons/ui/temperature.png</normaloff>:/icons/ui/temperature.png</iconset>
                 </property>
                 <property name="checked">
                  <bool>true</bool>
@@ -130,6 +130,20 @@
                 <property name="icon">
                  <iconset resource="../res/res.qrc">
                   <normaloff>:/icons/ui/arrow-right.png</normaloff>:/icons/ui/arrow-right.png</iconset>
+                </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="7" column="0">
+               <widget class="QCheckBox" name="exportBattery">
+                <property name="text">
+                 <string>Battery</string>
+                </property>
+                <property name="icon">
+                 <iconset resource="../res/res.qrc">
+                  <normaloff>:/icons/ui/battery-75.png</normaloff>:/icons/ui/battery-75.png</iconset>
                 </property>
                 <property name="checked">
                  <bool>true</bool>
@@ -304,18 +318,6 @@
          <property name="bottomMargin">
           <number>0</number>
          </property>
-         <item>
-          <widget class="QPushButton" name="preview">
-           <property name="font">
-            <font>
-             <family>Cantarell</family>
-            </font>
-           </property>
-           <property name="text">
-            <string>Preview</string>
-           </property>
-          </widget>
-         </item>
          <item>
           <widget class="QTextEdit" name="previewText">
            <property name="font">

@@ -6,18 +6,35 @@
 #include <iomanip>
 #include <cstring>
 
+extern float getBatteryLevel(float vcc);
+
+
 ExportDataDialog::ExportDataDialog(DB& db, MeasurementsModel& model)
     : m_db(db)
     , m_model(model)
 {
     m_ui.setupUi(this);
 
-    connect(m_ui.preview, &QPushButton::released, this, &ExportDataDialog::showPreview);
+    connect(m_ui.dateFormat, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &ExportDataDialog::refreshPreview);
+    connect(m_ui.exportId, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
+    connect(m_ui.exportIndex, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
+    connect(m_ui.exportSensorName, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
+    connect(m_ui.exportTimePoint, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
+    connect(m_ui.exportTemperature, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
+    connect(m_ui.exportHumidity, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
+    connect(m_ui.exportBattery, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
+    connect(m_ui.units, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &ExportDataDialog::refreshPreview);
+    connect(m_ui.exportBattery, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
+    connect(m_ui.decimalPlaces, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, &ExportDataDialog::refreshPreview);
+    connect(m_ui.separator, &QLineEdit::textChanged, this, &ExportDataDialog::refreshPreview);
+    connect(m_ui.tabSeparator, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
+
+    refreshPreview();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void ExportDataDialog::showPreview()
+void ExportDataDialog::refreshPreview()
 {
     std::stringstream stream;
     exportTo(stream, 100);
@@ -85,6 +102,7 @@ void ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount)
     bool exportTimePoint = m_ui.exportTimePoint->isChecked();
     bool exportTemperature = m_ui.exportTemperature->isChecked();
     bool exportHumidity = m_ui.exportHumidity->isChecked();
+    bool exportBattery = m_ui.exportBattery->isChecked();
     UnitsFormat unitsFormat = static_cast<UnitsFormat>(m_ui.units->currentIndex());
     int decimalPlaces = m_ui.decimalPlaces->value();
 
@@ -113,21 +131,31 @@ void ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount)
     {
         stream << "Temperature";
         stream << separator;
-    }
-    if (unitsFormat == UnitsFormat::SeparateColumn)
-    {
-        stream << "Temperature Unit";
-        stream << separator;
+        if (unitsFormat == UnitsFormat::SeparateColumn)
+        {
+            stream << "Temperature Unit";
+            stream << separator;
+        }
     }
     if (exportHumidity)
     {
         stream << "Humidity";
         stream << separator;
+        if (unitsFormat == UnitsFormat::SeparateColumn)
+        {
+            stream << "Humidity Unit";
+            stream << separator;
+        }
     }
-    if (unitsFormat == UnitsFormat::SeparateColumn)
+    if (exportBattery)
     {
-        stream << "Humidity Unit";
+        stream << "Battery";
         stream << separator;
+        if (unitsFormat == UnitsFormat::SeparateColumn)
+        {
+            stream << "Battery Unit";
+            stream << separator;
+        }
     }
     stream << std::endl;
 
@@ -191,11 +219,11 @@ void ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount)
                 stream << u8" °C";
             }
             stream << separator;
-        }
-        if (unitsFormat == UnitsFormat::SeparateColumn)
-        {
-            stream << u8"°C";
-            stream << separator;
+            if (unitsFormat == UnitsFormat::SeparateColumn)
+            {
+                stream << u8"°C";
+                stream << separator;
+            }
         }
         if (exportHumidity)
         {
@@ -205,11 +233,25 @@ void ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount)
                 stream << " %RH";
             }
             stream << separator;
+            if (unitsFormat == UnitsFormat::SeparateColumn)
+            {
+                stream << "%RH";
+                stream << separator;
+            }
         }
-        if (unitsFormat == UnitsFormat::SeparateColumn)
+        if (exportBattery)
         {
-            stream << "%RH";
+            stream << std::fixed << std::setprecision(decimalPlaces) << getBatteryLevel(m.descriptor.vcc) * 100.f;
+            if (unitsFormat == UnitsFormat::Embedded)
+            {
+                stream << " %";
+            }
             stream << separator;
+            if (unitsFormat == UnitsFormat::SeparateColumn)
+            {
+                stream << "%";
+                stream << separator;
+            }
         }
         stream << std::endl;
     }

@@ -75,9 +75,9 @@ void MeasurementsWidget::init(DB& db)
 
     setDateTimePreset(m_ui.dateTimePreset->currentIndex());
 
-    refreshFromDB();
+    refresh();
 
-    connect(m_ui.apply, &QPushButton::released, this, &MeasurementsWidget::refreshFromDB);
+    connect(m_ui.apply, &QPushButton::released, this, &MeasurementsWidget::refresh);
     connect(m_ui.dateTimePreset, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &MeasurementsWidget::setDateTimePreset);
     connect(m_ui.selectSensors, &QPushButton::released, this, &MeasurementsWidget::selectSensors);
     connect(m_ui.exportData, &QPushButton::released, this, &MeasurementsWidget::exportData);
@@ -90,11 +90,17 @@ void MeasurementsWidget::init(DB& db)
 
     connect(m_ui.minHumidity, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::minHumidityChanged);
     connect(m_ui.maxHumidity, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::maxHumidityChanged);
-//    connect(m_ui.minTemperature, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &MeasurementsWidget::minTemperatureChanged);
-//    connect(m_ui.maxTemperature, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &MeasurementsWidget::maxTemperatureChanged);
 
-//    connect(m_ui.minHumidity, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &MeasurementsWidget::minHumidityChanged);
-//    connect(m_ui.maxHumidity, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &MeasurementsWidget::maxHumidityChanged);
+
+    connect(m_ui.dateTimePreset, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &MeasurementsWidget::refresh);
+    connect(m_ui.minDateTime, &QDateTimeEdit::editingFinished, this, &MeasurementsWidget::refresh);
+    connect(m_ui.maxDateTime, &QDateTimeEdit::dateTimeChanged, this, &MeasurementsWidget::refresh);
+    connect(m_ui.useTemperature, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh);
+    connect(m_ui.minTemperature, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh);
+    connect(m_ui.maxTemperature, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh);
+    connect(m_ui.useHumidity, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh);
+    connect(m_ui.minHumidity, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh);
+    connect(m_ui.maxHumidity, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -140,10 +146,10 @@ DB::Filter MeasurementsWidget::createFilter() const
 
 //////////////////////////////////////////////////////////////////////////
 
-void MeasurementsWidget::refreshFromDB()
+void MeasurementsWidget::refresh()
 {
     //in case the date changed, reapply it
-    if (m_ui.useDateTimePreset)
+    if (m_ui.useDateTimePreset->isChecked())
     {
         setDateTimePreset(m_ui.dateTimePreset->currentIndex());
     }
@@ -416,6 +422,8 @@ void MeasurementsWidget::selectSensors()
             }
         }
     }
+
+    refresh();
 }
 
 //////////////////////////////////////////////////////////////////////////

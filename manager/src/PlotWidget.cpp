@@ -12,9 +12,10 @@ PlotWidget::PlotWidget(QWidget* parent)
     : QWidget(parent)
 {
     m_ui.setupUi(this);
+    setEnabled(false);
 
-    setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(this, &QChartView::customContextMenuRequested, this, &PlotWidget::plotContextMenu);
+//    setContextMenuPolicy(Qt::CustomContextMenu);
+//    connect(this, &QChartView::customContextMenuRequested, this, &PlotWidget::plotContextMenu);
 
     createPlotWidgets();
 }
@@ -26,13 +27,21 @@ void PlotWidget::init(DB& db)
     setEnabled(true);
     m_db = &db;
 
-    connect(m_ui.apply, &QPushButton::released, this, &PlotWidget::refreshFromDB);
+    connect(m_ui.clearAnnotations, &QPushButton::released, this, &PlotWidget::clearAnnotations);
     connect(m_ui.dateTimePreset, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &PlotWidget::setDateTimePreset);
     connect(m_ui.selectSensors, &QPushButton::released, this, &PlotWidget::selectSensors);
     connect(m_ui.exportData, &QPushButton::released, this, &PlotWidget::exportData);
 
     connect(m_ui.minDateTime, &QDateTimeEdit::dateTimeChanged, this, &PlotWidget::minDateTimeChanged);
     connect(m_ui.maxDateTime, &QDateTimeEdit::dateTimeChanged, this, &PlotWidget::maxDateTimeChanged);
+
+    connect(m_ui.fitMeasurements, &QCheckBox::stateChanged, this, &PlotWidget::refresh);
+    connect(m_ui.useSmoothing, &QCheckBox::stateChanged, this, &PlotWidget::refresh);
+    connect(m_ui.dateTimePreset, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &PlotWidget::refresh);
+    connect(m_ui.minDateTime, &QDateTimeEdit::editingFinished, this, &PlotWidget::refresh);
+    connect(m_ui.maxDateTime, &QDateTimeEdit::dateTimeChanged, this, &PlotWidget::refresh);
+
+    refresh();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -66,16 +75,19 @@ DB::Filter PlotWidget::createFilter() const
 
 //////////////////////////////////////////////////////////////////////////
 
-void PlotWidget::refreshFromDB()
+void PlotWidget::refresh()
 {
     //in case the date changed, reapply it
-    if (m_ui.useDateTimePreset)
+    if (m_ui.useDateTimePreset->isChecked())
     {
         setDateTimePreset(m_ui.dateTimePreset->currentIndex());
     }
 
+    m_useSmoothing = m_ui.useSmoothing->isChecked();
+    m_fitMeasurements = m_ui.fitMeasurements->isChecked();
+
     DB::Filter filter = createFilter();
-    refresh(filter);
+    applyFilter(filter);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -269,14 +281,24 @@ void PlotWidget::selectSensors()
             }
         }
     }
+
+    refresh();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::clearAnnotations()
+{
+    m_annotations.clear();
+    m_ui.clearAnnotations->setEnabled(false);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void PlotWidget::createPlotWidgets()
 {
-    m_tooltip.reset();
-    m_tooltips.clear();
+    m_annotation.reset();
+    clearAnnotations();
 
     delete m_chart;
     delete m_chartView;
@@ -343,7 +365,7 @@ void PlotWidget::createPlotWidgets()
 
 //////////////////////////////////////////////////////////////////////////
 
-void PlotWidget::refresh(DB::Filter const& filter)
+void PlotWidget::applyFilter(DB::Filter const& filter)
 {
     m_filter = filter;
     foreach (QLegendMarker* marker, m_chart->legend()->markers())
@@ -406,7 +428,7 @@ void PlotWidget::refresh(DB::Filter const& filter)
         PlotData& plotData = m_series[m.descriptor.sensorId];
 
         qreal value = m.descriptor.temperature;
-        if (m_useFiltering)
+        if (m_useSmoothing)
         {
             plotData.temperatureLpf.process(value);
         }
@@ -415,7 +437,7 @@ void PlotWidget::refresh(DB::Filter const& filter)
         maxT = std::max(maxT, value);
 
         value = m.descriptor.humidity;
-        if (m_useFiltering)
+        if (m_useSmoothing)
         {
             plotData.humidityLpf.process(value);
         }
@@ -437,10 +459,10 @@ void PlotWidget::refresh(DB::Filter const& filter)
             series->attachAxis(m_axisX);
             series->attachAxis(m_axisTY);
 
-            connect(series, SIGNAL(clicked(QPointF)), this, SLOT(keepTooltip()));
+            connect(series, SIGNAL(clicked(QPointF)), this, SLOT(keepAnnotation()));
             connect(series, &QLineSeries::hovered, [this, series, &plotData](QPointF const& point, bool state)
             {
-                tooltip(series, point, state, plotData.sensor, true);
+                createAnnotation(series, point, state, plotData.sensor, true);
             });
 
             QList<QPointF> const& points = plotData.temperaturePoints;
@@ -461,10 +483,10 @@ void PlotWidget::refresh(DB::Filter const& filter)
             series->attachAxis(m_axisX);
             series->attachAxis(m_axisHY);
 
-            connect(series, SIGNAL(clicked(QPointF)), this, SLOT(keepTooltip()));
+            connect(series, SIGNAL(clicked(QPointF)), this, SLOT(keepAnnotation()));
             connect(series, &QLineSeries::hovered, [this, series, &plotData](QPointF const& point, bool state)
             {
-                tooltip(series, point, state, plotData.sensor, false);
+                createAnnotation(series, point, state, plotData.sensor, false);
             });
 
             QList<QPointF> const& points = plotData.humidityPoints;
@@ -495,6 +517,14 @@ void PlotWidget::refresh(DB::Filter const& filter)
     maxDT.setTime_t(maxTS);
     m_axisX->setRange(minDT, maxDT);
 
+    if (!m_fitMeasurements)
+    {
+        maxT = std::max(maxT, 50.0);
+        minT = std::min(minT, 0.0);
+        maxH = std::max(maxH, 100.0);
+        minH = std::min(minH, 0.0);
+    }
+
     constexpr qreal minTemperatureRange = 5.0;
     if (std::abs(maxT - minT) < minTemperatureRange)
     {
@@ -518,7 +548,7 @@ void PlotWidget::refresh(DB::Filter const& filter)
 
 void PlotWidget::resizeEvent(QResizeEvent *event)
 {
-    for (std::unique_ptr<PlotToolTip>& p: m_tooltips)
+    for (std::unique_ptr<PlotToolTip>& p: m_annotations)
     {
         p->updateGeometry();
     }
@@ -527,23 +557,25 @@ void PlotWidget::resizeEvent(QResizeEvent *event)
 
 //////////////////////////////////////////////////////////////////////////
 
-void PlotWidget::keepTooltip()
+void PlotWidget::keepAnnotation()
 {
-    if (m_tooltip != nullptr)
+    if (m_annotation != nullptr)
     {
-        m_tooltip->setFixed(true);
-        m_tooltips.push_back(std::move(m_tooltip));
-        m_tooltip.reset(new PlotToolTip(m_chart));
+        m_annotation->setFixed(true);
+        m_annotations.push_back(std::move(m_annotation));
+        m_ui.clearAnnotations->setEnabled(true);
+
+        m_annotation.reset(new PlotToolTip(m_chart));
     }
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void PlotWidget::tooltip(QLineSeries* series, QPointF point, bool state, DB::Sensor const& sensor, bool temperature)
+void PlotWidget::createAnnotation(QLineSeries* series, QPointF point, bool state, DB::Sensor const& sensor, bool temperature)
 {
-    if (m_tooltip == nullptr)
+    if (m_annotation == nullptr)
     {
-        m_tooltip.reset(new PlotToolTip(m_chart));
+        m_annotation.reset(new PlotToolTip(m_chart));
     }
 
     if (state)
@@ -553,7 +585,7 @@ void PlotWidget::tooltip(QLineSeries* series, QPointF point, bool state, DB::Sen
         dt.setMSecsSinceEpoch(point.x());
         if (temperature)
         {
-            m_tooltip->setText(QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Temperature: <b>%3 °C</b>")
+            m_annotation->setText(QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Temperature: <b>%3 °C</b>")
                                .arg(sensor.descriptor.name.c_str())
                                .arg(dt.toString("dd-MM-yyyy h:mm"))
                                .arg(point.y(), 0, 'f', 1)
@@ -561,20 +593,20 @@ void PlotWidget::tooltip(QLineSeries* series, QPointF point, bool state, DB::Sen
         }
         else
         {
-            m_tooltip->setText(QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Humidity: <b>%3 %RH</b>")
+            m_annotation->setText(QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Humidity: <b>%3 %RH</b>")
                                .arg(sensor.descriptor.name.c_str())
                                .arg(dt.toString("dd-MM-yyyy h:mm"))
                                .arg(point.y(), 0, 'f', 1)
                                .arg(color.name()));
         }
-        m_tooltip->setAnchor(point, series);
-        m_tooltip->setZValue(11);
-        m_tooltip->updateGeometry();
-        m_tooltip->show();
+        m_annotation->setAnchor(point, series);
+        m_annotation->setZValue(11);
+        m_annotation->updateGeometry();
+        m_annotation->show();
     }
     else
     {
-        m_tooltip->hide();
+        m_annotation->hide();
     }
 }
 
@@ -582,25 +614,8 @@ void PlotWidget::tooltip(QLineSeries* series, QPointF point, bool state, DB::Sen
 
 void PlotWidget::plotContextMenu(QPoint const& position)
 {
-    QMenu menu;
-
-    QAction* action = menu.addAction(QIcon(":/icons/ui/smooth.png"), "Use Smoothing");
-    action->setCheckable(true);
-    action->setChecked(m_useFiltering);
-    connect(action, &QAction::toggled, [this](bool triggered)
-    {
-        m_useFiltering = triggered;
-        refresh(m_filter);
-    });
-
-    action = menu.addAction(QIcon(":/icons/ui/remove.png"), "Remove Bubbles");
-    action->setEnabled(!m_tooltips.empty());
-    connect(action, &QAction::triggered, [this](bool triggered)
-    {
-        m_tooltips.clear();
-    });
-
-    menu.exec(mapToGlobal(position));
+//    QMenu menu;
+//    menu.exec(mapToGlobal(position));
 }
 
 //////////////////////////////////////////////////////////////////////////

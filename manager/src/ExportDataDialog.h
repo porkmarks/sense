@@ -16,7 +16,7 @@ private slots:
 
 private:
 
-    void showPreview();
+    void refreshPreview();
     void exportTo(std::ostream& stream, size_t maxCount);
 
     Ui::ExportDataDialog m_ui;

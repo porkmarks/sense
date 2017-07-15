@@ -8,8 +8,8 @@ src/Low_Power.h
 src/main.cpp
 src/SPI.cpp
 src/SPI.h
-../common/src/Comms.cpp
-../common/src/Comms.h
+../common/src/Sensor_Comms.cpp
+../common/src/Sensor_Comms.h
 ../common/src/CRC.cpp
 ../common/src/CRC.h
 ../common/src/Data_Defs.h

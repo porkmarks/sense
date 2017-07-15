@@ -20,7 +20,7 @@ public:
 signals:
 
 private slots:
-    void refreshFromDB();
+    void refresh();
     void setMinDateTimeNow();
     void setMaxDateTimeNow();
     void selectSensors();

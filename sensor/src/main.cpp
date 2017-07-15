@@ -11,7 +11,7 @@
 #include "LEDs.h"
 #include "Buttons.h"
 #include "Battery.h"
-#include "Comms.h"
+#include "Sensor_Comms.h"
 #include "Data_Defs.h"
 #include "avr_stdio.h"
 #include "Storage.h"
@@ -80,7 +80,7 @@ uint8_t s_error_flags = 0;
 SHT2xClass s_sht;
 #endif
 
-Comms s_comms;
+Sensor_Comms s_comms;
 
 FILE s_uart_output;
 
@@ -239,22 +239,22 @@ void setup()
     s_error_flags = 0;
     if (mcusr_value & (1<<PORF ))
     {
-        s_error_flags |= static_cast<uint8_t>(data::Measurement::Flag::REBOOT_POWER_ON);
+        s_error_flags |= static_cast<uint8_t>(data::sensor::Measurement::Flag::REBOOT_POWER_ON);
         LOG(PSTR("Power-on reset."));
     }
     if (mcusr_value & (1<<EXTRF))
     {
-        s_error_flags |= static_cast<uint8_t>(data::Measurement::Flag::REBOOT_RESET);
+        s_error_flags |= static_cast<uint8_t>(data::sensor::Measurement::Flag::REBOOT_RESET);
         LOG(PSTR("External reset!"));
     }
     if (mcusr_value & (1<<BORF ))
     {
-        s_error_flags |= static_cast<uint8_t>(data::Measurement::Flag::REBOOT_BROWNOUT);
+        s_error_flags |= static_cast<uint8_t>(data::sensor::Measurement::Flag::REBOOT_BROWNOUT);
         LOG(PSTR("Brownout reset!"));
     }
     if (mcusr_value & (1<<WDRF ))
     {
-        s_error_flags |= static_cast<uint8_t>(data::Measurement::Flag::REBOOT_WATCHDOG);
+        s_error_flags |= static_cast<uint8_t>(data::sensor::Measurement::Flag::REBOOT_WATCHDOG);
         LOG(PSTR("Watchdog reset!"));
     }
     LOG(PSTR(" << ********************\n"));
@@ -311,7 +311,7 @@ void setup()
 
     LOG(PSTR("Starting rfm22b setup..."));
     
-    while (!s_comms.init(5))
+    while (!s_comms.init(5, 1))
     {
         LOG(PSTR("failed\n"));
         blink_leds(RED_LED, 3, chrono::millis(100));
@@ -346,29 +346,42 @@ void setup()
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-static bool apply_config(const data::Config& config)
+static bool apply_config(const data::sensor::Config& config)
 {
-    if (config.measurement_period.count == 0 ||
-            config.comms_period.count == 0)
+    if (config.measurement_period.count == 0 || config.comms_period.count == 0)
     {
         LOG(PSTR("Bag config received!!!\n"));
         return false;
     }
 
-    //chrono::s_time_point = chrono::time_ms(config.base_time_point.ticks * 1000ULL);
+    s_comms_period = chrono::millis(config.comms_period.count * 1000LL);
+    s_measurement_period = chrono::millis(config.measurement_period.count * 1000LL);
 
-    s_next_comms_time_point = chrono::now() + chrono::millis(config.next_comms_delay);
-    s_comms_period = chrono::millis(config.comms_period.count * 1000ULL);
+    chrono::time_ms now = chrono::now();
+    if (config.next_comms_delay.count < 0 && (now + chrono::millis(config.next_comms_delay)) > now) //overflow?
+    {
+        s_next_comms_time_point = chrono::time_ms(0);
+    }
+    else
+    {
+        s_next_comms_time_point = now + chrono::millis(config.next_comms_delay);
+    }
 
-    s_next_measurement_time_point = chrono::now() + chrono::millis(config.next_measurement_delay);
-    s_measurement_period = chrono::millis(config.measurement_period.count * 1000ULL);
+    if (config.next_measurement_delay.count < 0 && (now + chrono::millis(config.next_measurement_delay)) > now) //overflow?
+    {
+        s_next_comms_time_point = chrono::time_ms(0);
+    }
+    else
+    {
+        s_next_measurement_time_point = now + chrono::millis(config.next_measurement_delay);
+    }
 
     //remove confirmed measurements
     while (s_first_measurement_index <= config.last_confirmed_measurement_index)
     {
         if (!s_storage.pop_front())
         {
-            LOG(PSTR("Failed to pop storage data. Left: %lu\n"), config.last_confirmed_measurement_index - s_first_measurement_index);
+            LOG(PSTR("Failed to pop storage data. Left: %ld\n"), config.last_confirmed_measurement_index - s_first_measurement_index);
             s_first_measurement_index = config.last_confirmed_measurement_index + 1;
             break;
         }
@@ -377,10 +390,10 @@ static bool apply_config(const data::Config& config)
 
     uint32_t measurement_count = s_storage.get_data_count();
 
-    LOG(PSTR("next comms delay: %lu\n"), config.next_comms_delay.count);
-    LOG(PSTR("comms period: %lu\n"), config.comms_period.count);
-    LOG(PSTR("next measurement delay: %lu\n"), config.next_measurement_delay.count);
-    LOG(PSTR("measurement period: %lu\n"), config.measurement_period.count);
+    LOG(PSTR("next comms delay: %ld\n"), config.next_comms_delay.count);
+    LOG(PSTR("comms period: %ld\n"), config.comms_period.count);
+    LOG(PSTR("next measurement delay: %ld\n"), config.next_measurement_delay.count);
+    LOG(PSTR("measurement period: %ld\n"), config.measurement_period.count);
     LOG(PSTR("last confirmed index: %lu\n"), config.last_confirmed_measurement_index);
     LOG(PSTR("first index: %lu\n"), s_first_measurement_index);
     LOG(PSTR("count: %lu\n"), measurement_count);
@@ -394,9 +407,9 @@ static bool request_config()
 {
     bool send_successful = false;
     {
-        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::Config_Request))];
-        s_comms.begin_packet(raw_buffer, data::Type::CONFIG_REQUEST);
-        data::Config_Request req;
+        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::sensor::Config_Request))];
+        s_comms.begin_packet(raw_buffer, data::sensor::Type::CONFIG_REQUEST);
+        data::sensor::Config_Request req;
         req.first_measurement_index = s_first_measurement_index;
         req.measurement_count = s_storage.get_data_count();
         req.b2s_input_dBm = s_comms.get_input_dBm();
@@ -406,15 +419,15 @@ static bool request_config()
 
     if (send_successful)
     {
-        uint8_t size = sizeof(data::Config);
+        uint8_t size = sizeof(data::sensor::Config);
         uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(size)];
         uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, 500);
         if (buffer)
         {
-            data::Type type = s_comms.get_rx_packet_type(buffer);
-            if (type == data::Type::CONFIG && size == sizeof(data::Config))
+            data::sensor::Type type = s_comms.get_rx_packet_type(buffer);
+            if (type == data::sensor::Type::CONFIG && size == sizeof(data::sensor::Config))
             {
-                const data::Config* ptr = reinterpret_cast<const data::Config*>(s_comms.get_rx_packet_payload(buffer));
+                const data::sensor::Config* ptr = reinterpret_cast<const data::sensor::Config*>(s_comms.get_rx_packet_payload(buffer));
                 return apply_config(*ptr);
             }
         }
@@ -424,7 +437,7 @@ static bool request_config()
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-static bool apply_first_config(const data::First_Config& first_config)
+static bool apply_first_config(const data::sensor::First_Config& first_config)
 {
     s_first_measurement_index = first_config.first_measurement_index;
     s_storage.clear();
@@ -443,23 +456,23 @@ static bool request_first_config()
 {
     bool send_successful = false;
     {
-        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::First_Config_Request))];
-        s_comms.begin_packet(raw_buffer, data::Type::FIRST_CONFIG_REQUEST);
-        s_comms.pack(raw_buffer, data::First_Config_Request());
+        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::sensor::First_Config_Request))];
+        s_comms.begin_packet(raw_buffer, data::sensor::Type::FIRST_CONFIG_REQUEST);
+        s_comms.pack(raw_buffer, data::sensor::First_Config_Request());
         send_successful = s_comms.send_packet(raw_buffer, 5);
     }
 
     if (send_successful)
     {
-        uint8_t size = sizeof(data::First_Config);
+        uint8_t size = sizeof(data::sensor::First_Config);
         uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(size)];
         uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, 500);
         if (buffer)
         {
-            data::Type type = s_comms.get_rx_packet_type(buffer);
-            if (type == data::Type::FIRST_CONFIG && size == sizeof(data::First_Config))
+            data::sensor::Type type = s_comms.get_rx_packet_type(buffer);
+            if (type == data::sensor::Type::FIRST_CONFIG && size == sizeof(data::sensor::First_Config))
             {
-                const data::First_Config* ptr = reinterpret_cast<const data::First_Config*>(s_comms.get_rx_packet_payload(buffer));
+                const data::sensor::First_Config* ptr = reinterpret_cast<const data::sensor::First_Config*>(s_comms.get_rx_packet_payload(buffer));
                 return apply_first_config(*ptr);
             }
         }
@@ -471,9 +484,9 @@ static bool request_first_config()
 
 static void pair()
 {
-    uint32_t addr = Comms::PAIR_ADDRESS_BEGIN + random() % (Comms::PAIR_ADDRESS_END - Comms::PAIR_ADDRESS_BEGIN);
+    uint32_t addr = Sensor_Comms::PAIR_ADDRESS_BEGIN + random() % (Sensor_Comms::PAIR_ADDRESS_END - Sensor_Comms::PAIR_ADDRESS_BEGIN);
     s_comms.set_address(addr);
-    s_comms.set_destination_address(Comms::BASE_ADDRESS);
+    s_comms.set_destination_address(Sensor_Comms::BASE_ADDRESS);
 
     LOG(PSTR("Starting pairing\n"));
 
@@ -501,9 +514,9 @@ static void pair()
 
                 bool send_successful = false;
                 {
-                    uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::Pair_Request))];
-                    s_comms.begin_packet(raw_buffer, data::Type::PAIR_REQUEST);
-                    s_comms.pack(raw_buffer, data::Pair_Request());
+                    uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::sensor::Pair_Request))];
+                    s_comms.begin_packet(raw_buffer, data::sensor::Type::PAIR_REQUEST);
+                    s_comms.pack(raw_buffer, data::sensor::Pair_Request());
                     send_successful = s_comms.send_packet(raw_buffer, 5);
                 }
 
@@ -513,7 +526,7 @@ static void pair()
 
                     set_leds(GREEN_LED);
 
-                    uint8_t size = sizeof(data::Pair_Response);
+                    uint8_t size = sizeof(data::sensor::Pair_Response);
                     uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(size)];
                     uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, 10000);
                     if (buffer)
@@ -521,11 +534,11 @@ static void pair()
                         LOG(PSTR("Received packet of %d bytes. Type %s\n"), (int)size, (int)s_comms.get_rx_packet_type(buffer));
                     }
 
-                    if (buffer && size == sizeof(data::Pair_Response) && s_comms.get_rx_packet_type(buffer) == data::Type::PAIR_RESPONSE)
+                    if (buffer && size == sizeof(data::sensor::Pair_Response) && s_comms.get_rx_packet_type(buffer) == data::sensor::Type::PAIR_RESPONSE)
                     {
                         s_comms.stand_by_mode();
 
-                        const data::Pair_Response* response_ptr = reinterpret_cast<const data::Pair_Response*>(s_comms.get_rx_packet_payload(buffer));
+                        const data::sensor::Pair_Response* response_ptr = reinterpret_cast<const data::sensor::Pair_Response*>(s_comms.get_rx_packet_payload(buffer));
                         s_comms.set_address(response_ptr->address);
                         LOG(PSTR("done. Addr: %lu\n"), response_ptr->address);
 
@@ -662,8 +675,8 @@ static void do_comms()
         const chrono::millis COMMS_SLOT_DURATION = chrono::millis(5000);
         chrono::time_ms start_tp = chrono::now();
 
-        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::Measurement_Batch))];
-        data::Measurement_Batch& batch = *(data::Measurement_Batch*)s_comms.get_tx_packet_payload(raw_buffer);
+        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::sensor::Measurement_Batch))];
+        data::sensor::Measurement_Batch& batch = *(data::sensor::Measurement_Batch*)s_comms.get_tx_packet_payload(raw_buffer);
 
         batch.start_index = s_first_measurement_index;
         batch.count = 0;
@@ -680,11 +693,11 @@ static void do_comms()
             }
             else
             {
-                data::Measurement& item = batch.measurements[batch.count++];
+                data::sensor::Measurement& item = batch.measurements[batch.count++];
                 item.flags = s_error_flags;
                 if (it.data.humidity < MIN_VALID_HUMIDITY)
                 {
-                    item.flags |= static_cast<uint8_t>(data::Measurement::Flag::SENSOR_ERROR);
+                    item.flags |= static_cast<uint8_t>(data::sensor::Measurement::Flag::SENSOR_ERROR);
                     item.pack(0.f, 0.f);
                     batch.pack(it.data.vcc);
                 }
@@ -695,7 +708,7 @@ static void do_comms()
                 }
             }
 
-            if (batch.count >= data::Measurement_Batch::MAX_COUNT)
+            if (batch.count >= data::sensor::Measurement_Batch::MAX_COUNT)
             {
                 send = true;
             }
@@ -703,15 +716,15 @@ static void do_comms()
             if (send && batch.count > 0)
             {
                 LOG(PSTR("Sending measurement batch of %d..."), (int)batch.count);
-                s_comms.begin_packet(raw_buffer, data::Type::MEASUREMENT_BATCH);
-                if (s_comms.send_packet(raw_buffer, sizeof(data::Measurement_Batch), 3) == true)
+                s_comms.begin_packet(raw_buffer, data::sensor::Type::MEASUREMENT_BATCH);
+                if (s_comms.send_packet(raw_buffer, sizeof(data::sensor::Measurement_Batch), 3) == true)
                 {
                     s_error_flags = 0;
                     LOG(PSTR("done.\n"));
                 }
                 else
                 {
-                    s_error_flags |= static_cast<uint8_t>(data::Measurement::Flag::COMMS_ERROR);
+                    s_error_flags |= static_cast<uint8_t>(data::sensor::Measurement::Flag::COMMS_ERROR);
                     LOG(PSTR("failed: comms\n"));
                     break;
                 }
@@ -768,6 +781,7 @@ static void measurement_loop()
 {
     while (true)
     {
+        bool force_comms = false;
         if (is_pressed(Button::BUTTON1))
         {
             chrono::time_ms start_tp = chrono::now();
@@ -779,6 +793,7 @@ static void measurement_loop()
                     soft_reset();
                 }
             }
+            force_comms = true;
         }
 
         chrono::time_ms now = chrono::now();
@@ -792,9 +807,12 @@ static void measurement_loop()
             set_leds(0);
         }
 
-        if (now >= s_next_comms_time_point)
+        if (force_comms || now >= s_next_comms_time_point)
         {
-            s_next_comms_time_point += s_comms_period;
+            if (!force_comms)
+            {
+                s_next_comms_time_point += s_comms_period;
+            }
 
             set_leds(YELLOW_LED);
             do_comms();
@@ -814,7 +832,7 @@ static void measurement_loop()
             LOG(PSTR("Timing error!\n"));
         }
 
-        LOG(PSTR("tp: %lu, nm: %lu, nc: %lu\n"), uint32_t(now.ticks), uint32_t(s_next_measurement_time_point.ticks), uint32_t(s_next_comms_time_point.ticks));
+        LOG(PSTR("tp: %ul, nm: %ul, nc: %ul\n"), uint32_t(now.ticks), uint32_t(s_next_measurement_time_point.ticks), uint32_t(s_next_comms_time_point.ticks));
         LOG(PSTR("Sleeping for %lu ms\n"), sleep_duration.count);
 
         chrono::millis remaining = Low_Power::power_down_int(sleep_duration);
