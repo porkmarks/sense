@@ -87,14 +87,14 @@ std::pair<std::string, time_t> getMostRecentBackup(std::string const& filename, 
     return bkFiles.front();
 }
 
-void copyToBackup(std::string const& filename, std::string const& folder)
+void copyToBackup(std::string const& filename, std::string const& srcFilepath, std::string const& folder)
 {
     time_t nowTT = QDateTime::currentDateTime().toTime_t();
-    std::string newFilename = folder + "/" + filename + "_" + std::to_string(nowTT);
+    std::string newFilepath = folder + "/" + filename + "_" + std::to_string(nowTT);
 
     QDir().mkpath(folder.c_str());
 
-    if (!QFile::copy(filename.c_str(), newFilename.c_str()))
+    if (!QFile::copy(srcFilepath.c_str(), newFilepath.c_str()))
     {
         return;
     }
@@ -102,28 +102,51 @@ void copyToBackup(std::string const& filename, std::string const& folder)
     clipBackups(filename, folder);
 }
 
-void moveToBackup(std::string const& filename, std::string const& folder)
+void moveToBackup(std::string const& filename, std::string const& srcFilepath, std::string const& folder)
 {
     time_t nowTT = QDateTime::currentDateTime().toTime_t();
-    std::string newFilename = folder + "/" + filename + "_" + std::to_string(nowTT);
+    std::string newFilepath = folder + "/" + filename + "_" + std::to_string(nowTT);
 
     QDir().mkpath(folder.c_str());
 
-    if (!renameFile(filename, newFilename))
+    if (!renameFile(srcFilepath, newFilepath))
     {
+        std::cerr << "Error renaming files: " << getLastErrorAsString() << "\n";
         return;
     }
 
     clipBackups(filename, folder);
 }
 
-bool renameFile(std::string const& oldName, std::string const& newName)
+bool renameFile(std::string const& oldFilepath, std::string const& newFilepath)
 {
 #ifdef _WIN32
     //one on success
-    return MoveFileA(oldName.c_str(), newName.c_str()) != 0;
+    return MoveFileExA(oldFilepath.c_str(), newFilepath.c_str(), MOVEFILE_REPLACE_EXISTING) != 0;
 #else
     //zero on success
-    return rename(oldName.c_str(), newName.c_str()) == 0;
+    return rename(oldFilepath.c_str(), newFilepath.c_str()) == 0;
+#endif
+}
+
+std::string getLastErrorAsString()
+{
+#ifdef _WIN32
+    //Get the error message, if any.
+    DWORD errorMessageID = ::GetLastError();
+    if(errorMessageID == 0)
+        return std::string(); //No error message has been recorded
+
+    LPSTR messageBuffer = nullptr;
+    size_t size = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                                 NULL, errorMessageID, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&messageBuffer, 0, NULL);
+
+    std::string message(messageBuffer, size);
+
+    //Free the buffer.
+    LocalFree(messageBuffer);
+    return message;
+#else
+    return std::strerror(errno);
 #endif
 }

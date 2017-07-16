@@ -70,8 +70,8 @@ bool DB::create(std::string const& name)
 
     QDir().mkpath((s_programFolder + "/db").c_str());
 
-    moveToBackup(s_programFolder + "/db/" + m_dbName, s_programFolder + "/backups/deleted");
-    moveToBackup(s_programFolder + "/db/" + m_dataName, s_programFolder + "/backups/deleted");
+    moveToBackup(m_dbName, s_programFolder + "/db/" + m_dbName, s_programFolder + "/backups/deleted");
+    moveToBackup(m_dataName, s_programFolder + "/db/" + m_dataName, s_programFolder + "/backups/deleted");
 
     remove((s_programFolder + "/db/" + m_dbName).c_str());
     remove((s_programFolder + "/db/" + m_dataName).c_str());
@@ -1923,11 +1923,11 @@ void DB::save(Data const& data) const
         file.flush();
         file.close();
 
-        copyToBackup(dataFilename, s_programFolder + "/backups/incremental");
+        copyToBackup(m_dataName, dataFilename, s_programFolder + "/backups/incremental");
 
         if (!renameFile(tempFilename.c_str(), dataFilename.c_str()))
         {
-            std::perror("Error renaming");
+            std::cerr << "Error renaming files: " << getLastErrorAsString() << "\n";
         }
     }
 
@@ -1952,11 +1952,11 @@ void DB::save(Data const& data) const
             file.flush();
             file.close();
 
-            copyToBackup(dbFilename, s_programFolder + "/backups/incremental");
+            copyToBackup(m_dbName, dbFilename, s_programFolder + "/backups/incremental");
 
             if (!renameFile(tempFilename.c_str(), dbFilename.c_str()))
             {
-                std::perror("Error renaming");
+                std::cerr << "Error renaming files: " << getLastErrorAsString() << "\n";
             }
         }
     }
@@ -1966,13 +1966,13 @@ void DB::save(Data const& data) const
 
     if (dailyBackup)
     {
-        copyToBackup(dataFilename, s_programFolder + "/backups/daily");
-        copyToBackup(dbFilename, s_programFolder + "/backups/daily");
+        copyToBackup(m_dataName, dataFilename, s_programFolder + "/backups/daily");
+        copyToBackup(m_dbName, dbFilename, s_programFolder + "/backups/daily");
     }
     if (weeklyBackup)
     {
-        copyToBackup(dataFilename, s_programFolder + "/backups/weekly");
-        copyToBackup(dbFilename, s_programFolder + "/backups/weekly");
+        copyToBackup(m_dataName, dataFilename, s_programFolder + "/backups/weekly");
+        copyToBackup(m_dbName, dbFilename, s_programFolder + "/backups/weekly");
     }
 }
 
