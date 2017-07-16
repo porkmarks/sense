@@ -97,8 +97,9 @@ void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor cons
 
     char macStr[128];
     sprintf(macStr, "%X_%X_%X_%X_%X_%X", bs.mac[0]&0xFF, bs.mac[1]&0xFF, bs.mac[2]&0xFF, bs.mac[3]&0xFF, bs.mac[4]&0xFF, bs.mac[5]&0xFF);
-
     std::string dbName = macStr;
+
+    sprintf(macStr, "%X:%X:%X:%X:%X:%X", bs.mac[0]&0xFF, bs.mac[1]&0xFF, bs.mac[2]&0xFF, bs.mac[3]&0xFF, bs.mac[4]&0xFF, bs.mac[5]&0xFF);
 
     std::unique_ptr<DB> db(new DB);
     if (!db->load(dbName))
