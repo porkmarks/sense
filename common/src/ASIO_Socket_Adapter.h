@@ -93,7 +93,7 @@ private:
 
             if (bytes_transferred > m_tx_pending_buffer.size())
             {
-                int a = 0;
+                //int a = 0;
             }
             bytes_transferred = std::min(bytes_transferred, m_tx_pending_buffer.size());
             m_pending_to_send_size -= bytes_transferred;
