@@ -36,6 +36,7 @@ public:
 
     bool init(uint8_t retries, uint8_t power);
 
+    uint32_t get_address() const;
     void set_address(uint32_t address);
     void set_destination_address(uint32_t address);
 

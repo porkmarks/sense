@@ -2,6 +2,10 @@
 
 #include <vector>
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <cstring>
 #include <QFile>
 #include <QDirIterator>
 #include <QDateTime>

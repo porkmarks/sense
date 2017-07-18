@@ -98,6 +98,7 @@ chrono::time_ms s_next_comms_time_point;
 chrono::millis s_comms_period;
 
 Storage s_storage;
+data::sensor::Calibration s_calibration;
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -189,23 +190,33 @@ static const uint8_t SETTINGS_VERSION = 1;
 
 static uint8_t  EEMEM eeprom_version;
 static uint32_t EEMEM eeprom_address;
+static uint16_t EEMEM eeprom_temperature_bias;
+static uint16_t EEMEM eeprom_humidity_bias;
 
 void reset_settings()
 {
     eeprom_write_byte(&eeprom_version, 0);
 }
 
-void save_settings(uint32_t address)
+void save_settings(uint32_t address, data::sensor::Calibration const& calibration)
 {
-    eeprom_write_dword(&eeprom_address, address);
     eeprom_write_byte(&eeprom_version, SETTINGS_VERSION);
+    eeprom_write_dword(&eeprom_address, address);
+    eeprom_write_word(&eeprom_temperature_bias, *reinterpret_cast<uint16_t const*>(&calibration.temperature_bias));
+    eeprom_write_word(&eeprom_humidity_bias, *reinterpret_cast<uint16_t const*>(&calibration.humidity_bias));
 }
 
-bool load_settings(uint32_t& address)
+bool load_settings(uint32_t& address, data::sensor::Calibration& calibration)
 {
     if (eeprom_read_byte(&eeprom_version) == SETTINGS_VERSION)
     {
         address = eeprom_read_dword(&eeprom_address);
+
+        uint16_t v = eeprom_read_word(&eeprom_temperature_bias);
+        calibration.temperature_bias = *reinterpret_cast<int16_t const*>(&v);
+
+        v = eeprom_read_word(&eeprom_humidity_bias);
+        calibration.humidity_bias = *reinterpret_cast<int16_t const*>(&v);
         return true;
     }
     else
@@ -331,7 +342,7 @@ void setup()
     //settings
     {
         uint32_t address = 0;
-        if (load_settings(address))
+        if (load_settings(address, s_calibration))
         {
             s_comms.set_address(address);
             LOG(PSTR("Loaded settings. Addr: %lu\n"), address);
@@ -352,6 +363,15 @@ static bool apply_config(const data::sensor::Config& config)
     {
         LOG(PSTR("Bag config received!!!\n"));
         return false;
+    }
+
+    data::sensor::Calibration calibration = s_calibration;
+    calibration.temperature_bias += config.calibration_change.temperature_bias;
+    calibration.humidity_bias += config.calibration_change.humidity_bias;
+    if (calibration.temperature_bias != s_calibration.temperature_bias || calibration.humidity_bias != s_calibration.humidity_bias)
+    {
+        s_calibration = calibration;
+        save_settings(s_comms.get_address(), s_calibration);
     }
 
     s_comms_period = chrono::millis(config.comms_period.count * 1000LL);
@@ -390,6 +410,8 @@ static bool apply_config(const data::sensor::Config& config)
 
     uint32_t measurement_count = s_storage.get_data_count();
 
+    LOG(PSTR("temp bias: %f\n"), s_calibration.temperature_bias / 100.f);
+    LOG(PSTR("humidity bias: %f\n"), s_calibration.humidity_bias / 100.f);
     LOG(PSTR("next comms delay: %ld\n"), config.next_comms_delay.count);
     LOG(PSTR("comms period: %ld\n"), config.comms_period.count);
     LOG(PSTR("next measurement delay: %ld\n"), config.next_measurement_delay.count);
@@ -413,6 +435,7 @@ static bool request_config()
         req.first_measurement_index = s_first_measurement_index;
         req.measurement_count = s_storage.get_data_count();
         req.b2s_input_dBm = s_comms.get_input_dBm();
+        req.calibration = s_calibration;
         s_comms.pack(raw_buffer, req);
         send_successful = s_comms.send_packet(raw_buffer, 5);
     }
@@ -516,7 +539,9 @@ static void pair()
                 {
                     uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::sensor::Pair_Request))];
                     s_comms.begin_packet(raw_buffer, data::sensor::Type::PAIR_REQUEST);
-                    s_comms.pack(raw_buffer, data::sensor::Pair_Request());
+                    data::sensor::Pair_Request request;
+                    request.calibration = s_calibration;
+                    s_comms.pack(raw_buffer, request);
                     send_successful = s_comms.send_packet(raw_buffer, 5);
                 }
 
@@ -542,7 +567,7 @@ static void pair()
                         s_comms.set_address(response_ptr->address);
                         LOG(PSTR("done. Addr: %lu\n"), response_ptr->address);
 
-                        save_settings(response_ptr->address);
+                        save_settings(response_ptr->address, s_calibration);
 
                         done = true;
                         break;
@@ -624,8 +649,8 @@ static void do_measurement()
             break;
         }
 #else
-        data.temperature = s_sht.GetTemperature();
-        data.humidity = s_sht.GetHumidity();
+        data.temperature = s_sht.GetTemperature() + static_cast<float>(s_calibration.temperature_bias) / 100.f;
+        data.humidity = s_sht.GetHumidity() + static_cast<float>(s_calibration.humidity_bias) / 100.f;
         break;
 #endif
     } while (++tries < max_tries);

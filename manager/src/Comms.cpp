@@ -161,6 +161,8 @@ void Comms::sendSensors(ConnectedBaseStation& cbs)
         sensorj.AddMember("name", rapidjson::Value(sensor.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
         sensorj.AddMember("id", sensor.id, document.GetAllocator());
         sensorj.AddMember("address", sensor.address, document.GetAllocator());
+        sensorj.AddMember("temperature_bias", sensor.calibration.temperatureBias, document.GetAllocator());
+        sensorj.AddMember("humidity_bias", sensor.calibration.humidityBias, document.GetAllocator());
         document.PushBack(sensorj, document.GetAllocator());
     }
 
@@ -434,7 +436,24 @@ void Comms::processSensorBoundReq(ConnectedBaseStation& cbs)
         }
         DB::SensorAddress address = it->value.GetUint();
 
-        if (!cbs.baseStation.db.bindSensor(id, address))
+        DB::Sensor::Calibration calibration;
+        it = document.FindMember("temperature_bias");
+        if (it == document.MemberEnd() || !it->value.IsNumber())
+        {
+            std::cerr << "Cannot deserialize request: Missing temperature_bias.\n";
+            goto end;
+        }
+        calibration.temperatureBias = static_cast<float>(it->value.GetDouble());
+
+        it = document.FindMember("humidity_bias");
+        if (it == document.MemberEnd() || !it->value.IsNumber())
+        {
+            std::cerr << "Cannot deserialize request: Missing humidity_bias.\n";
+            goto end;
+        }
+        calibration.humidityBias = static_cast<float>(it->value.GetDouble());
+
+        if (!cbs.baseStation.db.bindSensor(id, address, calibration))
         {
             std::cerr << "Cannot deserialize request: Bind failed.\n";
             goto end;

@@ -115,6 +115,12 @@ public:
 
     struct Sensor
     {
+        struct Calibration
+        {
+            float temperatureBias = 0.f;
+            float humidityBias = 0.f;
+        };
+
         enum class State
         {
             Active,
@@ -125,6 +131,7 @@ public:
         SensorDescriptor descriptor;
         SensorId id = 0;
         SensorAddress address = 0;
+        Calibration calibration;
         State state = State::Active;
         Clock::time_point nextCommsTimePoint = Clock::time_point(Clock::duration::zero());
         Clock::time_point nextMeasurementTimePoint = Clock::time_point(Clock::duration::zero());
@@ -136,7 +143,7 @@ public:
     size_t getSensorCount() const;
     Sensor const& getSensor(size_t index) const;
     bool addSensor(SensorDescriptor const& descriptor);
-    bool bindSensor(SensorId id, SensorAddress address);
+    bool bindSensor(SensorId id, SensorAddress address, Sensor::Calibration const& calibration);
     bool setSensorState(SensorId id, Sensor::State state);
     bool setSensorNextTimePoints(SensorId id, Clock::time_point nextMeasurementTimePoint, Clock::time_point nextCommsTimePoint);
     void removeSensor(size_t index);

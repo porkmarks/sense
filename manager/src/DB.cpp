@@ -324,6 +324,22 @@ bool DB::load(std::string const& name)
                 }
                 sensor.nextCommsTimePoint = Clock::time_point(std::chrono::seconds(it->value.GetUint64()));
 
+                it = sensorj.FindMember("temperature_bias");
+                if (it == sensorj.MemberEnd() || !it->value.IsNumber())
+                {
+                    std::cerr << "Bad or missing sensor temperature_bias\n";
+                    return false;
+                }
+                sensor.calibration.temperatureBias = static_cast<float>(it->value.GetDouble());
+
+                it = sensorj.FindMember("humidity_bias");
+                if (it == sensorj.MemberEnd() || !it->value.IsNumber())
+                {
+                    std::cerr << "Bad or missing sensor humidity_bias\n";
+                    return false;
+                }
+                sensor.calibration.humidityBias = static_cast<float>(it->value.GetDouble());
+
                 data.lastSensorId = std::max(data.lastSensorId, sensor.id);
                 data.sensors.push_back(sensor);
             }
@@ -991,7 +1007,7 @@ bool DB::addSensor(SensorDescriptor const& descriptor)
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::bindSensor(SensorId id, SensorAddress address)
+bool DB::bindSensor(SensorId id, SensorAddress address, Sensor::Calibration const& calibration)
 {
     int32_t index = findSensorIndexById(id);
     if (index < 0)
@@ -1012,6 +1028,7 @@ bool DB::bindSensor(SensorId id, SensorAddress address)
 
     sensor.address = address;
     sensor.state = Sensor::State::Active;
+    sensor.calibration = calibration;
 
     emit sensorBound(sensor.id);
     emit sensorChanged(sensor.id);
@@ -1831,6 +1848,8 @@ void DB::save(Data const& data) const
                 sensorj.AddMember("state", static_cast<int>(sensor.state), document.GetAllocator());
                 sensorj.AddMember("next_measurement", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(sensor.nextMeasurementTimePoint.time_since_epoch()).count()), document.GetAllocator());
                 sensorj.AddMember("next_comms", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(sensor.nextCommsTimePoint.time_since_epoch()).count()), document.GetAllocator());
+                sensorj.AddMember("temperature_bias", sensor.calibration.temperatureBias, document.GetAllocator());
+                sensorj.AddMember("humidity_bias", sensor.calibration.humidityBias, document.GetAllocator());
                 sensorsj.PushBack(sensorj, document.GetAllocator());
             }
             document.AddMember("sensors", sensorsj, document.GetAllocator());

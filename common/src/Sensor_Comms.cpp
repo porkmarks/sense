@@ -138,6 +138,10 @@ void Sensor_Comms::stand_by_mode()
     m_rf22.stand_by_mode();
 }
 
+uint32_t Sensor_Comms::get_address() const
+{
+    return m_address;
+}
 void Sensor_Comms::set_address(uint32_t address)
 {
     m_address = address;

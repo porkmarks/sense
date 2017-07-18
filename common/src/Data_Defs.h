@@ -80,13 +80,23 @@ static_assert(sizeof(Measurement_Batch) == 38, "");
 //template<int s> struct Size_Checker;
 //Size_Checker<sizeof(Measurement_Batch)> size_checker;
 
+struct Calibration
+{
+    int16_t temperature_bias = 0; //*100
+    int16_t humidity_bias = 0; //*100
+};
+static_assert(sizeof(Calibration) == 4, "");
+
+
 struct Config_Request
 {
     uint32_t first_measurement_index = 0;
     uint32_t measurement_count = 0;
     int8_t b2s_input_dBm = 0;
+
+    Calibration calibration;
 };
-static_assert(sizeof(Config_Request) == 9, "");
+static_assert(sizeof(Config_Request) == 13, "");
 
 struct Config
 {
@@ -96,8 +106,11 @@ struct Config
     chrono::seconds next_measurement_delay; //how much to wait before th enext measurement
     chrono::seconds measurement_period; //measurements every this much seconds
     uint32_t last_confirmed_measurement_index = 0;
+
+    //how much to change calibration. 0 means leave it unchanged
+    Calibration calibration_change;
 };
-static_assert(sizeof(Config) == 20, "");
+static_assert(sizeof(Config) == 24, "");
 
 struct First_Config_Request
 {
@@ -109,7 +122,7 @@ struct First_Config
     Config config;
     uint32_t first_measurement_index = 0;
 };
-static_assert(sizeof(First_Config) == 24, "");
+static_assert(sizeof(First_Config) == 28, "");
 
 struct Response
 {
@@ -120,8 +133,9 @@ static_assert(sizeof(Response) == 2, "");
 
 struct Pair_Request
 {
+    Calibration calibration;
 };
-static_assert(sizeof(Pair_Request) == 1, "");
+static_assert(sizeof(Pair_Request) == 4, "");
 
 struct Pair_Response
 {
