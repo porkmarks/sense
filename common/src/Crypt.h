@@ -75,6 +75,10 @@ public:
      */
     explicit Crypt(quint64 key);
 
+    void setAddRandomSalt(bool salt);
+
+    void setKey(QString const& key);
+
     /**
       (Re-) initializes the key with the given @arg key.
       */
@@ -187,6 +191,7 @@ private:
 
     void splitKey();
 
+    bool m_addRandomSalt = true;
     quint64 m_key;
     QVector<char> m_keyParts;
     CompressionMode m_compressionMode;

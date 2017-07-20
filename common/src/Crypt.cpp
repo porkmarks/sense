@@ -25,6 +25,17 @@ Crypt::Crypt(quint64 key):
     splitKey();
 }
 
+void Crypt::setKey(const QString& key)
+{
+    uint64_t k = 123423461235342ULL;
+    for (int i = 0; i < key.size(); i++)
+    {
+        char c = key.at(i).toLatin1();
+        k ^= c + 0x9e3779b9ULL + (k<<6) + (k>>2);
+    }
+    setKey(k);
+}
+
 void Crypt::setKey(quint64 key)
 {
     m_key = key;
@@ -42,6 +53,11 @@ void Crypt::splitKey()
         part = part & 0xff;
         m_keyParts[i] = static_cast<char>(part);
     }
+}
+
+void Crypt::setAddRandomSalt(bool salt)
+{
+    m_addRandomSalt = salt;
 }
 
 QByteArray Crypt::encryptToByteArray(const QString& plaintext)
@@ -87,7 +103,7 @@ QByteArray Crypt::encryptToByteArray(QByteArray plaintext)
     }
 
     //prepend a random char to the string
-    char randomChar = char(qrand() & 0xFF);
+    char randomChar = m_addRandomSalt ? char(qrand() & 0xFF) : 0;
     ba = randomChar + integrityProtection + ba;
 
     int pos(0);
