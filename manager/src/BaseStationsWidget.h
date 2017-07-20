@@ -5,6 +5,7 @@
 #include <QStandardItemModel>
 #include "ui_BaseStationsWidget.h"
 #include "Comms.h"
+#include "Settings.h"
 #include "Emailer.h"
 
 class BaseStationsWidget : public QWidget
@@ -14,7 +15,7 @@ public:
     explicit BaseStationsWidget(QWidget *parent = 0);
     ~BaseStationsWidget();
 
-    void init(Comms& comms);
+    void init(Comms& comms, Settings& settings);
 
 signals:
     void baseStationActivated(Comms::BaseStationDescriptor const& bs, DB& db);
@@ -29,6 +30,7 @@ private slots:
 private:
     Ui::BaseStationsWidget m_ui;
     Comms* m_comms = nullptr;
+    Settings* m_settings = nullptr;
     QStandardItemModel m_model;
 
     struct BaseStationData

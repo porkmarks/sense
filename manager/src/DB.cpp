@@ -115,105 +115,7 @@ bool DB::load(std::string const& name)
             return false;
         }
 
-        auto it = document.FindMember("email_settings");
-        if (it == document.MemberEnd() || !it->value.IsObject())
-        {
-            std::cerr << "Bad or missing email_settings\n";
-            return false;
-        }
-
-        {
-            Crypt crypt;
-            crypt.setKey(k_emailEncryptionKey);
-
-            rapidjson::Value const& esj = it->value;
-            auto it = esj.FindMember("host");
-            if (it == esj.MemberEnd() || !it->value.IsString())
-            {
-                std::cerr << "Bad or missing email settings host\n";
-                return false;
-            }
-            data.emailSettings.host = it->value.GetString();
-
-            it = esj.FindMember("port");
-            if (it == esj.MemberEnd() || !it->value.IsUint())
-            {
-                std::cerr << "Bad or missing email settings port\n";
-                return false;
-            }
-            data.emailSettings.port = it->value.GetUint();
-
-            it = esj.FindMember("username");
-            if (it == esj.MemberEnd() || !it->value.IsString())
-            {
-                std::cerr << "Bad or missing email settings username\n";
-                return false;
-            }
-            data.emailSettings.username = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
-
-            it = esj.FindMember("password");
-            if (it == esj.MemberEnd() || !it->value.IsString())
-            {
-                std::cerr << "Bad or missing email settings password\n";
-                return false;
-            }
-            data.emailSettings.password = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
-
-            it = esj.FindMember("from");
-            if (it == esj.MemberEnd() || !it->value.IsString())
-            {
-                std::cerr << "Bad or missing email settings from\n";
-                return false;
-            }
-            data.emailSettings.from = it->value.GetString();
-        }
-
-        it = document.FindMember("ftp_settings");
-        if (it == document.MemberEnd() || !it->value.IsObject())
-        {
-            std::cerr << "Bad or missing ftp_settings\n";
-            return false;
-        }
-
-        {
-            Crypt crypt;
-            crypt.setKey(k_ftpEncryptionKey);
-
-            rapidjson::Value const& esj = it->value;
-            auto it = esj.FindMember("host");
-            if (it == esj.MemberEnd() || !it->value.IsString())
-            {
-                std::cerr << "Bad or missing ftp settings host\n";
-                return false;
-            }
-            data.ftpSettings.host = it->value.GetString();
-
-            it = esj.FindMember("port");
-            if (it == esj.MemberEnd() || !it->value.IsUint())
-            {
-                std::cerr << "Bad or missing ftp settings port\n";
-                return false;
-            }
-            data.ftpSettings.port = it->value.GetUint();
-
-            it = esj.FindMember("username");
-            if (it == esj.MemberEnd() || !it->value.IsString())
-            {
-                std::cerr << "Bad or missing ftp settings username\n";
-                return false;
-            }
-            data.ftpSettings.username = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
-
-            it = esj.FindMember("password");
-            if (it == esj.MemberEnd() || !it->value.IsString())
-            {
-                std::cerr << "Bad or missing ftp settings password\n";
-                return false;
-            }
-            data.ftpSettings.password = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
-        }
-
-        it = document.FindMember("sensor_settings");
+        auto it = document.FindMember("sensor_settings");
         if (it == document.MemberEnd() || !it->value.IsObject())
         {
             std::cerr << "Bad or missing sensor settings object\n";
@@ -516,6 +418,7 @@ bool DB::load(std::string const& name)
             }
         }
 
+
         it = document.FindMember("reports");
         if (it == document.MemberEnd() || !it->value.IsArray())
         {
@@ -523,8 +426,6 @@ bool DB::load(std::string const& name)
             return false;
         }
 
-
-//        if (it != document.MemberEnd())
         {
             rapidjson::Value const& reportsj = it->value;
             for (size_t i = 0; i < reportsj.Size(); i++)
@@ -611,7 +512,7 @@ bool DB::load(std::string const& name)
                 it = reportj.FindMember("send_email_action");
                 if (it == reportj.MemberEnd() || !it->value.IsBool())
                 {
-                    std::cerr << "Bad or missing alarm send_email_action\n";
+                    std::cerr << "Bad or missing report send_email_action\n";
                     return false;
                 }
                 report.descriptor.sendEmailAction = it->value.GetBool();
@@ -627,7 +528,7 @@ bool DB::load(std::string const& name)
                 it = reportj.FindMember("upload_to_ftp_action");
                 if (it == reportj.MemberEnd() || !it->value.IsBool())
                 {
-                    std::cerr << "Bad or missing alarm upload_to_ftp_action\n";
+                    std::cerr << "Bad or missing report upload_to_ftp_action\n";
                     return false;
                 }
                 report.descriptor.uploadToFtpAction = it->value.GetBool();
@@ -798,88 +699,6 @@ DB::Sensor const& DB::getSensor(size_t index) const
 {
     assert(index < m_mainData.sensors.size());
     return m_mainData.sensors[index];
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-bool DB::setEmailSettings(EmailSettings const& settings)
-{
-    if (settings.from.empty())
-    {
-        return false;
-    }
-    if (settings.username.empty())
-    {
-        return false;
-    }
-    if (settings.password.empty())
-    {
-        return false;
-    }
-    if (settings.host.empty())
-    {
-        return false;
-    }
-    if (settings.port == 0)
-    {
-        return false;
-    }
-
-    emit emailSettingsWillBeChanged();
-
-    m_mainData.emailSettings = settings;
-
-    emit emailSettingsChanged();
-
-    triggerSave();
-
-    return true;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-DB::EmailSettings const& DB::getEmailSettings() const
-{
-    return m_mainData.emailSettings;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-bool DB::setFtpSettings(FtpSettings const& settings)
-{
-    if (settings.username.empty())
-    {
-        return false;
-    }
-    if (settings.password.empty())
-    {
-        return false;
-    }
-    if (settings.host.empty())
-    {
-        return false;
-    }
-    if (settings.port == 0)
-    {
-        return false;
-    }
-
-    emit ftpSettingsWillBeChanged();
-
-    m_mainData.ftpSettings = settings;
-
-    emit ftpSettingsChanged();
-
-    triggerSave();
-
-    return true;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-DB::FtpSettings const& DB::getFtpSettings() const
-{
-    return m_mainData.ftpSettings;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1796,34 +1615,6 @@ void DB::save(Data const& data) const
     {
         rapidjson::Document document;
         document.SetObject();
-        {
-            Crypt crypt;
-            crypt.setKey(k_emailEncryptionKey);
-            rapidjson::Value esj;
-            esj.SetObject();
-            esj.AddMember("host", rapidjson::Value(data.emailSettings.host.c_str(), document.GetAllocator()), document.GetAllocator());
-            esj.AddMember("port", static_cast<uint32_t>(data.emailSettings.port), document.GetAllocator());
-            QString username(data.emailSettings.username.c_str());
-            esj.AddMember("username", rapidjson::Value(crypt.encryptToString(username).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
-            QString password(data.emailSettings.password.c_str());
-            esj.AddMember("password", rapidjson::Value(crypt.encryptToString(password).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
-            esj.AddMember("from", rapidjson::Value(data.emailSettings.from.c_str(), document.GetAllocator()), document.GetAllocator());
-            document.AddMember("email_settings", esj, document.GetAllocator());
-        }
-        {
-            Crypt crypt;
-            crypt.setKey(k_ftpEncryptionKey);
-            rapidjson::Value fsj;
-            fsj.SetObject();
-            fsj.AddMember("host", rapidjson::Value(data.ftpSettings.host.c_str(), document.GetAllocator()), document.GetAllocator());
-            fsj.AddMember("port", static_cast<uint32_t>(data.ftpSettings.port), document.GetAllocator());
-            QString username(data.ftpSettings.username.c_str());
-            fsj.AddMember("username", rapidjson::Value(crypt.encryptToString(username).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
-            QString password(data.ftpSettings.password.c_str());
-            fsj.AddMember("password", rapidjson::Value(crypt.encryptToString(password).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
-            document.AddMember("ftp_settings", fsj, document.GetAllocator());
-        }
-
         {
             rapidjson::Value ssj;
             ssj.SetObject();

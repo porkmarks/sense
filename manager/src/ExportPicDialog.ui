@@ -156,6 +156,12 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>fileFormat</tabstop>
+  <tabstop>width</tabstop>
+  <tabstop>height</tabstop>
+  <tabstop>legend</tabstop>
+ </tabstops>
  <resources/>
  <connections>
   <connection>

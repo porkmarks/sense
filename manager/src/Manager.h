@@ -21,12 +21,16 @@ private slots:
 
 private:
     void process();
+    void userLoggedIn(Settings::UserId id);
+    void checkIfAdminExists();
+    void login();
 
     void closeEvent(QCloseEvent* event);
 
     void readSettings();
 
     Comms m_comms;
+    Settings m_settings;
     DB* m_activeDB = nullptr;
 
     Ui::Manager m_ui;

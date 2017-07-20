@@ -2,7 +2,7 @@
 
 #include <QDialog>
 #include "ui_FtpSettingsDialog.h"
-#include "DB.h"
+#include "Settings.h"
 
 class FtpSettingsDialog : public QDialog
 {
@@ -11,8 +11,8 @@ public:
     explicit FtpSettingsDialog(QWidget *parent = 0);
     ~FtpSettingsDialog();
 
-    void setFtpSettings(DB::FtpSettings const& settings);
-    DB::FtpSettings const& getFtpSettings() const;
+    void setFtpSettings(Settings::FtpSettings const& settings);
+    Settings::FtpSettings const& getFtpSettings() const;
 
 signals:
 
@@ -21,6 +21,6 @@ private slots:
 
 private:
     Ui::FtpSettingsDialog m_ui;
-    mutable DB::FtpSettings m_settings;
+    mutable Settings::FtpSettings m_settings;
 };
 

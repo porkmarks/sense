@@ -10,12 +10,13 @@ BaseStationsWidget::BaseStationsWidget(QWidget *parent)
     m_ui.setupUi(this);
     m_ui.list->setModel(&m_model);
 
-    m_model.setColumnCount(3);
-    m_model.setHorizontalHeaderLabels({"Name", "MAC", "IP"});
+    m_model.setColumnCount(4);
+    m_model.setHorizontalHeaderLabels({"Name", "MAC", "IP", "Status"});
 
     m_ui.list->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
     m_ui.list->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
-    m_ui.list->header()->setSectionResizeMode(2, QHeaderView::Stretch);
+    m_ui.list->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    m_ui.list->header()->setSectionResizeMode(3, QHeaderView::Stretch);
 
     connect(m_ui.list, &QTreeView::doubleClicked, this, &BaseStationsWidget::activateBaseStation);
 }
@@ -31,9 +32,10 @@ BaseStationsWidget::~BaseStationsWidget()
 
 //////////////////////////////////////////////////////////////////////////
 
-void BaseStationsWidget::init(Comms& comms)
+void BaseStationsWidget::init(Comms& comms, Settings& settings)
 {
     m_comms = &comms;
+    m_settings = &settings;
 
     connect(m_comms, &Comms::baseStationDiscovered, this, &BaseStationsWidget::baseStationDiscovered);
     connect(m_comms, &Comms::baseStationDisconnected, this, &BaseStationsWidget::baseStationDisconnected);
@@ -121,7 +123,7 @@ void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor cons
     bsd.descriptor = bs;
     bsd.db = std::move(db);
     bsd.emailer.reset(new Emailer());
-    bsd.emailer->init(*bsd.db);
+    bsd.emailer->init(*m_settings, *bsd.db);
     m_baseStations.push_back(std::move(bsd));
 
     QStandardItem* nameItem = new QStandardItem();

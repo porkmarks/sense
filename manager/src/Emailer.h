@@ -11,6 +11,7 @@
 #include <condition_variable>
 #include <QTimer>
 
+#include "Settings.h"
 #include "DB.h"
 
 
@@ -21,7 +22,7 @@ public:
     Emailer();
     ~Emailer();
 
-    void init(DB& db);
+    void init(Settings& settings, DB& db);
     void shutdown();
 
     void sendReportEmail(DB::Report const& report);
@@ -33,12 +34,13 @@ private slots:
 private:
     void checkReports();
 
+    Settings* m_settings = nullptr;
     DB* m_db = nullptr;
     QTimer m_timer;
 
     struct Email
     {
-        DB::EmailSettings settings;
+        Settings::EmailSettings settings;
         std::string to;
         std::string subject;
         std::string body;

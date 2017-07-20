@@ -3,9 +3,16 @@
 #include <QInputDialog>
 #include <QMessageBox>
 
+#include "ui_LoginDialog.h"
+
+#include "ConfigureUserDialog.h"
 #include "SensorSettingsDialog.h"
 #include "EmailSettingsDialog.h"
 #include "FtpSettingsDialog.h"
+
+#include "Crypt.h"
+
+extern std::string k_passwordHashReferenceText;
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -14,15 +21,17 @@ Manager::Manager(QWidget *parent)
 {
     m_ui.setupUi(this);
 
-    m_ui.baseStationsWidget->init(m_comms);
+    m_ui.settingsWidget->init(m_comms, m_settings);
+
+    //m_ui.baseStationsWidget->init(m_comms);
 
     auto* timer = new QTimer(this);
     timer->setSingleShot(false);
     timer->start(1);
     connect(timer, &QTimer::timeout, this, &Manager::process, Qt::QueuedConnection);
 
-    connect(m_ui.baseStationsWidget, &BaseStationsWidget::baseStationActivated, this, &Manager::activateBaseStation);
-    connect(m_ui.baseStationsWidget, &BaseStationsWidget::baseStationDeactivated, this, &Manager::deactivateBaseStation);
+//    connect(m_ui.baseStationsWidget, &BaseStationsWidget::baseStationActivated, this, &Manager::activateBaseStation);
+//    connect(m_ui.baseStationsWidget, &BaseStationsWidget::baseStationDeactivated, this, &Manager::deactivateBaseStation);
 
     connect(m_ui.actionSensorSettings, &QAction::triggered, this, &Manager::openSensorSettingsDialog);
     connect(m_ui.actionEmailSettings, &QAction::triggered, this, &Manager::openEmailSettingsDialog);
@@ -31,17 +40,131 @@ Manager::Manager(QWidget *parent)
     readSettings();
 
     show();
+
+    if (!m_settings.load("settings"))
+    {
+        if (!m_settings.create("settings"))
+        {
+            QMessageBox::critical(this, "Error", "Cannot create the settings file.");
+            exit(1);
+        }
+    }
+
+    connect(&m_settings, &Settings::userLoggedIn, this, &Manager::userLoggedIn);
+
+    checkIfAdminExists();
+
+    login();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 Manager::~Manager()
 {
-    delete m_ui.baseStationsWidget;
+//    delete m_ui.baseStationsWidget;
     delete m_ui.sensorsWidget;
     delete m_ui.measurementsWidget;
     delete m_ui.alarmsWidget;
-    delete m_ui.reportsWidget;
+//    delete m_ui.reportsWidget;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Manager::checkIfAdminExists()
+{
+    if (m_settings.needsAdmin())
+    {
+        QMessageBox::information(this, "Admin", "No admin user exists. Please create one now.");
+
+        ConfigureUserDialog dialog(m_settings);
+
+        Settings::User user;
+        dialog.setUser(user);
+        dialog.setForcedType(Settings::UserDescriptor::Type::Admin);
+
+        int result = dialog.exec();
+        if (result == QDialog::Accepted)
+        {
+            user = dialog.getUser();
+            if (m_settings.addUser(user.descriptor))
+            {
+                int32_t userIndex = m_settings.findUserIndexByName(user.descriptor.name);
+                if (userIndex >= 0)
+                {
+                    m_settings.setLoggedInUserId(m_settings.getUser(userIndex).id);
+                }
+            }
+        }
+
+        if (m_settings.needsAdmin())
+        {
+            QMessageBox::critical(this, "Error", "No admin user exists.\nThe program will now close.");
+            exit(1);
+        }
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Manager::login()
+{
+    if (!m_settings.getLoggedInUser())
+    {
+        QDialog dialog;
+        Ui::LoginDialog ui;
+        ui.setupUi(&dialog);
+
+        while (true)
+        {
+            int result = dialog.exec();
+            if (result == QDialog::Accepted)
+            {
+                int32_t userIndex = m_settings.findUserIndexByName(ui.username->text().toUtf8().data());
+                if (userIndex < 0)
+                {
+                    QMessageBox::critical(this, "Error", "Invalid username/password.");
+                    continue;
+                }
+
+                Settings::User const& user = m_settings.getUser(userIndex);
+
+                Crypt crypt;
+                crypt.setAddRandomSalt(false);
+                crypt.setIntegrityProtectionMode(Crypt::ProtectionHash);
+                crypt.setCompressionMode(Crypt::CompressionAlways);
+                crypt.setKey(ui.password->text());
+                std::string passwordHash = crypt.encryptToString(QString(k_passwordHashReferenceText.c_str())).toUtf8().data();
+                if (user.descriptor.passwordHash != passwordHash)
+                {
+                    QMessageBox::critical(this, "Error", "Invalid username/password.");
+                    continue;
+                }
+
+                m_settings.setLoggedInUserId(user.id);
+                break;
+            }
+            else
+            {
+                QMessageBox::critical(this, "Error", "You need to be logged in to user this program.\nThe program will now close.");
+                exit(1);
+            }
+        }
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Manager::userLoggedIn(Settings::UserId id)
+{
+    int32_t index = m_settings.findUserIndexById(id);
+    if (index < 0)
+    {
+        setWindowTitle("Manager (Not Logged In");
+    }
+    else
+    {
+        setWindowTitle(QString("Manager (%1)").arg(m_settings.getUser(index).descriptor.name.c_str()));
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -52,7 +175,8 @@ void Manager::activateBaseStation(Comms::BaseStationDescriptor const& bs, DB& db
     m_ui.measurementsWidget->init(db);
     m_ui.plotWidget->init(db);
     m_ui.alarmsWidget->init(db);
-    m_ui.reportsWidget->init(db);
+//    m_ui.reportsWidget->init(db);
+    m_ui.settingsWidget->initDB(db);
 
     m_ui.actionEmailSettings->setEnabled(true);
     m_ui.actionFtpSettings->setEnabled(true);
@@ -71,7 +195,8 @@ void Manager::deactivateBaseStation(Comms::BaseStationDescriptor const& bs)
     m_ui.measurementsWidget->shutdown();
     m_ui.plotWidget->shutdown();
     m_ui.alarmsWidget->shutdown();
-    m_ui.reportsWidget->shutdown();
+//    m_ui.reportsWidget->shutdown();
+    m_ui.settingsWidget->shutdownDB();;
 
     m_ui.actionEmailSettings->setEnabled(false);
     m_ui.actionFtpSettings->setEnabled(false);
@@ -115,21 +240,21 @@ void Manager::openEmailSettingsDialog()
         return;
     }
 
-    DB::EmailSettings settings = m_activeDB->getEmailSettings();
+//    Settings::EmailSettings settings = m_activeDB->getEmailSettings();
 
-    EmailSettingsDialog dialog(this);
-    dialog.setEmailSettings(settings);
+//    EmailSettingsDialog dialog(this);
+//    dialog.setEmailSettings(settings);
 
-    int result = dialog.exec();
-    if (result == QDialog::Accepted)
-    {
-        settings = dialog.getEmailSettings();
-        if (!m_activeDB->setEmailSettings(settings))
-        {
-            QMessageBox::critical(this, "Error", "Cannot set the email settings.");
-            return;
-        }
-    }
+//    int result = dialog.exec();
+//    if (result == QDialog::Accepted)
+//    {
+//        settings = dialog.getEmailSettings();
+//        if (!m_activeDB->setEmailSettings(settings))
+//        {
+//            QMessageBox::critical(this, "Error", "Cannot set the email settings.");
+//            return;
+//        }
+//    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -141,21 +266,21 @@ void Manager::openFtpSettingsDialog()
         return;
     }
 
-    DB::FtpSettings settings = m_activeDB->getFtpSettings();
+//    DB::FtpSettings settings = m_activeDB->getFtpSettings();
 
-    FtpSettingsDialog dialog(this);
-    dialog.setFtpSettings(settings);
+//    FtpSettingsDialog dialog(this);
+//    dialog.setFtpSettings(settings);
 
-    int result = dialog.exec();
-    if (result == QDialog::Accepted)
-    {
-        settings = dialog.getFtpSettings();
-        if (!m_activeDB->setFtpSettings(settings))
-        {
-            QMessageBox::critical(this, "Error", "Cannot set the ftp settings.");
-            return;
-        }
-    }
+//    int result = dialog.exec();
+//    if (result == QDialog::Accepted)
+//    {
+//        settings = dialog.getFtpSettings();
+//        if (!m_activeDB->setFtpSettings(settings))
+//        {
+//            QMessageBox::critical(this, "Error", "Cannot set the ftp settings.");
+//            return;
+//        }
+//    }
 }
 
 //////////////////////////////////////////////////////////////////////////

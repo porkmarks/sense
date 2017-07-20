@@ -18,7 +18,7 @@ EmailSettingsDialog::~EmailSettingsDialog()
 
 //////////////////////////////////////////////////////////////////////////
 
-void EmailSettingsDialog::setEmailSettings(DB::EmailSettings const& settings)
+void EmailSettingsDialog::setEmailSettings(Settings::EmailSettings const& settings)
 {
     m_settings = settings;
 
@@ -31,14 +31,14 @@ void EmailSettingsDialog::setEmailSettings(DB::EmailSettings const& settings)
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::EmailSettings const& EmailSettingsDialog::getEmailSettings() const
+Settings::EmailSettings const& EmailSettingsDialog::getEmailSettings() const
 {
     return m_settings;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool EmailSettingsDialog::getSettings(DB::EmailSettings& settings)
+bool EmailSettingsDialog::getSettings(Settings::EmailSettings& settings)
 {
     settings.host = m_ui.host->text().toUtf8().data();
     settings.port = static_cast<uint16_t>(m_ui.port->value());
@@ -59,7 +59,7 @@ bool EmailSettingsDialog::getSettings(DB::EmailSettings& settings)
 
 void EmailSettingsDialog::accept()
 {
-    DB::EmailSettings settings;
+    Settings::EmailSettings settings;
     if (!getSettings(settings))
     {
         return;
@@ -73,7 +73,7 @@ void EmailSettingsDialog::accept()
 
 void EmailSettingsDialog::sendTestEmail()
 {
-    DB::EmailSettings settings;
+    Settings::EmailSettings settings;
     if (!getSettings(settings))
     {
         return;

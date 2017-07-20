@@ -101,7 +101,12 @@ HEADERS += \
     ../../src/Smtp/mimetext.h \
     ../../src/Smtp/quotedprintable.h \
     ../../src/Smtp/smtpclient.h \
-    ../../src/Smtp/smtpexports.h
+    ../../src/Smtp/smtpexports.h \
+    ../../src/SettingsWidget.h \
+    ../../src/ConfigureUserDialog.h \
+    ../../src/UsersModel.h \
+    ../../src/UsersWidget.h \
+    ../../src/Settings.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -143,7 +148,12 @@ SOURCES += \
     ../../src/Smtp/mimepart.cpp \
     ../../src/Smtp/mimetext.cpp \
     ../../src/Smtp/quotedprintable.cpp \
-    ../../src/Smtp/smtpclient.cpp
+    ../../src/Smtp/smtpclient.cpp \
+    ../../src/SettingsWidget.cpp \
+    ../../src/ConfigureUserDialog.cpp \
+    ../../src/UsersModel.cpp \
+    ../../src/UsersWidget.cpp \
+    ../../src/Settings.cpp
 
 FORMS += \
     ../../src/Manager.ui \
@@ -160,7 +170,11 @@ FORMS += \
     ../../src/ConfigureReportDialog.ui \
     ../../src/SensorSettingsDialog.ui \
     ../../src/EmailSettingsDialog.ui \
-    ../../src/FtpSettingsDialog.ui
+    ../../src/FtpSettingsDialog.ui \
+    ../../src/SettingsWidget.ui \
+    ../../src/ConfigureUserDialog.ui \
+    ../../src/UsersWidget.ui \
+    ../../src/LoginDialog.ui
 
 DISTFILES += \
 

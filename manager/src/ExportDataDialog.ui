@@ -351,6 +351,22 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>exportId</tabstop>
+  <tabstop>exportIndex</tabstop>
+  <tabstop>exportSensorName</tabstop>
+  <tabstop>exportTimePoint</tabstop>
+  <tabstop>exportTemperature</tabstop>
+  <tabstop>exportHumidity</tabstop>
+  <tabstop>exportBattery</tabstop>
+  <tabstop>fileFormat</tabstop>
+  <tabstop>separator</tabstop>
+  <tabstop>tabSeparator</tabstop>
+  <tabstop>decimalPlaces</tabstop>
+  <tabstop>dateFormat</tabstop>
+  <tabstop>units</tabstop>
+  <tabstop>previewText</tabstop>
+ </tabstops>
  <resources>
   <include location="../res/res.qrc"/>
  </resources>

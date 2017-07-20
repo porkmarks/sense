@@ -1,35 +1,37 @@
-#include "ReportsWidget.h"
-#include "ConfigureReportDialog.h"
+#include "UsersWidget.h"
+#include "ConfigureUserDialog.h"
+#include <QMessageBox>
+
+#include "Settings.h"
 
 //////////////////////////////////////////////////////////////////////////
 
-ReportsWidget::ReportsWidget(QWidget *parent)
+UsersWidget::UsersWidget(QWidget *parent)
     : QWidget(parent)
 {
     m_ui.setupUi(this);
-    setEnabled(false);
+    //setEnabled(false);
 
-    connect(m_ui.add, &QPushButton::released, this, &ReportsWidget::addReport);
-    connect(m_ui.remove, &QPushButton::released, this, &ReportsWidget::removeReports);
-    connect(m_ui.list, &QTreeView::activated, this, &ReportsWidget::configureReport);
+    connect(m_ui.add, &QPushButton::released, this, &UsersWidget::addUser);
+    connect(m_ui.remove, &QPushButton::released, this, &UsersWidget::removeUsers);
+    connect(m_ui.list, &QTreeView::activated, this, &UsersWidget::configureUser);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-ReportsWidget::~ReportsWidget()
+UsersWidget::~UsersWidget()
 {
     shutdown();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void ReportsWidget::init(Settings& settings, DB& db)
+void UsersWidget::init(Settings& settings)
 {
     setEnabled(true);
     m_settings = &settings;
-    m_db = &db;
 
-    m_model.reset(new ReportsModel(db));
+    m_model.reset(new UsersModel(settings));
     m_ui.list->setModel(m_model.get());
 
     for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
@@ -40,34 +42,34 @@ void ReportsWidget::init(Settings& settings, DB& db)
 
 //////////////////////////////////////////////////////////////////////////
 
-void ReportsWidget::shutdown()
+void UsersWidget::shutdown()
 {
     setEnabled(false);
     m_ui.list->setModel(nullptr);
     m_ui.list->setItemDelegate(nullptr);
     m_model.reset();
-    m_db = nullptr;
+    m_settings = nullptr;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void ReportsWidget::configureReport(QModelIndex const& index)
+void UsersWidget::configureUser(QModelIndex const& index)
 {
-    if (!index.isValid() || static_cast<size_t>(index.row()) >= m_db->getReportCount())
+    if (!index.isValid() || static_cast<size_t>(index.row()) >= m_settings->getUserCount())
     {
         return;
     }
 
-    DB::Report report = m_db->getReport(index.row());
+    Settings::User user = m_settings->getUser(index.row());
 
-    ConfigureReportDialog dialog(*m_settings, *m_db);
-    dialog.setReport(report);
+    ConfigureUserDialog dialog(*m_settings);
+    dialog.setUser(user);
 
     int result = dialog.exec();
     if (result == QDialog::Accepted)
     {
-        report = dialog.getReport();
-        m_db->setReport(report.id, report.descriptor);
+        user = dialog.getUser();
+        m_settings->setUser(user.id, user.descriptor);
         m_model->refresh();
 
         for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
@@ -79,19 +81,18 @@ void ReportsWidget::configureReport(QModelIndex const& index)
 
 //////////////////////////////////////////////////////////////////////////
 
-void ReportsWidget::addReport()
+void UsersWidget::addUser()
 {
-    ConfigureReportDialog dialog(*m_settings, *m_db);
+    ConfigureUserDialog dialog(*m_settings);
 
-    DB::Report report;
-    report.descriptor.name = "Report " + std::to_string(m_db->getReportCount());
-    dialog.setReport(report);
+    Settings::User user;
+    dialog.setUser(user);
 
     int result = dialog.exec();
     if (result == QDialog::Accepted)
     {
-        report = dialog.getReport();
-        m_db->addReport(report.descriptor);
+        user = dialog.getUser();
+        m_settings->addUser(user.descriptor);
         m_model->refresh();
 
         for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
@@ -103,33 +104,33 @@ void ReportsWidget::addReport()
 
 //////////////////////////////////////////////////////////////////////////
 
-void ReportsWidget::removeReports()
+void UsersWidget::removeUsers()
 {
     QModelIndexList selected = m_ui.list->selectionModel()->selectedIndexes();
     if (selected.isEmpty())
     {
-        QMessageBox::critical(this, "Error", "Please select the report you want to remove.");
+        QMessageBox::critical(this, "Error", "Please select the user you want to remove.");
         return;
     }
 
-    QModelIndex mi = m_model->index(selected.at(0).row(), static_cast<int>(ReportsModel::Column::Id));
-    DB::ReportId id = m_model->data(mi).toUInt();
-    int32_t index = m_db->findReportIndexById(id);
+    QModelIndex mi = m_model->index(selected.at(0).row(), static_cast<int>(UsersModel::Column::Id));
+    Settings::UserId id = m_model->data(mi).toUInt();
+    int32_t index = m_settings->findUserIndexById(id);
     if (index < 0)
     {
-        QMessageBox::critical(this, "Error", "Invalid report selected.");
+        QMessageBox::critical(this, "Error", "Invalid user selected.");
         return;
     }
 
-    DB::Report const& report = m_db->getReport(index);
+    Settings::User const& user = m_settings->getUser(index);
 
-    int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete report '%1'").arg(report.descriptor.name.c_str()));
+    int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete user '%1'").arg(user.descriptor.name.c_str()));
     if (response != QMessageBox::Yes)
     {
         return;
     }
 
-    m_db->removeReport(index);
+    m_settings->removeUser(index);
 
     for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
     {

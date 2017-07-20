@@ -25,28 +25,7 @@ public:
     bool create(std::string const& name);
     bool load(std::string const& name);
 
-    struct EmailSettings
-    {
-        std::string host;
-        uint16_t port = 0;
-        std::string username;
-        std::string password;
-        std::string from;
-    };
-
-    bool setEmailSettings(EmailSettings const& settings);
-    EmailSettings const& getEmailSettings() const;
-
-    struct FtpSettings
-    {
-        std::string host;
-        uint16_t port = 0;
-        std::string username;
-        std::string password;
-    };
-
-    bool setFtpSettings(FtpSettings const& settings);
-    FtpSettings const& getFtpSettings() const;
+    ////////////////////////////////////////////////////////////////////////////
 
     struct SensorSettingsDescriptor
     {
@@ -150,6 +129,8 @@ public:
     int32_t findSensorIndexByName(std::string const& name) const;
     int32_t findSensorIndexById(SensorId id) const;
 
+    ////////////////////////////////////////////////////////////////////////////
+
     struct AlarmDescriptor
     {
         std::string name;
@@ -193,6 +174,8 @@ public:
     bool addAlarm(AlarmDescriptor const& descriptor);
     bool setAlarm(AlarmId id, AlarmDescriptor const& descriptor);
     void removeAlarm(size_t index);
+
+    ////////////////////////////////////////////////////////////////////////////
 
     struct TriggeredAlarm
     {
@@ -259,6 +242,7 @@ public:
     bool isReportTriggered(ReportId id) const;
     void setReportExecuted(ReportId id);
 
+    ////////////////////////////////////////////////////////////////////////////
 
     bool addMeasurement(MeasurementDescriptor const& descriptor);
 
@@ -307,15 +291,11 @@ public:
 
     bool getLastMeasurementForSensor(SensorId sensor_id, Measurement& measurement) const;
 
+    ////////////////////////////////////////////////////////////////////////////
+
 signals:
     void sensorSettingsWillBeChanged();
     void sensorSettingsChanged();
-
-    void emailSettingsWillBeChanged();
-    void emailSettingsChanged();
-
-    void ftpSettingsWillBeChanged();
-    void ftpSettingsChanged();
 
     void sensorWillBeAdded(SensorId id);
     void sensorAdded(SensorId id);
@@ -379,8 +359,6 @@ private:
 
     struct Data
     {
-        EmailSettings emailSettings;
-        FtpSettings ftpSettings;
         SensorSettings sensorSettings;
         std::vector<Sensor> sensors;
         std::vector<Alarm> alarms;

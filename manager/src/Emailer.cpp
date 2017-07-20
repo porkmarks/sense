@@ -50,8 +50,9 @@ Emailer::~Emailer()
 
 //////////////////////////////////////////////////////////////////////////
 
-void Emailer::init(DB& db)
+void Emailer::init(Settings& settings, DB& db)
 {
+    m_settings = &settings;
     m_db = &db;
 
     connect(m_db, &DB::alarmWasTriggered, this, &Emailer::alarmTriggered);
@@ -157,7 +158,7 @@ void Emailer::sendAlarmUntriggeredEmail(DB::Alarm const& alarm, DB::Sensor const
 
 void Emailer::sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor const& sensor, DB::MeasurementDescriptor const& md)
 {
-    email.settings = m_db->getEmailSettings();
+    email.settings = m_settings->getEmailSettings();
     email.to = alarm.descriptor.emailRecipient;
 
     QDateTime dt;
@@ -189,7 +190,7 @@ void Emailer::sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor co
 void Emailer::sendReportEmail(DB::Report const& report)
 {
     Email email;
-    email.settings = m_db->getEmailSettings();
+    email.settings = m_settings->getEmailSettings();
     email.to = report.descriptor.emailRecipient;
 
     switch (report.descriptor.period)

@@ -4,6 +4,7 @@
 #include <QSortFilterProxyModel>
 #include "ui_ConfigureReportDialog.h"
 
+#include "Settings.h"
 #include "DB.h"
 #include "SensorsModel.h"
 #include "SensorsDelegate.h"
@@ -11,7 +12,7 @@
 class ConfigureReportDialog : public QDialog
 {
 public:
-    ConfigureReportDialog(DB& db);
+    ConfigureReportDialog(Settings& settings, DB& db);
 
     DB::Report const& getReport() const;
     void setReport(DB::Report const& report);
@@ -25,6 +26,7 @@ private:
 
     Ui::ConfigureReportDialog m_ui;
 
+    Settings& m_settings;
     DB& m_db;
     DB::Report m_report;
     SensorsModel m_model;

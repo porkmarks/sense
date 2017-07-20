@@ -353,6 +353,21 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>name</tabstop>
+  <tabstop>period</tabstop>
+  <tabstop>useCustomPeriod</tabstop>
+  <tabstop>customPeriod</tabstop>
+  <tabstop>summaryData</tabstop>
+  <tabstop>allData</tabstop>
+  <tabstop>sendEmailAction</tabstop>
+  <tabstop>emailRecipient</tabstop>
+  <tabstop>uploadToFtpAction</tabstop>
+  <tabstop>ftpFolder</tabstop>
+  <tabstop>sendNow</tabstop>
+  <tabstop>sensorGroup</tabstop>
+  <tabstop>sensorList</tabstop>
+ </tabstops>
  <resources>
   <include location="../res/res.qrc"/>
  </resources>

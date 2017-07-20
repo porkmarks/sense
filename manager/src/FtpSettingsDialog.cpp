@@ -16,7 +16,7 @@ FtpSettingsDialog::~FtpSettingsDialog()
 
 //////////////////////////////////////////////////////////////////////////
 
-void FtpSettingsDialog::setFtpSettings(DB::FtpSettings const& settings)
+void FtpSettingsDialog::setFtpSettings(Settings::FtpSettings const& settings)
 {
     m_settings = settings;
 
@@ -27,7 +27,7 @@ void FtpSettingsDialog::setFtpSettings(DB::FtpSettings const& settings)
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::FtpSettings const& FtpSettingsDialog::getFtpSettings() const
+Settings::FtpSettings const& FtpSettingsDialog::getFtpSettings() const
 {
     return m_settings;
 }
@@ -36,7 +36,7 @@ DB::FtpSettings const& FtpSettingsDialog::getFtpSettings() const
 
 void FtpSettingsDialog::accept()
 {
-    DB::FtpSettings descriptor;
+    Settings::FtpSettings descriptor;
 
     descriptor.host = m_ui.host->text().toUtf8().data();
     descriptor.username = m_ui.username->text().toUtf8().data();

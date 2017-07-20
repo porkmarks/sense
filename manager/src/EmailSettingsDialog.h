@@ -2,7 +2,7 @@
 
 #include <QDialog>
 #include "ui_EmailSettingsDialog.h"
-#include "DB.h"
+#include "Settings.h"
 
 class EmailSettingsDialog : public QDialog
 {
@@ -11,8 +11,8 @@ public:
     explicit EmailSettingsDialog(QWidget *parent = 0);
     ~EmailSettingsDialog();
 
-    void setEmailSettings(DB::EmailSettings const& settings);
-    DB::EmailSettings const& getEmailSettings() const;
+    void setEmailSettings(Settings::EmailSettings const& settings);
+    Settings::EmailSettings const& getEmailSettings() const;
 
 signals:
 
@@ -21,9 +21,9 @@ private slots:
     void accept() override;
 
 private:
-    bool getSettings(DB::EmailSettings& settings);
+    bool getSettings(Settings::EmailSettings& settings);
 
     Ui::EmailSettingsDialog m_ui;
-    mutable DB::EmailSettings m_settings;
+    mutable Settings::EmailSettings m_settings;
 };
 

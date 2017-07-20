@@ -3,8 +3,9 @@
 
 //////////////////////////////////////////////////////////////////////////
 
-ConfigureReportDialog::ConfigureReportDialog(DB& db)
-    : m_db(db)
+ConfigureReportDialog::ConfigureReportDialog(Settings& settings, DB& db)
+    : m_settings(settings)
+    , m_db(db)
     , m_model(db)
     , m_delegate(m_sortingModel)
 {
@@ -45,7 +46,7 @@ void ConfigureReportDialog::sendReportNow()
         else
         {
             Emailer emailer;
-            emailer.init(m_db);
+            emailer.init(m_settings, m_db);
 
             emailer.sendReportEmail(report);
             QMessageBox::information(this, "Success", QString("Report sent to %1.").arg(report.descriptor.emailRecipient.c_str()));

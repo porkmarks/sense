@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>New Alarm</string>
+   <string>Alarm</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
@@ -520,6 +520,24 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>name</tabstop>
+  <tabstop>lowTemperatureWatch</tabstop>
+  <tabstop>lowTemperature</tabstop>
+  <tabstop>highTemperatureWatch</tabstop>
+  <tabstop>highTemperature</tabstop>
+  <tabstop>lowHumidityWatch</tabstop>
+  <tabstop>lowHumidity</tabstop>
+  <tabstop>highHumidityWatch</tabstop>
+  <tabstop>highHumidity</tabstop>
+  <tabstop>lowBatteryWatch</tabstop>
+  <tabstop>lowSignalWatch</tabstop>
+  <tabstop>sensorErrorsWatch</tabstop>
+  <tabstop>sendEmailAction</tabstop>
+  <tabstop>emailRecipient</tabstop>
+  <tabstop>sensorGroup</tabstop>
+  <tabstop>sensorList</tabstop>
+ </tabstops>
  <resources>
   <include location="../res/res.qrc"/>
  </resources>
