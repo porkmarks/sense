@@ -246,12 +246,14 @@ void Server::report_measurement(Sensors::Sensor_Id sensor_id, Clock::time_point 
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-void Server::sensor_bound(std::string const& name, Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address sensor_address)
+void Server::sensor_bound(Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address sensor_address, Sensors::Calibration const& calibration)
 {
     rapidjson::Document document;
     document.SetObject();
     document.AddMember("id", sensor_id, document.GetAllocator());
     document.AddMember("address", sensor_address, document.GetAllocator());
+    document.AddMember("temperature_bias", calibration.temperature_bias, document.GetAllocator());
+    document.AddMember("humidity_bias", calibration.humidity_bias, document.GetAllocator());
 
     rapidjson::StringBuffer buffer;
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
@@ -394,14 +396,32 @@ void Server::process_set_sensors_req()
             }
             Sensors::Sensor_Address address = it->value.GetUint();
 
+            Sensors::Calibration calibration;
+            it = sensorj.FindMember("temperature_bias");
+            if (it == sensorj.MemberEnd() || !it->value.IsNumber())
+            {
+                std::cerr << "Cannot deserialize request: Missing temperature_bias.\n";
+                goto end;
+            }
+            calibration.temperature_bias = static_cast<float>(it->value.GetDouble());
+
+            it = sensorj.FindMember("humidity_bias");
+            if (it == sensorj.MemberEnd() || !it->value.IsNumber())
+            {
+                std::cerr << "Cannot deserialize request: Missing humidity_bias.\n";
+                goto end;
+            }
+            calibration.humidity_bias = static_cast<float>(it->value.GetDouble());
+
             if (address == 0)
             {
                 Sensors::Unbound_Sensor_Data data;
                 data.name = name;
                 data.id = id;
+                //data.calibration = calibration;
                 m_sensors.set_unbound_sensor_data(data);
             }
-            else if (!m_sensors.add_sensor(id, name, address))
+            else if (!m_sensors.add_sensor(id, name, address, calibration))
             {
                 std::cerr << "Cannot add sensor\n";
                 goto end;

@@ -40,7 +40,7 @@ extern std::string time_point_to_string(std::chrono::high_resolution_clock::time
 
 ////////////////////////////////////////////////////////////////////////
 
-void fill_config_packet(data::sensor::Config& packet, Sensors::Sensor const& sensor)
+void fill_config_packet(data::sensor::Config& packet, Sensors::Calibration const& reported_calibration, Sensors::Sensor const& sensor)
 {
     Clock::time_point now = Clock::now();
     packet.next_measurement_delay = chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(s_sensors.compute_next_measurement_time_point(sensor.id) - now).count());
@@ -48,12 +48,16 @@ void fill_config_packet(data::sensor::Config& packet, Sensors::Sensor const& sen
     packet.next_comms_delay = chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(s_sensors.compute_next_comms_time_point(sensor.id) - now).count());
     packet.comms_period = chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(s_sensors.compute_comms_period()).count());
     packet.last_confirmed_measurement_index = s_sensors.compute_last_confirmed_measurement_index(sensor.id);
+    packet.calibration_change.temperature_bias = static_cast<int16_t>((sensor.calibration.temperature_bias - reported_calibration.temperature_bias) * 100.f);
+    packet.calibration_change.humidity_bias = static_cast<int16_t>((sensor.calibration.humidity_bias - reported_calibration.humidity_bias) * 100.f);
 
     std::cout << "\tnext measurement delay: " << packet.next_measurement_delay.count
               << "\n\tmeasurement period: " << packet.measurement_period.count
               << "\n\tnext comms delay: " << packet.next_comms_delay.count
               << "\n\tcomms period: " << packet.comms_period.count
               << "\n\tlast confirmed measurement index: " << packet.last_confirmed_measurement_index
+              << "\n\ttemperature bias calibration change: " << sensor.calibration.temperature_bias - reported_calibration.temperature_bias
+              << "\n\thumidity bias calibration change: " << sensor.calibration.humidity_bias - reported_calibration.humidity_bias
               << "\n";
 }
 
@@ -71,7 +75,13 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
         //LOG_LN("Received packed of " << (int)size << " bytes. Type: "<< (int)type);
         if (type == data::sensor::Type::PAIR_REQUEST && size == sizeof(data::sensor::Pair_Request))
         {
-            Sensors::Sensor const* sensor = s_sensors.bind_sensor();
+            data::sensor::Pair_Request const& pair_request = *reinterpret_cast<data::sensor::Pair_Request const*>(s_sensor_comms.get_rx_packet_payload(packet_data));
+
+            Sensors::Calibration reported_calibration;
+            reported_calibration.temperature_bias = static_cast<float>(pair_request.calibration.temperature_bias) / 100.f;
+            reported_calibration.humidity_bias = static_cast<float>(pair_request.calibration.humidity_bias) / 100.f;
+
+            Sensors::Sensor const* sensor = s_sensors.bind_sensor(reported_calibration);
             if (sensor)
             {
                 std::cout << "Adding sensor " << sensor->name << ", id " << sensor->id << ", address " << sensor->address << "\n";
@@ -153,7 +163,7 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
                 data::sensor::First_Config packet;
                 packet.first_measurement_index = s_sensors.compute_next_measurement_index();
                 s_sensors.set_sensor_measurement_range(sensor->id, packet.first_measurement_index, 0);
-                fill_config_packet(packet.config, *sensor);
+                fill_config_packet(packet.config, Sensors::Calibration(), *sensor);
 
                 s_sensor_comms.set_destination_address(s_sensor_comms.get_rx_packet_source_address(packet_data));
                 s_sensor_comms.begin_packet(raw_packet_data.data(), data::sensor::Type::FIRST_CONFIG);
@@ -180,6 +190,10 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
             const Sensors::Sensor* sensor = s_sensors.find_sensor_by_address(address);
             if (sensor)
             {
+                Sensors::Calibration reported_calibration;
+                reported_calibration.temperature_bias = static_cast<float>(config_request.calibration.temperature_bias) / 100.f;
+                reported_calibration.humidity_bias = static_cast<float>(config_request.calibration.humidity_bias) / 100.f;
+
                 std::cout << "Config for " << sensor->id << "\n";
                 if (config_request.measurement_count == 0)
                 {
@@ -198,7 +212,7 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
                 s_sensors.set_sensor_b2s_input_dBm(sensor->id, config_request.b2s_input_dBm);
 
                 data::sensor::Config packet;
-                fill_config_packet(packet, *sensor);
+                fill_config_packet(packet, reported_calibration, *sensor);
 
                 s_sensor_comms.set_destination_address(s_sensor_comms.get_rx_packet_source_address(packet_data));
                 s_sensor_comms.begin_packet(raw_packet_data.data(), data::sensor::Type::CONFIG);

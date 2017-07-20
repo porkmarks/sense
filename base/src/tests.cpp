@@ -211,10 +211,10 @@ void test_storage()
 
 ////////////////////////////////////////////////////////////////////////////
 
-static bool equal(Sensors::Clock::duration d1, Sensors::Clock::duration d2, Sensors::Clock::duration epsilon)
-{
-    return std::abs(d2 - d1) <= epsilon;
-}
+//static bool equal(Sensors::Clock::duration d1, Sensors::Clock::duration d2, Sensors::Clock::duration epsilon)
+//{
+//    return std::abs(d2 - d1) <= epsilon;
+//}
 
 void test_sensor_operations()
 {

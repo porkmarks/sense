@@ -35,6 +35,12 @@ public:
         uint8_t flags = 0;
     };
 
+    struct Calibration
+    {
+        float temperature_bias = 0.f;
+        float humidity_bias = 0.f;
+    };
+
     struct Sensor
     {
         Sensor_Id id = 0;
@@ -45,6 +51,8 @@ public:
         int8_t b2s_input_dBm = 0;
         uint32_t first_recorded_measurement_index = 0;
         uint32_t recorded_measurement_count = 0;
+
+        Calibration calibration;
     };
 
     Sensors();
@@ -100,16 +108,18 @@ public:
     boost::optional<Unbound_Sensor_Data> get_unbound_sensor_data() const;
     void confirm_sensor_binding(Sensor_Id id, bool confirmed);
 
-    std::function<void(std::string const&, Sensor_Id, Sensor_Address)> cb_sensor_bound;
+    std::function<void(Sensor_Id, Sensor_Address, Sensors::Calibration const&)> cb_sensor_bound;
 
-    Sensor const* bind_sensor();
-    Sensor const* add_sensor(Sensor_Id id, std::string const& name, Sensor_Address address);
+    Sensor const* bind_sensor(Sensors::Calibration const& calibration);
+    Sensor const* add_sensor(Sensor_Id id, std::string const& name, Sensor_Address address, Calibration const& calibration);
     bool remove_sensor(Sensor_Id id);
     void remove_all_sensors();
     std::vector<Sensor> get_sensors() const;
 
     Sensor const* find_sensor_by_id(Sensor_Id id) const;
     Sensor const* find_sensor_by_address(Sensor_Address address) const;
+
+    void set_sensor_calibration(Sensor_Id id, Calibration const& calibration);
 
     void set_sensor_measurement_range(Sensor_Id id, uint32_t first_measurement_index, uint32_t last_measurement_index);
     void set_sensor_b2s_input_dBm(Sensor_Id id, int8_t dBm);
