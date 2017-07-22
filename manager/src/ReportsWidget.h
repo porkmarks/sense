@@ -22,6 +22,7 @@ public:
 signals:
 
 private slots:
+    void setRW();
     void addReport();
     void removeReports();
     void configureReport(QModelIndex const& index);

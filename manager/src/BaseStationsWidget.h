@@ -23,6 +23,7 @@ signals:
 
 
 private slots:
+    void setRW();
     void baseStationDiscovered(Comms::BaseStationDescriptor const& bs);
     void baseStationDisconnected(Comms::BaseStationDescriptor const& bs);
     void activateBaseStation(QModelIndex const& index);

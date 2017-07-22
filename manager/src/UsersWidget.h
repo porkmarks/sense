@@ -20,6 +20,7 @@ private slots:
     void addUser();
     void removeUsers();
     void configureUser(QModelIndex const& index);
+    void setRW();
 
 private:
 

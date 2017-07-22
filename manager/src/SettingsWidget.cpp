@@ -1,6 +1,7 @@
 #include "SettingsWidget.h"
 #include "ConfigureAlarmDialog.h"
 #include <QMessageBox>
+#include "Smtp/SmtpMime"
 
 #include "DB.h"
 
@@ -30,6 +31,13 @@ void SettingsWidget::init(Comms& comms, Settings& settings)
 
     m_ui.baseStationsWidget->init(comms, settings);
     m_ui.usersWidget->init(settings);
+
+    setRW();
+    connect(&settings, &Settings::userLoggedIn, this, &SettingsWidget::setRW);
+
+    setEmailSettings(m_settings->getEmailSettings());
+    connect(m_ui.emailApply, &QPushButton::released, this, &SettingsWidget::applyEmailSettings);
+
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -46,20 +54,166 @@ void SettingsWidget::shutdown()
 
 //////////////////////////////////////////////////////////////////////////
 
-void SettingsWidget::initDB(DB& db)
+void SettingsWidget::initBaseStation(Settings::BaseStationId id)
 {
+    int32_t index = m_settings->findBaseStationIndexById(id);
+    if (index < 0)
+    {
+        assert(false);
+        return;
+    }
+
+    Settings::BaseStation const& bs = m_settings->getBaseStation(index);
+    DB& db = m_settings->getBaseStationDB(index);
     m_db = &db;
     m_ui.reportsWidget->init(*m_settings, db);
+
+    //Settings::BaseStationDescriptor::Mac const& mac = bs.descriptor.mac;
+    //char macStr[128];
+    //sprintf(macStr, "%X:%X:%X:%X:%X:%X", mac[0]&0xFF, mac[1]&0xFF, mac[2]&0xFF, mac[3]&0xFF, mac[4]&0xFF, mac[5]&0xFF);
+    //m_ui.sensorsTab->setTitle(QString("Sensor settings for %1 / %2").arg(bs.descriptor.name.c_str()).arg(macStr));
+
+    //m_ui.reportsTab->setTitle(QString("Reports for %1 / %2").arg(bs.descriptor.name.c_str()).arg(macStr));
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void SettingsWidget::shutdownDB()
+void SettingsWidget::shutdownBaseStation(Settings::BaseStationId id)
 {
     m_db = nullptr;
-
     m_ui.reportsWidget->shutdown();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
+void SettingsWidget::setRW()
+{
+    m_ui.emailTab->setEnabled(m_settings->isLoggedInAsAdmin());
+    m_ui.ftpTab->setEnabled(m_settings->isLoggedInAsAdmin());
+    m_ui.sensorsTab->setEnabled(m_settings->isLoggedInAsAdmin());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::setEmailSettings(Settings::EmailSettings const& settings)
+{
+    m_ui.emailHost->setText(settings.host.c_str());
+    m_ui.emailPort->setValue(settings.port);
+    m_ui.emailUsername->setText(settings.username.c_str());
+    m_ui.emailPassword->setText(settings.password.c_str());
+    m_ui.emailFrom->setText(settings.from.c_str());
+    m_ui.emailRecipient->setText(settings.recipient.c_str());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool SettingsWidget::getEmailSettings(Settings::EmailSettings& settings)
+{
+    settings.host = m_ui.emailHost->text().toUtf8().data();
+    settings.port = static_cast<uint16_t>(m_ui.emailPort->value());
+    settings.username = m_ui.emailUsername->text().toUtf8().data();
+    settings.password = m_ui.emailPassword->text().toUtf8().data();
+    settings.from = m_ui.emailFrom->text().toUtf8().data();
+    settings.recipient = m_ui.emailRecipient->text().toUtf8().data();
+
+    if (settings.host.empty())
+    {
+        QMessageBox::critical(this, "Error", "You need to specify a valid host.");
+        return false;
+    }
+    if (settings.recipient.empty())
+    {
+        QMessageBox::critical(this, "Error", "You need to specify a valid recipient.");
+        return false;
+    }
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::applyEmailSettings()
+{
+    Settings::EmailSettings settings;
+    if (!getEmailSettings(settings))
+    {
+        return;
+    }
+
+    m_settings->setEmailSettings(settings);
+//    if (!m_ui.testEmailTo->text().isEmpty())
+//    {
+//        sendTestEmail(settings);
+//    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::sendTestEmail(Settings::EmailSettings const& settings)
+{
+    SmtpClient smtp(QString::fromUtf8(settings.host.c_str()), settings.port, SmtpClient::SslConnection);
+
+    bool hasError = false;
+    connect(&smtp, &SmtpClient::smtpError, [this, &hasError](SmtpClient::SmtpError error)
+    {
+        switch (error)
+        {
+        case SmtpClient::ConnectionTimeoutError:
+            QMessageBox::critical(this, "Error", "Connection timeout.");
+            break;
+        case SmtpClient::ResponseTimeoutError:
+            QMessageBox::critical(this, "Error", "Response timeout.");
+            break;
+        case SmtpClient::SendDataTimeoutError:
+            QMessageBox::critical(this, "Error", "Send data timeout.");
+            break;
+        case SmtpClient::AuthenticationFailedError:
+            QMessageBox::critical(this, "Error", "Authentication failed.");
+            break;
+        case SmtpClient::ServerError:
+            QMessageBox::critical(this, "Error", "Server error.");
+            break;
+        case SmtpClient::ClientError:
+            QMessageBox::critical(this, "Error", "Client error.");
+            break;
+        default:
+            QMessageBox::critical(this, "Error", "Unknown error.");
+            break;
+        }
+
+        hasError = true;
+    });
+
+    smtp.setUser(QString::fromUtf8(settings.username.c_str()));
+    smtp.setPassword(QString::fromUtf8(settings.password.c_str()));
+
+    MimeMessage message;
+
+    message.setSender(new EmailAddress(QString::fromUtf8(settings.from.c_str())));
+    message.addRecipient(new EmailAddress(settings.recipient.c_str()));
+    message.setSubject(QString::fromUtf8("Test Email: Sensor 'Sensor1' triggered alarm 'Alarm1'"));
+
+    MimeHtml body;
+    body.setHtml(QString::fromUtf8(
+                "<p><span style=\"color: #ff0000; font-size: 12pt;\">&lt;&lt;&lt; This is a test email! &gt;&gt;&gt;</span></p>"
+                "<p>Alarm '<strong>Alarm1</strong>' was triggered by sensor '<strong>Sensor1</strong>.</p>"
+                "<p>Measurement:</p>"
+                "<ul>"
+                "<li>Temperature: <strong>23 &deg;C</strong></li>"
+                "<li>Humidity: <strong>77 %RH</strong></li>"
+                "<li>Sensor Errors: <strong>None</strong></li>"
+                "<li>Battery: <strong>55&nbsp;%</strong></li>"
+                "</ul>"
+                "<p>Timestamp: <strong>12-23-2017 12:00</strong> <span style=\"font-size: 8pt;\"><em>(dd-mm-yyyy hh:mm)</em></span></p>"
+                "<p><span style=\"font-size: 12pt; color: #ff0000;\">&lt;&lt;&lt; This is a test email! &gt;&gt;&gt;</span></p>"
+                "<p><span style=\"font-size: 10pt;\"><em>- Sense -</em></span></p>"
+                     ));
+
+    message.addPart(&body);
+
+    if (smtp.connectToHost() && smtp.login() && smtp.sendMail(message))
+    {
+        QMessageBox::information(this, "Done", QString("Email sent to '%1'.").arg(settings.recipient.c_str()));
+    }
+    smtp.quit();
+}

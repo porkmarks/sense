@@ -6,6 +6,7 @@
 
 #include "ui_SensorsWidget.h"
 #include "DB.h"
+#include "Settings.h"
 #include "SensorsModel.h"
 #include "SensorsDelegate.h"
 
@@ -15,7 +16,7 @@ class SensorsWidget : public QWidget
 public:
     explicit SensorsWidget(QWidget *parent = 0);
     ~SensorsWidget();
-    void init(DB& dm);
+    void init(Settings& settings, DB& dm);
     void shutdown();
 
 signals:
@@ -23,6 +24,7 @@ signals:
 private slots:
     void bindSensor();
     void unbindSensor();
+    void setRW();
 
 private:
     Ui::SensorsWidget m_ui;
@@ -31,5 +33,6 @@ private:
     std::unique_ptr<SensorsDelegate> m_delegate;
 
     DB* m_db = nullptr;
+    Settings* m_settings = nullptr;
 };
 

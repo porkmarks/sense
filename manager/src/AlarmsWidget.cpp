@@ -1,5 +1,6 @@
 #include "AlarmsWidget.h"
 #include "ConfigureAlarmDialog.h"
+#include "Settings.h"
 #include <QMessageBox>
 
 #include "DB.h"
@@ -26,10 +27,12 @@ AlarmsWidget::~AlarmsWidget()
 
 //////////////////////////////////////////////////////////////////////////
 
-void AlarmsWidget::init(DB& db)
+void AlarmsWidget::init(Settings& settings, DB& db)
 {
     setEnabled(true);
+
     m_db = &db;
+    m_settings = &settings;
 
     m_model.reset(new AlarmsModel(db));
     m_ui.list->setModel(m_model.get());
@@ -38,6 +41,9 @@ void AlarmsWidget::init(DB& db)
     {
         m_ui.list->resizeColumnToContents(i);
     }
+
+    setRW();
+    connect(&settings, &Settings::userLoggedIn, this, &AlarmsWidget::setRW);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -46,9 +52,18 @@ void AlarmsWidget::shutdown()
 {
     setEnabled(false);
     m_ui.list->setModel(nullptr);
-    m_ui.list->setItemDelegate(nullptr);
+//    m_ui.list->setItemDelegate(nullptr);
     m_model.reset();
     m_db = nullptr;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void AlarmsWidget::setRW()
+{
+    //available to normal users as well
+//    m_ui.add->setEnabled(m_settings->isLoggedInAsAdmin());
+//    m_ui.remove->setEnabled(m_settings->isLoggedInAsAdmin());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -64,6 +79,7 @@ void AlarmsWidget::configureAlarm(QModelIndex const& index)
 
     ConfigureAlarmDialog dialog(*m_db);
     dialog.setAlarm(alarm);
+    dialog.setEnabled(m_settings->isLoggedInAsAdmin());
 
     int result = dialog.exec();
     if (result == QDialog::Accepted)

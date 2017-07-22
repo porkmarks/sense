@@ -176,7 +176,7 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
         {
             if (descriptor.sendEmailAction)
             {
-                return ("Email " + descriptor.emailRecipient).c_str();
+                return "Send Email";
             }
         }
     }

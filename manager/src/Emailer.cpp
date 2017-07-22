@@ -69,7 +69,7 @@ void Emailer::checkReports()
         DB::Report const& report = m_db.getReport(i);
         if (m_db.isReportTriggered(report.id))
         {
-            if (report.descriptor.sendEmailAction && !report.descriptor.emailRecipient.empty())
+            if (report.descriptor.sendEmailAction)
             {
                 sendReportEmail(report);
             }
@@ -93,7 +93,7 @@ void Emailer::alarmTriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::Mea
     DB::Alarm const& alarm = m_db.getAlarm(alarmIndex);
     DB::Sensor const& sensor = m_db.getSensor(sensorIndex);
 
-    if (alarm.descriptor.sendEmailAction && !alarm.descriptor.emailRecipient.empty())
+    if (alarm.descriptor.sendEmailAction)
     {
         sendAlarmTriggeredEmail(alarm, sensor, md);
     }
@@ -114,7 +114,7 @@ void Emailer::alarmUntriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::M
     DB::Alarm const& alarm = m_db.getAlarm(alarmIndex);
     DB::Sensor const& sensor = m_db.getSensor(sensorIndex);
 
-    if (alarm.descriptor.sendEmailAction && !alarm.descriptor.emailRecipient.empty())
+    if (alarm.descriptor.sendEmailAction)
     {
         sendAlarmUntriggeredEmail(alarm, sensor, md);
     }
@@ -146,31 +146,31 @@ void Emailer::sendAlarmUntriggeredEmail(DB::Alarm const& alarm, DB::Sensor const
 
 void Emailer::sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor const& sensor, DB::MeasurementDescriptor const& md)
 {
-    email.settings = m_settings.getEmailSettings();
-    email.to = alarm.descriptor.emailRecipient;
+//    email.settings = m_settings.getEmailSettings();
+//    email.to = alarm.descriptor.emailRecipient;
 
-    QDateTime dt;
-    dt.setTime_t(DB::Clock::to_time_t(md.timePoint));
+//    QDateTime dt;
+//    dt.setTime_t(DB::Clock::to_time_t(md.timePoint));
 
-    email.body += QString(R"X(
-                          <p>Measurement:</p>
-                          <ul>
-                          <li>Temperature: <strong>%1 &deg;C</strong></li>
-                          <li>Humidity: <strong>%2 %RH</strong></li>
-                          <li>Sensor Errors: <strong>%3</strong></li>
-                          <li>Battery: <strong>%4 %</strong></li>
-                          </ul>
-                          <p>Timestamp: <strong>%5</strong> <span style="font-size: 8pt;"><em>(dd-mm-yyyy hh:mm)</em></span></p>
-                          <p>&nbsp;</p>
-                          <p><span style="font-size: 10pt;"><em>- Sense -</em></span></p>)X")
-            .arg(md.temperature, 0, 'f', 1)
-            .arg(md.humidity, 0, 'f', 1)
-            .arg(getSensorErrors(md.sensorErrors).c_str())
-            .arg(static_cast<int>(getBatteryLevel(md.vcc)*100.f))
-            .arg(dt.toString("dd-MM-yyyy HH:mm"))
-            .toUtf8().data();
+//    email.body += QString(R"X(
+//                          <p>Measurement:</p>
+//                          <ul>
+//                          <li>Temperature: <strong>%1 &deg;C</strong></li>
+//                          <li>Humidity: <strong>%2 %RH</strong></li>
+//                          <li>Sensor Errors: <strong>%3</strong></li>
+//                          <li>Battery: <strong>%4 %</strong></li>
+//                          </ul>
+//                          <p>Timestamp: <strong>%5</strong> <span style="font-size: 8pt;"><em>(dd-mm-yyyy hh:mm)</em></span></p>
+//                          <p>&nbsp;</p>
+//                          <p><span style="font-size: 10pt;"><em>- Sense -</em></span></p>)X")
+//            .arg(md.temperature, 0, 'f', 1)
+//            .arg(md.humidity, 0, 'f', 1)
+//            .arg(getSensorErrors(md.sensorErrors).c_str())
+//            .arg(static_cast<int>(getBatteryLevel(md.vcc)*100.f))
+//            .arg(dt.toString("dd-MM-yyyy HH:mm"))
+//            .toUtf8().data();
 
-    sendEmail(email);
+//    sendEmail(email);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -179,7 +179,6 @@ void Emailer::sendReportEmail(DB::Report const& report)
 {
     Email email;
     email.settings = m_settings.getEmailSettings();
-    email.to = report.descriptor.emailRecipient;
 
     switch (report.descriptor.period)
     {
@@ -421,7 +420,7 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
         MimeMessage message;
 
         message.setSender(new EmailAddress(QString::fromUtf8(email.settings.from.c_str())));
-        message.addRecipient(new EmailAddress(QString::fromUtf8(email.to.c_str())));
+        message.addRecipient(new EmailAddress(QString::fromUtf8(email.settings.recipient.c_str())));
         message.setSubject(QString::fromUtf8(email.subject.c_str()));
 
         MimeHtml body;

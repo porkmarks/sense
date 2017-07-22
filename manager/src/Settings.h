@@ -73,6 +73,9 @@ public:
         uint16_t port = 0;
         std::string username;
         std::string password;
+        std::string folder;
+        bool uploadBackups = false;
+        Clock::duration uploadBackupsPeriod = std::chrono::hours(24);
     };
 
     bool setFtpSettings(FtpSettings const& settings);

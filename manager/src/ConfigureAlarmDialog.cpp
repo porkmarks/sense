@@ -82,7 +82,7 @@ void ConfigureAlarmDialog::setAlarm(DB::Alarm const& alarm)
     m_ui.lowBatteryWatch->setChecked(descriptor.lowVccWatch);
 
     m_ui.sendEmailAction->setChecked(descriptor.sendEmailAction);
-    m_ui.emailRecipient->setText(descriptor.emailRecipient.c_str());
+//    m_ui.emailRecipient->setText(descriptor.emailRecipient.c_str());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -122,18 +122,18 @@ void ConfigureAlarmDialog::accept()
     descriptor.lowVccWatch = m_ui.lowBatteryWatch->isChecked();
 
     descriptor.sendEmailAction = m_ui.sendEmailAction->isChecked();
-    descriptor.emailRecipient = m_ui.emailRecipient->text().toUtf8().data();
+//    descriptor.emailRecipient = m_ui.emailRecipient->text().toUtf8().data();
 
     if (descriptor.name.empty())
     {
         QMessageBox::critical(this, "Error", "You need to specify a name for this alarm.");
         return;
     }
-    if (descriptor.sendEmailAction && descriptor.emailRecipient.empty())
-    {
-        QMessageBox::critical(this, "Error", "You need to specify the email recipient.");
-        return;
-    }
+//    if (descriptor.sendEmailAction && descriptor.emailRecipient.empty())
+//    {
+//        QMessageBox::critical(this, "Error", "You need to specify the email recipient.");
+//        return;
+//    }
 
     int32_t alarmIndex = m_db.findAlarmIndexByName(descriptor.name);
     if (alarmIndex >= 0 && m_db.getAlarm(alarmIndex).id != m_alarm.id)

@@ -31,6 +31,7 @@ public:
         std::string username;
         std::string password;
         std::string from;
+        std::string recipient;
     };
 
 private slots:
@@ -47,7 +48,6 @@ private:
     struct Email
     {
         EmailSettings settings;
-        std::string to;
         std::string subject;
         std::string body;
         std::vector<std::string> files;

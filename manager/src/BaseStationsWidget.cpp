@@ -1,4 +1,5 @@
 #include "BaseStationsWidget.h"
+#include "Settings.h"
 #include <cassert>
 #include <QMessageBox>
 
@@ -34,6 +35,8 @@ BaseStationsWidget::~BaseStationsWidget()
 
 void BaseStationsWidget::init(Comms& comms, Settings& settings)
 {
+    setEnabled(true);
+
     m_comms = &comms;
     m_settings = &settings;
 
@@ -82,6 +85,18 @@ void BaseStationsWidget::init(Comms& comms, Settings& settings)
             setStatus(i, connected ? "Added / Connected" : "Added / Disconnected");
         }
     }
+
+    setRW();
+    connect(&settings, &Settings::userLoggedIn, this, &BaseStationsWidget::setRW);
+}
+
+
+//////////////////////////////////////////////////////////////////////////
+
+void BaseStationsWidget::setRW()
+{
+//    m_ui.add->setEnabled(m_settings->isLoggedInAsAdmin());
+//    m_ui.remove->setEnabled(m_settings->isLoggedInAsAdmin());
 }
 
 //////////////////////////////////////////////////////////////////////////

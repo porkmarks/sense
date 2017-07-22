@@ -20,14 +20,19 @@ public:
     void init(Comms& comms, Settings& settings);
     void shutdown();
 
-    void initDB(DB& db);
-    void shutdownDB();
+    void initBaseStation(Settings::BaseStationId id);
+    void shutdownBaseStation(Settings::BaseStationId id);
 
 signals:
 
 private slots:
+    void setRW();
+    void sendTestEmail(Settings::EmailSettings const& settings);
+    void applyEmailSettings();
 
 private:
+    void setEmailSettings(Settings::EmailSettings const& settings);
+    bool getEmailSettings(Settings::EmailSettings& settings);
 
     Ui::SettingsWidget m_ui;
     Settings* m_settings = nullptr;

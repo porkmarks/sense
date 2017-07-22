@@ -181,11 +181,11 @@ void Manager::activateBaseStation(Settings::BaseStationId id)
 
     DB& db = m_settings.getBaseStationDB(index);
 
-    m_ui.sensorsWidget->init(db);
+    m_ui.sensorsWidget->init(m_settings, db);
     m_ui.measurementsWidget->init(db);
     m_ui.plotWidget->init(db);
-    m_ui.alarmsWidget->init(db);
-    m_ui.settingsWidget->initDB(db);
+    m_ui.alarmsWidget->init(m_settings, db);
+    m_ui.settingsWidget->initBaseStation(id);
 
     m_ui.actionEmailSettings->setEnabled(true);
     m_ui.actionFtpSettings->setEnabled(true);
@@ -204,7 +204,7 @@ void Manager::deactivateBaseStation(Settings::BaseStationId id)
     m_ui.measurementsWidget->shutdown();
     m_ui.plotWidget->shutdown();
     m_ui.alarmsWidget->shutdown();
-    m_ui.settingsWidget->shutdownDB();;
+    m_ui.settingsWidget->shutdownBaseStation(id);
 
     m_ui.actionEmailSettings->setEnabled(false);
     m_ui.actionFtpSettings->setEnabled(false);

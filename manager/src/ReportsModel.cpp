@@ -153,7 +153,7 @@ QVariant ReportsModel::data(QModelIndex const& index, int role) const
             QString str;
             if (descriptor.sendEmailAction)
             {
-                str = ("Email " + descriptor.emailRecipient).c_str();
+                str = "Send Email";
             }
             if (descriptor.uploadToFtpAction)
             {
@@ -161,7 +161,7 @@ QVariant ReportsModel::data(QModelIndex const& index, int role) const
                 {
                     str += " and ";
                 }
-                str += ("Upload to FTP folder: " + descriptor.ftpFolder).c_str();
+                str += "Upload to FTP";
             }
             return str;
         }

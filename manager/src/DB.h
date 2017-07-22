@@ -155,7 +155,6 @@ public:
         bool sensorErrorsWatch = false;
 
         bool sendEmailAction = false;
-        std::string emailRecipient;
     };
 
     typedef uint32_t AlarmId;
@@ -218,10 +217,7 @@ public:
         std::vector<SensorId> sensors;
 
         bool sendEmailAction = false;
-        std::string emailRecipient;
-
         bool uploadToFtpAction = false;
-        std::string ftpFolder;
     };
 
     typedef uint32_t ReportId;

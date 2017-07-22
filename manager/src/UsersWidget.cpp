@@ -29,6 +29,7 @@ UsersWidget::~UsersWidget()
 void UsersWidget::init(Settings& settings)
 {
     setEnabled(true);
+
     m_settings = &settings;
 
     m_model.reset(new UsersModel(settings));
@@ -38,6 +39,9 @@ void UsersWidget::init(Settings& settings)
     {
         m_ui.list->resizeColumnToContents(i);
     }
+
+    setRW();
+    connect(&settings, &Settings::userLoggedIn, this, &UsersWidget::setRW);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -49,6 +53,14 @@ void UsersWidget::shutdown()
     m_ui.list->setItemDelegate(nullptr);
     m_model.reset();
     m_settings = nullptr;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void UsersWidget::setRW()
+{
+    m_ui.add->setEnabled(m_settings->isLoggedInAsAdmin());
+    m_ui.remove->setEnabled(m_settings->isLoggedInAsAdmin());
 }
 
 //////////////////////////////////////////////////////////////////////////

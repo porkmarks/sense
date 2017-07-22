@@ -22,6 +22,7 @@
 
 extern std::string s_programFolder;
 
+constexpr uint64_t k_fileEncryptionKey = 32455153254365ULL;
 constexpr uint64_t k_emailEncryptionKey = 1735271834639209ULL;
 constexpr uint64_t k_ftpEncryptionKey = 45235321231234ULL;
 
@@ -73,20 +74,29 @@ bool Settings::load(std::string const& name)
     Data data;
 
     {
-        std::ifstream file(dataFilename);
+        std::ifstream file(dataFilename, std::ios_base::binary);
         if (!file.is_open())
         {
             std::cerr << "Failed to open " << dataFilename << " file: " << std::strerror(errno) << "\n";
             return false;
         }
 
+        std::string streamData((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+        Crypt crypt;
+        crypt.setKey(k_fileEncryptionKey);
+        QByteArray decryptedData = crypt.decryptToByteArray(QByteArray(streamData.data(), streamData.size()));
+
         rapidjson::Document document;
-        rapidjson::BasicIStreamWrapper<std::ifstream> reader(file);
-        document.ParseStream(reader);
+        document.Parse(decryptedData.data(), decryptedData.size());
         if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
         {
-            std::cerr << "Failed to open " << dataFilename << " file: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
-            return false;
+            document.Parse(streamData.data(), streamData.size());
+            if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
+            {
+                std::cerr << "Failed to open " << dataFilename << " file: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
+                return false;
+            }
         }
         if (!document.IsObject())
         {
@@ -145,6 +155,14 @@ bool Settings::load(std::string const& name)
                 return false;
             }
             data.emailSettings.from = it->value.GetString();
+
+            it = esj.FindMember("recipient");
+            if (it == esj.MemberEnd() || !it->value.IsString())
+            {
+                std::cerr << "Bad or missing email settings recipient\n";
+                return false;
+            }
+            data.emailSettings.recipient = it->value.GetString();
         }
 
         it = document.FindMember("ftp_settings");
@@ -190,6 +208,30 @@ bool Settings::load(std::string const& name)
                 return false;
             }
             data.ftpSettings.password = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
+
+            it = esj.FindMember("folder");
+            if (it == esj.MemberEnd() || !it->value.IsString())
+            {
+                std::cerr << "Bad or missing ftp settings folder\n";
+                return false;
+            }
+            data.ftpSettings.folder = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
+
+            it = esj.FindMember("upload_backups");
+            if (it == esj.MemberEnd() || !it->value.IsBool())
+            {
+                std::cerr << "Bad or missing ftp settings upload_backups\n";
+                return false;
+            }
+            data.ftpSettings.uploadBackups = it->value.GetBool();
+
+            it = esj.FindMember("upload_backups_every");
+            if (it == esj.MemberEnd() || !it->value.IsUint64())
+            {
+                std::cerr << "Bad or missing ftp settings upload_backups_every\n";
+                return false;
+            }
+            data.ftpSettings.uploadBackupsPeriod = std::chrono::seconds(it->value.GetUint64());
         }
 
         it = document.FindMember("users");
@@ -875,6 +917,7 @@ void Settings::save(Data const& data) const
             QString password(data.emailSettings.password.c_str());
             esj.AddMember("password", rapidjson::Value(crypt.encryptToString(password).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
             esj.AddMember("from", rapidjson::Value(data.emailSettings.from.c_str(), document.GetAllocator()), document.GetAllocator());
+            esj.AddMember("recipient", rapidjson::Value(data.emailSettings.recipient.c_str(), document.GetAllocator()), document.GetAllocator());
             document.AddMember("email_settings", esj, document.GetAllocator());
         }
         {
@@ -888,6 +931,9 @@ void Settings::save(Data const& data) const
             fsj.AddMember("username", rapidjson::Value(crypt.encryptToString(username).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
             QString password(data.ftpSettings.password.c_str());
             fsj.AddMember("password", rapidjson::Value(crypt.encryptToString(password).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
+            fsj.AddMember("folder", rapidjson::Value(data.ftpSettings.folder.c_str(), document.GetAllocator()), document.GetAllocator());
+            fsj.AddMember("upload_backups", rapidjson::Value(data.ftpSettings.uploadBackups), document.GetAllocator());
+            fsj.AddMember("upload_backups_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.ftpSettings.uploadBackupsPeriod).count()), document.GetAllocator());
             document.AddMember("ftp_settings", fsj, document.GetAllocator());
         }
 
@@ -928,18 +974,24 @@ void Settings::save(Data const& data) const
         }
         document.AddMember("active_base_station", rapidjson::Value(data.activeBaseStationId), document.GetAllocator());
 
+        rapidjson::StringBuffer buffer;
+        rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
+        document.Accept(writer);
+
+        Crypt crypt;
+        crypt.setKey(k_fileEncryptionKey);
+        QByteArray encryptedData = crypt.encryptToByteArray(QByteArray(buffer.GetString(), buffer.GetSize()));
+//        QByteArray encryptedData = QByteArray(buffer.GetString(), buffer.GetSize());
+
         std::string tempFilename = (s_programFolder + "/data/" + m_dataName + "_temp");
-        std::ofstream file(tempFilename);
+        std::ofstream file(tempFilename, std::ios_base::binary);
         if (!file.is_open())
         {
             std::cerr << "Failed to open " << tempFilename << " file: " << std::strerror(errno) << "\n";
         }
         else
         {
-            rapidjson::BasicOStreamWrapper<std::ofstream> buffer{file};
-            //rapidjson::Writer<rapidjson::BasicOStreamWrapper<std::ofstream>> writer(buffer);
-            rapidjson::PrettyWriter<rapidjson::BasicOStreamWrapper<std::ofstream>> writer(buffer);
-            document.Accept(writer);
+            file.write(encryptedData.data(), encryptedData.size());
         }
         file.flush();
         file.close();

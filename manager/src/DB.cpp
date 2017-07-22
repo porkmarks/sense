@@ -25,8 +25,7 @@ extern std::string s_programFolder;
 constexpr float k_alertVcc = 2.2f;
 constexpr int8_t k_alertSignal = -110;
 
-constexpr uint64_t k_emailEncryptionKey = 1735271834639209ULL;
-constexpr uint64_t k_ftpEncryptionKey = 45235321231234ULL;
+constexpr uint64_t k_fileEncryptionKey = 4353123543565ULL;
 
 template <typename Stream, typename T>
 void write(Stream& s, T const& t)
@@ -94,21 +93,31 @@ bool DB::load(std::string const& name)
     Data data;
 
     {
-        std::ifstream file(dataFilename);
+        std::ifstream file(dataFilename, std::ios_base::binary);
         if (!file.is_open())
         {
             std::cerr << "Failed to open " << dataFilename << " file: " << std::strerror(errno) << "\n";
             return false;
         }
 
+        std::string streamData((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+        Crypt crypt;
+        crypt.setKey(k_fileEncryptionKey);
+        QByteArray decryptedData = crypt.decryptToByteArray(QByteArray(streamData.data(), streamData.size()));
+
         rapidjson::Document document;
-        rapidjson::BasicIStreamWrapper<std::ifstream> reader(file);
-        document.ParseStream(reader);
+        document.Parse(decryptedData.data(), decryptedData.size());
         if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
         {
-            std::cerr << "Failed to open " << dataFilename << " file: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
-            return false;
+            document.Parse(streamData.data(), streamData.size());
+            if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
+            {
+                std::cerr << "Failed to open " << dataFilename << " file: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
+                return false;
+            }
         }
+
         if (!document.IsObject())
         {
             std::cerr << "Bad document.\n";
@@ -405,14 +414,6 @@ bool DB::load(std::string const& name)
                 }
                 alarm.descriptor.sendEmailAction = it->value.GetBool();
 
-                it = alarmj.FindMember("email_recipient");
-                if (it == alarmj.MemberEnd() || !it->value.IsString())
-                {
-                    std::cerr << "Bad or missing alarm email_recipient\n";
-                    return false;
-                }
-                alarm.descriptor.emailRecipient = it->value.GetString();
-
                 data.lastAlarmId = std::max(data.lastAlarmId, alarm.id);
                 data.alarms.push_back(alarm);
             }
@@ -517,14 +518,6 @@ bool DB::load(std::string const& name)
                 }
                 report.descriptor.sendEmailAction = it->value.GetBool();
 
-                it = reportj.FindMember("email_recipient");
-                if (it == reportj.MemberEnd() || !it->value.IsString())
-                {
-                    std::cerr << "Bad or missing report email_recipient\n";
-                    return false;
-                }
-                report.descriptor.emailRecipient = it->value.GetString();
-
                 it = reportj.FindMember("upload_to_ftp_action");
                 if (it == reportj.MemberEnd() || !it->value.IsBool())
                 {
@@ -532,14 +525,6 @@ bool DB::load(std::string const& name)
                     return false;
                 }
                 report.descriptor.uploadToFtpAction = it->value.GetBool();
-
-                it = reportj.FindMember("ftp_folder");
-                if (it == reportj.MemberEnd() || !it->value.IsString())
-                {
-                    std::cerr << "Bad or missing report ftp_folder\n";
-                    return false;
-                }
-                report.descriptor.ftpFolder = it->value.GetString();
 
                 data.lastReportId = std::max(data.lastReportId, report.id);
                 data.reports.push_back(report);
@@ -1678,7 +1663,6 @@ void DB::save(Data const& data) const
                 alarmj.AddMember("low_signal_watch", alarm.descriptor.lowSignalWatch, document.GetAllocator());
                 alarmj.AddMember("sensor_errors_watch", alarm.descriptor.sensorErrorsWatch, document.GetAllocator());
                 alarmj.AddMember("send_email_action", alarm.descriptor.sendEmailAction, document.GetAllocator());
-                alarmj.AddMember("email_recipient", rapidjson::Value(alarm.descriptor.emailRecipient.c_str(), document.GetAllocator()), document.GetAllocator());
                 alarmsj.PushBack(alarmj, document.GetAllocator());
             }
             document.AddMember("alarms", alarmsj, document.GetAllocator());
@@ -1709,26 +1693,30 @@ void DB::save(Data const& data) const
                 reportj.AddMember("custom_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(report.descriptor.customPeriod).count()), document.GetAllocator());
                 reportj.AddMember("data", static_cast<int32_t>(report.descriptor.data), document.GetAllocator());
                 reportj.AddMember("send_email_action", report.descriptor.sendEmailAction, document.GetAllocator());
-                reportj.AddMember("email_recipient", rapidjson::Value(report.descriptor.emailRecipient.c_str(), document.GetAllocator()), document.GetAllocator());
                 reportj.AddMember("upload_to_ftp_action", report.descriptor.uploadToFtpAction, document.GetAllocator());
-                reportj.AddMember("ftp_folder", rapidjson::Value(report.descriptor.ftpFolder.c_str(), document.GetAllocator()), document.GetAllocator());
                 reportsj.PushBack(reportj, document.GetAllocator());
             }
             document.AddMember("reports", reportsj, document.GetAllocator());
         }
 
+        rapidjson::StringBuffer buffer;
+        rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
+        document.Accept(writer);
+
+        Crypt crypt;
+        crypt.setKey(k_fileEncryptionKey);
+        QByteArray encryptedData = crypt.encryptToByteArray(QByteArray(buffer.GetString(), buffer.GetSize()));
+//        QByteArray encryptedData = QByteArray(buffer.GetString(), buffer.GetSize());
+
         std::string tempFilename = (s_programFolder + "/db/" + m_dataName + "_temp");
-        std::ofstream file(tempFilename);
+        std::ofstream file(tempFilename, std::ios_base::binary);
         if (!file.is_open())
         {
             std::cerr << "Failed to open " << tempFilename << " file: " << std::strerror(errno) << "\n";
         }
         else
         {
-            rapidjson::BasicOStreamWrapper<std::ofstream> buffer{file};
-            //rapidjson::Writer<rapidjson::BasicOStreamWrapper<std::ofstream>> writer(buffer);
-            rapidjson::PrettyWriter<rapidjson::BasicOStreamWrapper<std::ofstream>> writer(buffer);
-            document.Accept(writer);
+            file.write(encryptedData.data(), encryptedData.size());
         }
         file.flush();
         file.close();

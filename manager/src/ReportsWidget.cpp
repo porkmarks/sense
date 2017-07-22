@@ -1,5 +1,6 @@
 #include "ReportsWidget.h"
 #include "ConfigureReportDialog.h"
+#include "Settings.h"
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -26,6 +27,7 @@ ReportsWidget::~ReportsWidget()
 void ReportsWidget::init(Settings& settings, DB& db)
 {
     setEnabled(true);
+
     m_settings = &settings;
     m_db = &db;
 
@@ -36,6 +38,9 @@ void ReportsWidget::init(Settings& settings, DB& db)
     {
         m_ui.list->resizeColumnToContents(i);
     }
+
+    setRW();
+    connect(&settings, &Settings::userLoggedIn, this, &ReportsWidget::setRW);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -44,9 +49,18 @@ void ReportsWidget::shutdown()
 {
     setEnabled(false);
     m_ui.list->setModel(nullptr);
-    m_ui.list->setItemDelegate(nullptr);
+    //m_ui.list->setItemDelegate(nullptr);
     m_model.reset();
     m_db = nullptr;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void ReportsWidget::setRW()
+{
+    //available to normal users as well
+//    m_ui.add->setEnabled(m_settings->isLoggedInAsAdmin());
+//    m_ui.remove->setEnabled(m_settings->isLoggedInAsAdmin());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -62,6 +76,7 @@ void ReportsWidget::configureReport(QModelIndex const& index)
 
     ConfigureReportDialog dialog(*m_settings, *m_db);
     dialog.setReport(report);
+    dialog.setEnabled(m_settings->isLoggedInAsAdmin());
 
     int result = dialog.exec();
     if (result == QDialog::Accepted)
