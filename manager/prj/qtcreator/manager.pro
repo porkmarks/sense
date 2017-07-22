@@ -106,7 +106,8 @@ HEADERS += \
     ../../src/ConfigureUserDialog.h \
     ../../src/UsersModel.h \
     ../../src/UsersWidget.h \
-    ../../src/Settings.h
+    ../../src/Settings.h \
+    ../../src/Logger.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -153,7 +154,8 @@ SOURCES += \
     ../../src/ConfigureUserDialog.cpp \
     ../../src/UsersModel.cpp \
     ../../src/UsersWidget.cpp \
-    ../../src/Settings.cpp
+    ../../src/Settings.cpp \
+    ../../src/Logger.cpp
 
 FORMS += \
     ../../src/Manager.ui \

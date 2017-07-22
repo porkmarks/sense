@@ -20,7 +20,7 @@
 #include "Utils.h"
 #include "Crypt.h"
 
-extern std::string s_programFolder;
+extern std::string s_dataFolder;
 
 constexpr float k_alertVcc = 2.2f;
 constexpr int8_t k_alertSignal = -110;
@@ -67,13 +67,11 @@ bool DB::create(std::string const& name)
     m_dataName = "sense-" + name + ".data";
     m_mainData.measurements.clear();
 
-    QDir().mkpath((s_programFolder + "/db").c_str());
+    moveToBackup(m_dbName, s_dataFolder + "/" + m_dbName, s_dataFolder + "/backups/deleted");
+    moveToBackup(m_dataName, s_dataFolder + "/" + m_dataName, s_dataFolder + "/backups/deleted");
 
-    moveToBackup(m_dbName, s_programFolder + "/db/" + m_dbName, s_programFolder + "/backups/deleted");
-    moveToBackup(m_dataName, s_programFolder + "/db/" + m_dataName, s_programFolder + "/backups/deleted");
-
-    remove((s_programFolder + "/db/" + m_dbName).c_str());
-    remove((s_programFolder + "/db/" + m_dataName).c_str());
+    remove((s_dataFolder + "/" + m_dbName).c_str());
+    remove((s_dataFolder + "/" + m_dataName).c_str());
 
     return true;
 }
@@ -87,8 +85,8 @@ bool DB::load(std::string const& name)
     m_dbName = "sense-" + name + ".db";
     m_dataName = "sense-" + name + ".data";
 
-    std::string dataFilename = (s_programFolder + "/db/" + m_dataName);
-    std::string dbFilename = (s_programFolder + "/db/" + m_dbName);
+    std::string dataFilename = (s_dataFolder + "/" + m_dataName);
+    std::string dbFilename = (s_dataFolder + "/" + m_dbName);
 
     Data data;
 
@@ -101,6 +99,7 @@ bool DB::load(std::string const& name)
         }
 
         std::string streamData((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        file.close();
 
         Crypt crypt;
         crypt.setKey(k_fileEncryptionKey);
@@ -530,8 +529,6 @@ bool DB::load(std::string const& name)
                 data.reports.push_back(report);
             }
         }
-
-        file.close();
     }
 
 
@@ -635,7 +632,7 @@ bool DB::load(std::string const& name)
         file.close();
     }
 
-    std::pair<std::string, time_t> bkf = getMostRecentBackup(dbFilename, s_programFolder + "/backups/daily");
+    std::pair<std::string, time_t> bkf = getMostRecentBackup(dbFilename, s_dataFolder + "/backups/daily");
     if (bkf.first.empty())
     {
         m_lastDailyBackupTP = DB::Clock::now();
@@ -644,7 +641,7 @@ bool DB::load(std::string const& name)
     {
         m_lastDailyBackupTP = DB::Clock::from_time_t(bkf.second);
     }
-    bkf = getMostRecentBackup(dbFilename, s_programFolder + "/backups/weekly");
+    bkf = getMostRecentBackup(dbFilename, s_dataFolder + "/backups/weekly");
     if (bkf.first.empty())
     {
         m_lastWeeklyBackupTP = DB::Clock::now();
@@ -1592,8 +1589,8 @@ void DB::save(Data const& data) const
         weeklyBackup = true;
     }
 
-    std::string dataFilename = (s_programFolder + "/db/" + m_dataName);
-    std::string dbFilename = (s_programFolder + "/db/" + m_dbName);
+    std::string dataFilename = (s_dataFolder + "/" + m_dataName);
+    std::string dbFilename = (s_dataFolder + "/" + m_dbName);
 
     Clock::time_point start = now;
 
@@ -1708,7 +1705,7 @@ void DB::save(Data const& data) const
         QByteArray encryptedData = crypt.encryptToByteArray(QByteArray(buffer.GetString(), buffer.GetSize()));
 //        QByteArray encryptedData = QByteArray(buffer.GetString(), buffer.GetSize());
 
-        std::string tempFilename = (s_programFolder + "/db/" + m_dataName + "_temp");
+        std::string tempFilename = (s_dataFolder + "/" + m_dataName + "_temp");
         std::ofstream file(tempFilename, std::ios_base::binary);
         if (!file.is_open())
         {
@@ -1721,7 +1718,7 @@ void DB::save(Data const& data) const
         file.flush();
         file.close();
 
-        copyToBackup(m_dataName, dataFilename, s_programFolder + "/backups/incremental");
+        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/incremental");
 
         if (!renameFile(tempFilename.c_str(), dataFilename.c_str()))
         {
@@ -1730,7 +1727,7 @@ void DB::save(Data const& data) const
     }
 
     {
-        std::string tempFilename = (s_programFolder + "/db/" + m_dbName + "_temp");
+        std::string tempFilename = (s_dataFolder + "/" + m_dbName + "_temp");
         std::ofstream file(tempFilename, std::ios_base::binary);
         if (!file.is_open())
         {
@@ -1750,7 +1747,7 @@ void DB::save(Data const& data) const
             file.flush();
             file.close();
 
-            copyToBackup(m_dbName, dbFilename, s_programFolder + "/backups/incremental");
+            copyToBackup(m_dbName, dbFilename, s_dataFolder + "/backups/incremental");
 
             if (!renameFile(tempFilename.c_str(), dbFilename.c_str()))
             {
@@ -1764,13 +1761,13 @@ void DB::save(Data const& data) const
 
     if (dailyBackup)
     {
-        copyToBackup(m_dataName, dataFilename, s_programFolder + "/backups/daily");
-        copyToBackup(m_dbName, dbFilename, s_programFolder + "/backups/daily");
+        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/daily");
+        copyToBackup(m_dbName, dbFilename, s_dataFolder + "/backups/daily");
     }
     if (weeklyBackup)
     {
-        copyToBackup(m_dataName, dataFilename, s_programFolder + "/backups/weekly");
-        copyToBackup(m_dbName, dbFilename, s_programFolder + "/backups/weekly");
+        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/weekly");
+        copyToBackup(m_dbName, dbFilename, s_dataFolder + "/backups/weekly");
     }
 }
 

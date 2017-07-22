@@ -4,6 +4,7 @@
 #include <QLocale>
 
 std::string s_programFolder;
+std::string s_dataFolder;
 
 /* This prints an "Assertion failed" message and aborts.  */
 void __assert_fail(const char *__assertion, const char *__file, unsigned int __line, const char *__function)
@@ -22,6 +23,8 @@ int main(int argc, char *argv[])
     QApplication a(argc, argv);
 
     s_programFolder = a.applicationDirPath().toUtf8().data();
+    s_dataFolder = s_programFolder + "/data";
+    QDir().mkpath(s_dataFolder.c_str());
 
 //    QApplication::setStyle("fusion");
 

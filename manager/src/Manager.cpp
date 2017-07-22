@@ -14,6 +14,13 @@
 
 extern std::string k_passwordHashReferenceText;
 
+std::string getMacStr(Settings::BaseStationDescriptor::Mac const& mac)
+{
+    char macStr[128];
+    sprintf(macStr, "%X:%X:%X:%X:%X:%X", mac[0]&0xFF, mac[1]&0xFF, mac[2]&0xFF, mac[3]&0xFF, mac[4]&0xFF, mac[5]&0xFF);
+    return macStr;
+}
+
 //////////////////////////////////////////////////////////////////////////
 
 Manager::Manager(QWidget *parent)
@@ -21,10 +28,21 @@ Manager::Manager(QWidget *parent)
 {
     m_ui.setupUi(this);
 
+    if (!m_logger.load("log"))
+    {
+        if (!m_settings.create("log"))
+        {
+            QMessageBox::critical(this, "Error", "Cannot create the log file.");
+            exit(1);
+        }
+    }
+    m_logger.logInfo("Program started");
+
     if (!m_settings.load("settings"))
     {
         if (!m_settings.create("settings"))
         {
+            m_logger.logError("Cannot create the settings file");
             QMessageBox::critical(this, "Error", "Cannot create the settings file.");
             exit(1);
         }
@@ -62,6 +80,8 @@ Manager::Manager(QWidget *parent)
 
 Manager::~Manager()
 {
+    m_logger.logInfo("Program exit");
+
 //    delete m_ui.baseStationsWidget;
     delete m_ui.sensorsWidget;
     delete m_ui.measurementsWidget;
@@ -75,6 +95,8 @@ void Manager::checkIfAdminExists()
 {
     if (m_settings.needsAdmin())
     {
+        m_logger.logInfo("No admin account exists, creating one");
+
         QMessageBox::information(this, "Admin", "No admin user exists. Please create one now.");
 
         ConfigureUserDialog dialog(m_settings);
@@ -89,16 +111,27 @@ void Manager::checkIfAdminExists()
             user = dialog.getUser();
             if (m_settings.addUser(user.descriptor))
             {
+                m_logger.logInfo(QString("Admin user %1 created, logging in").arg(user.descriptor.name.c_str()).toUtf8().data());
+
                 int32_t userIndex = m_settings.findUserIndexByName(user.descriptor.name);
                 if (userIndex >= 0)
                 {
                     m_settings.setLoggedInUserId(m_settings.getUser(userIndex).id);
                 }
+                else
+                {
+                    m_logger.logError("Internal consistency error: user not found after adding");
+                }
             }
+        }
+        else
+        {
+            m_logger.logWarning("User cancelled admin creation dialog");
         }
 
         if (m_settings.needsAdmin())
         {
+            m_logger.logError("User failed to create an admin account. Exiting");
             QMessageBox::critical(this, "Error", "No admin user exists.\nThe program will now close.");
             exit(1);
         }
@@ -111,10 +144,13 @@ void Manager::login()
 {
     if (!m_settings.getLoggedInUser())
     {
+        m_logger.logInfo("Asking the user to log in");
+
         QDialog dialog;
         Ui::LoginDialog ui;
         ui.setupUi(&dialog);
 
+        size_t attempts = 0;
         while (true)
         {
             int result = dialog.exec();
@@ -123,6 +159,8 @@ void Manager::login()
                 int32_t userIndex = m_settings.findUserIndexByName(ui.username->text().toUtf8().data());
                 if (userIndex < 0)
                 {
+                    attempts++;
+                    m_logger.logError(QString("Invalid login credentials (user not found), attempt %1").arg(attempts).toUtf8().data());
                     QMessageBox::critical(this, "Error", "Invalid username/password.");
                     continue;
                 }
@@ -137,6 +175,8 @@ void Manager::login()
                 std::string passwordHash = crypt.encryptToString(QString(k_passwordHashReferenceText.c_str())).toUtf8().data();
                 if (user.descriptor.passwordHash != passwordHash)
                 {
+                    attempts++;
+                    m_logger.logError(QString("Invalid login credentials (wrong password), attempt %1").arg(attempts).toUtf8().data());
                     QMessageBox::critical(this, "Error", "Invalid username/password.");
                     continue;
                 }
@@ -146,6 +186,7 @@ void Manager::login()
             }
             else
             {
+                m_logger.logError("User failed to log in. Exiting");
                 QMessageBox::critical(this, "Error", "You need to be logged in to user this program.\nThe program will now close.");
                 exit(1);
             }
@@ -164,7 +205,9 @@ void Manager::userLoggedIn(Settings::UserId id)
     }
     else
     {
-        setWindowTitle(QString("Manager (%1)").arg(m_settings.getUser(index).descriptor.name.c_str()));
+        Settings::User const& user = m_settings.getUser(index);
+        m_logger.logInfo(QString("Logged in as %1").arg(user.descriptor.name.c_str()).toUtf8().data());
+        setWindowTitle(QString("Manager (%1)").arg(user.descriptor.name.c_str()));
     }
 }
 
@@ -175,11 +218,15 @@ void Manager::activateBaseStation(Settings::BaseStationId id)
     int32_t index = m_settings.findBaseStationIndexById(id);
     if (index < 0)
     {
+        m_logger.logError("Tried to activate an inexisting base station");
         assert(false);
         return;
     }
 
+    Settings::BaseStation const& bs = m_settings.getBaseStation(index);
     DB& db = m_settings.getBaseStationDB(index);
+
+    m_logger.logInfo(QString("Activated base station %1 / %2").arg(bs.descriptor.name.c_str()).arg(getMacStr(bs.descriptor.mac).c_str()).toUtf8().data());
 
     m_ui.sensorsWidget->init(m_settings, db);
     m_ui.measurementsWidget->init(db);
@@ -200,6 +247,18 @@ void Manager::activateBaseStation(Settings::BaseStationId id)
 
 void Manager::deactivateBaseStation(Settings::BaseStationId id)
 {
+    int32_t index = m_settings.findBaseStationIndexById(id);
+    if (index < 0)
+    {
+        m_logger.logError("Tried to deactivate an inexisting base station");
+        assert(false);
+    }
+    else
+    {
+        Settings::BaseStation const& bs = m_settings.getBaseStation(index);
+        m_logger.logInfo(QString("Deactivated base station %1 / %2").arg(bs.descriptor.name.c_str()).arg(getMacStr(bs.descriptor.mac).c_str()).toUtf8().data());
+    }
+
     m_ui.sensorsWidget->shutdown();
     m_ui.measurementsWidget->shutdown();
     m_ui.plotWidget->shutdown();

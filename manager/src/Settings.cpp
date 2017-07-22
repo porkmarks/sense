@@ -20,11 +20,13 @@
 #include "Utils.h"
 #include "Crypt.h"
 
-extern std::string s_programFolder;
+extern std::string s_dataFolder;
 
 constexpr uint64_t k_fileEncryptionKey = 32455153254365ULL;
 constexpr uint64_t k_emailEncryptionKey = 1735271834639209ULL;
 constexpr uint64_t k_ftpEncryptionKey = 45235321231234ULL;
+
+extern std::string getMacStr(Settings::BaseStationDescriptor::Mac const& mac);
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -52,11 +54,9 @@ bool Settings::create(std::string const& name)
 {
     m_dataName = "sense-" + name + ".settings";
 
-    QDir().mkpath((s_programFolder + "/data").c_str());
+    moveToBackup(m_dataName, s_dataFolder + "/" + m_dataName, s_dataFolder + "/backups/deleted");
 
-    moveToBackup(m_dataName, s_programFolder + "/data/" + m_dataName, s_programFolder + "/backups/deleted");
-
-    remove((s_programFolder + "/data/" + m_dataName).c_str());
+    remove((s_dataFolder + "/" + m_dataName).c_str());
 
     return true;
 }
@@ -69,7 +69,7 @@ bool Settings::load(std::string const& name)
 
     m_dataName = "sense-" + name + ".settings";
 
-    std::string dataFilename = (s_programFolder + "/data/" + m_dataName);
+    std::string dataFilename = (s_dataFolder + "/" + m_dataName);
 
     Data data;
 
@@ -386,7 +386,7 @@ bool Settings::load(std::string const& name)
     m_emailers.emplace_back(new Emailer(*this, *m_dbs.back()));
 
     //initialize backups
-    std::pair<std::string, time_t> bkf = getMostRecentBackup(dataFilename, s_programFolder + "/backups/daily");
+    std::pair<std::string, time_t> bkf = getMostRecentBackup(dataFilename, s_dataFolder + "/backups/daily");
     if (bkf.first.empty())
     {
         m_lastDailyBackupTP = Settings::Clock::now();
@@ -395,7 +395,7 @@ bool Settings::load(std::string const& name)
     {
         m_lastDailyBackupTP = Settings::Clock::from_time_t(bkf.second);
     }
-    bkf = getMostRecentBackup(dataFilename, s_programFolder + "/backups/weekly");
+    bkf = getMostRecentBackup(dataFilename, s_dataFolder + "/backups/weekly");
     if (bkf.first.empty())
     {
         m_lastWeeklyBackupTP = Settings::Clock::now();
@@ -898,7 +898,7 @@ void Settings::save(Data const& data) const
         weeklyBackup = true;
     }
 
-    std::string dataFilename = (s_programFolder + "/data/" + m_dataName);
+    std::string dataFilename = (s_dataFolder + "/" + m_dataName);
 
     Clock::time_point start = now;
 
@@ -965,9 +965,7 @@ void Settings::save(Data const& data) const
                 bsj.AddMember("address", rapidjson::Value(baseStation.descriptor.address.toString().toUtf8().data(), document.GetAllocator()), document.GetAllocator());
 
                 BaseStationDescriptor::Mac const& mac = baseStation.descriptor.mac;
-                char macStr[128];
-                sprintf(macStr, "%X:%X:%X:%X:%X:%X", mac[0]&0xFF, mac[1]&0xFF, mac[2]&0xFF, mac[3]&0xFF, mac[4]&0xFF, mac[5]&0xFF);
-                bsj.AddMember("mac", rapidjson::Value(macStr, document.GetAllocator()), document.GetAllocator());
+                bsj.AddMember("mac", rapidjson::Value(getMacStr(mac).c_str(), document.GetAllocator()), document.GetAllocator());
                 bssj.PushBack(bsj, document.GetAllocator());
             }
             document.AddMember("base_stations", bssj, document.GetAllocator());
@@ -983,7 +981,7 @@ void Settings::save(Data const& data) const
         QByteArray encryptedData = crypt.encryptToByteArray(QByteArray(buffer.GetString(), buffer.GetSize()));
 //        QByteArray encryptedData = QByteArray(buffer.GetString(), buffer.GetSize());
 
-        std::string tempFilename = (s_programFolder + "/data/" + m_dataName + "_temp");
+        std::string tempFilename = (s_dataFolder + "/" + m_dataName + "_temp");
         std::ofstream file(tempFilename, std::ios_base::binary);
         if (!file.is_open())
         {
@@ -996,7 +994,7 @@ void Settings::save(Data const& data) const
         file.flush();
         file.close();
 
-        copyToBackup(m_dataName, dataFilename, s_programFolder + "/backups/incremental");
+        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/incremental");
 
         if (!renameFile(tempFilename.c_str(), dataFilename.c_str()))
         {
@@ -1009,11 +1007,11 @@ void Settings::save(Data const& data) const
 
     if (dailyBackup)
     {
-        copyToBackup(m_dataName, dataFilename, s_programFolder + "/backups/daily");
+        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/daily");
     }
     if (weeklyBackup)
     {
-        copyToBackup(m_dataName, dataFilename, s_programFolder + "/backups/weekly");
+        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/weekly");
     }
 }
 

@@ -3,6 +3,8 @@
 #include <cassert>
 #include <QMessageBox>
 
+extern std::string getMacStr(Settings::BaseStationDescriptor::Mac const& mac);
+
 //////////////////////////////////////////////////////////////////////////
 
 BaseStationsWidget::BaseStationsWidget(QWidget *parent)
@@ -60,9 +62,7 @@ void BaseStationsWidget::init(Comms& comms, Settings& settings)
 
         {
             Settings::BaseStationDescriptor::Mac mac = bs.descriptor.mac;
-            char macStr[128];
-            sprintf(macStr, "%X:%X:%X:%X:%X:%X", mac[0]&0xFF, mac[1]&0xFF, mac[2]&0xFF, mac[3]&0xFF, mac[4]&0xFF, mac[5]&0xFF);
-            macItem->setText(QString("   %1   ").arg(macStr));
+            macItem->setText(QString("   %1   ").arg(getMacStr(mac).c_str()));
             macItem->setEditable(false);
         }
 
@@ -200,9 +200,6 @@ void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor cons
     }
     m_unregisteredBaseStations.push_back(bs);
 
-    char macStr[128];
-    sprintf(macStr, "%X:%X:%X:%X:%X:%X", bs.mac[0]&0xFF, bs.mac[1]&0xFF, bs.mac[2]&0xFF, bs.mac[3]&0xFF, bs.mac[4]&0xFF, bs.mac[5]&0xFF);
-
     QStandardItem* nameItem = new QStandardItem();
     QStandardItem* macItem = new QStandardItem();
     QStandardItem* ipItem = new QStandardItem();
@@ -215,7 +212,7 @@ void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor cons
     }
 
     {
-        macItem->setText(QString("   %1   ").arg(macStr));
+        macItem->setText(QString("   %1   ").arg(getMacStr(bs.mac).c_str()));
         macItem->setEditable(false);
     }
 
