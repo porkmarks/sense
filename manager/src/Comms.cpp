@@ -89,7 +89,7 @@ void Comms::connectedToBaseStation(ConnectedBaseStation* cbs)
 {
     if (cbs)
     {
-        emit baseStationConnected(cbs->baseStation);
+        emit baseStationConnected(cbs->descriptor);
         cbs->socketAdapter.start();
 
         sendSensorSettings(*cbs);
@@ -103,7 +103,7 @@ void Comms::disconnectedFromBaseStation(ConnectedBaseStation* cbs)
 {
     if (cbs)
     {
-        emit baseStationDisconnected(cbs->baseStation);
+        emit baseStationDisconnected(cbs->descriptor);
 
         auto it = std::find_if(m_connectedBaseStations.begin(), m_connectedBaseStations.end(), [cbs](std::unique_ptr<ConnectedBaseStation> const& _cbs) { return _cbs.get() == cbs; });
         if (it == m_connectedBaseStations.end())
@@ -119,16 +119,17 @@ void Comms::disconnectedFromBaseStation(ConnectedBaseStation* cbs)
 
 //////////////////////////////////////////////////////////////////////////
 
-std::vector<Comms::BaseStationDescriptor> const& Comms::getDiscoveredBaseStations() const
+bool Comms::isBaseStationConnected(Mac mac)
 {
-    return m_discoveredBaseStations;
+    auto it = std::find_if(m_connectedBaseStations.begin(), m_connectedBaseStations.end(), [&mac](std::unique_ptr<ConnectedBaseStation> const& cbs) { return cbs->descriptor.mac == mac; });
+    return (it != m_connectedBaseStations.end());
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void Comms::sendSensorSettings(ConnectedBaseStation& cbs)
 {
-    DB::SensorSettings const& sensorSettings = cbs.baseStation.db.getSensorSettings();
+    DB::SensorSettings const& sensorSettings = cbs.db.getSensorSettings();
 
     rapidjson::Document document;
     document.SetObject();
@@ -149,7 +150,7 @@ void Comms::sendSensorSettings(ConnectedBaseStation& cbs)
 
 void Comms::sendSensors(ConnectedBaseStation& cbs)
 {
-    DB& db = cbs.baseStation.db;
+    DB& db = cbs.db;
 
     rapidjson::Document document;
     document.SetArray();
@@ -177,7 +178,7 @@ void Comms::sendSensors(ConnectedBaseStation& cbs)
 
 void Comms::requestBindSensor(ConnectedBaseStation& cbs, DB::SensorId sensorId)
 {
-    DB& db = cbs.baseStation.db;
+    DB& db = cbs.db;
 
     int32_t sensorIndex = db.findSensorIndexById(sensorId);
     if (sensorIndex < 0)
@@ -370,7 +371,7 @@ void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
         }
         descriptor.sensorErrors = static_cast<uint8_t>(it->value.GetUint());
 
-        if (!cbs.baseStation.db.addMeasurement(descriptor))
+        if (!cbs.db.addMeasurement(descriptor))
         {
             std::cerr << "Cannot deserialize request: Adding measurement failed.\n";
             goto end;
@@ -381,7 +382,7 @@ void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
 
 end:
     {
-        DB& db = cbs.baseStation.db;
+        DB& db = cbs.db;
 
         rapidjson::Document document;
         document.SetObject();
@@ -453,7 +454,7 @@ void Comms::processSensorBoundReq(ConnectedBaseStation& cbs)
         }
         calibration.humidityBias = static_cast<float>(it->value.GetDouble());
 
-        if (!cbs.baseStation.db.bindSensor(id, address, calibration))
+        if (!cbs.db.bindSensor(id, address, calibration))
         {
             std::cerr << "Cannot deserialize request: Bind failed.\n";
             goto end;

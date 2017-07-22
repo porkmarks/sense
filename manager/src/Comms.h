@@ -21,46 +21,37 @@ public:
     Comms();
     ~Comms();
 
+    typedef std::array<uint8_t, 6> Mac;
+
+    bool isBaseStationConnected(Mac mac);
     bool connectToBaseStation(DB& db, QHostAddress const& address);
 
     struct BaseStationDescriptor
     {
         std::string name;
-        std::array<uint8_t, 6> mac;
+        Mac mac;
         QHostAddress address;
         bool operator==(BaseStationDescriptor const& other) const { return name == other.name && mac == other.mac && address == other.address; }
     };
-
-    struct BaseStation
-    {
-        BaseStation(DB& db)
-            : db(db)
-        {}
-
-        BaseStationDescriptor descriptor;
-        DB& db;
-    };
-
-    std::vector<BaseStationDescriptor> const& getDiscoveredBaseStations() const;
-    std::vector<BaseStation> const& getConnectedBasestations() const;
 
     void process();
 
 signals:
     void baseStationDiscovered(BaseStationDescriptor const& bs);
-    void baseStationConnected(BaseStation const& bs);
-    void baseStationDisconnected(BaseStation const& bs);
+    void baseStationConnected(BaseStationDescriptor const& bs);
+    void baseStationDisconnected(BaseStationDescriptor const& bs);
 
 private:
     struct ConnectedBaseStation
     {
         ConnectedBaseStation(DB& db)
-            : baseStation(db)
+            : db(db)
             , channel(socketAdapter)
         {
         }
 
-        BaseStation baseStation;
+        BaseStationDescriptor descriptor;
+        DB& db;
         QTcpSocketAdapter socketAdapter;
         util::comms::Channel<data::Server_Message, QTcpSocketAdapter> channel;
     };

@@ -13,11 +13,8 @@ public:
     ~Manager();
 
 private slots:
-    void activateBaseStation(Comms::BaseStationDescriptor const& bs, DB& db);
-    void deactivateBaseStation(Comms::BaseStationDescriptor const& bs);
-    void openSensorSettingsDialog();
-    void openEmailSettingsDialog();
-    void openFtpSettingsDialog();
+    void activateBaseStation(Settings::BaseStationId id);
+    void deactivateBaseStation(Settings::BaseStationId id);
 
 private:
     void process();

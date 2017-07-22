@@ -21,26 +21,6 @@ Manager::Manager(QWidget *parent)
 {
     m_ui.setupUi(this);
 
-    m_ui.settingsWidget->init(m_comms, m_settings);
-
-    //m_ui.baseStationsWidget->init(m_comms);
-
-    auto* timer = new QTimer(this);
-    timer->setSingleShot(false);
-    timer->start(1);
-    connect(timer, &QTimer::timeout, this, &Manager::process, Qt::QueuedConnection);
-
-//    connect(m_ui.baseStationsWidget, &BaseStationsWidget::baseStationActivated, this, &Manager::activateBaseStation);
-//    connect(m_ui.baseStationsWidget, &BaseStationsWidget::baseStationDeactivated, this, &Manager::deactivateBaseStation);
-
-    connect(m_ui.actionSensorSettings, &QAction::triggered, this, &Manager::openSensorSettingsDialog);
-    connect(m_ui.actionEmailSettings, &QAction::triggered, this, &Manager::openEmailSettingsDialog);
-    connect(m_ui.actionFtpSettings, &QAction::triggered, this, &Manager::openFtpSettingsDialog);
-
-    readSettings();
-
-    show();
-
     if (!m_settings.load("settings"))
     {
         if (!m_settings.create("settings"))
@@ -50,11 +30,32 @@ Manager::Manager(QWidget *parent)
         }
     }
 
+    m_ui.settingsWidget->init(m_comms, m_settings);
+
+    //m_ui.baseStationsWidget->init(m_comms);
+
+    auto* timer = new QTimer(this);
+    timer->setSingleShot(false);
+    timer->start(1);
+    connect(timer, &QTimer::timeout, this, &Manager::process, Qt::QueuedConnection);
+
+    connect(&m_settings, &Settings::baseStationActivated, this, &Manager::activateBaseStation);
+    connect(&m_settings, &Settings::baseStationDeactivated, this, &Manager::deactivateBaseStation);
+
+    readSettings();
+
+    show();
+
     connect(&m_settings, &Settings::userLoggedIn, this, &Manager::userLoggedIn);
 
     checkIfAdminExists();
 
     login();
+
+    if (m_settings.getActiveBaseStationId() != 0)
+    {
+        activateBaseStation(m_settings.getActiveBaseStationId());
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -169,13 +170,21 @@ void Manager::userLoggedIn(Settings::UserId id)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Manager::activateBaseStation(Comms::BaseStationDescriptor const& bs, DB& db)
+void Manager::activateBaseStation(Settings::BaseStationId id)
 {
+    int32_t index = m_settings.findBaseStationIndexById(id);
+    if (index < 0)
+    {
+        assert(false);
+        return;
+    }
+
+    DB& db = m_settings.getBaseStationDB(index);
+
     m_ui.sensorsWidget->init(db);
     m_ui.measurementsWidget->init(db);
     m_ui.plotWidget->init(db);
     m_ui.alarmsWidget->init(db);
-//    m_ui.reportsWidget->init(db);
     m_ui.settingsWidget->initDB(db);
 
     m_ui.actionEmailSettings->setEnabled(true);
@@ -189,13 +198,12 @@ void Manager::activateBaseStation(Comms::BaseStationDescriptor const& bs, DB& db
 
 //////////////////////////////////////////////////////////////////////////
 
-void Manager::deactivateBaseStation(Comms::BaseStationDescriptor const& bs)
+void Manager::deactivateBaseStation(Settings::BaseStationId id)
 {
     m_ui.sensorsWidget->shutdown();
     m_ui.measurementsWidget->shutdown();
     m_ui.plotWidget->shutdown();
     m_ui.alarmsWidget->shutdown();
-//    m_ui.reportsWidget->shutdown();
     m_ui.settingsWidget->shutdownDB();;
 
     m_ui.actionEmailSettings->setEnabled(false);
@@ -203,84 +211,6 @@ void Manager::deactivateBaseStation(Comms::BaseStationDescriptor const& bs)
     m_ui.actionSensorSettings->setEnabled(false);
 
     m_activeDB = nullptr;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Manager::openSensorSettingsDialog()
-{
-    if (!m_activeDB)
-    {
-        return;
-    }
-
-    DB::SensorSettings settings = m_activeDB->getSensorSettings();
-
-    SensorSettingsDialog dialog(this);
-    dialog.setSensorSettings(settings);
-
-    int result = dialog.exec();
-    if (result == QDialog::Accepted)
-    {
-        settings = dialog.getSensorSettings();
-        if (!m_activeDB->setSensorSettings(settings.descriptor))
-        {
-            QMessageBox::critical(this, "Error", "Cannot set the sensor settings.");
-            return;
-        }
-    }
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Manager::openEmailSettingsDialog()
-{
-    if (!m_activeDB)
-    {
-        return;
-    }
-
-//    Settings::EmailSettings settings = m_activeDB->getEmailSettings();
-
-//    EmailSettingsDialog dialog(this);
-//    dialog.setEmailSettings(settings);
-
-//    int result = dialog.exec();
-//    if (result == QDialog::Accepted)
-//    {
-//        settings = dialog.getEmailSettings();
-//        if (!m_activeDB->setEmailSettings(settings))
-//        {
-//            QMessageBox::critical(this, "Error", "Cannot set the email settings.");
-//            return;
-//        }
-//    }
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Manager::openFtpSettingsDialog()
-{
-    if (!m_activeDB)
-    {
-        return;
-    }
-
-//    DB::FtpSettings settings = m_activeDB->getFtpSettings();
-
-//    FtpSettingsDialog dialog(this);
-//    dialog.setFtpSettings(settings);
-
-//    int result = dialog.exec();
-//    if (result == QDialog::Accepted)
-//    {
-//        settings = dialog.getFtpSettings();
-//        if (!m_activeDB->setFtpSettings(settings))
-//        {
-//            QMessageBox::critical(this, "Error", "Cannot set the ftp settings.");
-//            return;
-//        }
-//    }
 }
 
 //////////////////////////////////////////////////////////////////////////

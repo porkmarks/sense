@@ -11,21 +11,27 @@
 #include <condition_variable>
 #include <QTimer>
 
-#include "Settings.h"
 #include "DB.h"
 
+class Settings;
 
 class Emailer : public QObject
 {
     Q_OBJECT
 public:
-    Emailer();
+    Emailer(Settings& settings, DB& db);
     ~Emailer();
 
-    void init(Settings& settings, DB& db);
-    void shutdown();
-
     void sendReportEmail(DB::Report const& report);
+
+    struct EmailSettings
+    {
+        std::string host;
+        uint16_t port = 0;
+        std::string username;
+        std::string password;
+        std::string from;
+    };
 
 private slots:
     void alarmTriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::MeasurementDescriptor const& md);
@@ -34,13 +40,13 @@ private slots:
 private:
     void checkReports();
 
-    Settings* m_settings = nullptr;
-    DB* m_db = nullptr;
+    Settings& m_settings;
+    DB& m_db;
     QTimer m_timer;
 
     struct Email
     {
-        Settings::EmailSettings settings;
+        EmailSettings settings;
         std::string to;
         std::string subject;
         std::string body;

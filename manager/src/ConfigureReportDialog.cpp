@@ -45,9 +45,7 @@ void ConfigureReportDialog::sendReportNow()
         }
         else
         {
-            Emailer emailer;
-            emailer.init(m_settings, m_db);
-
+            Emailer emailer(m_settings, m_db);
             emailer.sendReportEmail(report);
             QMessageBox::information(this, "Success", QString("Report sent to %1.").arg(report.descriptor.emailRecipient.c_str()));
         }

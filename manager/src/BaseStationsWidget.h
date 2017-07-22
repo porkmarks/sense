@@ -24,24 +24,19 @@ signals:
 
 private slots:
     void baseStationDiscovered(Comms::BaseStationDescriptor const& bs);
-    void baseStationDisconnected(Comms::BaseStation const& bs);
+    void baseStationDisconnected(Comms::BaseStationDescriptor const& bs);
     void activateBaseStation(QModelIndex const& index);
 
 private:
+    void setStatus(int row, std::string const& status);
+
+
     Ui::BaseStationsWidget m_ui;
     Comms* m_comms = nullptr;
     Settings* m_settings = nullptr;
     QStandardItemModel m_model;
 
-    struct BaseStationData
-    {
-        Comms::BaseStationDescriptor descriptor;
-        std::unique_ptr<DB> db;
-        std::unique_ptr<Emailer> emailer;
-    };
-
-    std::vector<BaseStationData> m_baseStations;
-    Comms::BaseStationDescriptor m_activatedBaseStation;
+    std::vector<Comms::BaseStationDescriptor> m_unregisteredBaseStations;
 };
 
 

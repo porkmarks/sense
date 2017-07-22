@@ -2,6 +2,7 @@
 #include <iostream>
 #include <cassert>
 #include "Smtp/SmtpMime"
+#include "Settings.h"
 
 extern float getBatteryLevel(float vcc);
 
@@ -31,9 +32,19 @@ static std::string getSensorErrors(uint8_t errors)
 
 //////////////////////////////////////////////////////////////////////////
 
-Emailer::Emailer()
+Emailer::Emailer(Settings& settings, DB& db)
+    : m_settings(settings)
+    , m_db(db)
 {
     m_emailThread = std::thread(std::bind(&Emailer::emailThreadProc, this));
+
+    connect(&m_db, &DB::alarmWasTriggered, this, &Emailer::alarmTriggered);
+    connect(&m_db, &DB::alarmWasUntriggered, this, &Emailer::alarmUntriggered);
+
+    m_timer.setSingleShot(false);
+    m_timer.setInterval(60 * 1000); //every minute
+    m_timer.start(1);
+    connect(&m_timer, &QTimer::timeout, this, &Emailer::checkReports);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -50,42 +61,19 @@ Emailer::~Emailer()
 
 //////////////////////////////////////////////////////////////////////////
 
-void Emailer::init(Settings& settings, DB& db)
-{
-    m_settings = &settings;
-    m_db = &db;
-
-    connect(m_db, &DB::alarmWasTriggered, this, &Emailer::alarmTriggered);
-    connect(m_db, &DB::alarmWasUntriggered, this, &Emailer::alarmUntriggered);
-
-    m_timer.setSingleShot(false);
-    m_timer.setInterval(60 * 1000); //every minute
-    m_timer.start(1);
-    connect(&m_timer, &QTimer::timeout, this, &Emailer::checkReports);
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Emailer::shutdown()
-{
-    m_db = nullptr;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
 void Emailer::checkReports()
 {
-    size_t count = m_db->getReportCount();
+    size_t count = m_db.getReportCount();
     for (size_t i = 0; i < count; i++)
     {
-        DB::Report const& report = m_db->getReport(i);
-        if (m_db->isReportTriggered(report.id))
+        DB::Report const& report = m_db.getReport(i);
+        if (m_db.isReportTriggered(report.id))
         {
             if (report.descriptor.sendEmailAction && !report.descriptor.emailRecipient.empty())
             {
                 sendReportEmail(report);
             }
-            m_db->setReportExecuted(report.id);
+            m_db.setReportExecuted(report.id);
         }
     }
 }
@@ -94,16 +82,16 @@ void Emailer::checkReports()
 
 void Emailer::alarmTriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::MeasurementDescriptor const& md)
 {
-    int32_t alarmIndex = m_db->findAlarmIndexById(alarmId);
-    int32_t sensorIndex = m_db->findSensorIndexById(sensorId);
+    int32_t alarmIndex = m_db.findAlarmIndexById(alarmId);
+    int32_t sensorIndex = m_db.findSensorIndexById(sensorId);
     if (alarmIndex < 0 || sensorIndex < 0)
     {
         assert(false);
         return;
     }
 
-    DB::Alarm const& alarm = m_db->getAlarm(alarmIndex);
-    DB::Sensor const& sensor = m_db->getSensor(sensorIndex);
+    DB::Alarm const& alarm = m_db.getAlarm(alarmIndex);
+    DB::Sensor const& sensor = m_db.getSensor(sensorIndex);
 
     if (alarm.descriptor.sendEmailAction && !alarm.descriptor.emailRecipient.empty())
     {
@@ -115,16 +103,16 @@ void Emailer::alarmTriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::Mea
 
 void Emailer::alarmUntriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::MeasurementDescriptor const& md)
 {
-    int32_t alarmIndex = m_db->findAlarmIndexById(alarmId);
-    int32_t sensorIndex = m_db->findSensorIndexById(sensorId);
+    int32_t alarmIndex = m_db.findAlarmIndexById(alarmId);
+    int32_t sensorIndex = m_db.findSensorIndexById(sensorId);
     if (alarmIndex < 0 || sensorIndex < 0)
     {
         assert(false);
         return;
     }
 
-    DB::Alarm const& alarm = m_db->getAlarm(alarmIndex);
-    DB::Sensor const& sensor = m_db->getSensor(sensorIndex);
+    DB::Alarm const& alarm = m_db.getAlarm(alarmIndex);
+    DB::Sensor const& sensor = m_db.getSensor(sensorIndex);
 
     if (alarm.descriptor.sendEmailAction && !alarm.descriptor.emailRecipient.empty())
     {
@@ -158,7 +146,7 @@ void Emailer::sendAlarmUntriggeredEmail(DB::Alarm const& alarm, DB::Sensor const
 
 void Emailer::sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor const& sensor, DB::MeasurementDescriptor const& md)
 {
-    email.settings = m_settings->getEmailSettings();
+    email.settings = m_settings.getEmailSettings();
     email.to = alarm.descriptor.emailRecipient;
 
     QDateTime dt;
@@ -190,7 +178,7 @@ void Emailer::sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor co
 void Emailer::sendReportEmail(DB::Report const& report)
 {
     Email email;
-    email.settings = m_settings->getEmailSettings();
+    email.settings = m_settings.getEmailSettings();
     email.to = report.descriptor.emailRecipient;
 
     switch (report.descriptor.period)
@@ -217,7 +205,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
     filter.useTimePointFilter = true;
     filter.timePointFilter.min = report.lastTriggeredTimePoint;
     filter.timePointFilter.max = DB::Clock::now();
-    std::vector<DB::Measurement> measurements = m_db->getFilteredMeasurements(filter);
+    std::vector<DB::Measurement> measurements = m_db.getFilteredMeasurements(filter);
     std::sort(measurements.begin(), measurements.end(), [](DB::Measurement const& a, DB::Measurement const& b) { return a.descriptor.timePoint > b.descriptor.timePoint; });
 
     email.body += QString(R"X(
@@ -261,7 +249,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
                           <body>
                           <p>This is an automated daily report of the <strong>%1</strong> base station.</p>
                           <p>Measurements between <strong>%2</strong> and&nbsp;<strong>%3</strong></p>)X")
-                            .arg(m_db->getSensorSettings().descriptor.name.c_str())
+                            .arg(m_db.getSensorSettings().descriptor.name.c_str())
                             .arg(startDt.toString("dd-MM-yyyy HH:mm"))
                             .arg(endDt.toString("dd-MM-yyyy HH:mm"))
                             .toUtf8().data();
@@ -298,7 +286,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
             QDateTime dt;
             dt.setTime_t(DB::Clock::to_time_t(m.descriptor.timePoint));
             std::string sensorName = "N/A";
-            int32_t sensorIndex = m_db->findSensorIndexById(m.descriptor.sensorId);
+            int32_t sensorIndex = m_db.findSensorIndexById(m.descriptor.sensorId);
             if (sensorIndex < 0)
             {
                 continue;
@@ -308,7 +296,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
                 sensorDatas.resize(sensorIndex + 1);
             }
             SensorData& sd = sensorDatas[sensorIndex];
-            sd.name = m_db->getSensor(sensorIndex).descriptor.name;
+            sd.name = m_db.getSensor(sensorIndex).descriptor.name;
             sd.maxTemperature = std::max(sd.maxTemperature, m.descriptor.temperature);
             sd.minTemperature = std::min(sd.minTemperature, m.descriptor.temperature);
             sd.maxHumidity = std::max(sd.maxHumidity, m.descriptor.humidity);
@@ -359,10 +347,10 @@ void Emailer::sendReportEmail(DB::Report const& report)
             QDateTime dt;
             dt.setTime_t(DB::Clock::to_time_t(m.descriptor.timePoint));
             std::string sensorName = "N/A";
-            int32_t sensorIndex = m_db->findSensorIndexById(m.descriptor.sensorId);
+            int32_t sensorIndex = m_db.findSensorIndexById(m.descriptor.sensorId);
             if (sensorIndex >= 0)
             {
-                sensorName = m_db->getSensor(sensorIndex).descriptor.name;
+                sensorName = m_db.getSensor(sensorIndex).descriptor.name;
             }
             email.body += QString(R"X(
                                   <tr>

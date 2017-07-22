@@ -9,7 +9,10 @@
 #include <thread>
 #include <atomic>
 #include <condition_variable>
-#include "Data_Defs.h"
+#include <QHostAddress>
+
+#include "DB.h"
+#include "Emailer.h"
 
 class Settings : public QObject
 {
@@ -25,14 +28,39 @@ public:
 
     ////////////////////////////////////////////////////////////////////////////
 
-    struct EmailSettings
+    struct BaseStationDescriptor
     {
-        std::string host;
-        uint16_t port = 0;
-        std::string username;
-        std::string password;
-        std::string from;
+        typedef std::array<uint8_t, 6> Mac;
+
+        std::string name;
+        Mac mac;
+        QHostAddress address;
     };
+
+    typedef uint32_t BaseStationId;
+    struct BaseStation
+    {
+        BaseStationDescriptor descriptor;
+        BaseStationId id;
+    };
+
+    size_t getBaseStationCount() const;
+    BaseStation const& getBaseStation(size_t index) const;
+    int32_t findBaseStationIndexByName(std::string const& name) const;
+    int32_t findBaseStationIndexById(BaseStationId id) const;
+    int32_t findBaseStationIndexByMac(BaseStationDescriptor::Mac const& mac) const;
+    bool addBaseStation(BaseStationDescriptor const& descriptor);
+    bool setBaseStation(BaseStationId id, BaseStationDescriptor const& descriptor);
+    void removeBaseStation(size_t index);
+    DB const& getBaseStationDB(size_t index) const;
+    DB& getBaseStationDB(size_t index);
+
+    void setActiveBaseStationId(BaseStationId id);
+    BaseStationId getActiveBaseStationId() const;
+
+    ////////////////////////////////////////////////////////////////////////////
+
+    typedef Emailer::EmailSettings EmailSettings;
 
     bool setEmailSettings(EmailSettings const& settings);
     EmailSettings const& getEmailSettings() const;
@@ -88,6 +116,14 @@ public:
     ////////////////////////////////////////////////////////////////////////////
 
 signals:
+    void baseStationWillBeAdded(BaseStationId id);
+    void baseStationAdded(BaseStationId id);
+    void baseStationWillBeRemoved(BaseStationId id);
+    void baseStationRemoved(BaseStationId id);
+    void baseStationChanged(BaseStationId id);
+    void baseStationActivated(BaseStationId id);
+    void baseStationDeactivated(BaseStationId id);
+
     void emailSettingsWillBeChanged();
     void emailSettingsChanged();
 
@@ -102,12 +138,19 @@ signals:
     void userLoggedIn(UserId id);
 
 private:
+
+    std::vector<std::unique_ptr<DB>> m_dbs;
+    std::vector<std::unique_ptr<Emailer>> m_emailers;
+
     struct Data
     {
         EmailSettings emailSettings;
         FtpSettings ftpSettings;
+        std::vector<BaseStation> baseStations;
         std::vector<User> users;
+        BaseStationId lastBaseStationId = 0;
         UserId lastUserId = 0;
+        BaseStationId activeBaseStationId = 0;
     };
 
     Data m_mainData;
