@@ -164,6 +164,7 @@ void Comms::sendSensors(ConnectedBaseStation& cbs)
         sensorj.AddMember("address", sensor.address, document.GetAllocator());
         sensorj.AddMember("temperature_bias", sensor.calibration.temperatureBias, document.GetAllocator());
         sensorj.AddMember("humidity_bias", sensor.calibration.humidityBias, document.GetAllocator());
+        sensorj.AddMember("serial_number", sensor.serialNumber, document.GetAllocator());
         document.PushBack(sensorj, document.GetAllocator());
     }
 
@@ -437,6 +438,14 @@ void Comms::processSensorBoundReq(ConnectedBaseStation& cbs)
         }
         DB::SensorAddress address = it->value.GetUint();
 
+        it = document.FindMember("serial_number");
+        if (it == document.MemberEnd() || !it->value.IsUint())
+        {
+            std::cerr << "Cannot deserialize request: Missing serial_number.\n";
+            goto end;
+        }
+        uint32_t serialNumber = it->value.GetUint();
+
         DB::Sensor::Calibration calibration;
         it = document.FindMember("temperature_bias");
         if (it == document.MemberEnd() || !it->value.IsNumber())
@@ -454,7 +463,7 @@ void Comms::processSensorBoundReq(ConnectedBaseStation& cbs)
         }
         calibration.humidityBias = static_cast<float>(it->value.GetDouble());
 
-        if (!cbs.db.bindSensor(id, address, calibration))
+        if (!cbs.db.bindSensor(id, address, serialNumber, calibration))
         {
             std::cerr << "Cannot deserialize request: Bind failed.\n";
             goto end;

@@ -15,10 +15,14 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/ostreamwrapper.h"
 #include "rapidjson/istreamwrapper.h"
+#include "rapidjson/error/en.h"
 
 #include "CRC.h"
 #include "Utils.h"
 #include "Crypt.h"
+#include "Logger.h"
+
+extern Logger s_logger;
 
 extern std::string s_dataFolder;
 
@@ -54,9 +58,15 @@ bool Settings::create(std::string const& name)
 {
     m_dataName = "sense-" + name + ".settings";
 
-    moveToBackup(m_dataName, s_dataFolder + "/" + m_dataName, s_dataFolder + "/backups/deleted");
+    std::string dataFilename = s_dataFolder + "/" + m_dataName;
+    moveToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/deleted", 50);
 
-    remove((s_dataFolder + "/" + m_dataName).c_str());
+    remove((dataFilename).c_str());
+
+    m_mainData = Data();
+    save(m_mainData);
+
+    s_logger.logInfo(QString("Creating settings file: '%1'").arg(m_dataName.c_str()));
 
     return true;
 }
@@ -71,13 +81,15 @@ bool Settings::load(std::string const& name)
 
     std::string dataFilename = (s_dataFolder + "/" + m_dataName);
 
+    s_logger.logInfo(QString("Loading settings from '%1'").arg(m_dataName.c_str()));
+
     Data data;
 
     {
         std::ifstream file(dataFilename, std::ios_base::binary);
         if (!file.is_open())
         {
-            std::cerr << "Failed to open " << dataFilename << " file: " << std::strerror(errno) << "\n";
+            s_logger.logError(QString("Failed to open '%1': %2").arg(dataFilename.c_str()).arg(std::strerror(errno)));
             return false;
         }
 
@@ -94,20 +106,20 @@ bool Settings::load(std::string const& name)
             document.Parse(streamData.data(), streamData.size());
             if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
             {
-                std::cerr << "Failed to open " << dataFilename << " file: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
+                s_logger.logError(QString("Failed to load '%1': %2").arg(dataFilename.c_str()).arg(rapidjson::GetParseError_En(document.GetParseError())));
                 return false;
             }
         }
         if (!document.IsObject())
         {
-            std::cerr << "Bad document.\n";
+            s_logger.logError(QString("Failed to load '%1': Bad document").arg(dataFilename.c_str()));
             return false;
         }
 
         auto it = document.FindMember("email_settings");
         if (it == document.MemberEnd() || !it->value.IsObject())
         {
-            std::cerr << "Bad or missing email_settings\n";
+            s_logger.logError(QString("Failed to load '%1': Bad or missing email settings").arg(dataFilename.c_str()));
             return false;
         }
 
@@ -119,7 +131,7 @@ bool Settings::load(std::string const& name)
             auto it = esj.FindMember("host");
             if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                std::cerr << "Bad or missing email settings host\n";
+                s_logger.logError(QString("Failed to load '%1': Bad or missing email settings host").arg(dataFilename.c_str()));
                 return false;
             }
             data.emailSettings.host = it->value.GetString();
@@ -127,7 +139,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("port");
             if (it == esj.MemberEnd() || !it->value.IsUint())
             {
-                std::cerr << "Bad or missing email settings port\n";
+                s_logger.logError(QString("Failed to load '%1': Bad or missing email settings port").arg(dataFilename.c_str()));
                 return false;
             }
             data.emailSettings.port = it->value.GetUint();
@@ -135,7 +147,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("username");
             if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                std::cerr << "Bad or missing email settings username\n";
+                s_logger.logError(QString("Failed to load '%1': Bad or missing email settings username").arg(dataFilename.c_str()));
                 return false;
             }
             data.emailSettings.username = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
@@ -143,7 +155,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("password");
             if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                std::cerr << "Bad or missing email settings password\n";
+                s_logger.logError(QString("Failed to load '%1': Bad or missing email settings password").arg(dataFilename.c_str()));
                 return false;
             }
             data.emailSettings.password = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
@@ -151,7 +163,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("from");
             if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                std::cerr << "Bad or missing email settings from\n";
+                s_logger.logError(QString("Failed to load '%1': Bad or missing email settings from").arg(dataFilename.c_str()));
                 return false;
             }
             data.emailSettings.from = it->value.GetString();
@@ -159,7 +171,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("recipient");
             if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                std::cerr << "Bad or missing email settings recipient\n";
+                s_logger.logError(QString("Failed to load '%1': Bad or missing email settings recipient").arg(dataFilename.c_str()));
                 return false;
             }
             data.emailSettings.recipient = it->value.GetString();
@@ -168,7 +180,7 @@ bool Settings::load(std::string const& name)
         it = document.FindMember("ftp_settings");
         if (it == document.MemberEnd() || !it->value.IsObject())
         {
-            std::cerr << "Bad or missing ftp_settings\n";
+            s_logger.logError(QString("Failed to load '%1': Bad or missing ftp_settings").arg(dataFilename.c_str()));
             return false;
         }
 
@@ -180,7 +192,7 @@ bool Settings::load(std::string const& name)
             auto it = esj.FindMember("host");
             if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                std::cerr << "Bad or missing ftp settings host\n";
+                s_logger.logError(QString("Failed to load '%1': Bad or missing ftp settings host").arg(dataFilename.c_str()));
                 return false;
             }
             data.ftpSettings.host = it->value.GetString();
@@ -188,7 +200,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("port");
             if (it == esj.MemberEnd() || !it->value.IsUint())
             {
-                std::cerr << "Bad or missing ftp settings port\n";
+                s_logger.logError(QString("Failed to load '%1': Bad or missing ftp settings port").arg(dataFilename.c_str()));
                 return false;
             }
             data.ftpSettings.port = it->value.GetUint();
@@ -196,7 +208,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("username");
             if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                std::cerr << "Bad or missing ftp settings username\n";
+                s_logger.logError(QString("Failed to load '%1': Bad or missing ftp settings username").arg(dataFilename.c_str()));
                 return false;
             }
             data.ftpSettings.username = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
@@ -204,7 +216,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("password");
             if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                std::cerr << "Bad or missing ftp settings password\n";
+                s_logger.logError(QString("Failed to load '%1': Bad or missing ftp settings password").arg(dataFilename.c_str()));
                 return false;
             }
             data.ftpSettings.password = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
@@ -212,7 +224,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("folder");
             if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                std::cerr << "Bad or missing ftp settings folder\n";
+                s_logger.logError(QString("Failed to load '%1': Bad or missing ftp settings folder").arg(dataFilename.c_str()));
                 return false;
             }
             data.ftpSettings.folder = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
@@ -220,15 +232,15 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("upload_backups");
             if (it == esj.MemberEnd() || !it->value.IsBool())
             {
-                std::cerr << "Bad or missing ftp settings upload_backups\n";
+                s_logger.logError(QString("Failed to load '%1': Bad or missing ftp settings upload_backups").arg(dataFilename.c_str()));
                 return false;
             }
             data.ftpSettings.uploadBackups = it->value.GetBool();
 
-            it = esj.FindMember("upload_backups_every");
+            it = esj.FindMember("upload_backups_period");
             if (it == esj.MemberEnd() || !it->value.IsUint64())
             {
-                std::cerr << "Bad or missing ftp settings upload_backups_every\n";
+                s_logger.logError(QString("Failed to load '%1': Bad or missing ftp settings upload_backups_period").arg(dataFilename.c_str()));
                 return false;
             }
             data.ftpSettings.uploadBackupsPeriod = std::chrono::seconds(it->value.GetUint64());
@@ -237,7 +249,7 @@ bool Settings::load(std::string const& name)
         it = document.FindMember("users");
         if (it == document.MemberEnd() || !it->value.IsArray())
         {
-            std::cerr << "Bad or missing users array\n";
+            s_logger.logError(QString("Failed to load '%1': Bad or missing users array").arg(dataFilename.c_str()));
             return false;
         }
 
@@ -250,7 +262,7 @@ bool Settings::load(std::string const& name)
                 auto it = userj.FindMember("name");
                 if (it == userj.MemberEnd() || !it->value.IsString())
                 {
-                    std::cerr << "Bad or missing user name\n";
+                    s_logger.logError(QString("Failed to load '%1': Bad or missing user name").arg(dataFilename.c_str()));
                     return false;
                 }
                 user.descriptor.name = it->value.GetString();
@@ -258,7 +270,7 @@ bool Settings::load(std::string const& name)
                 it = userj.FindMember("password");
                 if (it == userj.MemberEnd() || !it->value.IsString())
                 {
-                    std::cerr << "Bad or missing user password\n";
+                    s_logger.logError(QString("Failed to load '%1': Bad or missing user password").arg(dataFilename.c_str()));
                     return false;
                 }
                 user.descriptor.passwordHash = it->value.GetString();
@@ -266,7 +278,7 @@ bool Settings::load(std::string const& name)
                 it = userj.FindMember("id");
                 if (it == userj.MemberEnd() || !it->value.IsUint())
                 {
-                    std::cerr << "Bad or missing user id\n";
+                    s_logger.logError(QString("Failed to load '%1': Bad or missing user id").arg(dataFilename.c_str()));
                     return false;
                 }
                 user.id = it->value.GetUint();
@@ -274,7 +286,7 @@ bool Settings::load(std::string const& name)
                 it = userj.FindMember("type");
                 if (it == userj.MemberEnd() || !it->value.IsInt())
                 {
-                    std::cerr << "Bad or missing user type\n";
+                    s_logger.logError(QString("Failed to load '%1': Bad or missing user type").arg(dataFilename.c_str()));
                     return false;
                 }
                 user.descriptor.type = static_cast<UserDescriptor::Type>(it->value.GetInt());
@@ -287,7 +299,7 @@ bool Settings::load(std::string const& name)
         it = document.FindMember("base_stations");
         if (it == document.MemberEnd() || !it->value.IsArray())
         {
-            std::cerr << "Bad or missing base_stations array\n";
+            s_logger.logError(QString("Failed to load '%1': Bad or missing base_stations array").arg(dataFilename.c_str()));
             return false;
         }
 
@@ -300,7 +312,7 @@ bool Settings::load(std::string const& name)
                 auto it = bsj.FindMember("name");
                 if (it == bsj.MemberEnd() || !it->value.IsString())
                 {
-                    std::cerr << "Bad or missing base station name\n";
+                    s_logger.logError(QString("Failed to load '%1': Bad or missing base station name").arg(dataFilename.c_str()));
                     return false;
                 }
                 bs.descriptor.name = it->value.GetString();
@@ -308,7 +320,7 @@ bool Settings::load(std::string const& name)
                 it = bsj.FindMember("address");
                 if (it == bsj.MemberEnd() || !it->value.IsString())
                 {
-                    std::cerr << "Bad or missing base station address\n";
+                    s_logger.logError(QString("Failed to load '%1': Bad or missing base station address").arg(dataFilename.c_str()));
                     return false;
                 }
                 bs.descriptor.address = QHostAddress(it->value.GetString());
@@ -316,7 +328,7 @@ bool Settings::load(std::string const& name)
                 it = bsj.FindMember("id");
                 if (it == bsj.MemberEnd() || !it->value.IsUint())
                 {
-                    std::cerr << "Bad or missing base station id\n";
+                    s_logger.logError(QString("Failed to load '%1': Bad or missing base station id").arg(dataFilename.c_str()));
                     return false;
                 }
                 bs.id = it->value.GetUint();
@@ -324,14 +336,14 @@ bool Settings::load(std::string const& name)
                 it = bsj.FindMember("mac");
                 if (it == bsj.MemberEnd() || !it->value.IsString())
                 {
-                    std::cerr << "Bad or missing base station mac\n";
+                    s_logger.logError(QString("Failed to load '%1': Bad or missing base station mac").arg(dataFilename.c_str()));
                     return false;
                 }
 
                 int m0, m1, m2, m3, m4, m5;
                 if (sscanf(it->value.GetString(), "%X:%X:%X:%X:%X:%X", &m0, &m1, &m2, &m3, &m4, &m5) != 6)
                 {
-                    std::cerr << "Bad base station mac\n";
+                    s_logger.logError(QString("Failed to load '%1': Bad base station mac").arg(dataFilename.c_str()));
                     return false;
                 }
                 bs.descriptor.mac = { static_cast<uint8_t>(m0&0xFF), static_cast<uint8_t>(m1&0xFF), static_cast<uint8_t>(m2&0xFF),
@@ -346,16 +358,17 @@ bool Settings::load(std::string const& name)
         it = document.FindMember("active_base_station");
         if (it == document.MemberEnd() || !it->value.IsUint())
         {
-            std::cerr << "Bad or missing active_base_station\n";
+            s_logger.logError(QString("Failed to load '%1': Bad or missing active_base_station").arg(dataFilename.c_str()));
             return false;
         }
         BaseStationId id = it->value.GetUint();
+        if (id != 0)
         {
             auto it = std::find_if(data.baseStations.begin(), data.baseStations.end(), [id](BaseStation const& baseStation) { return baseStation.id == id; });
             if (it == m_mainData.baseStations.end())
             {
-                std::cerr << "Cannot find active base station id\n";
-                return false;
+                s_logger.logWarning(QString("Cannot find active base station id %1. No base station will be active").arg(id));
+                id = 0;
             }
         }
         data.activeBaseStationId = id;
@@ -377,13 +390,13 @@ bool Settings::load(std::string const& name)
         {
             if (!db->create(dbName))
             {
-                std::cerr << (QString("Cannot open nor create a DB for Base Station '%1' (%2)\n").arg(bs.descriptor.name.c_str()).arg(macStr)).toUtf8().data();
+                s_logger.logError(QString("Cannot open nor create a DB for Base Station '%1' / %2").arg(bs.descriptor.name.c_str()).arg(macStr).toUtf8().data());
                 return false;
             }
         }
         m_dbs.push_back(std::move(db));
+        m_emailers.emplace_back(new Emailer(*this, *m_dbs.back()));
     }
-    m_emailers.emplace_back(new Emailer(*this, *m_dbs.back()));
 
     //initialize backups
     std::pair<std::string, time_t> bkf = getMostRecentBackup(dataFilename, s_dataFolder + "/backups/daily");
@@ -409,8 +422,7 @@ bool Settings::load(std::string const& name)
 
     m_mainData = data;
 
-    std::cout << "Time to load Data:" << std::chrono::duration<float>(Clock::now() - start).count() << "s\n";
-    std::cout.flush();
+    s_logger.logInfo(QString("Done loading '%1'. Time: %2s").arg(m_dataName.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()));
 
     return true;
 }
@@ -459,10 +471,10 @@ bool Settings::setEmailSettings(EmailSettings const& settings)
     }
 
     emit emailSettingsWillBeChanged();
-
     m_mainData.emailSettings = settings;
-
     emit emailSettingsChanged();
+
+    s_logger.logInfo("Changed email settings");
 
     triggerSave();
 
@@ -498,10 +510,10 @@ bool Settings::setFtpSettings(FtpSettings const& settings)
     }
 
     emit ftpSettingsWillBeChanged();
-
     m_mainData.ftpSettings = settings;
-
     emit ftpSettingsChanged();
+
+    s_logger.logInfo("Changed ftp settings");
 
     triggerSave();
 
@@ -547,6 +559,8 @@ bool Settings::addUser(UserDescriptor const& descriptor)
     m_mainData.users.push_back(user);
     emit userAdded(user.id);
 
+    s_logger.logInfo(QString("Added user '%1'").arg(descriptor.name.c_str()));
+
     triggerSave();
 
     return true;
@@ -571,6 +585,8 @@ bool Settings::setUser(UserId id, UserDescriptor const& descriptor)
     m_mainData.users[index].descriptor = descriptor;
     emit userChanged(id);
 
+    s_logger.logInfo(QString("Changed user '%1'").arg(descriptor.name.c_str()));
+
     triggerSave();
 
     return true;
@@ -582,6 +598,8 @@ void Settings::removeUser(size_t index)
 {
     assert(index < m_mainData.users.size());
     UserId id = m_mainData.users[index].id;
+
+    s_logger.logInfo(QString("Removed user '%1'").arg(m_mainData.users[index].descriptor.name.c_str()));
 
     emit userWillBeRemoved(id);
     m_mainData.users.erase(m_mainData.users.begin() + index);
@@ -642,8 +660,11 @@ bool Settings::needsAdmin() const
 
 void Settings::setLoggedInUserId(UserId id)
 {
-    if (findUserIndexById(id) >= 0)
+    int32_t index = findUserIndexById(id);
+    if (index >= 0)
     {
+        s_logger.logInfo(QString("User '%1' logged in").arg(m_mainData.users[index].descriptor.name.c_str()));
+
         m_loggedInUserId = id;
         emit userLoggedIn(id);
     }
@@ -718,10 +739,12 @@ bool Settings::addBaseStation(BaseStationDescriptor const& descriptor)
     {
         if (!db->create(dbName))
         {
-            std::cerr << (QString("Cannot open nor create a DB for Base Station '%1' (%2)\n").arg(descriptor.name.c_str()).arg(macStr)).toUtf8().data();
+            s_logger.logError(QString("Cannot open nor create a DB for Base Station '%1' / %2").arg(descriptor.name.c_str()).arg(macStr).toUtf8().data());
             return false;
         }
     }
+
+    s_logger.logInfo(QString("Adding base station '%1' / %2").arg(descriptor.name.c_str()).arg(getMacStr(descriptor.mac).c_str()));
 
     BaseStation baseStation;
     baseStation.descriptor = descriptor;
@@ -759,6 +782,8 @@ bool Settings::setBaseStation(BaseStationId id, BaseStationDescriptor const& des
         return false;
     }
 
+    s_logger.logInfo(QString("Changing base station '%1' / %2").arg(descriptor.name.c_str()).arg(getMacStr(descriptor.mac).c_str()));
+
     m_mainData.baseStations[index].descriptor = descriptor;
     emit baseStationChanged(id);
 
@@ -773,6 +798,9 @@ void Settings::removeBaseStation(size_t index)
 {
     assert(index < m_mainData.baseStations.size());
     BaseStationId id = m_mainData.baseStations[index].id;
+
+    BaseStationDescriptor const& descriptor = m_mainData.baseStations[index].descriptor;
+    s_logger.logInfo(QString("Removing base station '%1' / %2").arg(descriptor.name.c_str()).arg(getMacStr(descriptor.mac).c_str()));
 
     emit baseStationWillBeRemoved(id);
     m_mainData.baseStations.erase(m_mainData.baseStations.begin() + index);
@@ -842,8 +870,12 @@ void Settings::setActiveBaseStationId(BaseStationId id)
         emit baseStationDeactivated(m_mainData.activeBaseStationId);
     }
 
-    if (findBaseStationIndexById(id) >= 0)
+    int32_t index = findBaseStationIndexById(id);
+    if (index >= 0)
     {
+        BaseStationDescriptor const& descriptor = m_mainData.baseStations[index].descriptor;
+        s_logger.logInfo(QString("Activating base station '%1' / %2").arg(descriptor.name.c_str()).arg(getMacStr(descriptor.mac).c_str()));
+
         m_mainData.activeBaseStationId = id;
     }
     else
@@ -877,7 +909,7 @@ void Settings::triggerSave()
     }
     m_storeCV.notify_all();
 
-    std::cout << "Save triggered\n";
+    s_logger.logVerbose("Settings save triggered");
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -899,6 +931,7 @@ void Settings::save(Data const& data) const
     }
 
     std::string dataFilename = (s_dataFolder + "/" + m_dataName);
+    s_logger.logInfo(QString("Saving settings to '%1'").arg(dataFilename.c_str()));
 
     Clock::time_point start = now;
 
@@ -985,7 +1018,7 @@ void Settings::save(Data const& data) const
         std::ofstream file(tempFilename, std::ios_base::binary);
         if (!file.is_open())
         {
-            std::cerr << "Failed to open " << tempFilename << " file: " << std::strerror(errno) << "\n";
+            s_logger.logError(QString("Failed to open '%1': %2").arg(tempFilename.c_str()).arg(std::strerror(errno)));
         }
         else
         {
@@ -994,24 +1027,23 @@ void Settings::save(Data const& data) const
         file.flush();
         file.close();
 
-        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/incremental");
+        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/incremental", 50);
 
         if (!renameFile(tempFilename.c_str(), dataFilename.c_str()))
         {
-            std::cerr << "Error renaming files: " << getLastErrorAsString() << "\n";
+            s_logger.logError(QString("Failed to rename file '%1' to '%2': %3").arg(tempFilename.c_str()).arg(dataFilename.c_str()).arg(getLastErrorAsString().c_str()));
         }
     }
 
-    std::cout << "Time to save data:" << std::chrono::duration<float>(Clock::now() - start).count() << "s\n";
-    std::cout.flush();
+    s_logger.logInfo(QString("Saved settings to '%1'. Time: %2s").arg(dataFilename.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()));
 
     if (dailyBackup)
     {
-        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/daily");
+        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/daily", 10);
     }
     if (weeklyBackup)
     {
-        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/weekly");
+        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/weekly", 10);
     }
 }
 

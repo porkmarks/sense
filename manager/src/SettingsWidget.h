@@ -27,12 +27,16 @@ signals:
 
 private slots:
     void setRW();
-    void sendTestEmail(Settings::EmailSettings const& settings);
+    void sendTestEmail();
     void applyEmailSettings();
+    void applySensorSettings();
 
 private:
     void setEmailSettings(Settings::EmailSettings const& settings);
     bool getEmailSettings(Settings::EmailSettings& settings);
+
+    void setSensorSettings(DB::SensorSettings const& settings);
+    bool getSensorSettings(DB::SensorSettingsDescriptor& settings);
 
     Ui::SettingsWidget m_ui;
     Settings* m_settings = nullptr;

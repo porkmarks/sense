@@ -71,8 +71,6 @@ void MeasurementsWidget::init(DB& db)
 //    }
 //    std::cout << "Time to filter: " << (std::chrono::duration<float>(DB::Clock::now() - start).count()) << "\n";
 
-    std::cout.flush();
-
     setDateTimePreset(m_ui.dateTimePreset->currentIndex());
     refresh();
 

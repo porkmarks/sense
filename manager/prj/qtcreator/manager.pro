@@ -107,6 +107,8 @@ HEADERS += \
     ../../src/UsersModel.h \
     ../../src/UsersWidget.h \
     ../../src/Settings.h \
+    ../../src/LogsWidget.h \
+    ../../src/LogsModel.h \
     ../../src/Logger.h
 
 SOURCES += \
@@ -155,6 +157,8 @@ SOURCES += \
     ../../src/UsersModel.cpp \
     ../../src/UsersWidget.cpp \
     ../../src/Settings.cpp \
+    ../../src/LogsWidget.cpp \
+    ../../src/LogsModel.cpp \
     ../../src/Logger.cpp
 
 FORMS += \
@@ -176,7 +180,8 @@ FORMS += \
     ../../src/SettingsWidget.ui \
     ../../src/ConfigureUserDialog.ui \
     ../../src/UsersWidget.ui \
-    ../../src/LoginDialog.ui
+    ../../src/LoginDialog.ui \
+    ../../src/LogsWidget.ui
 
 DISTFILES += \
 

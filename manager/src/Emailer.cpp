@@ -3,10 +3,14 @@
 #include <cassert>
 #include "Smtp/SmtpMime"
 #include "Settings.h"
+#include "Logger.h"
+
+extern Logger s_logger;
 
 extern float getBatteryLevel(float vcc);
 
 
+//////////////////////////////////////////////////////////////////////////
 
 static std::string getSensorErrors(uint8_t errors)
 {
@@ -69,6 +73,7 @@ void Emailer::checkReports()
         DB::Report const& report = m_db.getReport(i);
         if (m_db.isReportTriggered(report.id))
         {
+            s_logger.logInfo(QString("Report '%1' triggered").arg(report.descriptor.name.c_str()));
             if (report.descriptor.sendEmailAction)
             {
                 sendReportEmail(report);
@@ -146,31 +151,32 @@ void Emailer::sendAlarmUntriggeredEmail(DB::Alarm const& alarm, DB::Sensor const
 
 void Emailer::sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor const& sensor, DB::MeasurementDescriptor const& md)
 {
-//    email.settings = m_settings.getEmailSettings();
-//    email.to = alarm.descriptor.emailRecipient;
+    email.settings = m_settings.getEmailSettings();
 
-//    QDateTime dt;
-//    dt.setTime_t(DB::Clock::to_time_t(md.timePoint));
+    s_logger.logInfo(QString("Sending alarm email to '%1'").arg(email.settings.recipient.c_str()));
 
-//    email.body += QString(R"X(
-//                          <p>Measurement:</p>
-//                          <ul>
-//                          <li>Temperature: <strong>%1 &deg;C</strong></li>
-//                          <li>Humidity: <strong>%2 %RH</strong></li>
-//                          <li>Sensor Errors: <strong>%3</strong></li>
-//                          <li>Battery: <strong>%4 %</strong></li>
-//                          </ul>
-//                          <p>Timestamp: <strong>%5</strong> <span style="font-size: 8pt;"><em>(dd-mm-yyyy hh:mm)</em></span></p>
-//                          <p>&nbsp;</p>
-//                          <p><span style="font-size: 10pt;"><em>- Sense -</em></span></p>)X")
-//            .arg(md.temperature, 0, 'f', 1)
-//            .arg(md.humidity, 0, 'f', 1)
-//            .arg(getSensorErrors(md.sensorErrors).c_str())
-//            .arg(static_cast<int>(getBatteryLevel(md.vcc)*100.f))
-//            .arg(dt.toString("dd-MM-yyyy HH:mm"))
-//            .toUtf8().data();
+    QDateTime dt;
+    dt.setTime_t(DB::Clock::to_time_t(md.timePoint));
 
-//    sendEmail(email);
+    email.body += QString(R"X(
+                          <p>Measurement:</p>
+                          <ul>
+                          <li>Temperature: <strong>%1 &deg;C</strong></li>
+                          <li>Humidity: <strong>%2 %RH</strong></li>
+                          <li>Sensor Errors: <strong>%3</strong></li>
+                          <li>Battery: <strong>%4 %</strong></li>
+                          </ul>
+                          <p>Timestamp: <strong>%5</strong> <span style="font-size: 8pt;"><em>(dd-mm-yyyy hh:mm)</em></span></p>
+                          <p>&nbsp;</p>
+                          <p><span style="font-size: 10pt;"><em>- Sense -</em></span></p>)X")
+            .arg(md.temperature, 0, 'f', 1)
+            .arg(md.humidity, 0, 'f', 1)
+            .arg(getSensorErrors(md.sensorErrors).c_str())
+            .arg(static_cast<int>(getBatteryLevel(md.vcc)*100.f))
+            .arg(dt.toString("dd-MM-yyyy HH:mm"))
+            .toUtf8().data();
+
+    sendEmail(email);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -179,6 +185,8 @@ void Emailer::sendReportEmail(DB::Report const& report)
 {
     Email email;
     email.settings = m_settings.getEmailSettings();
+
+    s_logger.logInfo(QString("Sending report email to '%1'").arg(email.settings.recipient.c_str()));
 
     switch (report.descriptor.period)
     {
@@ -387,8 +395,6 @@ void Emailer::sendEmail(Email const& email)
         m_emailThreadTriggered = true;
     }
     m_emailCV.notify_all();
-
-    std::cout << "Email triggered\n";
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -430,25 +436,13 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
 
         if (smtp.connectToHost() && smtp.login() && smtp.sendMail(message))
         {
-            std::cout << "Sent email\n";
+            s_logger.logInfo(QString("Successfully sent email to '%1'").arg(email.settings.recipient.c_str()));
         }
         else
         {
-            std::cout << "Failed to send email: " << errorMsg << "\n";
+            s_logger.logError(QString("Failed to send email to '%1': %2").arg(email.settings.recipient.c_str()).arg(errorMsg.c_str()));
         }
-        std::cout.flush();
         smtp.quit();
-
-        //        QStringList files;
-        //        for (std::string const& f: email.files)
-        //        {
-        //            files.append(QString::fromUtf8(f.c_str()));
-        //        }
-        //        smtp.sendHtmlMail(QString::fromUtf8(email.settings.from.c_str()),
-        //                          QString::fromUtf8(email.to.c_str()),
-        //                          QString::fromUtf8(email.subject.c_str()),
-        //                          QString::fromUtf8(email.body.c_str()),
-        //                          files);
     }
 }
 

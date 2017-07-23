@@ -4,6 +4,7 @@
 #include <cassert>
 #include <fstream>
 #include <iostream>
+#include <QDateTime>
 
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
@@ -46,8 +47,13 @@ bool Logger::create(std::string const& name)
 {
     m_dataName = "sense-" + name + ".log";
 
-    moveToBackup(m_dataName, s_dataFolder + "/" + m_dataName, s_dataFolder + "/backups/deleted");
-    remove((s_dataFolder + "/" + m_dataName).c_str());
+    std::string dataFilename = s_dataFolder + "/" + m_dataName;
+
+    moveToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/deleted", 50);
+    remove((dataFilename).c_str());
+
+    m_mainData = Data();
+    save(m_mainData);
 
     return true;
 }
@@ -107,7 +113,15 @@ bool Logger::load(std::string const& name)
                 std::cerr << "Bad or missing log timestamp\n";
                 return false;
             }
-            line.timePoint = Clock::time_point(std::chrono::seconds(it->value.GetUint64()));
+            line.timePoint = Clock::time_point(std::chrono::milliseconds(it->value.GetUint64()));
+
+            it = linej.FindMember("index");
+            if (it == linej.MemberEnd() || !it->value.IsUint64())
+            {
+                std::cerr << "Bad or missing log index\n";
+                return false;
+            }
+            line.index = it->value.GetUint64();
 
             it = linej.FindMember("type");
             if (it == linej.MemberEnd() || !it->value.IsInt())
@@ -125,6 +139,7 @@ bool Logger::load(std::string const& name)
             }
             line.message = it->value.GetString();
 
+            data.lastLineIndex = std::max(data.lastLineIndex, line.index);
             data.logLines.push_back(line);
         }
     }
@@ -133,20 +148,20 @@ bool Logger::load(std::string const& name)
     std::pair<std::string, time_t> bkf = getMostRecentBackup(dataFilename, s_dataFolder + "/backups/daily");
     if (bkf.first.empty())
     {
-        m_lastDailyBackupTP = Settings::Clock::now();
+        m_lastDailyBackupTP = Clock::now();
     }
     else
     {
-        m_lastDailyBackupTP = Settings::Clock::from_time_t(bkf.second);
+        m_lastDailyBackupTP = Clock::from_time_t(bkf.second);
     }
     bkf = getMostRecentBackup(dataFilename, s_dataFolder + "/backups/weekly");
     if (bkf.first.empty())
     {
-        m_lastWeeklyBackupTP = Settings::Clock::now();
+        m_lastWeeklyBackupTP = Clock::now();
     }
     else
     {
-        m_lastWeeklyBackupTP = Settings::Clock::from_time_t(bkf.second);
+        m_lastWeeklyBackupTP = Clock::from_time_t(bkf.second);
     }
 
     //done!!!
@@ -156,6 +171,8 @@ bool Logger::load(std::string const& name)
     std::cout << "Time to load logs:" << std::chrono::duration<float>(Clock::now() - start).count() << "s\n";
     std::cout.flush();
 
+    emit logLinesAdded();
+
     return true;
 }
 
@@ -163,32 +180,142 @@ bool Logger::load(std::string const& name)
 
 void Logger::logVerbose(std::string const& message)
 {
-    m_mainData.logLines.emplace_back(LogLine{ Clock::now(), Type::VERBOSE, message });
+    m_mainData.logLines.emplace_back(LogLine{ Clock::now(), ++m_mainData.lastLineIndex, Type::VERBOSE, message });
+
+    std::cout << "VERBOSE: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
+    std::cout.flush();
+
+    emit logLinesAdded();
     triggerSave();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Logger::logVerbose(QString const& message)
+{
+    logVerbose(message.toUtf8().data());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Logger::logVerbose(char const* message)
+{
+    logVerbose(std::string(message));
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void Logger::logInfo(std::string const& message)
 {
-    m_mainData.logLines.emplace_back(LogLine{ Clock::now(), Type::VERBOSE, message });
+    m_mainData.logLines.emplace_back(LogLine{ Clock::now(), ++m_mainData.lastLineIndex, Type::INFO, message });
+
+    std::cout << "INFO: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
+    std::cout.flush();
+
+    emit logLinesAdded();
     triggerSave();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Logger::logInfo(QString const& message)
+{
+    logInfo(message.toUtf8().data());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Logger::logInfo(char const* message)
+{
+    logInfo(std::string(message));
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void Logger::logWarning(std::string const& message)
 {
-    m_mainData.logLines.emplace_back(LogLine{ Clock::now(), Type::VERBOSE, message });
+    m_mainData.logLines.emplace_back(LogLine{ Clock::now(), ++m_mainData.lastLineIndex, Type::WARNING, message });
+
+    std::cout << "WARNING: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
+    std::cout.flush();
+
+    emit logLinesAdded();
     triggerSave();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Logger::logWarning(QString const& message)
+{
+    logWarning(message.toUtf8().data());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Logger::logWarning(char const* message)
+{
+    logWarning(std::string(message));
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void Logger::logError(std::string const& message)
 {
-    m_mainData.logLines.emplace_back(LogLine{ Clock::now(), Type::VERBOSE, message });
+    m_mainData.logLines.emplace_back(LogLine{ Clock::now(), ++m_mainData.lastLineIndex, Type::ERROR, message });
+
+    std::cout << "ERROR: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
+    std::cout.flush();
+
+    emit logLinesAdded();
     triggerSave();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Logger::logError(QString const& message)
+{
+    logError(message.toUtf8().data());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Logger::logError(char const* message)
+{
+    logError(std::string(message));
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+std::vector<Logger::LogLine> Logger::getFilteredLogLines(Filter const& filter) const
+{
+    std::vector<LogLine> result;
+    result.reserve(16384);
+
+    for (LogLine const& line: m_mainData.logLines)
+    {
+        if (line.timePoint < filter.minTimePoint || line.timePoint > filter.maxTimePoint)
+        {
+            continue;
+        }
+        if ((!filter.allowVerbose && line.type == Type::VERBOSE) ||
+            (!filter.allowInfo && line.type == Type::INFO) ||
+            (!filter.allowWarning && line.type == Type::WARNING) ||
+            (!filter.allowError && line.type == Type::ERROR))
+        {
+            continue;
+        }
+
+        result.push_back(line);
+    }
+
+    return result;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+size_t Logger::getAllLogLineCount() const
+{
+    return m_mainData.logLines.size();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -201,8 +328,6 @@ void Logger::triggerSave()
         m_storeThreadTriggered = true;
     }
     m_storeCV.notify_all();
-
-    //std::cout << "Save triggered\n";
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -234,7 +359,8 @@ void Logger::save(Data const& data) const
         {
             rapidjson::Value linej;
             linej.SetObject();
-            linej.AddMember("timestamp", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(line.timePoint.time_since_epoch()).count()), document.GetAllocator());
+            linej.AddMember("timestamp", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(line.timePoint.time_since_epoch()).count()), document.GetAllocator());
+            linej.AddMember("index", line.index, document.GetAllocator());
             linej.AddMember("type", static_cast<int>(line.type), document.GetAllocator());
             linej.AddMember("message", rapidjson::Value(line.message.c_str(), document.GetAllocator()), document.GetAllocator());
             document.PushBack(linej, document.GetAllocator());
@@ -262,7 +388,7 @@ void Logger::save(Data const& data) const
         file.flush();
         file.close();
 
-        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/incremental");
+        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/incremental", 50);
 
         if (!renameFile(tempFilename.c_str(), dataFilename.c_str()))
         {
@@ -275,11 +401,11 @@ void Logger::save(Data const& data) const
 
     if (dailyBackup)
     {
-        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/daily");
+        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/daily", 10);
     }
     if (weeklyBackup)
     {
-        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/weekly");
+        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/weekly", 10);
     }
 }
 

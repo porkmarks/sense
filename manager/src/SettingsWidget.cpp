@@ -37,7 +37,12 @@ void SettingsWidget::init(Comms& comms, Settings& settings)
 
     setEmailSettings(m_settings->getEmailSettings());
     connect(m_ui.emailApply, &QPushButton::released, this, &SettingsWidget::applyEmailSettings);
+    connect(m_ui.emailReset, &QPushButton::released, [this]() { setEmailSettings(m_settings->getEmailSettings()); });
+    connect(m_ui.emailTest, &QPushButton::released, this, &SettingsWidget::sendTestEmail);
 
+    connect(m_ui.sensorsApply, &QPushButton::released, this, &SettingsWidget::applySensorSettings);
+    connect(m_ui.sensorsReset, &QPushButton::released, [this]() { if (m_db) setSensorSettings(m_db->getSensorSettings()); });
+    m_ui.sensorsTab->setEnabled(m_settings->getActiveBaseStationId() != 0);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -68,12 +73,8 @@ void SettingsWidget::initBaseStation(Settings::BaseStationId id)
     m_db = &db;
     m_ui.reportsWidget->init(*m_settings, db);
 
-    //Settings::BaseStationDescriptor::Mac const& mac = bs.descriptor.mac;
-    //char macStr[128];
-    //sprintf(macStr, "%X:%X:%X:%X:%X:%X", mac[0]&0xFF, mac[1]&0xFF, mac[2]&0xFF, mac[3]&0xFF, mac[4]&0xFF, mac[5]&0xFF);
-    //m_ui.sensorsTab->setTitle(QString("Sensor settings for %1 / %2").arg(bs.descriptor.name.c_str()).arg(macStr));
-
-    //m_ui.reportsTab->setTitle(QString("Reports for %1 / %2").arg(bs.descriptor.name.c_str()).arg(macStr));
+    m_ui.sensorsTab->setEnabled(true);
+    setSensorSettings(m_db->getSensorSettings());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -82,6 +83,7 @@ void SettingsWidget::shutdownBaseStation(Settings::BaseStationId id)
 {
     m_db = nullptr;
     m_ui.reportsWidget->shutdown();
+    m_ui.sensorsTab->setEnabled(false);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -141,16 +143,17 @@ void SettingsWidget::applyEmailSettings()
     }
 
     m_settings->setEmailSettings(settings);
-//    if (!m_ui.testEmailTo->text().isEmpty())
-//    {
-//        sendTestEmail(settings);
-//    }
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void SettingsWidget::sendTestEmail(Settings::EmailSettings const& settings)
+void SettingsWidget::sendTestEmail()
 {
+    Settings::EmailSettings settings;
+    if (!getEmailSettings(settings))
+    {
+        return;
+    }
     SmtpClient smtp(QString::fromUtf8(settings.host.c_str()), settings.port, SmtpClient::SslConnection);
 
     bool hasError = false;
@@ -189,7 +192,7 @@ void SettingsWidget::sendTestEmail(Settings::EmailSettings const& settings)
 
     MimeMessage message;
 
-    message.setSender(new EmailAddress(QString::fromUtf8(settings.from.c_str())));
+    message.setSender(new EmailAddress(QString::fromUtf8(settings.from.c_str()), QString::fromUtf8(settings.from.c_str())));
     message.addRecipient(new EmailAddress(settings.recipient.c_str()));
     message.setSubject(QString::fromUtf8("Test Email: Sensor 'Sensor1' triggered alarm 'Alarm1'"));
 
@@ -217,3 +220,62 @@ void SettingsWidget::sendTestEmail(Settings::EmailSettings const& settings)
     }
     smtp.quit();
 }
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::setSensorSettings(DB::SensorSettings const& settings)
+{
+    m_ui.sensorsMeasurementPeriod->setValue(std::chrono::duration<float>(settings.descriptor.measurementPeriod).count() / 60.f);
+    m_ui.sensorsCommsPeriod->setValue(std::chrono::duration<float>(settings.descriptor.commsPeriod).count() / 60.f);
+    m_ui.sensorsComputedCommsPeriod->setValue(std::chrono::duration<float>(settings.computedCommsPeriod).count() / 60.f);
+    m_ui.sensorsSleeping->setChecked(settings.descriptor.sensorsSleeping);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool SettingsWidget::getSensorSettings(DB::SensorSettingsDescriptor& descriptor)
+{
+    descriptor.measurementPeriod = std::chrono::seconds(static_cast<size_t>(m_ui.sensorsMeasurementPeriod->value() * 60.0));
+    descriptor.commsPeriod = std::chrono::seconds(static_cast<size_t>(m_ui.sensorsCommsPeriod->value() * 60.0));
+    descriptor.sensorsSleeping = m_ui.sensorsSleeping->isChecked();
+
+    if (descriptor.commsPeriod.count() == 0)
+    {
+        QMessageBox::critical(this, "Error", "You need to specify a valid comms duration.");
+        return false;
+    }
+    if (descriptor.measurementPeriod.count() == 0)
+    {
+        QMessageBox::critical(this, "Error", "You need to specify a valid measurement duration.");
+        return false;
+    }
+    if (descriptor.commsPeriod < descriptor.measurementPeriod)
+    {
+        QMessageBox::critical(this, "Error", "The comms period cannot be smaller than the measurement period.");
+        return false;
+    }
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::applySensorSettings()
+{
+    if (!m_db)
+    {
+        return;
+    }
+
+    DB::SensorSettingsDescriptor settings;
+    if (!getSensorSettings(settings))
+    {
+        return;
+    }
+
+    if (!m_db->setSensorSettings(settings))
+    {
+        QMessageBox::critical(this, "Error", "Cannot set sensor settings.");
+    }
+}
+

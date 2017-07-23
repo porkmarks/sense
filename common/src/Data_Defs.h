@@ -134,8 +134,9 @@ static_assert(sizeof(Response) == 2, "");
 struct Pair_Request
 {
     Calibration calibration;
+    uint32_t serial_number;
 };
-static_assert(sizeof(Pair_Request) == 4, "");
+static_assert(sizeof(Pair_Request) == 8, "");
 
 struct Pair_Response
 {

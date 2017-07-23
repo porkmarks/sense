@@ -29,7 +29,6 @@ private:
 
     Comms m_comms;
     Settings m_settings;
-    Logger m_logger;
     DB* m_activeDB = nullptr;
 
     Ui::Manager m_ui;

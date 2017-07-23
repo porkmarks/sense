@@ -1,10 +1,16 @@
 #pragma once
 
-#include "Settings.h"
-#include "DB.h"
+#include <chrono>
+#include <mutex>
+#include <thread>
+#include <vector>
+#include <condition_variable>
+#include <QString>
+#include <QObject>
 
-class Logger
+class Logger : public QObject
 {
+    Q_OBJECT
 public:
     Logger();
     ~Logger();
@@ -22,23 +28,52 @@ public:
         ERROR
     };
 
+    void logVerbose(QString const& message);
     void logVerbose(std::string const& message);
-    void logInfo(std::string const& message);
-    void logWarning(std::string const& message);
-    void logError(std::string const& message);
+    void logVerbose(char const* message);
 
-private:
+    void logInfo(QString const& message);
+    void logInfo(std::string const& message);
+    void logInfo(char const* message);
+
+    void logWarning(QString const& message);
+    void logWarning(std::string const& message);
+    void logWarning(char const* message);
+
+    void logError(QString const& message);
+    void logError(std::string const& message);
+    void logError(char const* message);
 
     struct LogLine
     {
         Clock::time_point timePoint;
+        uint64_t index;
         Type type;
         std::string message;
     };
 
+    struct Filter
+    {
+        Clock::time_point minTimePoint;
+        Clock::time_point maxTimePoint;
+        bool allowVerbose = true;
+        bool allowInfo = true;
+        bool allowWarning = true;
+        bool allowError = true;
+    };
+
+    std::vector<LogLine> getFilteredLogLines(Filter const& filter) const;
+    size_t getAllLogLineCount() const;
+
+signals:
+    void logLinesAdded();
+
+private:
+
     struct Data
     {
         std::vector<LogLine> logLines;
+        uint64_t lastLineIndex = 0;
     };
 
     Data m_mainData;

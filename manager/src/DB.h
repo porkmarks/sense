@@ -9,7 +9,6 @@
 #include <thread>
 #include <atomic>
 #include <condition_variable>
-#include "Data_Defs.h"
 
 class DB : public QObject
 {
@@ -111,6 +110,7 @@ public:
         SensorId id = 0;
         SensorAddress address = 0;
         Calibration calibration;
+        uint32_t serialNumber = 0;
         State state = State::Active;
         Clock::time_point nextCommsTimePoint = Clock::time_point(Clock::duration::zero());
         Clock::time_point nextMeasurementTimePoint = Clock::time_point(Clock::duration::zero());
@@ -122,7 +122,7 @@ public:
     size_t getSensorCount() const;
     Sensor const& getSensor(size_t index) const;
     bool addSensor(SensorDescriptor const& descriptor);
-    bool bindSensor(SensorId id, SensorAddress address, Sensor::Calibration const& calibration);
+    bool bindSensor(SensorId id, SensorAddress address, uint32_t serialNumber, Sensor::Calibration const& calibration);
     bool setSensorState(SensorId id, Sensor::State state);
     bool setSensorNextTimePoints(SensorId id, Clock::time_point nextMeasurementTimePoint, Clock::time_point nextCommsTimePoint);
     void removeSensor(size_t index);

@@ -1,5 +1,9 @@
 <RCC>
 <qresource prefix="/">
+<file>icons/ui/verbose.png</file>
+<file>icons/ui/info.png</file>
+<file>icons/ui/warning.png</file>
+<file>icons/ui/error.png</file>
 <file>icons/ui/measurements.png</file>
 <file>icons/ui/ftp.png</file>
 <file>icons/ui/smooth.png</file>

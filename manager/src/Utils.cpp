@@ -9,8 +9,9 @@
 #include <QFile>
 #include <QDirIterator>
 #include <QDateTime>
+#include "Logger.h"
 
-constexpr size_t k_maxBackups = 10;
+extern Logger s_logger;
 
 typedef std::pair<std::string, time_t> FD;
 static std::vector<FD> getBackupFiles(std::string const& filename, std::string const& folder)
@@ -24,14 +25,14 @@ static std::vector<FD> getBackupFiles(std::string const& filename, std::string c
         QString fn = info.fileName();
         if (!info.isFile())
         {
-            std::cout << "Skipping folder '" << fn.toUtf8().data() << "'.\n";
+//            std::cout << "Skipping folder '" << fn.toUtf8().data() << "'.\n";
             it.next();
             continue;
         }
 
         if (!fn.startsWith((filename + "_").c_str()))
         {
-            std::cout << "Skipping unrecognized file '" << fn.toUtf8().data() << "'.\n";
+//            std::cout << "Skipping unrecognized file '" << fn.toUtf8().data() << "'.\n";
             it.next();
             continue;
         }
@@ -39,7 +40,7 @@ static std::vector<FD> getBackupFiles(std::string const& filename, std::string c
         QString tsStr = fn.mid(static_cast<int>(filename.size()) + 1);
         if (tsStr.isEmpty())
         {
-            std::cout << "Skipping unrecognized file '" << fn.toUtf8().data() << "'.\n";
+//            std::cout << "Skipping unrecognized file '" << fn.toUtf8().data() << "'.\n";
             it.next();
             continue;
         }
@@ -48,7 +49,7 @@ static std::vector<FD> getBackupFiles(std::string const& filename, std::string c
         time_t tt = tsStr.toULongLong(&ok);
         if (!ok)
         {
-            std::cout << "Skipping file '" << fn.toUtf8().data() << "' because of malformed timestamp.\n";
+//            std::cout << "Skipping file '" << fn.toUtf8().data() << "' because of malformed timestamp.\n";
             it.next();
             continue;
         }
@@ -61,19 +62,22 @@ static std::vector<FD> getBackupFiles(std::string const& filename, std::string c
     return bkFiles;
 }
 
-static void clipBackups(std::string const& filename, std::string const& folder)
+static void clipBackups(std::string const& filename, std::string const& folder, size_t maxBackups)
 {
     std::vector<FD> bkFiles = getBackupFiles(filename, folder);
-    if (bkFiles.size() <= k_maxBackups)
+    bool trim = bkFiles.size() > maxBackups;
+
+    s_logger.logVerbose(QString("File '%1' has %2 out of %3 backups. %4").arg(filename.c_str()).arg(bkFiles.size()).arg(maxBackups).arg(trim ? "Trimming" : "No trimming"));
+
+    if (!trim)
     {
-        std::cout << "File '" << filename << "' has " << std::to_string(bkFiles.size()) << " backups. Not trimming yet.\n";
         return;
     }
 
     std::sort(bkFiles.begin(), bkFiles.end(), [](FD const& a, FD const& b) { return a.second < b.second; });
-    while (bkFiles.size() > k_maxBackups)
+    while (bkFiles.size() > maxBackups)
     {
-        std::cout << "Deleting bk file '" << bkFiles.front().first << "'.\n";
+        s_logger.logVerbose(QString("Deleting backup of file '%1'").arg(filename.c_str()));
         remove((folder + "/" + bkFiles.front().first).c_str());
         bkFiles.erase(bkFiles.begin());
     }
@@ -91,35 +95,45 @@ std::pair<std::string, time_t> getMostRecentBackup(std::string const& filename, 
     return bkFiles.front();
 }
 
-void copyToBackup(std::string const& filename, std::string const& srcFilepath, std::string const& folder)
+void copyToBackup(std::string const& filename, std::string const& srcFilepath, std::string const& folder, size_t maxBackups)
 {
     time_t nowTT = QDateTime::currentDateTime().toTime_t();
     std::string newFilepath = folder + "/" + filename + "_" + std::to_string(nowTT);
 
     QDir().mkpath(folder.c_str());
+
+    if (!QFile::exists(srcFilepath.c_str()))
+    {
+        return;
+    }
 
     if (!QFile::copy(srcFilepath.c_str(), newFilepath.c_str()))
     {
         return;
     }
 
-    clipBackups(filename, folder);
+    clipBackups(filename, folder, maxBackups);
 }
 
-void moveToBackup(std::string const& filename, std::string const& srcFilepath, std::string const& folder)
+void moveToBackup(std::string const& filename, std::string const& srcFilepath, std::string const& folder, size_t maxBackups)
 {
     time_t nowTT = QDateTime::currentDateTime().toTime_t();
     std::string newFilepath = folder + "/" + filename + "_" + std::to_string(nowTT);
 
     QDir().mkpath(folder.c_str());
 
-    if (!renameFile(srcFilepath, newFilepath))
+    if (!QFile::exists(srcFilepath.c_str()))
     {
-        std::cerr << "Error renaming files: " << getLastErrorAsString() << "\n";
         return;
     }
 
-    clipBackups(filename, folder);
+    if (!renameFile(srcFilepath, newFilepath))
+    {
+        s_logger.logError(QString("Error moving file '%1' to '%2': %3").arg(srcFilepath.c_str()).arg(newFilepath.c_str()).arg(getLastErrorAsString().c_str()));
+        return;
+    }
+
+    clipBackups(filename, folder, maxBackups);
 }
 
 bool renameFile(std::string const& oldFilepath, std::string const& newFilepath)

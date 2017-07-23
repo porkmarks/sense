@@ -56,7 +56,10 @@ void log(PGM_P fmt, Args... args)
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-
+inline void hash_combine(uint32_t& seed, uint32_t v)
+{
+    seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -99,6 +102,7 @@ chrono::millis s_comms_period;
 
 Storage s_storage;
 data::sensor::Calibration s_calibration;
+uint32_t s_serial_number = 0;
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -186,9 +190,10 @@ uint16_t stack_size(void)
 //////////////////////////////////////////////////////////////////////////////////////////
 
 static const size_t MAX_NAME_LENGTH = 32;
-static const uint8_t SETTINGS_VERSION = 1;
+static const uint8_t SETTINGS_VERSION = 2;
 
 static uint8_t  EEMEM eeprom_version;
+static uint32_t EEMEM eeprom_serial_number;
 static uint32_t EEMEM eeprom_address;
 static uint16_t EEMEM eeprom_temperature_bias;
 static uint16_t EEMEM eeprom_humidity_bias;
@@ -198,18 +203,20 @@ void reset_settings()
     eeprom_write_byte(&eeprom_version, 0);
 }
 
-void save_settings(uint32_t address, data::sensor::Calibration const& calibration)
+void save_settings(uint32_t serial_number, uint32_t address, data::sensor::Calibration const& calibration)
 {
     eeprom_write_byte(&eeprom_version, SETTINGS_VERSION);
+    eeprom_write_dword(&eeprom_serial_number, serial_number);
     eeprom_write_dword(&eeprom_address, address);
     eeprom_write_word(&eeprom_temperature_bias, *reinterpret_cast<uint16_t const*>(&calibration.temperature_bias));
     eeprom_write_word(&eeprom_humidity_bias, *reinterpret_cast<uint16_t const*>(&calibration.humidity_bias));
 }
 
-bool load_settings(uint32_t& address, data::sensor::Calibration& calibration)
+bool load_settings(uint32_t& serial_number, uint32_t& address, data::sensor::Calibration& calibration)
 {
     if (eeprom_read_byte(&eeprom_version) == SETTINGS_VERSION)
     {
+        serial_number = eeprom_read_dword(&eeprom_serial_number);
         address = eeprom_read_dword(&eeprom_address);
 
         uint16_t v = eeprom_read_word(&eeprom_temperature_bias);
@@ -292,20 +299,24 @@ void setup()
 
     ///////////////////////////////////////////////
     //seed the RNG
+    uint32_t rnd_seed = 0;
     {
-        float t, h;
+        for (size_t i = 0; i < 30; i++)
+        {
+            float t, h;
 #if SENSOR_TYPE == SENSOR_DHT22
-        s_dht.read(t, h);
+            s_dht.read(t, h);
 #else
-        t = s_sht.GetTemperature();
-        h = s_sht.GetHumidity();
+            t = s_sht.GetTemperature();
+            h = s_sht.GetHumidity();
 #endif
-        LOG(PSTR("Temperature: %d\nHumidity: %d\n"), (int)t, (int)h);
-        float vcc = read_vcc();
-        float s = vcc + t + h;
-        uint32_t seed = reinterpret_cast<uint32_t&>(s);
-        srandom(seed);
-        LOG(PSTR("Random seed: %lu\n"), seed);
+            hash_combine(rnd_seed, static_cast<uint32_t>(read_vcc() * 10000000.f));
+            hash_combine(rnd_seed, static_cast<uint32_t>(t * 10000000.f));
+            hash_combine(rnd_seed, static_cast<uint32_t>(h * 10000000.f));
+            delay(10);
+        }
+        srandom(rnd_seed);
+        LOG(PSTR("Random seed: %lu\n"), rnd_seed);
     }
 
     ///////////////////////////////////////////////
@@ -342,10 +353,24 @@ void setup()
     //settings
     {
         uint32_t address = 0;
-        if (load_settings(address, s_calibration))
+        bool ok = load_settings(s_serial_number, address, s_calibration);
+
+        if (s_serial_number == 0)
+        {
+            s_serial_number = rnd_seed;
+            if (s_serial_number == 0)
+            {
+                LOG(PSTR("Serial number failed\n"));
+                blink_leds(RED_LED, 8, chrono::millis(100));
+                Low_Power::power_down(chrono::millis(5000000000));
+            }
+            save_settings(s_serial_number, address, s_calibration);
+        }
+
+        if (ok)
         {
             s_comms.set_address(address);
-            LOG(PSTR("Loaded settings. Addr: %lu\n"), address);
+            LOG(PSTR("Loaded settings. Addr: %lu. S/N: %lu.\n"), address, s_serial_number);
             s_state = State::FIRST_CONFIG;
         }
         else
@@ -371,7 +396,7 @@ static bool apply_config(const data::sensor::Config& config)
     if (calibration.temperature_bias != s_calibration.temperature_bias || calibration.humidity_bias != s_calibration.humidity_bias)
     {
         s_calibration = calibration;
-        save_settings(s_comms.get_address(), s_calibration);
+        save_settings(s_serial_number, s_comms.get_address(), s_calibration);
     }
 
     s_comms_period = chrono::millis(config.comms_period.count * 1000LL);
@@ -541,6 +566,7 @@ static void pair()
                     s_comms.begin_packet(raw_buffer, data::sensor::Type::PAIR_REQUEST);
                     data::sensor::Pair_Request request;
                     request.calibration = s_calibration;
+                    request.serial_number = s_serial_number;
                     s_comms.pack(raw_buffer, request);
                     send_successful = s_comms.send_packet(raw_buffer, 5);
                 }
@@ -567,7 +593,7 @@ static void pair()
                         s_comms.set_address(response_ptr->address);
                         LOG(PSTR("done. Addr: %lu\n"), response_ptr->address);
 
-                        save_settings(response_ptr->address, s_calibration);
+                        save_settings(s_serial_number, response_ptr->address, s_calibration);
 
                         done = true;
                         break;
