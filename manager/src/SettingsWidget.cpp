@@ -73,8 +73,9 @@ void SettingsWidget::initBaseStation(Settings::BaseStationId id)
     m_db = &db;
     m_ui.reportsWidget->init(*m_settings, db);
 
-    m_ui.sensorsTab->setEnabled(true);
     setSensorSettings(m_db->getSensorSettings());
+
+    setRW();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -83,6 +84,7 @@ void SettingsWidget::shutdownBaseStation(Settings::BaseStationId id)
 {
     m_db = nullptr;
     m_ui.reportsWidget->shutdown();
+    m_ui.reportsWidget->setEnabled(false);
     m_ui.sensorsTab->setEnabled(false);
 }
 

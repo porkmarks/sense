@@ -109,6 +109,15 @@ void UsersWidget::addUser()
     Settings::User user;
     dialog.setUser(user);
 
+    if (user.descriptor.type == Settings::UserDescriptor::Type::Admin)
+    {
+        dialog.setForcedType(Settings::UserDescriptor::Type::Admin);
+    }
+    else if (!m_settings->needsAdmin())
+    {
+        dialog.setForcedType(Settings::UserDescriptor::Type::Normal);
+    }
+
     int result = dialog.exec();
     if (result == QDialog::Accepted)
     {

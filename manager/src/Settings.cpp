@@ -66,7 +66,7 @@ bool Settings::create(std::string const& name)
     m_mainData = Data();
     save(m_mainData);
 
-    s_logger.logInfo(QString("Creating settings file: '%1'").arg(m_dataName.c_str()));
+    s_logger.logVerbose(QString("Creating settings file: '%1'").arg(m_dataName.c_str()));
 
     return true;
 }
@@ -80,8 +80,6 @@ bool Settings::load(std::string const& name)
     m_dataName = "sense-" + name + ".settings";
 
     std::string dataFilename = (s_dataFolder + "/" + m_dataName);
-
-    s_logger.logInfo(QString("Loading settings from '%1'").arg(m_dataName.c_str()));
 
     Data data;
 
@@ -422,7 +420,7 @@ bool Settings::load(std::string const& name)
 
     m_mainData = data;
 
-    s_logger.logInfo(QString("Done loading '%1'. Time: %2s").arg(m_dataName.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()));
+    s_logger.logVerbose(QString("Done loading settings from '%1'. Time: %2s").arg(m_dataName.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()));
 
     return true;
 }
@@ -909,7 +907,7 @@ void Settings::triggerSave()
     }
     m_storeCV.notify_all();
 
-    s_logger.logVerbose("Settings save triggered");
+    //s_logger.logVerbose("Settings save triggered");
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -931,7 +929,6 @@ void Settings::save(Data const& data) const
     }
 
     std::string dataFilename = (s_dataFolder + "/" + m_dataName);
-    s_logger.logInfo(QString("Saving settings to '%1'").arg(dataFilename.c_str()));
 
     Clock::time_point start = now;
 
@@ -1035,7 +1032,7 @@ void Settings::save(Data const& data) const
         }
     }
 
-    s_logger.logInfo(QString("Saved settings to '%1'. Time: %2s").arg(dataFilename.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()));
+    s_logger.logVerbose(QString("Done saving settings to '%1'. Time: %2s").arg(dataFilename.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()));
 
     if (dailyBackup)
     {

@@ -83,7 +83,7 @@ bool DB::create(std::string const& name)
     m_mainData = Data();
     save(m_mainData);
 
-    s_logger.logInfo(QString("Creating DB files: '%1' & '%2'").arg(m_dataName.c_str()).arg(m_dbName.c_str()));
+    s_logger.logVerbose(QString("Creating DB files: '%1' & '%2'").arg(m_dataName.c_str()).arg(m_dbName.c_str()));
 
     return true;
 }
@@ -100,7 +100,6 @@ bool DB::load(std::string const& name)
     std::string dataFilename = (s_dataFolder + "/" + m_dataName);
     std::string dbFilename = (s_dataFolder + "/" + m_dbName);
 
-    s_logger.logInfo(QString("Loading DB from '%1' & '%2'").arg(m_dataName.c_str()).arg(m_dbName.c_str()));
 
     Data data;
 
@@ -668,7 +667,7 @@ bool DB::load(std::string const& name)
 
     m_mainData = data;
 
-    s_logger.logInfo(QString("Done loading '%1' & '%2'. Time: %3s").arg(m_dataName.c_str()).arg(m_dbName.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()));
+    s_logger.logVerbose(QString("Done loading DB from '%1' & '%2'. Time: %3s").arg(m_dataName.c_str()).arg(m_dbName.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()));
 
     return true;
 }
@@ -1609,7 +1608,7 @@ void DB::triggerSave()
     }
     m_storeCV.notify_all();
 
-    s_logger.logVerbose("DB save triggered");
+    //s_logger.logVerbose("DB save triggered");
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1632,7 +1631,6 @@ void DB::save(Data const& data) const
 
     std::string dataFilename = (s_dataFolder + "/" + m_dataName);
     std::string dbFilename = (s_dataFolder + "/" + m_dbName);
-    s_logger.logInfo(QString("Saving DB to '%1' & '%2'").arg(m_dataName.c_str()).arg(m_dbName.c_str()));
 
     Clock::time_point start = now;
 
@@ -1811,7 +1809,7 @@ void DB::save(Data const& data) const
         }
     }
 
-    s_logger.logInfo(QString("Saved settings to '%1' & '%2'. Time: %2s").arg(m_dataName.c_str()).arg(m_dbName.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()));
+    s_logger.logVerbose(QString("Done saving DB to '%1' & '%2'. Time: %3s").arg(m_dataName.c_str()).arg(m_dbName.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()));
 
     if (dailyBackup)
     {
