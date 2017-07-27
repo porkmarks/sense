@@ -53,6 +53,7 @@ public:
         uint32_t recorded_measurement_count = 0;
 
         Calibration calibration;
+        uint32_t serial_number = 0;
     };
 
     Sensors();
@@ -108,10 +109,10 @@ public:
     boost::optional<Unbound_Sensor_Data> get_unbound_sensor_data() const;
     void confirm_sensor_binding(Sensor_Id id, bool confirmed);
 
-    std::function<void(Sensor_Id, Sensor_Address, Sensors::Calibration const&)> cb_sensor_bound;
+    std::function<void(Sensor_Id, Sensor_Address, uint32_t, Sensors::Calibration const&)> cb_sensor_bound;
 
-    Sensor const* bind_sensor(Sensors::Calibration const& calibration);
-    Sensor const* add_sensor(Sensor_Id id, std::string const& name, Sensor_Address address, Calibration const& calibration);
+    Sensor const* bind_sensor(uint32_t serial_number, Sensors::Calibration const& calibration);
+    Sensor const* add_sensor(Sensor_Id id, std::string const& name, Sensor_Address address, uint32_t serial_number, Calibration const& calibration);
     bool remove_sensor(Sensor_Id id);
     void remove_all_sensors();
     std::vector<Sensor> get_sensors() const;

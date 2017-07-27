@@ -81,17 +81,6 @@
            </property>
           </widget>
          </item>
-         <item row="18" column="0">
-          <widget class="QCheckBox" name="lowSignalWatch">
-           <property name="text">
-            <string>Low Signal</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/signal-0.png</normaloff>:/icons/ui/signal-0.png</iconset>
-           </property>
-          </widget>
-         </item>
          <item row="0" column="0">
           <widget class="QLabel" name="label">
            <property name="text">
@@ -336,24 +325,6 @@
            </property>
           </widget>
          </item>
-         <item row="21" column="0">
-          <widget class="QCheckBox" name="sensorErrorsWatch">
-           <property name="text">
-            <string>Sensor Errors</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/sensor-error.png</normaloff>:/icons/ui/sensor-error.png</iconset>
-           </property>
-          </widget>
-         </item>
-         <item row="24" column="1">
-          <widget class="QLineEdit" name="emailRecipient">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-          </widget>
-         </item>
          <item row="0" column="1">
           <widget class="QLineEdit" name="name">
            <property name="text">
@@ -370,17 +341,6 @@
            </property>
            <property name="text">
             <string>Triggered when a sensor is low on battery</string>
-           </property>
-          </widget>
-         </item>
-         <item row="24" column="0">
-          <widget class="QCheckBox" name="sendEmailAction">
-           <property name="text">
-            <string>Send Email</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/email.png</normaloff>:/icons/ui/email.png</iconset>
            </property>
           </widget>
          </item>
@@ -404,17 +364,6 @@
            </property>
            <property name="text">
             <string>Triggered when the temperature is below the set point</string>
-           </property>
-          </widget>
-         </item>
-         <item row="15" column="0">
-          <widget class="QCheckBox" name="lowBatteryWatch">
-           <property name="text">
-            <string>Low Battery</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/battery-0.png</normaloff>:/icons/ui/battery-0.png</iconset>
            </property>
           </widget>
          </item>
@@ -467,6 +416,50 @@
             </size>
            </property>
           </spacer>
+         </item>
+         <item row="21" column="0" colspan="2">
+          <widget class="QCheckBox" name="sensorErrorsWatch">
+           <property name="text">
+            <string>Sensor Errors</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/sensor-error.png</normaloff>:/icons/ui/sensor-error.png</iconset>
+           </property>
+          </widget>
+         </item>
+         <item row="18" column="0" colspan="2">
+          <widget class="QCheckBox" name="lowSignalWatch">
+           <property name="text">
+            <string>Low Signal</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/signal-0.png</normaloff>:/icons/ui/signal-0.png</iconset>
+           </property>
+          </widget>
+         </item>
+         <item row="15" column="0" colspan="2">
+          <widget class="QCheckBox" name="lowBatteryWatch">
+           <property name="text">
+            <string>Low Battery</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/battery-0.png</normaloff>:/icons/ui/battery-0.png</iconset>
+           </property>
+          </widget>
+         </item>
+         <item row="24" column="0" colspan="2">
+          <widget class="QCheckBox" name="sendEmailAction">
+           <property name="text">
+            <string>Send Email</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/email.png</normaloff>:/icons/ui/email.png</iconset>
+           </property>
+          </widget>
          </item>
         </layout>
        </widget>
@@ -534,7 +527,6 @@
   <tabstop>lowSignalWatch</tabstop>
   <tabstop>sensorErrorsWatch</tabstop>
   <tabstop>sendEmailAction</tabstop>
-  <tabstop>emailRecipient</tabstop>
   <tabstop>sensorGroup</tabstop>
   <tabstop>sensorList</tabstop>
  </tabstops>
@@ -635,22 +627,6 @@
     <hint type="destinationlabel">
      <x>212</x>
      <y>326</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>sendEmailAction</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>emailRecipient</receiver>
-   <slot>setEnabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>124</x>
-     <y>649</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>226</x>
-     <y>633</y>
     </hint>
    </hints>
   </connection>

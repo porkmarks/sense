@@ -135,7 +135,7 @@ void Sensors::confirm_sensor_binding(Sensor_Id id, bool confirmed)
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-Sensors::Sensor const* Sensors::bind_sensor(Sensors::Calibration const& calibration)
+Sensors::Sensor const* Sensors::bind_sensor(uint32_t serial_number, Sensors::Calibration const& calibration)
 {
     if (!is_initialized())
     {
@@ -149,10 +149,10 @@ Sensors::Sensor const* Sensors::bind_sensor(Sensors::Calibration const& calibrat
         return nullptr;
     }
 
-    Sensor const* sensor = add_sensor(m_unbound_sensor_data_opt->id, m_unbound_sensor_data_opt->name, ++m_last_address, calibration);
+    Sensor const* sensor = add_sensor(m_unbound_sensor_data_opt->id, m_unbound_sensor_data_opt->name, ++m_last_address, serial_number, calibration);
     if (sensor)
     {
-        cb_sensor_bound(sensor->id, sensor->address, sensor->calibration);
+        cb_sensor_bound(sensor->id, sensor->address, sensor->serial_number, sensor->calibration);
         m_unbound_sensor_data_opt = boost::none;
     }
 
@@ -229,7 +229,7 @@ void Sensors::set_sensor_b2s_input_dBm(Sensor_Id id, int8_t dBm)
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-Sensors::Sensor const* Sensors::add_sensor(Sensor_Id id, std::string const& name, Sensor_Address address, Calibration const& calibration)
+Sensors::Sensor const* Sensors::add_sensor(Sensor_Id id, std::string const& name, Sensor_Address address, uint32_t serial_number, Calibration const& calibration)
 {
     if (!is_initialized())
     {
@@ -249,6 +249,7 @@ Sensors::Sensor const* Sensors::add_sensor(Sensor_Id id, std::string const& name
     sensor.name = name;
     sensor.address = address;
     sensor.calibration = calibration;
+    sensor.serial_number = serial_number;
     m_sensors.emplace_back(std::move(sensor));
 
     m_last_address = std::max(m_last_address, sensor.address);

@@ -86,13 +86,6 @@
            </property>
           </widget>
          </item>
-         <item row="13" column="1">
-          <widget class="QLineEdit" name="ftpFolder">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-          </widget>
-         </item>
          <item row="12" column="0">
           <spacer name="verticalSpacer_3">
            <property name="orientation">
@@ -153,17 +146,6 @@
            </property>
           </widget>
          </item>
-         <item row="10" column="0">
-          <widget class="QCheckBox" name="sendEmailAction">
-           <property name="text">
-            <string>Send Email To</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/email.png</normaloff>:/icons/ui/email.png</iconset>
-           </property>
-          </widget>
-         </item>
          <item row="3" column="1">
           <widget class="QComboBox" name="period">
            <item>
@@ -181,17 +163,6 @@
              <string>Monthly</string>
             </property>
            </item>
-          </widget>
-         </item>
-         <item row="13" column="0">
-          <widget class="QCheckBox" name="uploadToFtpAction">
-           <property name="text">
-            <string>Upload To FTP Folder</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/ftp.png</normaloff>:/icons/ui/ftp.png</iconset>
-           </property>
           </widget>
          </item>
          <item row="4" column="0">
@@ -252,13 +223,6 @@
            </property>
           </spacer>
          </item>
-         <item row="10" column="1">
-          <widget class="QLineEdit" name="emailRecipient">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-          </widget>
-         </item>
          <item row="5" column="0" colspan="2">
           <widget class="QLabel" name="label_2">
            <property name="font">
@@ -298,6 +262,28 @@
           <widget class="QPushButton" name="sendNow">
            <property name="text">
             <string>Send Report Now</string>
+           </property>
+          </widget>
+         </item>
+         <item row="10" column="0" colspan="2">
+          <widget class="QCheckBox" name="sendEmailAction">
+           <property name="text">
+            <string>Send Email To</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/email.png</normaloff>:/icons/ui/email.png</iconset>
+           </property>
+          </widget>
+         </item>
+         <item row="13" column="0" colspan="2">
+          <widget class="QCheckBox" name="uploadToFtpAction">
+           <property name="text">
+            <string>Upload To FTP</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/ftp.png</normaloff>:/icons/ui/ftp.png</iconset>
            </property>
           </widget>
          </item>
@@ -361,9 +347,7 @@
   <tabstop>summaryData</tabstop>
   <tabstop>allData</tabstop>
   <tabstop>sendEmailAction</tabstop>
-  <tabstop>emailRecipient</tabstop>
   <tabstop>uploadToFtpAction</tabstop>
-  <tabstop>ftpFolder</tabstop>
   <tabstop>sendNow</tabstop>
   <tabstop>sensorGroup</tabstop>
   <tabstop>sensorList</tabstop>
@@ -401,22 +385,6 @@
     <hint type="destinationlabel">
      <x>286</x>
      <y>274</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>sendEmailAction</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>emailRecipient</receiver>
-   <slot>setEnabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>124</x>
-     <y>207</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>231</x>
-     <y>191</y>
     </hint>
    </hints>
   </connection>
@@ -465,22 +433,6 @@
     <hint type="destinationlabel">
      <x>236</x>
      <y>120</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>uploadToFtpAction</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>ftpFolder</receiver>
-   <slot>setEnabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>125</x>
-     <y>241</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>246</x>
-     <y>238</y>
     </hint>
    </hints>
   </connection>

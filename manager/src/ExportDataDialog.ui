@@ -52,6 +52,20 @@
            <layout class="QHBoxLayout" name="horizontalLayout">
             <item>
              <layout class="QGridLayout" name="gridLayout">
+              <item row="7" column="0">
+               <widget class="QCheckBox" name="exportBattery">
+                <property name="text">
+                 <string>Battery</string>
+                </property>
+                <property name="icon">
+                 <iconset resource="../res/res.qrc">
+                  <normaloff>:/icons/ui/battery-75.png</normaloff>:/icons/ui/battery-75.png</iconset>
+                </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
               <item row="3" column="0" colspan="2">
                <widget class="QCheckBox" name="exportTimePoint">
                 <property name="text">
@@ -66,35 +80,7 @@
                 </property>
                </widget>
               </item>
-              <item row="5" column="0" colspan="2">
-               <widget class="QCheckBox" name="exportTemperature">
-                <property name="text">
-                 <string>Temperature</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/temperature.png</normaloff>:/icons/ui/temperature.png</iconset>
-                </property>
-                <property name="checked">
-                 <bool>true</bool>
-                </property>
-               </widget>
-              </item>
-              <item row="6" column="0" colspan="2">
-               <widget class="QCheckBox" name="exportHumidity">
-                <property name="text">
-                 <string>Humidity</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/humidity.png</normaloff>:/icons/ui/humidity.png</iconset>
-                </property>
-                <property name="checked">
-                 <bool>true</bool>
-                </property>
-               </widget>
-              </item>
-              <item row="2" column="0" colspan="2">
+              <item row="2" column="0">
                <widget class="QCheckBox" name="exportSensorName">
                 <property name="text">
                  <string>Sensor Name</string>
@@ -108,21 +94,18 @@
                 </property>
                </widget>
               </item>
-              <item row="1" column="0" colspan="2">
-               <widget class="QCheckBox" name="exportIndex">
+              <item row="2" column="1">
+               <widget class="QCheckBox" name="exportSensorSN">
                 <property name="text">
-                 <string>Index</string>
+                 <string>Sensor S/N</string>
                 </property>
                 <property name="icon">
                  <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/arrow-right.png</normaloff>:/icons/ui/arrow-right.png</iconset>
-                </property>
-                <property name="checked">
-                 <bool>true</bool>
+                  <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
                 </property>
                </widget>
               </item>
-              <item row="0" column="0" colspan="2">
+              <item row="0" column="0">
                <widget class="QCheckBox" name="exportId">
                 <property name="text">
                  <string>Id</string>
@@ -136,14 +119,42 @@
                 </property>
                </widget>
               </item>
-              <item row="7" column="0">
-               <widget class="QCheckBox" name="exportBattery">
+              <item row="0" column="1">
+               <widget class="QCheckBox" name="exportIndex">
                 <property name="text">
-                 <string>Battery</string>
+                 <string>Index</string>
                 </property>
                 <property name="icon">
                  <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/battery-75.png</normaloff>:/icons/ui/battery-75.png</iconset>
+                  <normaloff>:/icons/ui/arrow-right.png</normaloff>:/icons/ui/arrow-right.png</iconset>
+                </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="0">
+               <widget class="QCheckBox" name="exportTemperature">
+                <property name="text">
+                 <string>Temperature</string>
+                </property>
+                <property name="icon">
+                 <iconset resource="../res/res.qrc">
+                  <normaloff>:/icons/ui/temperature.png</normaloff>:/icons/ui/temperature.png</iconset>
+                </property>
+                <property name="checked">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="1">
+               <widget class="QCheckBox" name="exportHumidity">
+                <property name="text">
+                 <string>Humidity</string>
+                </property>
+                <property name="icon">
+                 <iconset resource="../res/res.qrc">
+                  <normaloff>:/icons/ui/humidity.png</normaloff>:/icons/ui/humidity.png</iconset>
                 </property>
                 <property name="checked">
                  <bool>true</bool>
@@ -353,11 +364,9 @@
  </widget>
  <tabstops>
   <tabstop>exportId</tabstop>
-  <tabstop>exportIndex</tabstop>
   <tabstop>exportSensorName</tabstop>
   <tabstop>exportTimePoint</tabstop>
   <tabstop>exportTemperature</tabstop>
-  <tabstop>exportHumidity</tabstop>
   <tabstop>exportBattery</tabstop>
   <tabstop>fileFormat</tabstop>
   <tabstop>separator</tabstop>

@@ -19,6 +19,7 @@ ExportDataDialog::ExportDataDialog(DB& db, MeasurementsModel& model)
     connect(m_ui.exportId, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
     connect(m_ui.exportIndex, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
     connect(m_ui.exportSensorName, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
+    connect(m_ui.exportSensorSN, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
     connect(m_ui.exportTimePoint, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
     connect(m_ui.exportTemperature, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
     connect(m_ui.exportHumidity, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
@@ -99,6 +100,7 @@ void ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount)
     bool exportId = m_ui.exportId->isChecked();
     bool exportIndex = m_ui.exportIndex->isChecked();
     bool exportSensorName = m_ui.exportSensorName->isChecked();
+    bool exportSensorSN = m_ui.exportSensorSN->isChecked();
     bool exportTimePoint = m_ui.exportTimePoint->isChecked();
     bool exportTemperature = m_ui.exportTemperature->isChecked();
     bool exportHumidity = m_ui.exportHumidity->isChecked();
@@ -115,6 +117,11 @@ void ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount)
     if (exportSensorName)
     {
         stream << "Sensor Name";
+        stream << separator;
+    }
+    if (exportSensorSN)
+    {
+        stream << "Sensor S/N";
         stream << separator;
     }
     if (exportIndex)
@@ -179,6 +186,19 @@ void ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount)
             else
             {
                 stream << m_db.getSensor(sensorIndex).descriptor.name;
+            }
+            stream << separator;
+        }
+        if (exportSensorSN)
+        {
+            int32_t sensorIndex = m_db.findSensorIndexById(m.descriptor.sensorId);
+            if (sensorIndex < 0)
+            {
+                stream << "N/A";
+            }
+            else
+            {
+                stream << QString("%1").arg(m_db.getSensor(sensorIndex).serialNumber, 8, 16, QChar('0')).toUtf8().data();
             }
             stream << separator;
         }

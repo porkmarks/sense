@@ -166,7 +166,10 @@ bool Logger::load(std::string const& name)
 
     //done!!!
 
-    m_mainData = data;
+    {
+        std::lock_guard<std::mutex> lg(m_mainDataMutex);
+        m_mainData = data;
+    }
 
     std::cout << "Time to load logs:" << std::chrono::duration<float>(Clock::now() - start).count() << "s\n";
     std::cout.flush();
@@ -180,7 +183,10 @@ bool Logger::load(std::string const& name)
 
 void Logger::logVerbose(std::string const& message)
 {
-    m_mainData.logLines.emplace_back(LogLine{ Clock::now(), ++m_mainData.lastLineIndex, Type::VERBOSE, message });
+    {
+        std::lock_guard<std::mutex> lg(m_mainDataMutex);
+        m_mainData.logLines.emplace_back(LogLine{ Clock::now(), ++m_mainData.lastLineIndex, Type::VERBOSE, message });
+    }
 
     std::cout << "VERBOSE: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
     std::cout.flush();
@@ -207,7 +213,10 @@ void Logger::logVerbose(char const* message)
 
 void Logger::logInfo(std::string const& message)
 {
-    m_mainData.logLines.emplace_back(LogLine{ Clock::now(), ++m_mainData.lastLineIndex, Type::INFO, message });
+    {
+        std::lock_guard<std::mutex> lg(m_mainDataMutex);
+        m_mainData.logLines.emplace_back(LogLine{ Clock::now(), ++m_mainData.lastLineIndex, Type::INFO, message });
+    }
 
     std::cout << "INFO: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
     std::cout.flush();
@@ -234,7 +243,10 @@ void Logger::logInfo(char const* message)
 
 void Logger::logWarning(std::string const& message)
 {
-    m_mainData.logLines.emplace_back(LogLine{ Clock::now(), ++m_mainData.lastLineIndex, Type::WARNING, message });
+    {
+        std::lock_guard<std::mutex> lg(m_mainDataMutex);
+        m_mainData.logLines.emplace_back(LogLine{ Clock::now(), ++m_mainData.lastLineIndex, Type::WARNING, message });
+    }
 
     std::cout << "WARNING: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
     std::cout.flush();
@@ -261,7 +273,10 @@ void Logger::logWarning(char const* message)
 
 void Logger::logError(std::string const& message)
 {
-    m_mainData.logLines.emplace_back(LogLine{ Clock::now(), ++m_mainData.lastLineIndex, Type::ERROR, message });
+    {
+        std::lock_guard<std::mutex> lg(m_mainDataMutex);
+        m_mainData.logLines.emplace_back(LogLine{ Clock::now(), ++m_mainData.lastLineIndex, Type::ERROR, message });
+    }
 
     std::cout << "ERROR: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
     std::cout.flush();
@@ -291,6 +306,8 @@ std::vector<Logger::LogLine> Logger::getFilteredLogLines(Filter const& filter) c
     std::vector<LogLine> result;
     result.reserve(16384);
 
+    std::lock_guard<std::mutex> lg(m_mainDataMutex);
+
     for (LogLine const& line: m_mainData.logLines)
     {
         if (line.timePoint < filter.minTimePoint || line.timePoint > filter.maxTimePoint)
@@ -315,6 +332,7 @@ std::vector<Logger::LogLine> Logger::getFilteredLogLines(Filter const& filter) c
 
 size_t Logger::getAllLogLineCount() const
 {
+    std::lock_guard<std::mutex> lg(m_mainDataMutex);
     return m_mainData.logLines.size();
 }
 
@@ -322,9 +340,16 @@ size_t Logger::getAllLogLineCount() const
 
 void Logger::triggerSave()
 {
+    Data mainDataCopy;
+    {
+        std::lock_guard<std::mutex> lg(m_mainDataMutex);
+        mainDataCopy = m_mainData;
+    }
+
+
     {
         std::unique_lock<std::mutex> lg(m_storeMutex);
-        m_storeData = m_mainData;
+        m_storeData = mainDataCopy;
         m_storeThreadTriggered = true;
     }
     m_storeCV.notify_all();

@@ -80,11 +80,12 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
             Sensors::Calibration reported_calibration;
             reported_calibration.temperature_bias = static_cast<float>(pair_request.calibration.temperature_bias) / 100.f;
             reported_calibration.humidity_bias = static_cast<float>(pair_request.calibration.humidity_bias) / 100.f;
+            uint32_t serial_number = pair_request.serial_number;
 
-            Sensors::Sensor const* sensor = s_sensors.bind_sensor(reported_calibration);
+            Sensors::Sensor const* sensor = s_sensors.bind_sensor(serial_number, reported_calibration);
             if (sensor)
             {
-                std::cout << "Adding sensor " << sensor->name << ", id " << sensor->id << ", address " << sensor->address << "\n";
+                std::cout << "Adding sensor " << sensor->name << ", id " << sensor->id << ", address " << sensor->address << ", S/N " << sensor->serial_number << "\n";
 
                 data::sensor::Pair_Response packet;
                 packet.address = sensor->address;

@@ -15,7 +15,7 @@ Server::Server(Sensors& sensors)
     , m_broadcast_socket(m_io_service)
 {
     m_sensors.cb_report_measurement = std::bind(&Server::report_measurement, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-    m_sensors.cb_sensor_bound = std::bind(&Server::sensor_bound, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_sensors.cb_sensor_bound = std::bind(&Server::sensor_bound, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -246,7 +246,7 @@ void Server::report_measurement(Sensors::Sensor_Id sensor_id, Clock::time_point 
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-void Server::sensor_bound(Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address sensor_address, Sensors::Calibration const& calibration)
+void Server::sensor_bound(Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address sensor_address, uint32_t serial_number, Sensors::Calibration const& calibration)
 {
     rapidjson::Document document;
     document.SetObject();
@@ -254,6 +254,7 @@ void Server::sensor_bound(Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address 
     document.AddMember("address", sensor_address, document.GetAllocator());
     document.AddMember("temperature_bias", calibration.temperature_bias, document.GetAllocator());
     document.AddMember("humidity_bias", calibration.humidity_bias, document.GetAllocator());
+    document.AddMember("serial_number", serial_number, document.GetAllocator());
 
     rapidjson::StringBuffer buffer;
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
@@ -396,6 +397,14 @@ void Server::process_set_sensors_req()
             }
             Sensors::Sensor_Address address = it->value.GetUint();
 
+            it = sensorj.FindMember("serial_number");
+            if (it == sensorj.MemberEnd() || !it->value.IsUint())
+            {
+                std::cerr << "Cannot deserialize request: Missing serial_number.\n";
+                goto end;
+            }
+            uint32_t serial_number = it->value.GetUint();
+
             Sensors::Calibration calibration;
             it = sensorj.FindMember("temperature_bias");
             if (it == sensorj.MemberEnd() || !it->value.IsNumber())
@@ -421,7 +430,7 @@ void Server::process_set_sensors_req()
                 //data.calibration = calibration;
                 m_sensors.set_unbound_sensor_data(data);
             }
-            else if (!m_sensors.add_sensor(id, name, address, calibration))
+            else if (!m_sensors.add_sensor(id, name, address, serial_number, calibration))
             {
                 std::cerr << "Cannot add sensor\n";
                 goto end;

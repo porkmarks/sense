@@ -76,6 +76,7 @@ private:
         uint64_t lastLineIndex = 0;
     };
 
+    mutable std::mutex m_mainDataMutex;
     Data m_mainData;
 
     std::atomic_bool m_threadsExit = { false };
