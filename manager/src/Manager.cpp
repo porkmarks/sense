@@ -84,6 +84,7 @@ Manager::Manager(QWidget *parent)
 Manager::~Manager()
 {
     s_logger.logInfo("Program exit");
+    s_logger.shutdown();
 
 //    delete m_ui.baseStationsWidget;
     delete m_ui.sensorsWidget;

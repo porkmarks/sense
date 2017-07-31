@@ -17,6 +17,8 @@ public:
 
     typedef std::chrono::high_resolution_clock Clock;
 
+    void shutdown();
+
     bool create(std::string const& name);
     bool load(std::string const& name);
 
@@ -90,6 +92,7 @@ private:
     std::mutex m_storeMutex;
     Data m_storeData;
 
+    std::string m_dataFolder;
     std::string m_dataName;
 
     mutable Clock::time_point m_lastDailyBackupTP = Clock::time_point(Clock::duration::zero());

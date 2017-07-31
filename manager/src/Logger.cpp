@@ -25,6 +25,7 @@ constexpr uint64_t k_fileEncryptionKey = 3452354435332256ULL;
 
 Logger::Logger()
 {
+    m_dataFolder = s_dataFolder;
     m_storeThread = std::thread(std::bind(&Logger::storeThreadProc, this));
 }
 
@@ -32,6 +33,18 @@ Logger::Logger()
 
 Logger::~Logger()
 {
+    shutdown();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Logger::shutdown()
+{
+    if (m_threadsExit)
+    {
+        return;
+    }
+
     m_threadsExit = true;
 
     m_storeCV.notify_all();
@@ -47,9 +60,9 @@ bool Logger::create(std::string const& name)
 {
     m_dataName = "sense-" + name + ".log";
 
-    std::string dataFilename = s_dataFolder + "/" + m_dataName;
+    std::string dataFilename = m_dataFolder + "/" + m_dataName;
 
-    moveToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/deleted", 50);
+    moveToBackup(m_dataName, dataFilename, m_dataFolder + "/backups/deleted", 50);
     remove((dataFilename).c_str());
 
     m_mainData = Data();
@@ -66,7 +79,7 @@ bool Logger::load(std::string const& name)
 
     m_dataName = "sense-" + name + ".log";
 
-    std::string dataFilename = (s_dataFolder + "/" + m_dataName);
+    std::string dataFilename = (m_dataFolder + "/" + m_dataName);
 
     Data data;
     data.logLines.reserve(8192);
@@ -145,7 +158,7 @@ bool Logger::load(std::string const& name)
     }
 
     //initialize backups
-    std::pair<std::string, time_t> bkf = getMostRecentBackup(dataFilename, s_dataFolder + "/backups/daily");
+    std::pair<std::string, time_t> bkf = getMostRecentBackup(dataFilename, m_dataFolder + "/backups/daily");
     if (bkf.first.empty())
     {
         m_lastDailyBackupTP = Clock::now();
@@ -154,7 +167,7 @@ bool Logger::load(std::string const& name)
     {
         m_lastDailyBackupTP = Clock::from_time_t(bkf.second);
     }
-    bkf = getMostRecentBackup(dataFilename, s_dataFolder + "/backups/weekly");
+    bkf = getMostRecentBackup(dataFilename, m_dataFolder + "/backups/weekly");
     if (bkf.first.empty())
     {
         m_lastWeeklyBackupTP = Clock::now();
@@ -373,7 +386,7 @@ void Logger::save(Data const& data) const
         weeklyBackup = true;
     }
 
-    std::string dataFilename = (s_dataFolder + "/" + m_dataName);
+    std::string dataFilename = (m_dataFolder + "/" + m_dataName);
 
     Clock::time_point start = now;
 
@@ -400,7 +413,7 @@ void Logger::save(Data const& data) const
         QByteArray encryptedData = crypt.encryptToByteArray(QByteArray(buffer.GetString(), buffer.GetSize()));
 //        QByteArray encryptedData = QByteArray(buffer.GetString(), buffer.GetSize());
 
-        std::string tempFilename = (s_dataFolder + "/" + m_dataName + "_temp");
+        std::string tempFilename = (m_dataFolder + "/" + m_dataName + "_temp");
         std::ofstream file(tempFilename, std::ios_base::binary);
         if (!file.is_open())
         {
@@ -413,7 +426,7 @@ void Logger::save(Data const& data) const
         file.flush();
         file.close();
 
-        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/incremental", 50);
+        copyToBackup(m_dataName, dataFilename, m_dataFolder + "/backups/incremental", 50);
 
         if (!renameFile(tempFilename.c_str(), dataFilename.c_str()))
         {
@@ -426,11 +439,11 @@ void Logger::save(Data const& data) const
 
     if (dailyBackup)
     {
-        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/daily", 10);
+        copyToBackup(m_dataName, dataFilename, m_dataFolder + "/backups/daily", 10);
     }
     if (weeklyBackup)
     {
-        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/weekly", 10);
+        copyToBackup(m_dataName, dataFilename, m_dataFolder + "/backups/weekly", 10);
     }
 }
 
