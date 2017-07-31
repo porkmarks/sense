@@ -243,59 +243,6 @@
          <property name="bottomMargin">
           <number>2</number>
          </property>
-         <item row="3" column="1">
-          <widget class="QPushButton" name="clearAnnotations">
-           <property name="text">
-            <string>Clear Annotations</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/remove.png</normaloff>:/icons/ui/remove.png</iconset>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="1">
-          <widget class="QPushButton" name="exportData">
-           <property name="text">
-            <string>Export</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/export.png</normaloff>:/icons/ui/export.png</iconset>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="2">
-          <widget class="QCheckBox" name="fitMeasurements">
-           <property name="text">
-            <string>Fit Measurements</string>
-           </property>
-           <property name="checked">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="2">
-          <widget class="QCheckBox" name="useSmoothing">
-           <property name="text">
-            <string>Smooth Results</string>
-           </property>
-           <property name="checked">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="1">
-          <widget class="QPushButton" name="selectSensors">
-           <property name="text">
-            <string>Select Sensors</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
-           </property>
-          </widget>
-         </item>
          <item row="4" column="1">
           <spacer name="verticalSpacer_2">
            <property name="orientation">
@@ -309,7 +256,45 @@
            </property>
           </spacer>
          </item>
-         <item row="2" column="3">
+         <item row="2" column="4">
+          <widget class="QDoubleSpinBox" name="maxTemperature">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="suffix">
+            <string> °C</string>
+           </property>
+           <property name="decimals">
+            <number>1</number>
+           </property>
+           <property name="minimum">
+            <double>-100.000000000000000</double>
+           </property>
+           <property name="maximum">
+            <double>100.000000000000000</double>
+           </property>
+           <property name="value">
+            <double>50.000000000000000</double>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="4">
+          <widget class="QDoubleSpinBox" name="maxHumidity">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="suffix">
+            <string> %RH</string>
+           </property>
+           <property name="decimals">
+            <number>1</number>
+           </property>
+           <property name="value">
+            <double>100.000000000000000</double>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="7">
           <spacer name="horizontalSpacer">
            <property name="orientation">
             <enum>Qt::Horizontal</enum>
@@ -321,6 +306,91 @@
             </size>
            </property>
           </spacer>
+         </item>
+         <item row="0" column="3" colspan="2">
+          <widget class="QCheckBox" name="fitMeasurements">
+           <property name="text">
+            <string>Fit Measurements</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="3">
+          <widget class="QDoubleSpinBox" name="minHumidity">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="suffix">
+            <string> %RH</string>
+           </property>
+           <property name="decimals">
+            <number>1</number>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="3">
+          <widget class="QDoubleSpinBox" name="minTemperature">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="suffix">
+            <string> °C</string>
+           </property>
+           <property name="decimals">
+            <number>1</number>
+           </property>
+           <property name="minimum">
+            <double>-100.000000000000000</double>
+           </property>
+           <property name="maximum">
+            <double>150.000000000000000</double>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="6">
+          <widget class="QPushButton" name="selectSensors">
+           <property name="text">
+            <string>Select Sensors</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="6">
+          <widget class="QPushButton" name="exportData">
+           <property name="text">
+            <string>Export</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/export.png</normaloff>:/icons/ui/export.png</iconset>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="6">
+          <widget class="QPushButton" name="clearAnnotations">
+           <property name="text">
+            <string>Clear Annotations</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/remove.png</normaloff>:/icons/ui/remove.png</iconset>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="5">
+          <widget class="QCheckBox" name="useSmoothing">
+           <property name="text">
+            <string>Smooth Results</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
          </item>
         </layout>
        </widget>
@@ -467,6 +537,70 @@
     <hint type="destinationlabel">
      <x>90</x>
      <y>88</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>fitMeasurements</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>minTemperature</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>495</x>
+     <y>17</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>492</x>
+     <y>51</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>fitMeasurements</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>maxTemperature</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>563</x>
+     <y>14</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>585</x>
+     <y>47</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>fitMeasurements</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>minHumidity</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>533</x>
+     <y>22</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>517</x>
+     <y>93</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>fitMeasurements</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>maxHumidity</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>625</x>
+     <y>21</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>618</x>
+     <y>81</y>
     </hint>
    </hints>
   </connection>

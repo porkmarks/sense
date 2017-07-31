@@ -36,6 +36,11 @@ void PlotWidget::init(DB& db)
     connect(m_ui.maxDateTime, &QDateTimeEdit::dateTimeChanged, this, &PlotWidget::maxDateTimeChanged);
 
     connect(m_ui.fitMeasurements, &QCheckBox::stateChanged, this, &PlotWidget::refresh);
+    connect(m_ui.minTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh);
+    connect(m_ui.maxTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh);
+    connect(m_ui.minHumidity, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh);
+    connect(m_ui.maxHumidity, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh);
+
     connect(m_ui.useSmoothing, &QCheckBox::stateChanged, this, &PlotWidget::refresh);
     connect(m_ui.dateTimePreset, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &PlotWidget::refresh);
     connect(m_ui.minDateTime, &QDateTimeEdit::editingFinished, this, &PlotWidget::refresh);
@@ -518,30 +523,32 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
     maxDT.setTime_t(maxTS);
     m_axisX->setRange(minDT, maxDT);
 
-    if (!m_fitMeasurements)
+    if (m_fitMeasurements)
     {
-        maxT = std::max(maxT, 50.0);
-        minT = std::min(minT, 0.0);
-        maxH = std::max(maxH, 100.0);
-        minH = std::min(minH, 0.0);
+        constexpr qreal minTemperatureRange = 5.0;
+        if (std::abs(maxT - minT) < minTemperatureRange)
+        {
+            qreal center = (maxT + minT) / 2.0;
+            minT = center - minTemperatureRange / 2.0;
+            maxT = center + minTemperatureRange / 2.0;
+        }
+        constexpr qreal minHumidityRange = 10.0;
+        if (std::abs(maxH - minH) < minHumidityRange)
+        {
+            qreal center = (maxH + minH) / 2.0;
+            minH = center - minHumidityRange / 2.0;
+            maxH = center + minHumidityRange / 2.0;
+        }
+    }
+    else
+    {
+        maxT = std::max(maxT, std::max(m_ui.minTemperature->value(), m_ui.maxTemperature->value()));
+        minT = std::min(minT, std::min(m_ui.minTemperature->value(), m_ui.maxTemperature->value()));
+        maxH = std::max(maxH, std::max(m_ui.minHumidity->value(), m_ui.maxHumidity->value()));
+        minH = std::min(minH, std::max(m_ui.minHumidity->value(), m_ui.maxHumidity->value()));
     }
 
-    constexpr qreal minTemperatureRange = 5.0;
-    if (std::abs(maxT - minT) < minTemperatureRange)
-    {
-        qreal center = (maxT + minT) / 2.0;
-        minT = center - minTemperatureRange / 2.0;
-        maxT = center + minTemperatureRange / 2.0;
-    }
     m_axisTY->setRange(minT, maxT);
-
-    constexpr qreal minHumidityRange = 10.0;
-    if (std::abs(maxH - minH) < minHumidityRange)
-    {
-        qreal center = (maxH + minH) / 2.0;
-        minH = center - minHumidityRange / 2.0;
-        maxH = center + minHumidityRange / 2.0;
-    }
     m_axisHY->setRange(minH, maxH);
 }
 
