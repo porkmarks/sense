@@ -27,7 +27,7 @@ public:
         VERBOSE,
         INFO,
         WARNING,
-        ERROR
+        CRITICAL
     };
 
     void logVerbose(QString const& message);
@@ -42,9 +42,9 @@ public:
     void logWarning(std::string const& message);
     void logWarning(char const* message);
 
-    void logError(QString const& message);
-    void logError(std::string const& message);
-    void logError(char const* message);
+    void logCritical(QString const& message);
+    void logCritical(std::string const& message);
+    void logCritical(char const* message);
 
     struct LogLine
     {

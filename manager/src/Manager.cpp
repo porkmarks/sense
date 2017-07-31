@@ -44,7 +44,7 @@ Manager::Manager(QWidget *parent)
     {
         if (!m_settings.create("settings"))
         {
-            s_logger.logError("Cannot create the settings file");
+            s_logger.logCritical("Cannot create the settings file");
             QMessageBox::critical(this, "Error", "Cannot create the settings file.");
             exit(1);
         }
@@ -125,7 +125,7 @@ void Manager::checkIfAdminExists()
                 }
                 else
                 {
-                    s_logger.logError("Internal consistency error: user not found after adding");
+                    s_logger.logCritical("Internal consistency error: user not found after adding");
                 }
             }
         }
@@ -136,7 +136,7 @@ void Manager::checkIfAdminExists()
 
         if (m_settings.needsAdmin())
         {
-            s_logger.logError("User failed to create an admin account. Exiting");
+            s_logger.logCritical("User failed to create an admin account. Exiting");
             QMessageBox::critical(this, "Error", "No admin user exists.\nThe program will now close.");
             exit(1);
         }
@@ -165,7 +165,7 @@ void Manager::login()
                 if (userIndex < 0)
                 {
                     attempts++;
-                    s_logger.logError(QString("Invalid login credentials (user not found), attempt %1").arg(attempts).toUtf8().data());
+                    s_logger.logCritical(QString("Invalid login credentials (user not found), attempt %1").arg(attempts).toUtf8().data());
                     QMessageBox::critical(this, "Error", "Invalid username/password.");
                     continue;
                 }
@@ -181,7 +181,7 @@ void Manager::login()
                 if (user.descriptor.passwordHash != passwordHash)
                 {
                     attempts++;
-                    s_logger.logError(QString("Invalid login credentials (wrong password), attempt %1").arg(attempts).toUtf8().data());
+                    s_logger.logCritical(QString("Invalid login credentials (wrong password), attempt %1").arg(attempts).toUtf8().data());
                     QMessageBox::critical(this, "Error", "Invalid username/password.");
                     continue;
                 }
@@ -191,7 +191,7 @@ void Manager::login()
             }
             else
             {
-                s_logger.logError("User failed to log in. Exiting");
+                s_logger.logCritical("User failed to log in. Exiting");
                 QMessageBox::critical(this, "Error", "You need to be logged in to user this program.\nThe program will now close.");
                 exit(1);
             }
@@ -222,7 +222,7 @@ void Manager::activateBaseStation(Settings::BaseStationId id)
     int32_t index = m_settings.findBaseStationIndexById(id);
     if (index < 0)
     {
-        s_logger.logError("Tried to activate an inexisting base station");
+        s_logger.logCritical("Tried to activate an inexisting base station");
         assert(false);
         return;
     }
@@ -254,7 +254,7 @@ void Manager::deactivateBaseStation(Settings::BaseStationId id)
     int32_t index = m_settings.findBaseStationIndexById(id);
     if (index < 0)
     {
-        s_logger.logError("Tried to deactivate an inexisting base station");
+        s_logger.logCritical("Tried to deactivate an inexisting base station");
         assert(false);
     }
     else

@@ -125,7 +125,7 @@ QVariant LogsModel::data(QModelIndex const& index, int role) const
             case Logger::Type::VERBOSE: return vicon;
             case Logger::Type::INFO: return iicon;
             case Logger::Type::WARNING: return wicon;
-            case Logger::Type::ERROR: return eicon;
+            case Logger::Type::CRITICAL: return eicon;
             default: QVariant();
             }
         }
@@ -145,7 +145,7 @@ QVariant LogsModel::data(QModelIndex const& index, int role) const
             case Logger::Type::VERBOSE: return "Verbose";
             case Logger::Type::INFO: return "Info";
             case Logger::Type::WARNING: return "Warning";
-            case Logger::Type::ERROR: return "Error";
+            case Logger::Type::CRITICAL: return "Error";
             default: return "N/A";
             }
         }

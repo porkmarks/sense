@@ -61,7 +61,6 @@ bool Comms::connectToBaseStation(DB& db, QHostAddress const& address)
     auto it = std::find_if(m_discoveredBaseStations.begin(), m_discoveredBaseStations.end(), [&address](Comms::BaseStationDescriptor const& _bs) { return _bs.address == address; });
     if (it == m_discoveredBaseStations.end())
     {
-        assert(false);
         return false;
     }
 
@@ -480,22 +479,22 @@ end:
 
 void Comms::process()
 {
-//    static DB::Clock::time_point lastFakeDiscovery = DB::Clock::now();
-//    if (DB::Clock::now() - lastFakeDiscovery >= std::chrono::seconds(1))
-//    {
-//        lastFakeDiscovery = DB::Clock::now();
+    static DB::Clock::time_point lastFakeDiscovery = DB::Clock::now();
+    if (DB::Clock::now() - lastFakeDiscovery >= std::chrono::seconds(1))
+    {
+        lastFakeDiscovery = DB::Clock::now();
 
-//        BaseStationDescriptor bs;
-//        bs.mac = {0xB8, 0x27, 0xEB, 0xDA, 0x89, 0x1B };
-//        {
-//            auto it = std::find_if(m_discoveredBaseStations.begin(), m_discoveredBaseStations.end(), [&bs](Comms::BaseStationDescriptor const& _bs) { return _bs.mac == bs.mac; });
-//            if (it == m_discoveredBaseStations.end())
-//            {
-//                m_discoveredBaseStations.push_back(bs);
-//                emit baseStationDiscovered(bs);
-//            }
-//        }
-//    }
+        BaseStationDescriptor bs;
+        bs.mac = {0xB8, 0x27, 0xEB, 0xDA, 0x89, 0x1B };
+        {
+            auto it = std::find_if(m_discoveredBaseStations.begin(), m_discoveredBaseStations.end(), [&bs](Comms::BaseStationDescriptor const& _bs) { return _bs.mac == bs.mac; });
+            if (it == m_discoveredBaseStations.end())
+            {
+                m_discoveredBaseStations.push_back(bs);
+                emit baseStationDiscovered(bs);
+            }
+        }
+    }
 
     data::Server_Message message;
     for (std::unique_ptr<ConnectedBaseStation>& cbs: m_connectedBaseStations)

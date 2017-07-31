@@ -15,6 +15,7 @@ TEMPLATE = app
 
 CONFIG += console
 CONFIG += c++11
+CONFIG -= console
 
 INCLUDEPATH += ../../src
 INCLUDEPATH += ../../src/Smtp
@@ -23,6 +24,7 @@ INCLUDEPATH += ../../../common/src/rapidjson/include
 
 QMAKE_CXXFLAGS += -Wno-unused-variable -Wno-unused-parameter
 QMAKE_CFLAGS += -Wno-unused-variable -Wno-unused-parameter
+#QMAKE_LFLAGS += -Wl,-subsystem,windows
 
 PRECOMPILED_HEADER = ../../src/stdafx.h
 CONFIG *= precompile_header

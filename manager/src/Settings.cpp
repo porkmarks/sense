@@ -87,7 +87,7 @@ bool Settings::load(std::string const& name)
         std::ifstream file(dataFilename, std::ios_base::binary);
         if (!file.is_open())
         {
-            s_logger.logError(QString("Failed to open '%1': %2").arg(dataFilename.c_str()).arg(std::strerror(errno)));
+            s_logger.logCritical(QString("Failed to open '%1': %2").arg(dataFilename.c_str()).arg(std::strerror(errno)));
             return false;
         }
 
@@ -104,20 +104,20 @@ bool Settings::load(std::string const& name)
             document.Parse(streamData.data(), streamData.size());
             if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
             {
-                s_logger.logError(QString("Failed to load '%1': %2").arg(dataFilename.c_str()).arg(rapidjson::GetParseError_En(document.GetParseError())));
+                s_logger.logCritical(QString("Failed to load '%1': %2").arg(dataFilename.c_str()).arg(rapidjson::GetParseError_En(document.GetParseError())));
                 return false;
             }
         }
         if (!document.IsObject())
         {
-            s_logger.logError(QString("Failed to load '%1': Bad document").arg(dataFilename.c_str()));
+            s_logger.logCritical(QString("Failed to load '%1': Bad document").arg(dataFilename.c_str()));
             return false;
         }
 
         auto it = document.FindMember("email_settings");
         if (it == document.MemberEnd() || !it->value.IsObject())
         {
-            s_logger.logError(QString("Failed to load '%1': Bad or missing email settings").arg(dataFilename.c_str()));
+            s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings").arg(dataFilename.c_str()));
             return false;
         }
 
@@ -129,7 +129,7 @@ bool Settings::load(std::string const& name)
             auto it = esj.FindMember("host");
             if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                s_logger.logError(QString("Failed to load '%1': Bad or missing email settings host").arg(dataFilename.c_str()));
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings host").arg(dataFilename.c_str()));
                 return false;
             }
             data.emailSettings.host = it->value.GetString();
@@ -137,7 +137,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("port");
             if (it == esj.MemberEnd() || !it->value.IsUint())
             {
-                s_logger.logError(QString("Failed to load '%1': Bad or missing email settings port").arg(dataFilename.c_str()));
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings port").arg(dataFilename.c_str()));
                 return false;
             }
             data.emailSettings.port = it->value.GetUint();
@@ -145,7 +145,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("username");
             if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                s_logger.logError(QString("Failed to load '%1': Bad or missing email settings username").arg(dataFilename.c_str()));
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings username").arg(dataFilename.c_str()));
                 return false;
             }
             data.emailSettings.username = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
@@ -153,7 +153,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("password");
             if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                s_logger.logError(QString("Failed to load '%1': Bad or missing email settings password").arg(dataFilename.c_str()));
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings password").arg(dataFilename.c_str()));
                 return false;
             }
             data.emailSettings.password = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
@@ -161,7 +161,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("from");
             if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                s_logger.logError(QString("Failed to load '%1': Bad or missing email settings from").arg(dataFilename.c_str()));
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings from").arg(dataFilename.c_str()));
                 return false;
             }
             data.emailSettings.from = it->value.GetString();
@@ -169,7 +169,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("recipient");
             if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                s_logger.logError(QString("Failed to load '%1': Bad or missing email settings recipient").arg(dataFilename.c_str()));
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings recipient").arg(dataFilename.c_str()));
                 return false;
             }
             data.emailSettings.recipient = it->value.GetString();
@@ -178,7 +178,7 @@ bool Settings::load(std::string const& name)
         it = document.FindMember("ftp_settings");
         if (it == document.MemberEnd() || !it->value.IsObject())
         {
-            s_logger.logError(QString("Failed to load '%1': Bad or missing ftp_settings").arg(dataFilename.c_str()));
+            s_logger.logCritical(QString("Failed to load '%1': Bad or missing ftp_settings").arg(dataFilename.c_str()));
             return false;
         }
 
@@ -190,7 +190,7 @@ bool Settings::load(std::string const& name)
             auto it = esj.FindMember("host");
             if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                s_logger.logError(QString("Failed to load '%1': Bad or missing ftp settings host").arg(dataFilename.c_str()));
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing ftp settings host").arg(dataFilename.c_str()));
                 return false;
             }
             data.ftpSettings.host = it->value.GetString();
@@ -198,7 +198,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("port");
             if (it == esj.MemberEnd() || !it->value.IsUint())
             {
-                s_logger.logError(QString("Failed to load '%1': Bad or missing ftp settings port").arg(dataFilename.c_str()));
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing ftp settings port").arg(dataFilename.c_str()));
                 return false;
             }
             data.ftpSettings.port = it->value.GetUint();
@@ -206,7 +206,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("username");
             if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                s_logger.logError(QString("Failed to load '%1': Bad or missing ftp settings username").arg(dataFilename.c_str()));
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing ftp settings username").arg(dataFilename.c_str()));
                 return false;
             }
             data.ftpSettings.username = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
@@ -214,7 +214,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("password");
             if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                s_logger.logError(QString("Failed to load '%1': Bad or missing ftp settings password").arg(dataFilename.c_str()));
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing ftp settings password").arg(dataFilename.c_str()));
                 return false;
             }
             data.ftpSettings.password = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
@@ -222,7 +222,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("folder");
             if (it == esj.MemberEnd() || !it->value.IsString())
             {
-                s_logger.logError(QString("Failed to load '%1': Bad or missing ftp settings folder").arg(dataFilename.c_str()));
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing ftp settings folder").arg(dataFilename.c_str()));
                 return false;
             }
             data.ftpSettings.folder = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
@@ -230,7 +230,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("upload_backups");
             if (it == esj.MemberEnd() || !it->value.IsBool())
             {
-                s_logger.logError(QString("Failed to load '%1': Bad or missing ftp settings upload_backups").arg(dataFilename.c_str()));
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing ftp settings upload_backups").arg(dataFilename.c_str()));
                 return false;
             }
             data.ftpSettings.uploadBackups = it->value.GetBool();
@@ -238,7 +238,7 @@ bool Settings::load(std::string const& name)
             it = esj.FindMember("upload_backups_period");
             if (it == esj.MemberEnd() || !it->value.IsUint64())
             {
-                s_logger.logError(QString("Failed to load '%1': Bad or missing ftp settings upload_backups_period").arg(dataFilename.c_str()));
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing ftp settings upload_backups_period").arg(dataFilename.c_str()));
                 return false;
             }
             data.ftpSettings.uploadBackupsPeriod = std::chrono::seconds(it->value.GetUint64());
@@ -247,7 +247,7 @@ bool Settings::load(std::string const& name)
         it = document.FindMember("users");
         if (it == document.MemberEnd() || !it->value.IsArray())
         {
-            s_logger.logError(QString("Failed to load '%1': Bad or missing users array").arg(dataFilename.c_str()));
+            s_logger.logCritical(QString("Failed to load '%1': Bad or missing users array").arg(dataFilename.c_str()));
             return false;
         }
 
@@ -260,7 +260,7 @@ bool Settings::load(std::string const& name)
                 auto it = userj.FindMember("name");
                 if (it == userj.MemberEnd() || !it->value.IsString())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing user name").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing user name").arg(dataFilename.c_str()));
                     return false;
                 }
                 user.descriptor.name = it->value.GetString();
@@ -268,7 +268,7 @@ bool Settings::load(std::string const& name)
                 it = userj.FindMember("password");
                 if (it == userj.MemberEnd() || !it->value.IsString())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing user password").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing user password").arg(dataFilename.c_str()));
                     return false;
                 }
                 user.descriptor.passwordHash = it->value.GetString();
@@ -276,7 +276,7 @@ bool Settings::load(std::string const& name)
                 it = userj.FindMember("id");
                 if (it == userj.MemberEnd() || !it->value.IsUint())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing user id").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing user id").arg(dataFilename.c_str()));
                     return false;
                 }
                 user.id = it->value.GetUint();
@@ -284,7 +284,7 @@ bool Settings::load(std::string const& name)
                 it = userj.FindMember("type");
                 if (it == userj.MemberEnd() || !it->value.IsInt())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing user type").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing user type").arg(dataFilename.c_str()));
                     return false;
                 }
                 user.descriptor.type = static_cast<UserDescriptor::Type>(it->value.GetInt());
@@ -297,7 +297,7 @@ bool Settings::load(std::string const& name)
         it = document.FindMember("base_stations");
         if (it == document.MemberEnd() || !it->value.IsArray())
         {
-            s_logger.logError(QString("Failed to load '%1': Bad or missing base_stations array").arg(dataFilename.c_str()));
+            s_logger.logCritical(QString("Failed to load '%1': Bad or missing base_stations array").arg(dataFilename.c_str()));
             return false;
         }
 
@@ -310,7 +310,7 @@ bool Settings::load(std::string const& name)
                 auto it = bsj.FindMember("name");
                 if (it == bsj.MemberEnd() || !it->value.IsString())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing base station name").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing base station name").arg(dataFilename.c_str()));
                     return false;
                 }
                 bs.descriptor.name = it->value.GetString();
@@ -318,7 +318,7 @@ bool Settings::load(std::string const& name)
                 it = bsj.FindMember("address");
                 if (it == bsj.MemberEnd() || !it->value.IsString())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing base station address").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing base station address").arg(dataFilename.c_str()));
                     return false;
                 }
                 bs.descriptor.address = QHostAddress(it->value.GetString());
@@ -326,7 +326,7 @@ bool Settings::load(std::string const& name)
                 it = bsj.FindMember("id");
                 if (it == bsj.MemberEnd() || !it->value.IsUint())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing base station id").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing base station id").arg(dataFilename.c_str()));
                     return false;
                 }
                 bs.id = it->value.GetUint();
@@ -334,14 +334,14 @@ bool Settings::load(std::string const& name)
                 it = bsj.FindMember("mac");
                 if (it == bsj.MemberEnd() || !it->value.IsString())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing base station mac").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing base station mac").arg(dataFilename.c_str()));
                     return false;
                 }
 
                 int m0, m1, m2, m3, m4, m5;
                 if (sscanf(it->value.GetString(), "%X:%X:%X:%X:%X:%X", &m0, &m1, &m2, &m3, &m4, &m5) != 6)
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad base station mac").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad base station mac").arg(dataFilename.c_str()));
                     return false;
                 }
                 bs.descriptor.mac = { static_cast<uint8_t>(m0&0xFF), static_cast<uint8_t>(m1&0xFF), static_cast<uint8_t>(m2&0xFF),
@@ -356,7 +356,7 @@ bool Settings::load(std::string const& name)
         it = document.FindMember("active_base_station");
         if (it == document.MemberEnd() || !it->value.IsUint())
         {
-            s_logger.logError(QString("Failed to load '%1': Bad or missing active_base_station").arg(dataFilename.c_str()));
+            s_logger.logCritical(QString("Failed to load '%1': Bad or missing active_base_station").arg(dataFilename.c_str()));
             return false;
         }
         BaseStationId id = it->value.GetUint();
@@ -388,7 +388,7 @@ bool Settings::load(std::string const& name)
         {
             if (!db->create(dbName))
             {
-                s_logger.logError(QString("Cannot open nor create a DB for Base Station '%1' / %2").arg(bs.descriptor.name.c_str()).arg(macStr).toUtf8().data());
+                s_logger.logCritical(QString("Cannot open nor create a DB for Base Station '%1' / %2").arg(bs.descriptor.name.c_str()).arg(macStr).toUtf8().data());
                 return false;
             }
         }
@@ -737,7 +737,7 @@ bool Settings::addBaseStation(BaseStationDescriptor const& descriptor)
     {
         if (!db->create(dbName))
         {
-            s_logger.logError(QString("Cannot open nor create a DB for Base Station '%1' / %2").arg(descriptor.name.c_str()).arg(macStr).toUtf8().data());
+            s_logger.logCritical(QString("Cannot open nor create a DB for Base Station '%1' / %2").arg(descriptor.name.c_str()).arg(macStr).toUtf8().data());
             return false;
         }
     }
@@ -1015,7 +1015,7 @@ void Settings::save(Data const& data) const
         std::ofstream file(tempFilename, std::ios_base::binary);
         if (!file.is_open())
         {
-            s_logger.logError(QString("Failed to open '%1': %2").arg(tempFilename.c_str()).arg(std::strerror(errno)));
+            s_logger.logCritical(QString("Failed to open '%1': %2").arg(tempFilename.c_str()).arg(std::strerror(errno)));
         }
         else
         {
@@ -1028,7 +1028,7 @@ void Settings::save(Data const& data) const
 
         if (!renameFile(tempFilename.c_str(), dataFilename.c_str()))
         {
-            s_logger.logError(QString("Failed to rename file '%1' to '%2': %3").arg(tempFilename.c_str()).arg(dataFilename.c_str()).arg(getLastErrorAsString().c_str()));
+            s_logger.logCritical(QString("Failed to rename file '%1' to '%2': %3").arg(tempFilename.c_str()).arg(dataFilename.c_str()).arg(getLastErrorAsString().c_str()));
         }
     }
 

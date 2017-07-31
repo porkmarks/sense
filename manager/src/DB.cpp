@@ -107,7 +107,7 @@ bool DB::load(std::string const& name)
         std::ifstream file(dataFilename, std::ios_base::binary);
         if (!file.is_open())
         {
-            s_logger.logError(QString("Failed to open '%1': %2").arg(dataFilename.c_str()).arg(std::strerror(errno)));
+            s_logger.logCritical(QString("Failed to open '%1': %2").arg(dataFilename.c_str()).arg(std::strerror(errno)));
             return false;
         }
 
@@ -125,21 +125,21 @@ bool DB::load(std::string const& name)
             document.Parse(streamData.data(), streamData.size());
             if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
             {
-                s_logger.logError(QString("Failed to open '%1': %2").arg(dataFilename.c_str()).arg(rapidjson::GetParseError_En(document.GetParseError())));
+                s_logger.logCritical(QString("Failed to open '%1': %2").arg(dataFilename.c_str()).arg(rapidjson::GetParseError_En(document.GetParseError())));
                 return false;
             }
         }
 
         if (!document.IsObject())
         {
-            s_logger.logError(QString("Failed to load '%1': Bad document").arg(dataFilename.c_str()));
+            s_logger.logCritical(QString("Failed to load '%1': Bad document").arg(dataFilename.c_str()));
             return false;
         }
 
         auto it = document.FindMember("sensor_settings");
         if (it == document.MemberEnd() || !it->value.IsObject())
         {
-            s_logger.logError(QString("Failed to load '%1': Bad or missing sensor settings object").arg(dataFilename.c_str()));
+            s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings object").arg(dataFilename.c_str()));
             return false;
         }
 
@@ -148,7 +148,7 @@ bool DB::load(std::string const& name)
             auto it = ssj.FindMember("name");
             if (it == ssj.MemberEnd() || !it->value.IsString())
             {
-                s_logger.logError(QString("Failed to load '%1': Bad or missing sensor settings name").arg(dataFilename.c_str()));
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings name").arg(dataFilename.c_str()));
                 return false;
             }
             data.sensorSettings.descriptor.name = it->value.GetString();
@@ -156,7 +156,7 @@ bool DB::load(std::string const& name)
             it = ssj.FindMember("sensors_sleeping");
             if (it == ssj.MemberEnd() || !it->value.IsBool())
             {
-                s_logger.logError(QString("Failed to load '%1': Bad or missing sensor settings sensors_sleeping").arg(dataFilename.c_str()));
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings sensors_sleeping").arg(dataFilename.c_str()));
                 return false;
             }
             data.sensorSettings.descriptor.sensorsSleeping = it->value.GetBool();
@@ -164,7 +164,7 @@ bool DB::load(std::string const& name)
             it = ssj.FindMember("measurement_period");
             if (it == ssj.MemberEnd() || !it->value.IsUint64())
             {
-                s_logger.logError(QString("Failed to load '%1': Bad or missing sensor settings measurement_period").arg(dataFilename.c_str()));
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings measurement_period").arg(dataFilename.c_str()));
                 return false;
             }
             data.sensorSettings.descriptor.measurementPeriod = std::chrono::seconds(it->value.GetUint64());
@@ -172,7 +172,7 @@ bool DB::load(std::string const& name)
             it = ssj.FindMember("comms_period");
             if (it == ssj.MemberEnd() || !it->value.IsUint64())
             {
-                s_logger.logError(QString("Failed to load '%1': Bad or missing sensor settings comms_period").arg(dataFilename.c_str()));
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings comms_period").arg(dataFilename.c_str()));
                 return false;
             }
             data.sensorSettings.descriptor.commsPeriod = std::chrono::seconds(it->value.GetUint64());
@@ -180,7 +180,7 @@ bool DB::load(std::string const& name)
             it = ssj.FindMember("baseline");
             if (it == ssj.MemberEnd() || !it->value.IsUint64())
             {
-                s_logger.logError(QString("Failed to load '%1': Bad or missing sensor settings baseline").arg(dataFilename.c_str()));
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings baseline").arg(dataFilename.c_str()));
                 return false;
             }
             data.sensorSettings.baselineTimePoint = Clock::time_point(std::chrono::seconds(it->value.GetUint64()));
@@ -189,7 +189,7 @@ bool DB::load(std::string const& name)
         it = document.FindMember("sensors");
         if (it == document.MemberEnd() || !it->value.IsArray())
         {
-            s_logger.logError(QString("Failed to load '%1': Bad or missing sensors array").arg(dataFilename.c_str()));
+            s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensors array").arg(dataFilename.c_str()));
             return false;
         }
 
@@ -202,7 +202,7 @@ bool DB::load(std::string const& name)
                 auto it = sensorj.FindMember("name");
                 if (it == sensorj.MemberEnd() || !it->value.IsString())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing sensor name").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor name").arg(dataFilename.c_str()));
                     return false;
                 }
                 sensor.descriptor.name = it->value.GetString();
@@ -210,7 +210,7 @@ bool DB::load(std::string const& name)
                 it = sensorj.FindMember("id");
                 if (it == sensorj.MemberEnd() || !it->value.IsUint())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing sensor id").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor id").arg(dataFilename.c_str()));
                     return false;
                 }
                 sensor.id = it->value.GetUint();
@@ -218,7 +218,7 @@ bool DB::load(std::string const& name)
                 it = sensorj.FindMember("address");
                 if (it == sensorj.MemberEnd() || !it->value.IsUint())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing sensor address").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor address").arg(dataFilename.c_str()));
                     return false;
                 }
                 sensor.address = it->value.GetUint();
@@ -226,7 +226,7 @@ bool DB::load(std::string const& name)
                 it = sensorj.FindMember("state");
                 if (it == sensorj.MemberEnd() || !it->value.IsUint())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing sensor state").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor state").arg(dataFilename.c_str()));
                     return false;
                 }
                 sensor.state = static_cast<Sensor::State>(it->value.GetUint());
@@ -234,7 +234,7 @@ bool DB::load(std::string const& name)
                 it = sensorj.FindMember("serial_number");
                 if (it == sensorj.MemberEnd() || !it->value.IsUint())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing sensor serial_number").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor serial_number").arg(dataFilename.c_str()));
                     return false;
                 }
                 sensor.serialNumber = it->value.GetUint();
@@ -242,7 +242,7 @@ bool DB::load(std::string const& name)
                 it = sensorj.FindMember("next_measurement");
                 if (it == sensorj.MemberEnd() || !it->value.IsUint64())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing sensor next_measurement").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor next_measurement").arg(dataFilename.c_str()));
                     return false;
                 }
                 sensor.nextMeasurementTimePoint = Clock::time_point(std::chrono::seconds(it->value.GetUint64()));
@@ -250,7 +250,7 @@ bool DB::load(std::string const& name)
                 it = sensorj.FindMember("next_comms");
                 if (it == sensorj.MemberEnd() || !it->value.IsUint64())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing sensor next_comms").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor next_comms").arg(dataFilename.c_str()));
                     return false;
                 }
                 sensor.nextCommsTimePoint = Clock::time_point(std::chrono::seconds(it->value.GetUint64()));
@@ -258,7 +258,7 @@ bool DB::load(std::string const& name)
                 it = sensorj.FindMember("temperature_bias");
                 if (it == sensorj.MemberEnd() || !it->value.IsNumber())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing sensor temperature_bias").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor temperature_bias").arg(dataFilename.c_str()));
                     return false;
                 }
                 sensor.calibration.temperatureBias = static_cast<float>(it->value.GetDouble());
@@ -266,7 +266,7 @@ bool DB::load(std::string const& name)
                 it = sensorj.FindMember("humidity_bias");
                 if (it == sensorj.MemberEnd() || !it->value.IsNumber())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing sensor humidity_bias").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor humidity_bias").arg(dataFilename.c_str()));
                     return false;
                 }
                 sensor.calibration.humidityBias = static_cast<float>(it->value.GetDouble());
@@ -279,7 +279,7 @@ bool DB::load(std::string const& name)
         it = document.FindMember("alarms");
         if (it == document.MemberEnd() || !it->value.IsArray())
         {
-            s_logger.logError(QString("Failed to load '%1': Bad or missing alarms array").arg(dataFilename.c_str()));
+            s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarms array").arg(dataFilename.c_str()));
             return false;
         }
 
@@ -292,7 +292,7 @@ bool DB::load(std::string const& name)
                 auto it = alarmj.FindMember("name");
                 if (it == alarmj.MemberEnd() || !it->value.IsString())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing alarm name").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm name").arg(dataFilename.c_str()));
                     return false;
                 }
                 alarm.descriptor.name = it->value.GetString();
@@ -300,7 +300,7 @@ bool DB::load(std::string const& name)
                 it = alarmj.FindMember("id");
                 if (it == alarmj.MemberEnd() || !it->value.IsUint())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing alarm id").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm id").arg(dataFilename.c_str()));
                     return false;
                 }
                 alarm.id = it->value.GetUint();
@@ -308,7 +308,7 @@ bool DB::load(std::string const& name)
                 it = alarmj.FindMember("filter_sensors");
                 if (it != alarmj.MemberEnd() && !it->value.IsBool())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad alarm filter_sensors").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad alarm filter_sensors").arg(dataFilename.c_str()));
                     return false;
                 }
                 if (it != alarmj.MemberEnd())
@@ -321,7 +321,7 @@ bool DB::load(std::string const& name)
                     it = alarmj.FindMember("sensors");
                     if (it == alarmj.MemberEnd() || !it->value.IsArray())
                     {
-                        s_logger.logError(QString("Failed to load '%1': Bad or missing alarm sensors").arg(dataFilename.c_str()));
+                        s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm sensors").arg(dataFilename.c_str()));
                         return false;
                     }
                     rapidjson::Value const& sensorsj = it->value;
@@ -330,7 +330,7 @@ bool DB::load(std::string const& name)
                         rapidjson::Value const& sensorj = sensorsj[si];
                         if (!sensorj.IsUint())
                         {
-                            s_logger.logError(QString("Failed to load '%1': Bad or missing alarm sensor id").arg(dataFilename.c_str()));
+                            s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm sensor id").arg(dataFilename.c_str()));
                             return false;
                         }
                         alarm.descriptor.sensors.push_back(sensorj.GetUint());
@@ -341,7 +341,7 @@ bool DB::load(std::string const& name)
                 it = alarmj.FindMember("low_temperature_watch");
                 if (it == alarmj.MemberEnd() || !it->value.IsBool())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing alarm low_temperature_watch").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm low_temperature_watch").arg(dataFilename.c_str()));
                     return false;
                 }
                 alarm.descriptor.lowTemperatureWatch = it->value.GetBool();
@@ -349,7 +349,7 @@ bool DB::load(std::string const& name)
                 it = alarmj.FindMember("low_temperature");
                 if (it == alarmj.MemberEnd() || !it->value.IsDouble())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing alarm low_temperature").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm low_temperature").arg(dataFilename.c_str()));
                     return false;
                 }
                 alarm.descriptor.lowTemperature = static_cast<float>(it->value.GetDouble());
@@ -357,7 +357,7 @@ bool DB::load(std::string const& name)
                 it = alarmj.FindMember("high_temperature_watch");
                 if (it == alarmj.MemberEnd() || !it->value.IsBool())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing alarm high_temperature_watch").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm high_temperature_watch").arg(dataFilename.c_str()));
                     return false;
                 }
                 alarm.descriptor.highTemperatureWatch = it->value.GetBool();
@@ -365,7 +365,7 @@ bool DB::load(std::string const& name)
                 it = alarmj.FindMember("high_temperature");
                 if (it == alarmj.MemberEnd() || !it->value.IsDouble())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing alarm high_temperature").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm high_temperature").arg(dataFilename.c_str()));
                     return false;
                 }
                 alarm.descriptor.highTemperature = static_cast<float>(it->value.GetDouble());
@@ -373,7 +373,7 @@ bool DB::load(std::string const& name)
                 it = alarmj.FindMember("low_humidity_watch");
                 if (it == alarmj.MemberEnd() || !it->value.IsBool())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing alarm low_humidity_watch").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm low_humidity_watch").arg(dataFilename.c_str()));
                     return false;
                 }
                 alarm.descriptor.lowHumidityWatch = it->value.GetBool();
@@ -381,7 +381,7 @@ bool DB::load(std::string const& name)
                 it = alarmj.FindMember("low_humidity");
                 if (it == alarmj.MemberEnd() || !it->value.IsDouble())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing alarm low_humidity").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm low_humidity").arg(dataFilename.c_str()));
                     return false;
                 }
                 alarm.descriptor.lowHumidity = static_cast<float>(it->value.GetDouble());
@@ -389,7 +389,7 @@ bool DB::load(std::string const& name)
                 it = alarmj.FindMember("high_humidity_watch");
                 if (it == alarmj.MemberEnd() || !it->value.IsBool())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing alarm high_humidity_watch").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm high_humidity_watch").arg(dataFilename.c_str()));
                     return false;
                 }
                 alarm.descriptor.highHumidityWatch = it->value.GetBool();
@@ -397,7 +397,7 @@ bool DB::load(std::string const& name)
                 it = alarmj.FindMember("high_humidity");
                 if (it == alarmj.MemberEnd() || !it->value.IsDouble())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing alarm high_humidity").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm high_humidity").arg(dataFilename.c_str()));
                     return false;
                 }
                 alarm.descriptor.highHumidity = static_cast<float>(it->value.GetDouble());
@@ -405,7 +405,7 @@ bool DB::load(std::string const& name)
                 it = alarmj.FindMember("low_vcc_watch");
                 if (it == alarmj.MemberEnd() || !it->value.IsBool())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing alarm low_vcc_watch").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm low_vcc_watch").arg(dataFilename.c_str()));
                     return false;
                 }
                 alarm.descriptor.lowVccWatch = it->value.GetBool();
@@ -413,7 +413,7 @@ bool DB::load(std::string const& name)
                 it = alarmj.FindMember("low_signal_watch");
                 if (it == alarmj.MemberEnd() || !it->value.IsBool())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing alarm low_signal_watch").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm low_signal_watch").arg(dataFilename.c_str()));
                     return false;
                 }
                 alarm.descriptor.lowSignalWatch = it->value.GetBool();
@@ -421,7 +421,7 @@ bool DB::load(std::string const& name)
                 it = alarmj.FindMember("sensor_errors_watch");
                 if (it == alarmj.MemberEnd() || !it->value.IsBool())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing alarm sensor_errors_watch").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm sensor_errors_watch").arg(dataFilename.c_str()));
                     return false;
                 }
                 alarm.descriptor.sensorErrorsWatch = it->value.GetBool();
@@ -429,7 +429,7 @@ bool DB::load(std::string const& name)
                 it = alarmj.FindMember("send_email_action");
                 if (it == alarmj.MemberEnd() || !it->value.IsBool())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing alarm send_email_action").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm send_email_action").arg(dataFilename.c_str()));
                     return false;
                 }
                 alarm.descriptor.sendEmailAction = it->value.GetBool();
@@ -443,7 +443,7 @@ bool DB::load(std::string const& name)
         it = document.FindMember("reports");
         if (it == document.MemberEnd() || !it->value.IsArray())
         {
-            s_logger.logError(QString("Failed to load '%1': Bad or missing reports array").arg(dataFilename.c_str()));
+            s_logger.logCritical(QString("Failed to load '%1': Bad or missing reports array").arg(dataFilename.c_str()));
             return false;
         }
 
@@ -456,7 +456,7 @@ bool DB::load(std::string const& name)
                 auto it = reportj.FindMember("name");
                 if (it == reportj.MemberEnd() || !it->value.IsString())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing report name").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing report name").arg(dataFilename.c_str()));
                     return false;
                 }
                 report.descriptor.name = it->value.GetString();
@@ -464,7 +464,7 @@ bool DB::load(std::string const& name)
                 it = reportj.FindMember("id");
                 if (it == reportj.MemberEnd() || !it->value.IsUint())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing report id").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing report id").arg(dataFilename.c_str()));
                     return false;
                 }
                 report.id = it->value.GetUint();
@@ -472,7 +472,7 @@ bool DB::load(std::string const& name)
                 it = reportj.FindMember("last_triggered");
                 if (it == reportj.MemberEnd() || !it->value.IsUint64())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing sensor report last_triggered").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor report last_triggered").arg(dataFilename.c_str()));
                     return false;
                 }
                 report.lastTriggeredTimePoint = Clock::time_point(std::chrono::seconds(it->value.GetUint64()));
@@ -480,7 +480,7 @@ bool DB::load(std::string const& name)
                 it = reportj.FindMember("filter_sensors");
                 if (it == reportj.MemberEnd() || !it->value.IsBool())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad report filter_sensors").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad report filter_sensors").arg(dataFilename.c_str()));
                     return false;
                 }
                 report.descriptor.filterSensors = it->value.GetBool();
@@ -490,7 +490,7 @@ bool DB::load(std::string const& name)
                     it = reportj.FindMember("sensors");
                     if (it == reportj.MemberEnd() || !it->value.IsArray())
                     {
-                        s_logger.logError(QString("Failed to load '%1': Bad or missing report sensors").arg(dataFilename.c_str()));
+                        s_logger.logCritical(QString("Failed to load '%1': Bad or missing report sensors").arg(dataFilename.c_str()));
                         return false;
                     }
                     rapidjson::Value const& sensorsj = it->value;
@@ -499,7 +499,7 @@ bool DB::load(std::string const& name)
                         rapidjson::Value const& sensorj = sensorsj[si];
                         if (!sensorj.IsUint())
                         {
-                            s_logger.logError(QString("Failed to load '%1': Bad or missing report sensor id").arg(dataFilename.c_str()));
+                            s_logger.logCritical(QString("Failed to load '%1': Bad or missing report sensor id").arg(dataFilename.c_str()));
                             return false;
                         }
                         report.descriptor.sensors.push_back(sensorj.GetUint());
@@ -509,7 +509,7 @@ bool DB::load(std::string const& name)
                 it = reportj.FindMember("period");
                 if (it == reportj.MemberEnd() || !it->value.IsInt())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing report period").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing report period").arg(dataFilename.c_str()));
                     return false;
                 }
                 report.descriptor.period = static_cast<DB::ReportDescriptor::Period>(it->value.GetInt());
@@ -517,7 +517,7 @@ bool DB::load(std::string const& name)
                 it = reportj.FindMember("custom_period");
                 if (it == reportj.MemberEnd() || !it->value.IsUint64())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing report custom_period").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing report custom_period").arg(dataFilename.c_str()));
                     return false;
                 }
                 report.descriptor.customPeriod = std::chrono::seconds(it->value.GetUint64());
@@ -525,7 +525,7 @@ bool DB::load(std::string const& name)
                 it = reportj.FindMember("data");
                 if (it == reportj.MemberEnd() || !it->value.IsInt())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing report data").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing report data").arg(dataFilename.c_str()));
                     return false;
                 }
                 report.descriptor.data = static_cast<DB::ReportDescriptor::Data>(it->value.GetInt());
@@ -533,7 +533,7 @@ bool DB::load(std::string const& name)
                 it = reportj.FindMember("send_email_action");
                 if (it == reportj.MemberEnd() || !it->value.IsBool())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing report send_email_action").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing report send_email_action").arg(dataFilename.c_str()));
                     return false;
                 }
                 report.descriptor.sendEmailAction = it->value.GetBool();
@@ -541,7 +541,7 @@ bool DB::load(std::string const& name)
                 it = reportj.FindMember("upload_to_ftp_action");
                 if (it == reportj.MemberEnd() || !it->value.IsBool())
                 {
-                    s_logger.logError(QString("Failed to load '%1': Bad or missing report upload_to_ftp_action").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing report upload_to_ftp_action").arg(dataFilename.c_str()));
                     return false;
                 }
                 report.descriptor.uploadToFtpAction = it->value.GetBool();
@@ -557,7 +557,7 @@ bool DB::load(std::string const& name)
         std::ifstream file(dbFilename, std::ios_base::binary);
         if (!file.is_open())
         {
-            s_logger.logError(QString("Failed to open '%1': %2").arg(dbFilename.c_str()).arg(std::strerror(errno)));
+            s_logger.logCritical(QString("Failed to open '%1': %2").arg(dbFilename.c_str()).arg(std::strerror(errno)));
             return false;
         }
 
@@ -573,12 +573,12 @@ bool DB::load(std::string const& name)
         uint32_t sensorCount = 0;
         if (!read(stream, sensorCount))
         {
-            s_logger.logError(QString("Failed to read '%1': %2").arg(dbFilename.c_str()).arg(std::strerror(errno)));
+            s_logger.logCritical(QString("Failed to read '%1': %2").arg(dbFilename.c_str()).arg(std::strerror(errno)));
             return false;
         }
         if (sensorCount > 10000)
         {
-            s_logger.logError(QString("Failed to read '%1': file seems to be corrupted").arg(dbFilename.c_str()));
+            s_logger.logCritical(QString("Failed to read '%1': file seems to be corrupted").arg(dbFilename.c_str()));
             return false;
         }
 
@@ -588,19 +588,19 @@ bool DB::load(std::string const& name)
             uint32_t measurementsCount = 0;
             if (!read(stream, sensorId) || !read(stream, measurementsCount))
             {
-                s_logger.logError(QString("Failed to read '%1': %2").arg(dbFilename.c_str()).arg(std::strerror(errno)));
+                s_logger.logCritical(QString("Failed to read '%1': %2").arg(dbFilename.c_str()).arg(std::strerror(errno)));
                 return false;
             }
             if (measurementsCount > 100000000)
             {
-                s_logger.logError(QString("Failed to read '%1': file seems to be corrupted").arg(dbFilename.c_str()));
+                s_logger.logCritical(QString("Failed to read '%1': file seems to be corrupted").arg(dbFilename.c_str()));
                 return false;
             }
 
             auto sensorIt = std::find_if(data.sensors.begin(), data.sensors.end(), [&sensorId](Sensor const& sensor) { return sensor.id == sensorId; });
             if (sensorIt == data.sensors.end())
             {
-                s_logger.logError(QString("Failed to read '%1': cannot find sensor").arg(dbFilename.c_str()));
+                s_logger.logCritical(QString("Failed to read '%1': cannot find sensor").arg(dbFilename.c_str()));
                 return false;
             }
             Sensor& sensor = *sensorIt;
@@ -611,7 +611,7 @@ bool DB::load(std::string const& name)
             storedMeasurements.resize(measurementsCount);
             if (stream.read(reinterpret_cast<char*>(storedMeasurements.data()), storedMeasurements.size() * recordSize).bad())
             {
-                s_logger.logError(QString("Failed to read '%1': %2").arg(dbFilename.c_str()).arg(std::strerror(errno)));
+                s_logger.logCritical(QString("Failed to read '%1': %2").arg(dbFilename.c_str()).arg(std::strerror(errno)));
                 return false;
             }
 
@@ -1750,7 +1750,7 @@ void DB::save(Data const& data) const
         std::ofstream file(tempFilename, std::ios_base::binary);
         if (!file.is_open())
         {
-            s_logger.logError(QString("Failed to open '%1': %2").arg(tempFilename.c_str()).arg(std::strerror(errno)));
+            s_logger.logCritical(QString("Failed to open '%1': %2").arg(tempFilename.c_str()).arg(std::strerror(errno)));
         }
         else
         {
@@ -1763,7 +1763,7 @@ void DB::save(Data const& data) const
 
         if (!renameFile(tempFilename.c_str(), dataFilename.c_str()))
         {
-            s_logger.logError(QString("Failed to rename file '%1' to '%2': %3").arg(tempFilename.c_str()).arg(dataFilename.c_str()).arg(getLastErrorAsString().c_str()));
+            s_logger.logCritical(QString("Failed to rename file '%1' to '%2': %3").arg(tempFilename.c_str()).arg(dataFilename.c_str()).arg(getLastErrorAsString().c_str()));
         }
     }
 
@@ -1792,7 +1792,7 @@ void DB::save(Data const& data) const
         std::ofstream file(tempFilename, std::ios_base::binary);
         if (!file.is_open())
         {
-            s_logger.logError(QString("Failed to open '%1': %2").arg(tempFilename.c_str()).arg(std::strerror(errno)));
+            s_logger.logCritical(QString("Failed to open '%1': %2").arg(tempFilename.c_str()).arg(std::strerror(errno)));
         }
         else
         {
@@ -1805,7 +1805,7 @@ void DB::save(Data const& data) const
 
         if (!renameFile(tempFilename.c_str(), dbFilename.c_str()))
         {
-            s_logger.logError(QString("Failed to rename file '%1' to '%2': %3").arg(tempFilename.c_str()).arg(dbFilename.c_str()).arg(getLastErrorAsString().c_str()));
+            s_logger.logCritical(QString("Failed to rename file '%1' to '%2': %3").arg(tempFilename.c_str()).arg(dbFilename.c_str()).arg(getLastErrorAsString().c_str()));
         }
     }
 

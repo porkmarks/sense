@@ -129,7 +129,7 @@ void moveToBackup(std::string const& filename, std::string const& srcFilepath, s
 
     if (!renameFile(srcFilepath, newFilepath))
     {
-        s_logger.logError(QString("Error moving file '%1' to '%2': %3").arg(srcFilepath.c_str()).arg(newFilepath.c_str()).arg(getLastErrorAsString().c_str()));
+        s_logger.logCritical(QString("Error moving file '%1' to '%2': %3").arg(srcFilepath.c_str()).arg(newFilepath.c_str()).arg(getLastErrorAsString().c_str()));
         return;
     }
 

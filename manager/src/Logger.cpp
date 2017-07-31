@@ -25,7 +25,6 @@ constexpr uint64_t k_fileEncryptionKey = 3452354435332256ULL;
 
 Logger::Logger()
 {
-    m_dataFolder = s_dataFolder;
     m_storeThread = std::thread(std::bind(&Logger::storeThreadProc, this));
 }
 
@@ -60,6 +59,7 @@ bool Logger::create(std::string const& name)
 {
     m_dataName = "sense-" + name + ".log";
 
+    m_dataFolder = s_dataFolder;
     std::string dataFilename = m_dataFolder + "/" + m_dataName;
 
     moveToBackup(m_dataName, dataFilename, m_dataFolder + "/backups/deleted", 50);
@@ -79,6 +79,7 @@ bool Logger::load(std::string const& name)
 
     m_dataName = "sense-" + name + ".log";
 
+    m_dataFolder = s_dataFolder;
     std::string dataFilename = (m_dataFolder + "/" + m_dataName);
 
     Data data;
@@ -284,11 +285,11 @@ void Logger::logWarning(char const* message)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Logger::logError(std::string const& message)
+void Logger::logCritical(std::string const& message)
 {
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        m_mainData.logLines.emplace_back(LogLine{ Clock::now(), ++m_mainData.lastLineIndex, Type::ERROR, message });
+        m_mainData.logLines.emplace_back(LogLine{ Clock::now(), ++m_mainData.lastLineIndex, Type::CRITICAL, message });
     }
 
     std::cout << "ERROR: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
@@ -300,16 +301,16 @@ void Logger::logError(std::string const& message)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Logger::logError(QString const& message)
+void Logger::logCritical(QString const& message)
 {
-    logError(message.toUtf8().data());
+    logCritical(message.toUtf8().data());
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Logger::logError(char const* message)
+void Logger::logCritical(char const* message)
 {
-    logError(std::string(message));
+    logCritical(std::string(message));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -330,7 +331,7 @@ std::vector<Logger::LogLine> Logger::getFilteredLogLines(Filter const& filter) c
         if ((!filter.allowVerbose && line.type == Type::VERBOSE) ||
             (!filter.allowInfo && line.type == Type::INFO) ||
             (!filter.allowWarning && line.type == Type::WARNING) ||
-            (!filter.allowError && line.type == Type::ERROR))
+            (!filter.allowError && line.type == Type::CRITICAL))
         {
             continue;
         }

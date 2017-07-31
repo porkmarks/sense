@@ -440,7 +440,7 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
         }
         else
         {
-            s_logger.logError(QString("Failed to send email to '%1': %2").arg(email.settings.recipient.c_str()).arg(errorMsg.c_str()));
+            s_logger.logCritical(QString("Failed to send email to '%1': %2").arg(email.settings.recipient.c_str()).arg(errorMsg.c_str()));
         }
         smtp.quit();
     }
