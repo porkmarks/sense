@@ -135,7 +135,7 @@ void SettingsWidget::removeEmailRecipient()
         return;
     }
 
-    m_ui.emailRecipientList->removeItemWidget(selected.at(0));
+    delete selected.at(0);
     m_ui.emailRemoveRecipient->setEnabled(m_ui.emailRecipientList->count() > 0);
 }
 

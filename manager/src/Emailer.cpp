@@ -443,7 +443,7 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
         }
         else
         {
-            s_logger.logError(QString("Failed to send email: %2").arg(errorMsg.c_str()));
+            s_logger.logCritical(QString("Failed to send email: %2").arg(errorMsg.c_str()));
         }
         smtp.quit();
     }
