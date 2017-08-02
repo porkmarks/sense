@@ -47,9 +47,13 @@
        <item>
         <widget class="QTabWidget" name="tabWidget">
          <property name="currentIndex">
-          <number>0</number>
+          <number>3</number>
          </property>
          <widget class="QWidget" name="baseStationsTab">
+          <attribute name="icon">
+           <iconset resource="../res/res.qrc">
+            <normaloff>:/icons/ui/station.png</normaloff>:/icons/ui/station.png</iconset>
+          </attribute>
           <attribute name="title">
            <string>Base Stations</string>
           </attribute>
@@ -70,6 +74,10 @@
           </layout>
          </widget>
          <widget class="QWidget" name="reportsTab">
+          <attribute name="icon">
+           <iconset resource="../res/res.qrc">
+            <normaloff>:/icons/ui/report.png</normaloff>:/icons/ui/report.png</iconset>
+          </attribute>
           <attribute name="title">
            <string>Reports</string>
           </attribute>
@@ -80,6 +88,10 @@
           </layout>
          </widget>
          <widget class="QWidget" name="emailTab">
+          <attribute name="icon">
+           <iconset resource="../res/res.qrc">
+            <normaloff>:/icons/ui/email.png</normaloff>:/icons/ui/email.png</iconset>
+          </attribute>
           <attribute name="title">
            <string>Email</string>
           </attribute>
@@ -172,15 +184,76 @@
                  <item row="8" column="0">
                   <widget class="QLabel" name="label_4">
                    <property name="text">
-                    <string>Recipient</string>
+                    <string>Recipients</string>
                    </property>
                   </widget>
                  </item>
                  <item row="8" column="1">
-                  <widget class="QLineEdit" name="emailRecipient">
-                   <property name="placeholderText">
-                    <string>recipient@company.com</string>
-                   </property>
+                  <widget class="QListWidget" name="emailRecipientList"/>
+                 </item>
+                 <item row="9" column="1">
+                  <widget class="QWidget" name="widget_8" native="true">
+                   <layout class="QHBoxLayout" name="horizontalLayout_5">
+                    <property name="leftMargin">
+                     <number>0</number>
+                    </property>
+                    <property name="topMargin">
+                     <number>0</number>
+                    </property>
+                    <property name="rightMargin">
+                     <number>0</number>
+                    </property>
+                    <property name="bottomMargin">
+                     <number>0</number>
+                    </property>
+                    <item>
+                     <widget class="QPushButton" name="emailAddRecipient">
+                      <property name="text">
+                       <string/>
+                      </property>
+                      <property name="icon">
+                       <iconset resource="../res/res.qrc">
+                        <normaloff>:/icons/ui/add.png</normaloff>:/icons/ui/add.png</iconset>
+                      </property>
+                      <property name="iconSize">
+                       <size>
+                        <width>24</width>
+                        <height>24</height>
+                       </size>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QPushButton" name="emailRemoveRecipient">
+                      <property name="text">
+                       <string/>
+                      </property>
+                      <property name="icon">
+                       <iconset resource="../res/res.qrc">
+                        <normaloff>:/icons/ui/error.png</normaloff>:/icons/ui/error.png</iconset>
+                      </property>
+                      <property name="iconSize">
+                       <size>
+                        <width>24</width>
+                        <height>24</height>
+                       </size>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <spacer name="horizontalSpacer_4">
+                      <property name="orientation">
+                       <enum>Qt::Horizontal</enum>
+                      </property>
+                      <property name="sizeHint" stdset="0">
+                       <size>
+                        <width>516</width>
+                        <height>20</height>
+                       </size>
+                      </property>
+                     </spacer>
+                    </item>
+                   </layout>
                   </widget>
                  </item>
                 </layout>
@@ -245,6 +318,10 @@
           </layout>
          </widget>
          <widget class="QWidget" name="ftpTab">
+          <attribute name="icon">
+           <iconset resource="../res/res.qrc">
+            <normaloff>:/icons/ui/ftp.png</normaloff>:/icons/ui/ftp.png</iconset>
+          </attribute>
           <attribute name="title">
            <string>FTP</string>
           </attribute>
@@ -378,6 +455,10 @@
           </layout>
          </widget>
          <widget class="QWidget" name="sensorsTab">
+          <attribute name="icon">
+           <iconset resource="../res/res.qrc">
+            <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
+          </attribute>
           <attribute name="title">
            <string>Sensors</string>
           </attribute>
@@ -588,7 +669,6 @@
   <tabstop>emailUsername</tabstop>
   <tabstop>emailPassword</tabstop>
   <tabstop>emailFrom</tabstop>
-  <tabstop>emailRecipient</tabstop>
   <tabstop>emailTest</tabstop>
   <tabstop>emailApply</tabstop>
   <tabstop>emailReset</tabstop>
@@ -609,7 +689,9 @@
   <tabstop>sensorsApply</tabstop>
   <tabstop>sensorsReset</tabstop>
  </tabstops>
- <resources/>
+ <resources>
+  <include location="../res/res.qrc"/>
+ </resources>
  <connections>
   <connection>
    <sender>ftpUploadBackups</sender>

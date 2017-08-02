@@ -39,7 +39,7 @@
        <enum>QTabWidget::Rounded</enum>
       </property>
       <property name="currentIndex">
-       <number>5</number>
+       <number>0</number>
       </property>
       <widget class="SensorsWidget" name="sensorsWidget">
        <attribute name="icon">
@@ -56,7 +56,7 @@
          <normaloff>:/icons/ui/measurements.png</normaloff>:/icons/ui/measurements.png</iconset>
        </attribute>
        <attribute name="title">
-        <string>Measurements</string>
+        <string>Reports</string>
        </attribute>
       </widget>
       <widget class="PlotWidget" name="plotWidget">
@@ -65,7 +65,7 @@
          <normaloff>:/icons/ui/graph.png</normaloff>:/icons/ui/graph.png</iconset>
        </attribute>
        <attribute name="title">
-        <string>Graph</string>
+        <string>Graphs</string>
        </attribute>
       </widget>
       <widget class="AlarmsWidget" name="alarmsWidget">
@@ -87,6 +87,10 @@
        </attribute>
       </widget>
       <widget class="LogsWidget" name="logsWidget">
+       <attribute name="icon">
+        <iconset resource="../res/res.qrc">
+         <normaloff>:/icons/ui/info.png</normaloff>:/icons/ui/info.png</iconset>
+       </attribute>
        <attribute name="title">
         <string>Logs</string>
        </attribute>

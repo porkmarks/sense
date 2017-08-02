@@ -166,13 +166,26 @@ bool Settings::load(std::string const& name)
             }
             data.emailSettings.from = it->value.GetString();
 
-            it = esj.FindMember("recipient");
-            if (it == esj.MemberEnd() || !it->value.IsString())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings recipient").arg(dataFilename.c_str()));
-                return false;
-            }
-            data.emailSettings.recipient = it->value.GetString();
+//            it = esj.FindMember("recipients");
+//            if (it == esj.MemberEnd() || !it->value.IsArray())
+//            {
+//                s_logger.logError(QString("Failed to load '%1': Bad or missing email settings recipients").arg(dataFilename.c_str()));
+//                return false;
+//            }
+
+//            {
+//                rapidjson::Value const& recipientsj = it->value;
+//                for (size_t i = 0; i < recipientsj.Size(); i++)
+//                {
+//                    rapidjson::Value const& recipientj = recipientsj[i];
+//                    if (!recipientj.IsString())
+//                    {
+//                        s_logger.logError(QString("Failed to load '%1': Bad or missing email settings secipient").arg(dataFilename.c_str()));
+//                        return false;
+//                    }
+//                    data.emailSettings.recipients.push_back(recipientj.GetString());
+//                }
+//            }
         }
 
         it = document.FindMember("ftp_settings");
@@ -947,7 +960,17 @@ void Settings::save(Data const& data) const
             QString password(data.emailSettings.password.c_str());
             esj.AddMember("password", rapidjson::Value(crypt.encryptToString(password).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
             esj.AddMember("from", rapidjson::Value(data.emailSettings.from.c_str(), document.GetAllocator()), document.GetAllocator());
-            esj.AddMember("recipient", rapidjson::Value(data.emailSettings.recipient.c_str(), document.GetAllocator()), document.GetAllocator());
+
+            {
+                rapidjson::Value recipientsj;
+                recipientsj.SetArray();
+                for (std::string const& recipient: data.emailSettings.recipients)
+                {
+                    recipientsj.PushBack(rapidjson::Value(recipient.c_str(), document.GetAllocator()), document.GetAllocator());
+                }
+                esj.AddMember("recipients", recipientsj, document.GetAllocator());
+            }
+
             document.AddMember("email_settings", esj, document.GetAllocator());
         }
         {

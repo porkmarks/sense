@@ -30,6 +30,8 @@ private slots:
     void sendTestEmail();
     void applyEmailSettings();
     void applySensorSettings();
+    void addEmailRecipient();
+    void removeEmailRecipient();
 
 private:
     void setEmailSettings(Settings::EmailSettings const& settings);

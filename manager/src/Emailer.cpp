@@ -153,7 +153,7 @@ void Emailer::sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor co
 {
     email.settings = m_settings.getEmailSettings();
 
-    s_logger.logInfo(QString("Sending alarm email to '%1'").arg(email.settings.recipient.c_str()));
+    s_logger.logInfo(QString("Sending alarm email'"));
 
     QDateTime dt;
     dt.setTime_t(DB::Clock::to_time_t(md.timePoint));
@@ -186,7 +186,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
     Email email;
     email.settings = m_settings.getEmailSettings();
 
-    s_logger.logInfo(QString("Sending report email to '%1'").arg(email.settings.recipient.c_str()));
+    s_logger.logInfo(QString("Sending report email"));
 
     switch (report.descriptor.period)
     {
@@ -426,7 +426,10 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
         MimeMessage message;
 
         message.setSender(new EmailAddress(QString::fromUtf8(email.settings.from.c_str())));
-        message.addRecipient(new EmailAddress(QString::fromUtf8(email.settings.recipient.c_str())));
+        for (std::string const& recipient: email.settings.recipients)
+        {
+            message.addRecipient(new EmailAddress(QString::fromUtf8(recipient.c_str())));
+        }
         message.setSubject(QString::fromUtf8(email.subject.c_str()));
 
         MimeHtml body;
@@ -436,11 +439,11 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
 
         if (smtp.connectToHost() && smtp.login() && smtp.sendMail(message))
         {
-            s_logger.logInfo(QString("Successfully sent email to '%1'").arg(email.settings.recipient.c_str()));
+            s_logger.logInfo(QString("Successfully sent email"));
         }
         else
         {
-            s_logger.logCritical(QString("Failed to send email to '%1': %2").arg(email.settings.recipient.c_str()).arg(errorMsg.c_str()));
+            s_logger.logError(QString("Failed to send email: %2").arg(errorMsg.c_str()));
         }
         smtp.quit();
     }

@@ -31,7 +31,7 @@ public:
         std::string username;
         std::string password;
         std::string from;
-        std::string recipient;
+        std::vector<std::string> recipients;
     };
 
 private slots:

@@ -1,6 +1,7 @@
 #include "SettingsWidget.h"
 #include "ConfigureAlarmDialog.h"
 #include <QMessageBox>
+#include <QInputDialog>
 #include "Smtp/SmtpMime"
 
 #include "DB.h"
@@ -36,6 +37,8 @@ void SettingsWidget::init(Comms& comms, Settings& settings)
     connect(&settings, &Settings::userLoggedIn, this, &SettingsWidget::setRW);
 
     setEmailSettings(m_settings->getEmailSettings());
+    connect(m_ui.emailAddRecipient, &QPushButton::released, this, &SettingsWidget::addEmailRecipient);
+    connect(m_ui.emailRemoveRecipient, &QPushButton::released, this, &SettingsWidget::removeEmailRecipient);
     connect(m_ui.emailApply, &QPushButton::released, this, &SettingsWidget::applyEmailSettings);
     connect(m_ui.emailReset, &QPushButton::released, [this]() { setEmailSettings(m_settings->getEmailSettings()); });
     connect(m_ui.emailTest, &QPushButton::released, this, &SettingsWidget::sendTestEmail);
@@ -99,6 +102,45 @@ void SettingsWidget::setRW()
 
 //////////////////////////////////////////////////////////////////////////
 
+void SettingsWidget::addEmailRecipient()
+{
+    bool ok = false;
+    QString recipient = QInputDialog::getText(this, "Add Recipient", "Recipient", QLineEdit::Normal, "", &ok);
+    if (!ok)
+    {
+        return;
+    }
+
+    QRegExp mailREX("^[A-Z0-9._%-]+@[A-Z0-9.-]+\\.[A-Z]{2,4}$");//\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,4}\\b");
+    mailREX.setCaseSensitivity(Qt::CaseInsensitive);
+    mailREX.setPatternSyntax(QRegExp::RegExp);
+    if (recipient.isEmpty() || !mailREX.exactMatch(recipient))
+    {
+        QMessageBox::critical(this, "Error", "Please enter a valid email recipient.");
+        return;
+    }
+
+    m_ui.emailRecipientList->addItem(recipient);
+    m_ui.emailRemoveRecipient->setEnabled(m_ui.emailRecipientList->count() > 0);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::removeEmailRecipient()
+{
+    QList<QListWidgetItem*> selected = m_ui.emailRecipientList->selectedItems();
+    if (selected.isEmpty())
+    {
+        QMessageBox::critical(this, "Error", "Please select the alarm you want to remove.");
+        return;
+    }
+
+    m_ui.emailRecipientList->removeItemWidget(selected.at(0));
+    m_ui.emailRemoveRecipient->setEnabled(m_ui.emailRecipientList->count() > 0);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void SettingsWidget::setEmailSettings(Settings::EmailSettings const& settings)
 {
     m_ui.emailHost->setText(settings.host.c_str());
@@ -106,7 +148,13 @@ void SettingsWidget::setEmailSettings(Settings::EmailSettings const& settings)
     m_ui.emailUsername->setText(settings.username.c_str());
     m_ui.emailPassword->setText(settings.password.c_str());
     m_ui.emailFrom->setText(settings.from.c_str());
-    m_ui.emailRecipient->setText(settings.recipient.c_str());
+
+    m_ui.emailRecipientList->clear();
+    for (std::string const& recipient: settings.recipients)
+    {
+        m_ui.emailRecipientList->addItem(recipient.c_str());
+    }
+    m_ui.emailRemoveRecipient->setEnabled(m_ui.emailRecipientList->count() > 0);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -118,14 +166,23 @@ bool SettingsWidget::getEmailSettings(Settings::EmailSettings& settings)
     settings.username = m_ui.emailUsername->text().toUtf8().data();
     settings.password = m_ui.emailPassword->text().toUtf8().data();
     settings.from = m_ui.emailFrom->text().toUtf8().data();
-    settings.recipient = m_ui.emailRecipient->text().toUtf8().data();
+
+    settings.recipients.clear();
+    for (int i = 0; i < m_ui.emailRecipientList->count(); i++)
+    {
+        std::string recipient = m_ui.emailRecipientList->item(i)->text().toUtf8().data();
+        if (!recipient.empty())
+        {
+            settings.recipients.push_back(recipient);
+        }
+    }
 
     if (settings.host.empty())
     {
         QMessageBox::critical(this, "Error", "You need to specify a valid host.");
         return false;
     }
-    if (settings.recipient.empty())
+    if (settings.recipients.empty())
     {
         QMessageBox::critical(this, "Error", "You need to specify a valid recipient.");
         return false;
@@ -195,7 +252,10 @@ void SettingsWidget::sendTestEmail()
     MimeMessage message;
 
     message.setSender(new EmailAddress(QString::fromUtf8(settings.from.c_str()), QString::fromUtf8(settings.from.c_str())));
-    message.addRecipient(new EmailAddress(settings.recipient.c_str()));
+    for (std::string const& recipient: settings.recipients)
+    {
+        message.addRecipient(new EmailAddress(QString::fromUtf8(recipient.c_str())));
+    }
     message.setSubject(QString::fromUtf8("Test Email: Sensor 'Sensor1' triggered alarm 'Alarm1'"));
 
     MimeHtml body;
@@ -218,7 +278,7 @@ void SettingsWidget::sendTestEmail()
 
     if (smtp.connectToHost() && smtp.login() && smtp.sendMail(message))
     {
-        QMessageBox::information(this, "Done", QString("Email sent to '%1'.").arg(settings.recipient.c_str()));
+        QMessageBox::information(this, "Done", QString("Email sent."));
     }
     smtp.quit();
 }
