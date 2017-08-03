@@ -236,12 +236,12 @@ void ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount)
             stream << std::fixed << std::setprecision(decimalPlaces) << m.descriptor.temperature;
             if (unitsFormat == UnitsFormat::Embedded)
             {
-                stream << u8" °C";
+                stream << " °C";
             }
             stream << separator;
             if (unitsFormat == UnitsFormat::SeparateColumn)
             {
-                stream << u8"°C";
+                stream << "°C";
                 stream << separator;
             }
         }

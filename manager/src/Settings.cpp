@@ -623,7 +623,11 @@ void Settings::removeUser(size_t index)
 
 int32_t Settings::findUserIndexByName(std::string const& name) const
 {
-    auto it = std::find_if(m_mainData.users.begin(), m_mainData.users.end(), [&name](User const& user) { return user.descriptor.name == name; });
+    auto it = std::find_if(m_mainData.users.begin(), m_mainData.users.end(), [&name](User const& user)
+    {
+        return strcasecmp(user.descriptor.name.c_str(), name.c_str()) == 0;
+    });
+
     if (it == m_mainData.users.end())
     {
         return -1;

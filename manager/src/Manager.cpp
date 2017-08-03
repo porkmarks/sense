@@ -125,8 +125,15 @@ void Manager::checkIfAdminExists()
                 }
                 else
                 {
-                    s_logger.logCritical("Internal consistency error: user not found after adding");
+                    s_logger.logCritical("Internal consistency error: user not found after adding\nThe program will now close.");
+                    QMessageBox::critical(this, "Error", "Internal consistency error: user not found after adding\nThe program will now close.");
+                    exit(1);
                 }
+            }
+            else
+            {
+                s_logger.logCritical(QString("Cannot add user %1").arg(user.descriptor.name.c_str()));
+                QMessageBox::critical(this, "Error", QString("Cannot add user %1").arg(user.descriptor.name.c_str()));
             }
         }
         else

@@ -76,7 +76,6 @@ bool Comms::connectToBaseStation(DB& db, QHostAddress const& address)
     connect(&db, &DB::sensorChanged, [this, cbsPtr](DB::SensorId) { sendSensors(*cbsPtr); });
     connect(&db, &DB::sensorRemoved, [this, cbsPtr](DB::SensorId) { sendSensors(*cbsPtr); });
 
-    cbsPtr->socketAdapter.getSocket().disconnectFromHost();
     cbsPtr->socketAdapter.getSocket().connectToHost(address, 4444);
 
     return true;

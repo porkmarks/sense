@@ -146,7 +146,6 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
         if (index >= 0)
         {
             bool connected = m_comms->connectToBaseStation(m_settings->getBaseStationDB(index), commsBSDescriptor.address);
-            QStandardItem* statusItem = m_model.item(bsIndex, 3);
             setStatus(bsIndex, connected ? "Added / Connected" : "Added / Disconnected");
         }
     }
@@ -190,6 +189,18 @@ void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor cons
     int32_t bsIndex = m_settings->findBaseStationIndexByMac(bs.mac);
     if (bsIndex >= 0)
     {
+        Settings::BaseStation const& bs = m_settings->getBaseStation(bsIndex);
+
+        bool connected = m_comms->connectToBaseStation(m_settings->getBaseStationDB(bsIndex), bs.descriptor.address);
+        if (m_settings->getActiveBaseStationId() == bs.id)
+        {
+            setStatus(bsIndex, connected ? "Active / Connected" : "Active / Disconnected");
+        }
+        else
+        {
+            setStatus(bsIndex, connected ? "Added / Connected" : "Added / Disconnected");
+        }
+
         return;
     }
 
