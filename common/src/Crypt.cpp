@@ -79,10 +79,10 @@ QByteArray Crypt::encryptToByteArray(QByteArray plaintext)
 
     CryptoFlags flags = CryptoFlagNone;
     if (m_compressionMode == CompressionAlways) {
-        ba = qCompress(ba, 9); //maximum compression
+        ba = qCompress(ba, m_compressionLevel); //maximum compression
         flags |= CryptoFlagCompression;
     } else if (m_compressionMode == CompressionAuto) {
-        QByteArray compressed = qCompress(ba, 9);
+        QByteArray compressed = qCompress(ba, m_compressionLevel);
         if (compressed.count() < ba.count()) {
             ba = compressed;
             flags |= CryptoFlagCompression;

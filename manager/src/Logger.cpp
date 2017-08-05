@@ -411,6 +411,7 @@ void Logger::save(Data const& data) const
 
         Crypt crypt;
         crypt.setKey(k_fileEncryptionKey);
+        crypt.setCompressionLevel(1);
         QByteArray encryptedData = crypt.encryptToByteArray(QByteArray(buffer.GetString(), buffer.GetSize()));
 //        QByteArray encryptedData = QByteArray(buffer.GetString(), buffer.GetSize());
 
@@ -426,8 +427,6 @@ void Logger::save(Data const& data) const
         }
         file.flush();
         file.close();
-
-        copyToBackup(m_dataName, dataFilename, m_dataFolder + "/backups/incremental", 50);
 
         if (!renameFile(tempFilename.c_str(), dataFilename.c_str()))
         {

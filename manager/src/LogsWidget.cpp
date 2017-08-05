@@ -46,12 +46,12 @@ void LogsWidget::init()
 
     connect(m_ui.dateTimePreset, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &LogsWidget::setDateTimePreset);
 
-    connect(m_ui.minDateTime, &QDateTimeEdit::dateTimeChanged, this, &LogsWidget::minDateTimeChanged);
-    connect(m_ui.maxDateTime, &QDateTimeEdit::dateTimeChanged, this, &LogsWidget::maxDateTimeChanged);
+    connect(m_ui.minDateTime, &QDateTimeEdit::editingFinished, this, &LogsWidget::minDateTimeChanged);
+    connect(m_ui.maxDateTime, &QDateTimeEdit::editingFinished, this, &LogsWidget::maxDateTimeChanged);
 
     connect(m_ui.dateTimePreset, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &LogsWidget::refresh);
     connect(m_ui.minDateTime, &QDateTimeEdit::editingFinished, this, &LogsWidget::refresh);
-    connect(m_ui.maxDateTime, &QDateTimeEdit::dateTimeChanged, this, &LogsWidget::refresh);
+    connect(m_ui.maxDateTime, &QDateTimeEdit::editingFinished, this, &LogsWidget::refresh);
 
     connect(m_ui.verbose, &QCheckBox::stateChanged, this, &LogsWidget::refresh);
     connect(m_ui.info, &QCheckBox::stateChanged, this, &LogsWidget::refresh);
@@ -89,6 +89,8 @@ Logger::Filter LogsWidget::createFilter() const
 
 void LogsWidget::refresh()
 {
+    Logger::Clock::time_point start = Logger::Clock::now();
+
     //in case the date changed, reapply it
     if (m_ui.useDateTimePreset->isChecked())
     {
@@ -97,6 +99,11 @@ void LogsWidget::refresh()
 
     Logger::Filter filter = createFilter();
     m_model->setFilter(filter);
+
+    s_logger.logVerbose(QString("Refreshed %1/%2 logs: %3ms")
+                        .arg(m_model->getLineCount())
+                        .arg(s_logger.getAllLogLineCount())
+                        .arg(std::chrono::duration_cast<std::chrono::milliseconds>(Logger::Clock::now() - start).count()));
 
     //m_ui.resultCount->setText(QString("%1 out of %2 results.").arg(m_model->getLinesCount()).arg(s_logger->getAllLinesCount()));
 
@@ -158,7 +165,9 @@ void LogsWidget::setDateTimePresetToday()
     QDateTime dt = QDateTime::currentDateTime();
 
     dt.setTime(QTime(23, 59, 59, 999));
+    m_ui.maxDateTime->blockSignals(true);
     m_ui.maxDateTime->setDateTime(dt);
+    m_ui.maxDateTime->blockSignals(false);
 
     dt.setTime(QTime(0, 0));
     m_ui.minDateTime->setDateTime(dt);
@@ -173,7 +182,9 @@ void LogsWidget::setDateTimePresetYesterday()
     dt.setDate(dt.date().addDays(-1));
 
     dt.setTime(QTime(23, 59, 59, 999));
+    m_ui.maxDateTime->blockSignals(true);
     m_ui.maxDateTime->setDateTime(dt);
+    m_ui.maxDateTime->blockSignals(false);
 
     dt.setTime(QTime(0, 0));
     m_ui.minDateTime->setDateTime(dt);
@@ -187,7 +198,9 @@ void LogsWidget::setDateTimePresetThisWeek()
 
     dt.setDate(dt.date().addDays(-dt.date().dayOfWeek()));
     dt.setTime(QTime(0, 0));
+    m_ui.minDateTime->blockSignals(true);
     m_ui.minDateTime->setDateTime(dt);
+    m_ui.minDateTime->blockSignals(false);
 
     dt.setDate(dt.date().addDays(6));
     dt.setTime(QTime(23, 59, 59, 999));
@@ -202,7 +215,9 @@ void LogsWidget::setDateTimePresetLastWeek()
 
     dt.setDate(dt.date().addDays(-dt.date().dayOfWeek()).addDays(-7));
     dt.setTime(QTime(0, 0));
+    m_ui.minDateTime->blockSignals(true);
     m_ui.minDateTime->setDateTime(dt);
+    m_ui.minDateTime->blockSignals(false);
 
     dt.setDate(dt.date().addDays(6));
     dt.setTime(QTime(23, 59, 59, 999));
@@ -217,7 +232,9 @@ void LogsWidget::setDateTimePresetThisMonth()
     date = QDate(date.year(), date.month(), 1);
 
     QDateTime dt(date, QTime(0, 0));
+    m_ui.minDateTime->blockSignals(true);
     m_ui.minDateTime->setDateTime(dt);
+    m_ui.minDateTime->blockSignals(false);
 
     dt = QDateTime(date.addMonths(1).addDays(-1), QTime(23, 59, 59, 999));
     m_ui.maxDateTime->setDateTime(dt);
@@ -231,7 +248,9 @@ void LogsWidget::setDateTimePresetLastMonth()
     date = QDate(date.year(), date.month(), 1).addMonths(-1);
 
     QDateTime dt(date, QTime(0, 0));
+    m_ui.minDateTime->blockSignals(true);
     m_ui.minDateTime->setDateTime(dt);
+    m_ui.minDateTime->blockSignals(false);
 
     dt = QDateTime(date.addMonths(1).addDays(-1), QTime(23, 59, 59, 999));
     m_ui.maxDateTime->setDateTime(dt);
@@ -239,8 +258,9 @@ void LogsWidget::setDateTimePresetLastMonth()
 
 //////////////////////////////////////////////////////////////////////////
 
-void LogsWidget::minDateTimeChanged(QDateTime const& value)
+void LogsWidget::minDateTimeChanged()
 {
+    QDateTime value = m_ui.minDateTime->dateTime();
     if (value >= m_ui.maxDateTime->dateTime())
     {
         QDateTime dt = value;
@@ -251,8 +271,9 @@ void LogsWidget::minDateTimeChanged(QDateTime const& value)
 
 //////////////////////////////////////////////////////////////////////////
 
-void LogsWidget::maxDateTimeChanged(QDateTime const& value)
+void LogsWidget::maxDateTimeChanged()
 {
+    QDateTime value = m_ui.maxDateTime->dateTime();
     if (value <= m_ui.minDateTime->dateTime())
     {
         QDateTime dt = value;

@@ -100,6 +100,10 @@ public:
       */
     CompressionMode compressionMode() const {return m_compressionMode;}
 
+    //level: -1 (zlib default)
+    //0 - 9: no compression - max compression
+    void setCompressionLevel(int level) { m_compressionLevel = level; }
+
     /**
       Sets the integrity mode to use when encrypting data. The default mode is Checksum.
 
@@ -195,6 +199,7 @@ private:
     quint64 m_key;
     QVector<char> m_keyParts;
     CompressionMode m_compressionMode;
+    int m_compressionLevel = 9;
     IntegrityProtectionMode m_protectionMode;
     Error m_lastError;
 };

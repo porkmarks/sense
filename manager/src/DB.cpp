@@ -1724,6 +1724,7 @@ void DB::save(Data const& data) const
         document.Accept(writer);
 
         Crypt crypt;
+        crypt.setCompressionLevel(1);
         crypt.setKey(k_fileEncryptionKey);
         QByteArray encryptedData = crypt.encryptToByteArray(QByteArray(buffer.GetString(), buffer.GetSize()));
 //        QByteArray encryptedData = QByteArray(buffer.GetString(), buffer.GetSize());
@@ -1766,6 +1767,7 @@ void DB::save(Data const& data) const
         }
 
         Crypt crypt;
+        crypt.setCompressionLevel(1);
         crypt.setKey(k_fileEncryptionKey);
         QByteArray encryptedData = crypt.encryptToByteArray(QByteArray(buffer.data(), buffer.size()));
 //        QByteArray encryptedData = QByteArray(buffer.GetString(), buffer.GetSize());

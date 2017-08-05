@@ -11,6 +11,10 @@
 
 #include "ui_SensorsFilterDialog.h"
 
+#include "Logger.h"
+
+extern Logger s_logger;
+
 //////////////////////////////////////////////////////////////////////////
 
 MeasurementsWidget::MeasurementsWidget(QWidget *parent)
@@ -78,8 +82,8 @@ void MeasurementsWidget::init(DB& db)
     connect(m_ui.selectSensors, &QPushButton::released, this, &MeasurementsWidget::selectSensors);
     connect(m_ui.exportData, &QPushButton::released, this, &MeasurementsWidget::exportData);
 
-    connect(m_ui.minDateTime, &QDateTimeEdit::dateTimeChanged, this, &MeasurementsWidget::minDateTimeChanged);
-    connect(m_ui.maxDateTime, &QDateTimeEdit::dateTimeChanged, this, &MeasurementsWidget::maxDateTimeChanged);
+    connect(m_ui.minDateTime, &QDateTimeEdit::editingFinished, this, &MeasurementsWidget::minDateTimeChanged);
+    connect(m_ui.maxDateTime, &QDateTimeEdit::editingFinished, this, &MeasurementsWidget::maxDateTimeChanged);
 
     connect(m_ui.minTemperature, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::minTemperatureChanged);
     connect(m_ui.maxTemperature, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::maxTemperatureChanged);
@@ -90,7 +94,7 @@ void MeasurementsWidget::init(DB& db)
 
     connect(m_ui.dateTimePreset, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &MeasurementsWidget::refresh);
     connect(m_ui.minDateTime, &QDateTimeEdit::editingFinished, this, &MeasurementsWidget::refresh);
-    connect(m_ui.maxDateTime, &QDateTimeEdit::dateTimeChanged, this, &MeasurementsWidget::refresh);
+    connect(m_ui.maxDateTime, &QDateTimeEdit::editingFinished, this, &MeasurementsWidget::refresh);
     connect(m_ui.useTemperature, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh);
     connect(m_ui.minTemperature, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh);
     connect(m_ui.maxTemperature, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh);
@@ -144,6 +148,8 @@ DB::Filter MeasurementsWidget::createFilter() const
 
 void MeasurementsWidget::refresh()
 {
+    DB::Clock::time_point start = DB::Clock::now();
+
     //in case the date changed, reapply it
     if (m_ui.useDateTimePreset->isChecked())
     {
@@ -152,6 +158,11 @@ void MeasurementsWidget::refresh()
 
     DB::Filter filter = createFilter();
     m_model->setFilter(filter);
+
+    s_logger.logVerbose(QString("Refreshed %1/%2 measurements: %3ms")
+                        .arg(m_model->getMeasurementCount())
+                        .arg(m_db->getAllMeasurementCount())
+                        .arg(std::chrono::duration_cast<std::chrono::milliseconds>(DB::Clock::now() - start).count()));
 
     m_ui.resultCount->setText(QString("%1 out of %2 results.").arg(m_model->getMeasurementCount()).arg(m_db->getAllMeasurementCount()));
 
@@ -201,7 +212,9 @@ void MeasurementsWidget::setDateTimePresetToday()
     QDateTime dt = QDateTime::currentDateTime();
 
     dt.setTime(QTime(23, 59, 59, 999));
+    m_ui.maxDateTime->blockSignals(true);
     m_ui.maxDateTime->setDateTime(dt);
+    m_ui.maxDateTime->blockSignals(false);
 
     dt.setTime(QTime(0, 0));
     m_ui.minDateTime->setDateTime(dt);
@@ -216,7 +229,9 @@ void MeasurementsWidget::setDateTimePresetYesterday()
     dt.setDate(dt.date().addDays(-1));
 
     dt.setTime(QTime(23, 59, 59, 999));
+    m_ui.maxDateTime->blockSignals(true);
     m_ui.maxDateTime->setDateTime(dt);
+    m_ui.maxDateTime->blockSignals(false);
 
     dt.setTime(QTime(0, 0));
     m_ui.minDateTime->setDateTime(dt);
@@ -230,7 +245,9 @@ void MeasurementsWidget::setDateTimePresetThisWeek()
 
     dt.setDate(dt.date().addDays(-dt.date().dayOfWeek()));
     dt.setTime(QTime(0, 0));
+    m_ui.minDateTime->blockSignals(true);
     m_ui.minDateTime->setDateTime(dt);
+    m_ui.minDateTime->blockSignals(false);
 
     dt.setDate(dt.date().addDays(6));
     dt.setTime(QTime(23, 59, 59, 999));
@@ -245,7 +262,9 @@ void MeasurementsWidget::setDateTimePresetLastWeek()
 
     dt.setDate(dt.date().addDays(-dt.date().dayOfWeek()).addDays(-7));
     dt.setTime(QTime(0, 0));
+    m_ui.minDateTime->blockSignals(true);
     m_ui.minDateTime->setDateTime(dt);
+    m_ui.minDateTime->blockSignals(false);
 
     dt.setDate(dt.date().addDays(6));
     dt.setTime(QTime(23, 59, 59, 999));
@@ -260,7 +279,9 @@ void MeasurementsWidget::setDateTimePresetThisMonth()
     date = QDate(date.year(), date.month(), 1);
 
     QDateTime dt(date, QTime(0, 0));
+    m_ui.minDateTime->blockSignals(true);
     m_ui.minDateTime->setDateTime(dt);
+    m_ui.minDateTime->blockSignals(false);
 
     dt = QDateTime(date.addMonths(1).addDays(-1), QTime(23, 59, 59, 999));
     m_ui.maxDateTime->setDateTime(dt);
@@ -274,7 +295,9 @@ void MeasurementsWidget::setDateTimePresetLastMonth()
     date = QDate(date.year(), date.month(), 1).addMonths(-1);
 
     QDateTime dt(date, QTime(0, 0));
+    m_ui.minDateTime->blockSignals(true);
     m_ui.minDateTime->setDateTime(dt);
+    m_ui.minDateTime->blockSignals(false);
 
     dt = QDateTime(date.addMonths(1).addDays(-1), QTime(23, 59, 59, 999));
     m_ui.maxDateTime->setDateTime(dt);
@@ -282,8 +305,9 @@ void MeasurementsWidget::setDateTimePresetLastMonth()
 
 //////////////////////////////////////////////////////////////////////////
 
-void MeasurementsWidget::minDateTimeChanged(QDateTime const& value)
+void MeasurementsWidget::minDateTimeChanged()
 {
+    QDateTime value = m_ui.minDateTime->dateTime();
     if (value >= m_ui.maxDateTime->dateTime())
     {
         QDateTime dt = value;
@@ -294,8 +318,9 @@ void MeasurementsWidget::minDateTimeChanged(QDateTime const& value)
 
 //////////////////////////////////////////////////////////////////////////
 
-void MeasurementsWidget::maxDateTimeChanged(QDateTime const& value)
+void MeasurementsWidget::maxDateTimeChanged()
 {
+    QDateTime value = m_ui.maxDateTime->dateTime();
     if (value <= m_ui.minDateTime->dateTime())
     {
         QDateTime dt = value;

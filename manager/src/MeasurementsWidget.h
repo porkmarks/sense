@@ -34,8 +34,8 @@ private slots:
     void setDateTimePresetThisMonth();
     void setDateTimePresetLastMonth();
 
-    void minDateTimeChanged(QDateTime const& value);
-    void maxDateTimeChanged(QDateTime const& value);
+    void minDateTimeChanged();
+    void maxDateTimeChanged();
 
     void minTemperatureChanged();
     void maxTemperatureChanged();
