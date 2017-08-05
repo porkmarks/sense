@@ -31,7 +31,6 @@ protected:
 
 private:
     bool m_isFixed = false;
-    std::chrono::high_resolution_clock::time_point m_animationStartTP;
 
     QString m_text;
     QRectF m_textRect;
