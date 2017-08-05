@@ -19,3 +19,11 @@ base
 server
 living
 data.tsv
+manager/bin/data
+moc_*.cpp
+ui_*.h
+c++
+qrc_*.cpp
+.qmake.stash
+Makefile.manager
+moc_predefs.h
