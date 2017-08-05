@@ -3,7 +3,7 @@
 #include <QWidget>
 #include <QIcon>
 
-static std::array<const char*, 5> s_headerNames = {"Id", "Name", "Period", "Data", "Action"};
+static std::array<const char*, 5> s_headerNames = {"Id", "Name", "Period", "Data"};
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -147,23 +147,6 @@ QVariant ReportsModel::data(QModelIndex const& index, int role) const
             {
                 return "All";
             }
-        }
-        else if (column == Column::Action)
-        {
-            QString str;
-            if (descriptor.sendEmailAction)
-            {
-                str = "Send Email";
-            }
-            if (descriptor.uploadToFtpAction)
-            {
-                if (!str.isEmpty())
-                {
-                    str += " and ";
-                }
-                str += "Upload to FTP";
-            }
-            return str;
         }
     }
     else if (role == Qt::DecorationRole)

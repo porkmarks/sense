@@ -39,16 +39,8 @@ void ConfigureReportDialog::sendReportNow()
     DB::Report report = m_report;
     if (getDescriptor(report.descriptor))
     {
-        if (!report.descriptor.sendEmailAction)
-        {
-            QMessageBox::critical(this, "Error", "You need to specify an email recipient to send a test email.");
-        }
-        else
-        {
-            Emailer emailer(m_settings, m_db);
-            emailer.sendReportEmail(report);
-            //QMessageBox::information(this, "Success", QString("Report sent to %1.").arg(report.descriptor.emailRecipient.c_str()));
-        }
+        Emailer emailer(m_settings, m_db);
+        emailer.sendReportEmail(report);
     }
 }
 
@@ -102,12 +94,6 @@ void ConfigureReportDialog::setReport(DB::Report const& report)
         m_ui.period->setCurrentIndex(static_cast<int>(descriptor.period));
         m_ui.useCustomPeriod->setChecked(false);
     }
-
-    m_ui.sendEmailAction->setChecked(descriptor.sendEmailAction);
-//    m_ui.emailRecipient->setText(descriptor.emailRecipient.c_str());
-
-    m_ui.uploadToFtpAction->setChecked(descriptor.uploadToFtpAction);
-//    m_ui.ftpFolder->setText(descriptor.ftpFolder.c_str());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -147,27 +133,11 @@ bool ConfigureReportDialog::getDescriptor(DB::ReportDescriptor& descriptor)
         descriptor.period = static_cast<DB::ReportDescriptor::Period>(m_ui.period->currentIndex());
     }
 
-    descriptor.sendEmailAction = m_ui.sendEmailAction->isChecked();
-//    descriptor.emailRecipient = m_ui.emailRecipient->text().toUtf8().data();
-
-    descriptor.uploadToFtpAction = m_ui.uploadToFtpAction->isChecked();
-//    descriptor.ftpFolder = m_ui.ftpFolder->text().toUtf8().data();
-
     if (descriptor.name.empty())
     {
         QMessageBox::critical(this, "Error", "You need to specify a name for this report.");
         return false;
     }
-//    if (descriptor.uploadToFtpAction && descriptor.ftpFolder.empty())
-//    {
-//        QMessageBox::critical(this, "Error", "You need to specify the ftp folder.");
-//        return false;
-//    }
-//    if (descriptor.sendEmailAction && descriptor.emailRecipient.empty())
-//    {
-//        QMessageBox::critical(this, "Error", "You need to specify the email recipient.");
-//        return false;
-//    }
 
     int32_t reportIndex = m_db.findReportIndexByName(descriptor.name);
     if (reportIndex >= 0 && m_db.getReport(reportIndex).id != m_report.id)
@@ -178,11 +148,6 @@ bool ConfigureReportDialog::getDescriptor(DB::ReportDescriptor& descriptor)
     if (descriptor.filterSensors && descriptor.sensors.empty())
     {
         QMessageBox::critical(this, "Error", "You need to specify at least one sensor.");
-        return false;
-    }
-    if (!descriptor.sendEmailAction && !descriptor.uploadToFtpAction)
-    {
-        QMessageBox::critical(this, "Error", "You need to enable at least one action.");
         return false;
     }
 

@@ -456,6 +456,21 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>useDateTimePreset</tabstop>
+  <tabstop>dateTimePreset</tabstop>
+  <tabstop>minDateTime</tabstop>
+  <tabstop>maxDateTime</tabstop>
+  <tabstop>fitMeasurements</tabstop>
+  <tabstop>minTemperature</tabstop>
+  <tabstop>maxTemperature</tabstop>
+  <tabstop>minHumidity</tabstop>
+  <tabstop>maxHumidity</tabstop>
+  <tabstop>useSmoothing</tabstop>
+  <tabstop>selectSensors</tabstop>
+  <tabstop>exportData</tabstop>
+  <tabstop>clearAnnotations</tabstop>
+ </tabstops>
  <resources>
   <include location="../res/res.qrc"/>
  </resources>
@@ -551,8 +566,8 @@
      <y>17</y>
     </hint>
     <hint type="destinationlabel">
-     <x>492</x>
-     <y>51</y>
+     <x>381</x>
+     <y>67</y>
     </hint>
    </hints>
   </connection>
@@ -563,12 +578,12 @@
    <slot>setDisabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>563</x>
-     <y>14</y>
+     <x>497</x>
+     <y>18</y>
     </hint>
     <hint type="destinationlabel">
-     <x>585</x>
-     <y>47</y>
+     <x>497</x>
+     <y>67</y>
     </hint>
    </hints>
   </connection>
@@ -579,12 +594,12 @@
    <slot>setDisabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>533</x>
-     <y>22</y>
+     <x>497</x>
+     <y>26</y>
     </hint>
     <hint type="destinationlabel">
-     <x>517</x>
-     <y>93</y>
+     <x>381</x>
+     <y>103</y>
     </hint>
    </hints>
   </connection>
@@ -595,12 +610,12 @@
    <slot>setDisabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>625</x>
-     <y>21</y>
+     <x>497</x>
+     <y>25</y>
     </hint>
     <hint type="destinationlabel">
-     <x>618</x>
-     <y>81</y>
+     <x>497</x>
+     <y>103</y>
     </hint>
    </hints>
   </connection>

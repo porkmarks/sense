@@ -192,17 +192,10 @@
       <item>
        <widget class="QWidget" name="widget_4" native="true">
         <layout class="QGridLayout" name="gridLayout_2">
-         <item row="0" column="0">
-          <widget class="QCheckBox" name="verbose">
+         <item row="1" column="0">
+          <widget class="QCheckBox" name="warning">
            <property name="text">
-            <string>Verbose</string>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="1">
-          <widget class="QCheckBox" name="info">
-           <property name="text">
-            <string>Info</string>
+            <string>Warning</string>
            </property>
            <property name="checked">
             <bool>true</bool>
@@ -219,13 +212,44 @@
            </property>
           </widget>
          </item>
-         <item row="1" column="0">
-          <widget class="QCheckBox" name="warning">
+         <item row="0" column="1">
+          <widget class="QCheckBox" name="info">
            <property name="text">
-            <string>Warning</string>
+            <string>Info</string>
            </property>
            <property name="checked">
             <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="0">
+          <widget class="QCheckBox" name="verbose">
+           <property name="text">
+            <string>Verbose</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="2">
+          <spacer name="verticalSpacer">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>40</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item row="0" column="2">
+          <widget class="QPushButton" name="exportLogs">
+           <property name="text">
+            <string>Export Logs</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/export.png</normaloff>:/icons/ui/export.png</iconset>
            </property>
           </widget>
          </item>
@@ -281,6 +305,100 @@
    </item>
   </layout>
  </widget>
- <resources/>
- <connections/>
+ <tabstops>
+  <tabstop>useDateTimePreset</tabstop>
+  <tabstop>dateTimePreset</tabstop>
+  <tabstop>maxDateTime</tabstop>
+  <tabstop>minDateTime</tabstop>
+  <tabstop>verbose</tabstop>
+  <tabstop>info</tabstop>
+  <tabstop>warning</tabstop>
+  <tabstop>error</tabstop>
+  <tabstop>list</tabstop>
+ </tabstops>
+ <resources>
+  <include location="../res/res.qrc"/>
+ </resources>
+ <connections>
+  <connection>
+   <sender>useDateTimePreset</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>dateTimePreset</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>40</x>
+     <y>21</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>125</x>
+     <y>15</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>useDateTimePreset</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>label_2</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>44</x>
+     <y>22</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>62</x>
+     <y>52</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>useDateTimePreset</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>label</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>26</x>
+     <y>11</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>30</x>
+     <y>88</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>useDateTimePreset</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>minDateTime</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>12</x>
+     <y>17</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>115</x>
+     <y>50</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>useDateTimePreset</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>maxDateTime</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>43</x>
+     <y>19</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>115</x>
+     <y>96</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>

@@ -8,8 +8,9 @@
 
 class QGraphicsSceneMouseEvent;
 
-class PlotToolTip : public QGraphicsItem
+class PlotToolTip : public QObject, public QGraphicsItem
 {
+    Q_OBJECT
 public:
     PlotToolTip(QChart* parent);
 
@@ -20,6 +21,9 @@ public:
 
     QRectF boundingRect() const;
     void paint(QPainter* painter, const QStyleOptionGraphicsItem* option,QWidget* widget);
+
+signals:
+    void closeMe();
 
 protected:
     void mousePressEvent(QGraphicsSceneMouseEvent* event);
@@ -32,6 +36,7 @@ private:
     QString m_text;
     QRectF m_textRect;
     QRectF m_rect;
+    QRectF m_closeRect;
     QPointF m_anchor;
     QAbstractSeries* m_series = nullptr;
     QFont m_font;

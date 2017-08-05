@@ -157,35 +157,43 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
 
 void BaseStationsWidget::baseStationDisconnected(Comms::BaseStationDescriptor const& bs)
 {
-//    auto it = std::find_if(m_baseStations.begin(), m_baseStations.end(), [&bs](BaseStationData const& bsd) { return bsd.descriptor == bs.descriptor; });
-//    if (it == m_baseStations.end())
-//    {
-//        assert(false);
-//        return;
-//    }
+    {
+        int32_t bsIndex = m_settings->findBaseStationIndexByMac(bs.mac);
+        if (bsIndex >= 0)
+        {
+            Settings::BaseStation const& bs = m_settings->getBaseStation(bsIndex);
 
-//    if (bs.descriptor.mac == m_settings->getActiveBaseStation())
-//    {
-//        emit baseStationDeactivated(bs.descriptor);
-//        m_settings->setActiveBaseStation(Settings::Mac());
-//    }
+            if (m_settings->getActiveBaseStationId() == bs.id)
+            {
+                setStatus(bsIndex, "Active / Disconnected");
+            }
+            else
+            {
+                setStatus(bsIndex, "Added / Disconnected");
+            }
 
-//    size_t bsIndex = std::distance(m_baseStations.begin(), it);
-//    m_model.removeRow(static_cast<int>(bsIndex));
+            return;
+        }
+    }
 
-//    m_baseStations.erase(it);
+    {
+        auto it = std::find_if(m_unregisteredBaseStations.begin(), m_unregisteredBaseStations.end(), [&bs](Comms::BaseStationDescriptor const& descriptor) { return descriptor == bs; });
+        if (it == m_unregisteredBaseStations.end())
+        {
+            return;
+        }
+
+        size_t index = std::distance(m_unregisteredBaseStations.begin(), it);
+        m_model.removeRow(m_settings->getBaseStationCount() + index);
+
+        m_unregisteredBaseStations.erase(it);
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor const& bs)
 {
-//    QList<QListWidgetItem*> items = m_ui.list->findItems(QString(buf), Qt::MatchExactly);
-//    if (!items.empty())
-//    {
-//        return;
-//    }
-
     int32_t bsIndex = m_settings->findBaseStationIndexByMac(bs.mac);
     if (bsIndex >= 0)
     {

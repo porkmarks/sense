@@ -542,10 +542,10 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
     }
     else
     {
-        maxT = std::max(maxT, std::max(m_ui.minTemperature->value(), m_ui.maxTemperature->value()));
-        minT = std::min(minT, std::min(m_ui.minTemperature->value(), m_ui.maxTemperature->value()));
-        maxH = std::max(maxH, std::max(m_ui.minHumidity->value(), m_ui.maxHumidity->value()));
-        minH = std::min(minH, std::max(m_ui.minHumidity->value(), m_ui.maxHumidity->value()));
+        maxT = std::max(m_ui.minTemperature->value(), m_ui.maxTemperature->value());
+        minT = std::min(m_ui.minTemperature->value(), m_ui.maxTemperature->value());
+        maxH = std::max(m_ui.minHumidity->value(), m_ui.maxHumidity->value());
+        minH = std::min(m_ui.minHumidity->value(), m_ui.maxHumidity->value());
     }
 
     m_axisTY->setRange(minT, maxT);
@@ -570,6 +570,17 @@ void PlotWidget::keepAnnotation()
     if (m_annotation != nullptr)
     {
         m_annotation->setFixed(true);
+
+        PlotToolTip* annotation = m_annotation.get();
+        connect(annotation, &PlotToolTip::closeMe, [this, annotation]()
+        {
+            auto it = std::find_if(m_annotations.begin(), m_annotations.end(), [annotation](std::unique_ptr<PlotToolTip> const& a) { return a.get() == annotation; });
+            if (it != m_annotations.end())
+            {
+                m_annotations.erase(it);
+            }
+        });
+
         m_annotations.push_back(std::move(m_annotation));
         m_ui.clearAnnotations->setEnabled(true);
 

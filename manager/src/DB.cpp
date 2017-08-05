@@ -530,22 +530,6 @@ bool DB::load(std::string const& name)
                 }
                 report.descriptor.data = static_cast<DB::ReportDescriptor::Data>(it->value.GetInt());
 
-                it = reportj.FindMember("send_email_action");
-                if (it == reportj.MemberEnd() || !it->value.IsBool())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing report send_email_action").arg(dataFilename.c_str()));
-                    return false;
-                }
-                report.descriptor.sendEmailAction = it->value.GetBool();
-
-                it = reportj.FindMember("upload_to_ftp_action");
-                if (it == reportj.MemberEnd() || !it->value.IsBool())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing report upload_to_ftp_action").arg(dataFilename.c_str()));
-                    return false;
-                }
-                report.descriptor.uploadToFtpAction = it->value.GetBool();
-
                 data.lastReportId = std::max(data.lastReportId, report.id);
                 data.reports.push_back(report);
             }
@@ -1730,8 +1714,6 @@ void DB::save(Data const& data) const
                 reportj.AddMember("period", static_cast<int32_t>(report.descriptor.period), document.GetAllocator());
                 reportj.AddMember("custom_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(report.descriptor.customPeriod).count()), document.GetAllocator());
                 reportj.AddMember("data", static_cast<int32_t>(report.descriptor.data), document.GetAllocator());
-                reportj.AddMember("send_email_action", report.descriptor.sendEmailAction, document.GetAllocator());
-                reportj.AddMember("upload_to_ftp_action", report.descriptor.uploadToFtpAction, document.GetAllocator());
                 reportsj.PushBack(reportj, document.GetAllocator());
             }
             document.AddMember("reports", reportsj, document.GetAllocator());

@@ -215,9 +215,6 @@ public:
 
         bool filterSensors = false;
         std::vector<SensorId> sensors;
-
-        bool sendEmailAction = false;
-        bool uploadToFtpAction = false;
     };
 
     typedef uint32_t ReportId;

@@ -35,6 +35,7 @@ private slots:
     void maxDateTimeChanged(QDateTime const& value);
 
 private:
+    void exportData();
 
     Logger::Filter createFilter() const;
 

@@ -77,7 +77,6 @@ HEADERS += \
     ../../src/MeasurementsDelegate.h \
     ../../src/SensorsDelegate.h \
     ../../src/ConfigureAlarmDialog.h \
-    ../../src/PlotToolTip.h \
     ../../src/PlotWidget.h \
     ../../../common/src/Butterworth.h \
     ../../src/ExportDataDialog.h \
@@ -111,7 +110,9 @@ HEADERS += \
     ../../src/Settings.h \
     ../../src/LogsWidget.h \
     ../../src/LogsModel.h \
-    ../../src/Logger.h
+    ../../src/Logger.h \
+    ../../src/ExportLogsDialog.h \
+    ../../src/PlotToolTip.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -129,7 +130,6 @@ SOURCES += \
     ../../src/MeasurementsDelegate.cpp \
     ../../src/SensorsDelegate.cpp \
     ../../src/ConfigureAlarmDialog.cpp \
-    ../../src/PlotToolTip.cpp \
     ../../src/PlotWidget.cpp \
     ../../src/ExportDataDialog.cpp \
     ../../src/ExportPicDialog.cpp \
@@ -161,7 +161,9 @@ SOURCES += \
     ../../src/Settings.cpp \
     ../../src/LogsWidget.cpp \
     ../../src/LogsModel.cpp \
-    ../../src/Logger.cpp
+    ../../src/Logger.cpp \
+    ../../src/ExportLogsDialog.cpp \
+    ../../src/PlotToolTip.cpp
 
 FORMS += \
     ../../src/Manager.ui \
@@ -183,7 +185,8 @@ FORMS += \
     ../../src/ConfigureUserDialog.ui \
     ../../src/UsersWidget.ui \
     ../../src/LoginDialog.ui \
-    ../../src/LogsWidget.ui
+    ../../src/LogsWidget.ui \
+    ../../src/ExportLogsDialog.ui
 
 DISTFILES += \
 

@@ -28,6 +28,7 @@ void PlotToolTip::paint(QPainter* painter, const QStyleOptionGraphicsItem* optio
     Q_UNUSED(option)
     Q_UNUSED(widget)
     QPainterPath path;
+    path.setFillRule(Qt::WindingFill);
     path.addRoundedRect(m_rect, 5, 5);
 
     QPointF anchor = mapFromParent(m_chart->mapToPosition(m_anchor, m_series));
@@ -70,6 +71,15 @@ void PlotToolTip::paint(QPainter* painter, const QStyleOptionGraphicsItem* optio
 
     if (m_isFixed)
     {
+        path.addRect(m_closeRect);
+        path.moveTo(m_closeRect.bottomLeft() + QPointF(3, -3));
+        path.lineTo(m_closeRect.topRight() + QPointF(-3, 3));
+        path.moveTo(m_closeRect.topLeft() + QPointF(3, 3));
+        path.lineTo(m_closeRect.bottomRight() - QPointF(3, 3));
+    }
+
+    if (m_isFixed)
+    {
         constexpr float animationDurationS = 0.5f;
         float d = std::chrono::duration<float>(std::chrono::high_resolution_clock::now() - m_animationStartTP).count();
         if (d < animationDurationS)
@@ -108,6 +118,10 @@ void PlotToolTip::paint(QPainter* painter, const QStyleOptionGraphicsItem* optio
 void PlotToolTip::mousePressEvent(QGraphicsSceneMouseEvent* event)
 {
     event->setAccepted(true);
+    if (m_isFixed && m_closeRect.contains(event->pos()))
+    {
+        emit closeMe();
+    }
 }
 
 void PlotToolTip::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
@@ -143,6 +157,12 @@ void PlotToolTip::setText(const QString& text)
 //    m_textRect.translate(5, 5);
     prepareGeometryChange();
     m_rect = m_textRect.adjusted(-5, -5, 5, 5);
+
+    {
+        float length = 14;
+        float margin = 6;
+        m_closeRect = QRectF(m_rect.topRight() + QPointF(-(length + margin), margin), QSizeF(length, length));
+    }
 }
 
 void PlotToolTip::setAnchor(const QPointF& point, QAbstractSeries* series)

@@ -58,9 +58,8 @@ void ReportsWidget::shutdown()
 
 void ReportsWidget::setRW()
 {
-    //available to normal users as well
-//    m_ui.add->setEnabled(m_settings->isLoggedInAsAdmin());
-//    m_ui.remove->setEnabled(m_settings->isLoggedInAsAdmin());
+    m_ui.add->setEnabled(m_settings->isLoggedInAsAdmin());
+    m_ui.remove->setEnabled(m_settings->isLoggedInAsAdmin());
 }
 
 //////////////////////////////////////////////////////////////////////////

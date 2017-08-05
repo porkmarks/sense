@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>ExportDataDialog</class>
- <widget class="QDialog" name="ExportDataDialog">
+ <class>ExportLogsDialog</class>
+ <widget class="QDialog" name="ExportLogsDialog">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -52,28 +52,20 @@
            <layout class="QHBoxLayout" name="horizontalLayout">
             <item>
              <layout class="QGridLayout" name="gridLayout">
-              <item row="7" column="0">
-               <widget class="QCheckBox" name="exportBattery">
+              <item row="1" column="0">
+               <widget class="QCheckBox" name="exportIndex">
                 <property name="text">
-                 <string>Battery</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/battery-75.png</normaloff>:/icons/ui/battery-75.png</iconset>
+                 <string>Index</string>
                 </property>
                 <property name="checked">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="3" column="0" colspan="2">
-               <widget class="QCheckBox" name="exportTimePoint">
+              <item row="6" column="0">
+               <widget class="QCheckBox" name="exportMessage">
                 <property name="text">
-                 <string>Date/Time</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/today.png</normaloff>:/icons/ui/today.png</iconset>
+                 <string>Message</string>
                 </property>
                 <property name="checked">
                  <bool>true</bool>
@@ -81,80 +73,19 @@
                </widget>
               </item>
               <item row="2" column="0">
-               <widget class="QCheckBox" name="exportSensorName">
+               <widget class="QCheckBox" name="exportTimePoint">
                 <property name="text">
-                 <string>Sensor Name</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
+                 <string>Date/Time</string>
                 </property>
                 <property name="checked">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="2" column="1">
-               <widget class="QCheckBox" name="exportSensorSN">
+              <item row="4" column="0">
+               <widget class="QCheckBox" name="exportType">
                 <property name="text">
-                 <string>Sensor S/N</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
-                </property>
-               </widget>
-              </item>
-              <item row="0" column="0">
-               <widget class="QCheckBox" name="exportId">
-                <property name="text">
-                 <string>Id</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/arrow-right.png</normaloff>:/icons/ui/arrow-right.png</iconset>
-                </property>
-                <property name="checked">
-                 <bool>false</bool>
-                </property>
-               </widget>
-              </item>
-              <item row="0" column="1">
-               <widget class="QCheckBox" name="exportIndex">
-                <property name="text">
-                 <string>Index</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/arrow-right.png</normaloff>:/icons/ui/arrow-right.png</iconset>
-                </property>
-                <property name="checked">
-                 <bool>false</bool>
-                </property>
-               </widget>
-              </item>
-              <item row="5" column="0">
-               <widget class="QCheckBox" name="exportTemperature">
-                <property name="text">
-                 <string>Temperature</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/temperature.png</normaloff>:/icons/ui/temperature.png</iconset>
-                </property>
-                <property name="checked">
-                 <bool>true</bool>
-                </property>
-               </widget>
-              </item>
-              <item row="5" column="1">
-               <widget class="QCheckBox" name="exportHumidity">
-                <property name="text">
-                 <string>Humidity</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/humidity.png</normaloff>:/icons/ui/humidity.png</iconset>
+                 <string>Type</string>
                 </property>
                 <property name="checked">
                  <bool>true</bool>
@@ -179,13 +110,6 @@
               </property>
              </widget>
             </item>
-            <item row="4" column="0">
-             <widget class="QLabel" name="label_7">
-              <property name="text">
-               <string>Units</string>
-              </property>
-             </widget>
-            </item>
             <item row="1" column="0">
              <widget class="QLabel" name="label_6">
               <property name="text">
@@ -203,17 +127,10 @@
               </property>
              </widget>
             </item>
-            <item row="3" column="0">
+            <item row="2" column="0">
              <widget class="QLabel" name="label_5">
               <property name="text">
                <string>Date Format</string>
-              </property>
-             </widget>
-            </item>
-            <item row="2" column="0">
-             <widget class="QLabel" name="label_4">
-              <property name="text">
-               <string>Decimal Places</string>
               </property>
              </widget>
             </item>
@@ -234,16 +151,6 @@
              </widget>
             </item>
             <item row="2" column="1" colspan="2">
-             <widget class="QSpinBox" name="decimalPlaces">
-              <property name="maximum">
-               <number>2</number>
-              </property>
-              <property name="value">
-               <number>2</number>
-              </property>
-             </widget>
-            </item>
-            <item row="3" column="1" colspan="2">
              <widget class="QComboBox" name="dateFormat">
               <item>
                <property name="text">
@@ -263,28 +170,6 @@
               <item>
                <property name="text">
                 <string>05/22/2017 17:52:21</string>
-               </property>
-              </item>
-             </widget>
-            </item>
-            <item row="4" column="1" colspan="2">
-             <widget class="QComboBox" name="units">
-              <property name="currentIndex">
-               <number>2</number>
-              </property>
-              <item>
-               <property name="text">
-                <string>None</string>
-               </property>
-              </item>
-              <item>
-               <property name="text">
-                <string>Embedded</string>
-               </property>
-              </item>
-              <item>
-               <property name="text">
-                <string>Separate Column</string>
                </property>
               </item>
              </widget>
@@ -363,30 +248,21 @@
   </layout>
  </widget>
  <tabstops>
-  <tabstop>exportId</tabstop>
-  <tabstop>exportIndex</tabstop>
-  <tabstop>exportSensorName</tabstop>
-  <tabstop>exportSensorSN</tabstop>
   <tabstop>exportTimePoint</tabstop>
-  <tabstop>exportTemperature</tabstop>
-  <tabstop>exportHumidity</tabstop>
-  <tabstop>exportBattery</tabstop>
+  <tabstop>exportType</tabstop>
+  <tabstop>exportMessage</tabstop>
   <tabstop>fileFormat</tabstop>
   <tabstop>separator</tabstop>
   <tabstop>tabSeparator</tabstop>
-  <tabstop>decimalPlaces</tabstop>
   <tabstop>dateFormat</tabstop>
-  <tabstop>units</tabstop>
   <tabstop>previewText</tabstop>
  </tabstops>
- <resources>
-  <include location="../res/res.qrc"/>
- </resources>
+ <resources/>
  <connections>
   <connection>
    <sender>buttonBox</sender>
    <signal>accepted()</signal>
-   <receiver>ExportDataDialog</receiver>
+   <receiver>ExportLogsDialog</receiver>
    <slot>accept()</slot>
    <hints>
     <hint type="sourcelabel">
@@ -402,7 +278,7 @@
   <connection>
    <sender>buttonBox</sender>
    <signal>rejected()</signal>
-   <receiver>ExportDataDialog</receiver>
+   <receiver>ExportLogsDialog</receiver>
    <slot>reject()</slot>
    <hints>
     <hint type="sourcelabel">

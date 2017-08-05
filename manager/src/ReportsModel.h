@@ -16,8 +16,7 @@ public:
         Id,
         Name,
         Period,
-        Data,
-        Action
+        Data
     };
 
     void refresh();

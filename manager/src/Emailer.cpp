@@ -74,10 +74,7 @@ void Emailer::checkReports()
         if (m_db.isReportTriggered(report.id))
         {
             s_logger.logInfo(QString("Report '%1' triggered").arg(report.descriptor.name.c_str()));
-            if (report.descriptor.sendEmailAction)
-            {
-                sendReportEmail(report);
-            }
+            sendReportEmail(report);
             m_db.setReportExecuted(report.id);
         }
     }

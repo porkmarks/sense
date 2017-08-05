@@ -5,6 +5,7 @@
 #include <QMessageBox>
 
 #include "Logger.h"
+#include "ExportLogsDialog.h"
 
 extern Logger s_logger;
 
@@ -40,6 +41,8 @@ void LogsWidget::init()
 
     setDateTimePreset(m_ui.dateTimePreset->currentIndex());
     refresh();
+
+    connect(m_ui.exportLogs, &QPushButton::released, this, &LogsWidget::exportData);
 
     connect(m_ui.dateTimePreset, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &LogsWidget::setDateTimePreset);
 
@@ -100,6 +103,20 @@ void LogsWidget::refresh()
     for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
     {
         m_ui.list->resizeColumnToContents(i);
+    }
+
+    m_ui.exportLogs->setEnabled(m_model->getLineCount() > 0);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void LogsWidget::exportData()
+{
+    ExportLogsDialog dialog(*m_model);
+    int result = dialog.exec();
+    if (result != QDialog::Accepted)
+    {
+        return;
     }
 }
 

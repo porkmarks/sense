@@ -47,7 +47,7 @@
        <item>
         <widget class="QTabWidget" name="tabWidget">
          <property name="currentIndex">
-          <number>3</number>
+          <number>5</number>
          </property>
          <widget class="QWidget" name="baseStationsTab">
           <attribute name="icon">
@@ -669,6 +669,9 @@
   <tabstop>emailUsername</tabstop>
   <tabstop>emailPassword</tabstop>
   <tabstop>emailFrom</tabstop>
+  <tabstop>emailRecipientList</tabstop>
+  <tabstop>emailAddRecipient</tabstop>
+  <tabstop>emailRemoveRecipient</tabstop>
   <tabstop>emailTest</tabstop>
   <tabstop>emailApply</tabstop>
   <tabstop>emailReset</tabstop>
