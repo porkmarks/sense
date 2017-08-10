@@ -714,6 +714,10 @@ QPixmap PlotWidget::grabPic(bool showLegend)
     pixmap.fill();
 
     QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::TextAntialiasing, true);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    painter.setRenderHint(QPainter::HighQualityAntialiasing, true);
 
     m_chart->legend()->setVisible(showLegend);
 
