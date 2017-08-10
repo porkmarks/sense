@@ -32,8 +32,8 @@ void PlotWidget::init(DB& db)
     connect(m_ui.selectSensors, &QPushButton::released, this, &PlotWidget::selectSensors);
     connect(m_ui.exportData, &QPushButton::released, this, &PlotWidget::exportData);
 
-    connect(m_ui.minDateTime, &QDateTimeEdit::dateTimeChanged, this, &PlotWidget::minDateTimeChanged);
-    connect(m_ui.maxDateTime, &QDateTimeEdit::dateTimeChanged, this, &PlotWidget::maxDateTimeChanged);
+    connect(m_ui.minDateTime, &QDateTimeEdit::editingFinished, this, &PlotWidget::minDateTimeChanged);
+    connect(m_ui.maxDateTime, &QDateTimeEdit::editingFinished, this, &PlotWidget::maxDateTimeChanged);
 
     connect(m_ui.fitMeasurements, &QCheckBox::stateChanged, this, &PlotWidget::refresh);
     connect(m_ui.minTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh);
@@ -44,7 +44,7 @@ void PlotWidget::init(DB& db)
     connect(m_ui.useSmoothing, &QCheckBox::stateChanged, this, &PlotWidget::refresh);
     connect(m_ui.dateTimePreset, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &PlotWidget::refresh);
     connect(m_ui.minDateTime, &QDateTimeEdit::editingFinished, this, &PlotWidget::refresh);
-    connect(m_ui.maxDateTime, &QDateTimeEdit::dateTimeChanged, this, &PlotWidget::refresh);
+    connect(m_ui.maxDateTime, &QDateTimeEdit::editingFinished, this, &PlotWidget::refresh);
 
     setDateTimePreset(m_ui.dateTimePreset->currentIndex());
     refresh();
@@ -118,7 +118,9 @@ void PlotWidget::setDateTimePresetToday()
     QDateTime dt = QDateTime::currentDateTime();
 
     dt.setTime(QTime(23, 59, 59, 999));
+    m_ui.maxDateTime->blockSignals(true);
     m_ui.maxDateTime->setDateTime(dt);
+    m_ui.maxDateTime->blockSignals(false);
 
     dt.setTime(QTime(0, 0));
     m_ui.minDateTime->setDateTime(dt);
@@ -133,7 +135,9 @@ void PlotWidget::setDateTimePresetYesterday()
     dt.setDate(dt.date().addDays(-1));
 
     dt.setTime(QTime(23, 59, 59, 999));
+    m_ui.maxDateTime->blockSignals(true);
     m_ui.maxDateTime->setDateTime(dt);
+    m_ui.maxDateTime->blockSignals(false);
 
     dt.setTime(QTime(0, 0));
     m_ui.minDateTime->setDateTime(dt);
@@ -147,7 +151,9 @@ void PlotWidget::setDateTimePresetThisWeek()
 
     dt.setDate(dt.date().addDays(-dt.date().dayOfWeek()));
     dt.setTime(QTime(0, 0));
+    m_ui.minDateTime->blockSignals(true);
     m_ui.minDateTime->setDateTime(dt);
+    m_ui.minDateTime->blockSignals(false);
 
     dt.setDate(dt.date().addDays(6));
     dt.setTime(QTime(23, 59, 59, 999));
@@ -162,7 +168,9 @@ void PlotWidget::setDateTimePresetLastWeek()
 
     dt.setDate(dt.date().addDays(-dt.date().dayOfWeek()).addDays(-7));
     dt.setTime(QTime(0, 0));
+    m_ui.minDateTime->blockSignals(true);
     m_ui.minDateTime->setDateTime(dt);
+    m_ui.minDateTime->blockSignals(false);
 
     dt.setDate(dt.date().addDays(6));
     dt.setTime(QTime(23, 59, 59, 999));
@@ -177,7 +185,9 @@ void PlotWidget::setDateTimePresetThisMonth()
     date = QDate(date.year(), date.month(), 1);
 
     QDateTime dt(date, QTime(0, 0));
+    m_ui.minDateTime->blockSignals(true);
     m_ui.minDateTime->setDateTime(dt);
+    m_ui.minDateTime->blockSignals(false);
 
     dt = QDateTime(date.addMonths(1).addDays(-1), QTime(23, 59, 59, 999));
     m_ui.maxDateTime->setDateTime(dt);
@@ -191,7 +201,9 @@ void PlotWidget::setDateTimePresetLastMonth()
     date = QDate(date.year(), date.month(), 1).addMonths(-1);
 
     QDateTime dt(date, QTime(0, 0));
+    m_ui.minDateTime->blockSignals(true);
     m_ui.minDateTime->setDateTime(dt);
+    m_ui.minDateTime->blockSignals(false);
 
     dt = QDateTime(date.addMonths(1).addDays(-1), QTime(23, 59, 59, 999));
     m_ui.maxDateTime->setDateTime(dt);
@@ -199,8 +211,9 @@ void PlotWidget::setDateTimePresetLastMonth()
 
 //////////////////////////////////////////////////////////////////////////
 
-void PlotWidget::minDateTimeChanged(QDateTime const& value)
+void PlotWidget::minDateTimeChanged()
 {
+    QDateTime value = m_ui.minDateTime->dateTime();
     if (value >= m_ui.maxDateTime->dateTime())
     {
         QDateTime dt = value;
@@ -211,8 +224,9 @@ void PlotWidget::minDateTimeChanged(QDateTime const& value)
 
 //////////////////////////////////////////////////////////////////////////
 
-void PlotWidget::maxDateTimeChanged(QDateTime const& value)
+void PlotWidget::maxDateTimeChanged()
 {
+    QDateTime value = m_ui.maxDateTime->dateTime();
     if (value <= m_ui.minDateTime->dateTime())
     {
         QDateTime dt = value;
@@ -411,16 +425,12 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         plotData.sensor = sensor;
         plotData.temperatureLpf.setup(1, 1, 0.15);
         plotData.humidityLpf.setup(1, 1, 0.15);
+        plotData.temperaturePoints.reserve(8192);
+        plotData.humidityPoints.reserve(8192);
     }
 
     for (DB::Measurement const& m : measurements)
     {
-        int32_t sensorIndex = m_db->findSensorIndexById(m.descriptor.sensorId);
-        if (sensorIndex < 0)
-        {
-            continue;
-        }
-
         qreal millis = std::chrono::duration_cast<std::chrono::milliseconds>(m.descriptor.timePoint.time_since_epoch()).count();
         time_t tt = DB::Clock::to_time_t(m.descriptor.timePoint);
         minTS = std::min<uint64_t>(minTS, tt);
@@ -431,7 +441,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         {
             continue;
         }
-        PlotData& plotData = m_series[m.descriptor.sensorId];
+        PlotData& plotData = it->second;
 
         qreal value = m.descriptor.temperature;
         if (m_useSmoothing)
@@ -451,6 +461,40 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         minH = std::min(minH, value);
         maxH = std::max(maxH, value);
     }
+
+    QDateTime minDT, maxDT;
+    minDT.setTime_t(minTS);
+    maxDT.setTime_t(maxTS);
+    m_axisX->setRange(minDT, maxDT);
+
+    if (m_fitMeasurements)
+    {
+        constexpr qreal minTemperatureRange = 5.0;
+        if (std::abs(maxT - minT) < minTemperatureRange)
+        {
+            qreal center = (maxT + minT) / 2.0;
+            minT = center - minTemperatureRange / 2.0;
+            maxT = center + minTemperatureRange / 2.0;
+        }
+        constexpr qreal minHumidityRange = 10.0;
+        if (std::abs(maxH - minH) < minHumidityRange)
+        {
+            qreal center = (maxH + minH) / 2.0;
+            minH = center - minHumidityRange / 2.0;
+            maxH = center + minHumidityRange / 2.0;
+        }
+    }
+    else
+    {
+        maxT = std::max(m_ui.minTemperature->value(), m_ui.maxTemperature->value());
+        minT = std::min(m_ui.minTemperature->value(), m_ui.maxTemperature->value());
+        maxH = std::max(m_ui.minHumidity->value(), m_ui.maxHumidity->value());
+        minH = std::min(m_ui.minHumidity->value(), m_ui.maxHumidity->value());
+    }
+
+    m_axisTY->setRange(minT, maxT);
+    m_axisHY->setRange(minH, maxH);
+
 
     for (auto& pair : m_series)
     {
@@ -517,39 +561,6 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         }
         index++;
     }
-
-    QDateTime minDT, maxDT;
-    minDT.setTime_t(minTS);
-    maxDT.setTime_t(maxTS);
-    m_axisX->setRange(minDT, maxDT);
-
-    if (m_fitMeasurements)
-    {
-        constexpr qreal minTemperatureRange = 5.0;
-        if (std::abs(maxT - minT) < minTemperatureRange)
-        {
-            qreal center = (maxT + minT) / 2.0;
-            minT = center - minTemperatureRange / 2.0;
-            maxT = center + minTemperatureRange / 2.0;
-        }
-        constexpr qreal minHumidityRange = 10.0;
-        if (std::abs(maxH - minH) < minHumidityRange)
-        {
-            qreal center = (maxH + minH) / 2.0;
-            minH = center - minHumidityRange / 2.0;
-            maxH = center + minHumidityRange / 2.0;
-        }
-    }
-    else
-    {
-        maxT = std::max(m_ui.minTemperature->value(), m_ui.maxTemperature->value());
-        minT = std::min(m_ui.minTemperature->value(), m_ui.maxTemperature->value());
-        maxH = std::max(m_ui.minHumidity->value(), m_ui.maxHumidity->value());
-        minH = std::min(m_ui.minHumidity->value(), m_ui.maxHumidity->value());
-    }
-
-    m_axisTY->setRange(minT, maxT);
-    m_axisHY->setRange(minH, maxH);
 }
 
 //////////////////////////////////////////////////////////////////////////
