@@ -47,7 +47,7 @@
        <item>
         <widget class="QTabWidget" name="tabWidget">
          <property name="currentIndex">
-          <number>5</number>
+          <number>4</number>
          </property>
          <widget class="QWidget" name="baseStationsTab">
           <attribute name="icon">
@@ -328,67 +328,84 @@
           <layout class="QVBoxLayout" name="verticalLayout_11">
            <item>
             <widget class="QWidget" name="widget_2" native="true">
-             <layout class="QFormLayout" name="formLayout_2">
+             <layout class="QGridLayout" name="gridLayout">
               <property name="verticalSpacing">
                <number>6</number>
               </property>
-              <item row="2" column="0">
-               <widget class="QLabel" name="label_11">
-                <property name="text">
-                 <string>Server address</string>
-                </property>
-               </widget>
-              </item>
-              <item row="2" column="1">
+              <item row="0" column="1" colspan="2">
                <widget class="QLineEdit" name="ftpHost">
                 <property name="text">
-                 <string>smtp.gmail.com</string>
+                 <string>ftp://server.com</string>
                 </property>
                </widget>
               </item>
               <item row="4" column="0">
-               <widget class="QLabel" name="label_12">
-                <property name="text">
-                 <string>Username</string>
-                </property>
-               </widget>
-              </item>
-              <item row="4" column="1">
-               <widget class="QLineEdit" name="ftpUsername"/>
-              </item>
-              <item row="5" column="0">
-               <widget class="QLabel" name="label_13">
-                <property name="text">
-                 <string>Password</string>
-                </property>
-               </widget>
-              </item>
-              <item row="5" column="1">
-               <widget class="QLineEdit" name="ftpPassword">
-                <property name="echoMode">
-                 <enum>QLineEdit::PasswordEchoOnEdit</enum>
-                </property>
-               </widget>
-              </item>
-              <item row="6" column="0">
                <widget class="QLabel" name="label_10">
                 <property name="text">
                  <string>Folder</string>
                 </property>
                </widget>
               </item>
-              <item row="6" column="1">
+              <item row="4" column="1">
                <widget class="QLineEdit" name="ftpFolder"/>
               </item>
-              <item row="7" column="0">
+              <item row="5" column="0">
                <widget class="QCheckBox" name="ftpUploadBackups">
                 <property name="text">
                  <string>Upload Backups Every</string>
                 </property>
                </widget>
               </item>
-              <item row="7" column="1">
-               <widget class="QSpinBox" name="spinBox">
+              <item row="2" column="0">
+               <widget class="QLabel" name="label_12">
+                <property name="text">
+                 <string>Username</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="0">
+               <widget class="QLabel" name="label_11">
+                <property name="text">
+                 <string>Server address</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="0">
+               <widget class="QLabel" name="label_13">
+                <property name="text">
+                 <string>Password</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="1" colspan="2">
+               <widget class="QLineEdit" name="ftpUsername"/>
+              </item>
+              <item row="3" column="1" colspan="2">
+               <widget class="QLineEdit" name="ftpPassword">
+                <property name="echoMode">
+                 <enum>QLineEdit::PasswordEchoOnEdit</enum>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="2">
+               <widget class="QPushButton" name="ftpBrowse">
+                <property name="text">
+                 <string/>
+                </property>
+                <property name="icon">
+                 <iconset resource="../res/res.qrc">
+                  <normaloff>:/icons/ui/ftp.png</normaloff>:/icons/ui/ftp.png</iconset>
+                </property>
+                <property name="iconSize">
+                 <size>
+                  <width>24</width>
+                  <height>24</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="1" colspan="2">
+               <widget class="QSpinBox" name="ftpBackupPeriod">
                 <property name="enabled">
                  <bool>false</bool>
                 </property>
@@ -400,6 +417,26 @@
                 </property>
                 <property name="maximum">
                  <number>99999</number>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="label_14">
+                <property name="text">
+                 <string>Server port</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1" colspan="2">
+               <widget class="QSpinBox" name="ftpPort">
+                <property name="minimum">
+                 <number>1</number>
+                </property>
+                <property name="maximum">
+                 <number>65535</number>
+                </property>
+                <property name="value">
+                 <number>21</number>
                 </property>
                </widget>
               </item>
@@ -434,6 +471,13 @@
                  </size>
                 </property>
                </spacer>
+              </item>
+              <item>
+               <widget class="QPushButton" name="ftpTest">
+                <property name="text">
+                 <string>Test</string>
+                </property>
+               </widget>
               </item>
               <item>
                <widget class="QPushButton" name="ftpApply">
@@ -680,7 +724,7 @@
   <tabstop>ftpPassword</tabstop>
   <tabstop>ftpFolder</tabstop>
   <tabstop>ftpUploadBackups</tabstop>
-  <tabstop>spinBox</tabstop>
+  <tabstop>ftpBackupPeriod</tabstop>
   <tabstop>ftpApply</tabstop>
   <tabstop>ftpReset</tabstop>
   <tabstop>scrollArea</tabstop>
@@ -699,7 +743,7 @@
   <connection>
    <sender>ftpUploadBackups</sender>
    <signal>toggled(bool)</signal>
-   <receiver>spinBox</receiver>
+   <receiver>ftpBackupPeriod</receiver>
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">

@@ -19,6 +19,7 @@ CONFIG -= console
 
 INCLUDEPATH += ../../src
 INCLUDEPATH += ../../src/Smtp
+INCLUDEPATH += ../../src/qftp
 INCLUDEPATH += ../../../common/src
 INCLUDEPATH += ../../../common/src/rapidjson/include
 
@@ -112,7 +113,9 @@ HEADERS += \
     ../../src/LogsModel.h \
     ../../src/Logger.h \
     ../../src/ExportLogsDialog.h \
-    ../../src/PlotToolTip.h
+    ../../src/PlotToolTip.h \
+    ../../src/qftp/qftp.h \
+    ../../src/qftp/qurlinfo.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -163,7 +166,9 @@ SOURCES += \
     ../../src/LogsModel.cpp \
     ../../src/Logger.cpp \
     ../../src/ExportLogsDialog.cpp \
-    ../../src/PlotToolTip.cpp
+    ../../src/PlotToolTip.cpp \
+    ../../src/qftp/qftp.cpp \
+    ../../src/qftp/qurlinfo.cpp
 
 FORMS += \
     ../../src/Manager.ui \

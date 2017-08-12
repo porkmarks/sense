@@ -3,6 +3,7 @@
 #include <QMessageBox>
 #include <QInputDialog>
 #include "Smtp/SmtpMime"
+#include "qftp.h"
 
 #include "DB.h"
 
@@ -42,6 +43,10 @@ void SettingsWidget::init(Comms& comms, Settings& settings)
     connect(m_ui.emailApply, &QPushButton::released, this, &SettingsWidget::applyEmailSettings);
     connect(m_ui.emailReset, &QPushButton::released, [this]() { setEmailSettings(m_settings->getEmailSettings()); });
     connect(m_ui.emailTest, &QPushButton::released, this, &SettingsWidget::sendTestEmail);
+
+    connect(m_ui.ftpApply, &QPushButton::released, this, &SettingsWidget::applyFtpSettings);
+    connect(m_ui.ftpReset, &QPushButton::released, [this]() { setFtpSettings(m_settings->getFtpSettings()); });
+    connect(m_ui.ftpTest, &QPushButton::released, this, &SettingsWidget::testFtpSettings);
 
     connect(m_ui.sensorsApply, &QPushButton::released, this, &SettingsWidget::applySensorSettings);
     connect(m_ui.sensorsReset, &QPushButton::released, [this]() { if (m_db) setSensorSettings(m_db->getSensorSettings()); });
@@ -281,6 +286,116 @@ void SettingsWidget::sendTestEmail()
         QMessageBox::information(this, "Done", QString("Email sent."));
     }
     smtp.quit();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::setFtpSettings(Settings::FtpSettings const& settings)
+{
+    m_ui.ftpHost->setText(settings.host.c_str());
+    m_ui.ftpPort->setValue(settings.port);
+    m_ui.ftpUsername->setText(settings.username.c_str());
+    m_ui.ftpPassword->setText(settings.password.c_str());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool SettingsWidget::getFtpSettings(Settings::FtpSettings& settings)
+{
+    settings.host = m_ui.ftpHost->text().toUtf8().data();
+    settings.port = static_cast<uint16_t>(m_ui.ftpPort->value());
+    settings.username = m_ui.ftpUsername->text().toUtf8().data();
+    settings.password = m_ui.ftpPassword->text().toUtf8().data();
+
+    if (settings.host.empty())
+    {
+        QMessageBox::critical(this, "Error", "You need to specify a valid host.");
+        return false;
+    }
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::applyFtpSettings()
+{
+    Settings::FtpSettings settings;
+    if (!getFtpSettings(settings))
+    {
+        return;
+    }
+
+    m_settings->setFtpSettings(settings);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::testFtpSettings()
+{
+    Settings::FtpSettings settings;
+    if (!getFtpSettings(settings))
+    {
+        return;
+    }
+
+    static const Settings::Clock::duration timeout = std::chrono::seconds(10);
+
+    QFtp* ftp = new QFtp(this);
+
+    ftp->connectToHost(settings.host.c_str(), settings.port);
+
+    Settings::Clock::time_point start = Settings::Clock::now();
+    while (ftp->hasPendingCommands())
+    {
+        if (Settings::Clock::now() - start > timeout)
+        {
+            QMessageBox::critical(this, "Error", "Connection timed out.");
+            return;
+        }
+        if (ftp->error() != QFtp::Error::NoError)
+        {
+            QMessageBox::critical(this, "Error", QString("Connection error: %1.").arg(ftp->errorString()));
+            return;
+        }
+    }
+
+    ftp->login(settings.username.c_str(), settings.password.c_str());
+    start = Settings::Clock::now();
+    while (ftp->hasPendingCommands())
+    {
+        if (Settings::Clock::now() - start > timeout)
+        {
+            QMessageBox::critical(this, "Error", "Authentication timed out.");
+            return;
+        }
+        if (ftp->error() != QFtp::Error::NoError)
+        {
+            QMessageBox::critical(this, "Error", QString("Authentication error: %1.").arg(ftp->errorString()));
+            return;
+        }
+    }
+
+    ftp->cd(settings.folder.c_str());
+    start = Settings::Clock::now();
+    while (ftp->hasPendingCommands())
+    {
+        if (Settings::Clock::now() - start > timeout)
+        {
+            QMessageBox::critical(this, "Error", "Selecting folder timed out.");
+            return;
+        }
+        if (ftp->error() != QFtp::Error::NoError)
+        {
+            QMessageBox::critical(this, "Error", QString("Selecting folder error: %1.").arg(ftp->errorString()));
+            return;
+        }
+    }
+
+    ftp->close();
+    ftp->deleteLater();
+
+    QMessageBox::information(this, "Success", "The FTP configuration seems ok");
 }
 
 //////////////////////////////////////////////////////////////////////////

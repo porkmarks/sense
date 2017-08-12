@@ -28,7 +28,9 @@ signals:
 private slots:
     void setRW();
     void sendTestEmail();
+    void testFtpSettings();
     void applyEmailSettings();
+    void applyFtpSettings();
     void applySensorSettings();
     void addEmailRecipient();
     void removeEmailRecipient();
@@ -36,6 +38,9 @@ private slots:
 private:
     void setEmailSettings(Settings::EmailSettings const& settings);
     bool getEmailSettings(Settings::EmailSettings& settings);
+
+    void setFtpSettings(Settings::FtpSettings const& settings);
+    bool getFtpSettings(Settings::FtpSettings& settings);
 
     void setSensorSettings(DB::SensorSettings const& settings);
     bool getSensorSettings(DB::SensorSettingsDescriptor& settings);
