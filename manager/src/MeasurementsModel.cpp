@@ -151,9 +151,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
     {
         if (column == Column::Timestamp)
         {
-            QDateTime dt;
-            dt.setTime_t(DB::Clock::to_time_t(measurement.descriptor.timePoint));
-            return dt;
+            return static_cast<qlonglong>(DB::Clock::to_time_t(measurement.descriptor.timePoint));
         }
         else if (column == Column::Temperature)
         {
