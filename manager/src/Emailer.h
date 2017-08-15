@@ -26,8 +26,16 @@ public:
 
     struct EmailSettings
     {
+        enum class Connection
+        {
+            Tcp,
+            Ssl,
+            Tls
+        };
+
         std::string host;
         uint16_t port = 0;
+        Connection connection = Connection::Ssl;
         std::string username;
         std::string password;
         std::string from;

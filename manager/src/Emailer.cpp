@@ -400,7 +400,15 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
 {
     for (Email const& email: emails)
     {
-        SmtpClient smtp(QString::fromUtf8(email.settings.host.c_str()), email.settings.port, SmtpClient::SslConnection);
+        SmtpClient::ConnectionType connectionType = SmtpClient::SslConnection;
+        switch (email.settings.connection)
+        {
+        case EmailSettings::Connection::Ssl: connectionType = SmtpClient::SslConnection; break;
+        case EmailSettings::Connection::Tcp: connectionType = SmtpClient::TcpConnection; break;
+        case EmailSettings::Connection::Tls: connectionType = SmtpClient::TlsConnection; break;
+        }
+
+        SmtpClient smtp(QString::fromUtf8(email.settings.host.c_str()), email.settings.port, connectionType);
 
         std::string errorMsg;
         connect(&smtp, &SmtpClient::smtpError, [&errorMsg](SmtpClient::SmtpError error)
