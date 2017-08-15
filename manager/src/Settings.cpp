@@ -142,6 +142,14 @@ bool Settings::load(std::string const& name)
             }
             data.emailSettings.port = it->value.GetUint();
 
+            it = esj.FindMember("connection");
+            if (it == esj.MemberEnd() || !it->value.IsUint())
+            {
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings connection").arg(dataFilename.c_str()));
+                return false;
+            }
+            data.emailSettings.connection = static_cast<EmailSettings::Connection>(it->value.GetUint());
+
             it = esj.FindMember("username");
             if (it == esj.MemberEnd() || !it->value.IsString())
             {
@@ -166,26 +174,26 @@ bool Settings::load(std::string const& name)
             }
             data.emailSettings.from = it->value.GetString();
 
-//            it = esj.FindMember("recipients");
-//            if (it == esj.MemberEnd() || !it->value.IsArray())
-//            {
-//                s_logger.logError(QString("Failed to load '%1': Bad or missing email settings recipients").arg(dataFilename.c_str()));
-//                return false;
-//            }
+            it = esj.FindMember("recipients");
+            if (it == esj.MemberEnd() || !it->value.IsArray())
+            {
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings recipients").arg(dataFilename.c_str()));
+                return false;
+            }
 
-//            {
-//                rapidjson::Value const& recipientsj = it->value;
-//                for (size_t i = 0; i < recipientsj.Size(); i++)
-//                {
-//                    rapidjson::Value const& recipientj = recipientsj[i];
-//                    if (!recipientj.IsString())
-//                    {
-//                        s_logger.logError(QString("Failed to load '%1': Bad or missing email settings secipient").arg(dataFilename.c_str()));
-//                        return false;
-//                    }
-//                    data.emailSettings.recipients.push_back(recipientj.GetString());
-//                }
-//            }
+            {
+                rapidjson::Value const& recipientsj = it->value;
+                for (size_t i = 0; i < recipientsj.Size(); i++)
+                {
+                    rapidjson::Value const& recipientj = recipientsj[i];
+                    if (!recipientj.IsString())
+                    {
+                        s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings secipient").arg(dataFilename.c_str()));
+                        return false;
+                    }
+                    data.emailSettings.recipients.push_back(recipientj.GetString());
+                }
+            }
         }
 
         it = document.FindMember("ftp_settings");
@@ -959,6 +967,7 @@ void Settings::save(Data const& data) const
             esj.SetObject();
             esj.AddMember("host", rapidjson::Value(data.emailSettings.host.c_str(), document.GetAllocator()), document.GetAllocator());
             esj.AddMember("port", static_cast<uint32_t>(data.emailSettings.port), document.GetAllocator());
+            esj.AddMember("connection", static_cast<uint32_t>(data.emailSettings.connection), document.GetAllocator());
             QString username(data.emailSettings.username.c_str());
             esj.AddMember("username", rapidjson::Value(crypt.encryptToString(username).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
             QString password(data.emailSettings.password.c_str());

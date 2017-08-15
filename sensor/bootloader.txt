@@ -1,6 +1,0 @@
-https://www.arduino.cc/en/Tutorial/ArduinoToBreadboard
-8Mhz, internal oscillator
-
-http://www.atmel.com/webdoc/avrlibcreferencemanual/group__avr__fuse.html
-
-BOD should be 1.8V!!!!!!

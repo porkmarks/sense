@@ -84,7 +84,15 @@ void EmailSettingsDialog::sendTestEmail()
         return;
     }
 
-    SmtpClient smtp(QString::fromUtf8(settings.host.c_str()), settings.port, SmtpClient::SslConnection);
+    SmtpClient::ConnectionType connectionType = SmtpClient::SslConnection;
+    switch (settings.connection)
+    {
+    case Emailer::EmailSettings::Connection::Ssl: connectionType = SmtpClient::SslConnection; break;
+    case Emailer::EmailSettings::Connection::Tcp: connectionType = SmtpClient::TcpConnection; break;
+    case Emailer::EmailSettings::Connection::Tls: connectionType = SmtpClient::TlsConnection; break;
+    }
+
+    SmtpClient smtp(QString::fromUtf8(settings.host.c_str()), settings.port, connectionType);
 
     bool hasError = false;
     connect(&smtp, &SmtpClient::smtpError, [this, &hasError](SmtpClient::SmtpError error)

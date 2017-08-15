@@ -77,7 +77,6 @@ public:
         int8_t b2s = 0;
         int8_t s2b = 0;
         uint8_t sensorErrors = 0;
-        uint8_t triggeredAlarms = 0;
     };
     struct Measurement
     {
@@ -322,6 +321,7 @@ signals:
 private:
     Clock::time_point computeBaselineTimePoint(SensorSettings const& oldSensorSettings, SensorSettingsDescriptor const& newDescriptor);
 
+    size_t _getFilteredMeasurements(Filter const& filter, std::vector<Measurement>* result) const;
     bool cull(Measurement const& measurement, Filter const& filter) const;
 
 #pragma pack(push, 1) // exact fit - no padding

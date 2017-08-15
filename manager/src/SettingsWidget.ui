@@ -47,7 +47,7 @@
        <item>
         <widget class="QTabWidget" name="tabWidget">
          <property name="currentIndex">
-          <number>4</number>
+          <number>3</number>
          </property>
          <widget class="QWidget" name="baseStationsTab">
           <attribute name="icon">
@@ -97,164 +97,177 @@
           </attribute>
           <layout class="QVBoxLayout" name="verticalLayout_7">
            <item>
-            <widget class="QWidget" name="emailWidget" native="true">
-             <layout class="QVBoxLayout" name="verticalLayout_8">
-              <item>
-               <widget class="QWidget" name="widget" native="true">
-                <layout class="QFormLayout" name="formLayout">
-                 <property name="verticalSpacing">
-                  <number>6</number>
+            <widget class="QWidget" name="widget" native="true">
+             <layout class="QGridLayout" name="gridLayout_2">
+              <property name="verticalSpacing">
+               <number>6</number>
+              </property>
+              <item row="0" column="0">
+               <widget class="QLabel" name="label">
+                <property name="text">
+                 <string>SMTP server address</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="0">
+               <widget class="QLabel" name="label_2">
+                <property name="text">
+                 <string>Username</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1" colspan="2">
+               <widget class="QSpinBox" name="emailPort">
+                <property name="maximum">
+                 <number>65535</number>
+                </property>
+                <property name="value">
+                 <number>465</number>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="0">
+               <widget class="QLabel" name="label_3">
+                <property name="text">
+                 <string>Password</string>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="0">
+               <widget class="QLabel" name="label_8">
+                <property name="text">
+                 <string>From field</string>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="0">
+               <widget class="QLabel" name="label_4">
+                <property name="text">
+                 <string>Recipients</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="label_5">
+                <property name="text">
+                 <string>SMTP Port</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="3">
+               <widget class="QComboBox" name="emailConnection">
+                <item>
+                 <property name="text">
+                  <string>SSL</string>
                  </property>
-                 <item row="2" column="0">
-                  <widget class="QLabel" name="label">
-                   <property name="text">
-                    <string>SMTP server address</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="2" column="1">
-                  <widget class="QLineEdit" name="emailHost">
+                </item>
+                <item>
+                 <property name="text">
+                  <string>TSL</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>TCP</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+              <item row="0" column="1" colspan="3">
+               <widget class="QLineEdit" name="emailHost">
+                <property name="text">
+                 <string/>
+                </property>
+                <property name="placeholderText">
+                 <string>smtp.gmail.com</string>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="1" colspan="3">
+               <widget class="QLineEdit" name="emailUsername">
+                <property name="placeholderText">
+                 <string>you@company.com</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="1" colspan="3">
+               <widget class="QLineEdit" name="emailPassword">
+                <property name="echoMode">
+                 <enum>QLineEdit::PasswordEchoOnEdit</enum>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="1" colspan="3">
+               <widget class="QLineEdit" name="emailFrom">
+                <property name="text">
+                 <string>Sense Monitoring System</string>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="1" colspan="3">
+               <widget class="QListWidget" name="emailRecipientList"/>
+              </item>
+              <item row="6" column="1" colspan="3">
+               <widget class="QWidget" name="widget_8" native="true">
+                <layout class="QHBoxLayout" name="horizontalLayout_5">
+                 <property name="leftMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="topMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="rightMargin">
+                  <number>0</number>
+                 </property>
+                 <property name="bottomMargin">
+                  <number>0</number>
+                 </property>
+                 <item>
+                  <widget class="QPushButton" name="emailAddRecipient">
                    <property name="text">
                     <string/>
                    </property>
-                   <property name="placeholderText">
-                    <string>smtp.gmail.com</string>
+                   <property name="icon">
+                    <iconset resource="../res/res.qrc">
+                     <normaloff>:/icons/ui/add.png</normaloff>:/icons/ui/add.png</iconset>
+                   </property>
+                   <property name="iconSize">
+                    <size>
+                     <width>24</width>
+                     <height>24</height>
+                    </size>
                    </property>
                   </widget>
                  </item>
-                 <item row="3" column="0">
-                  <widget class="QLabel" name="label_5">
+                 <item>
+                  <widget class="QPushButton" name="emailRemoveRecipient">
                    <property name="text">
-                    <string>SMTP SSL Port</string>
+                    <string/>
+                   </property>
+                   <property name="icon">
+                    <iconset resource="../res/res.qrc">
+                     <normaloff>:/icons/ui/error.png</normaloff>:/icons/ui/error.png</iconset>
+                   </property>
+                   <property name="iconSize">
+                    <size>
+                     <width>24</width>
+                     <height>24</height>
+                    </size>
                    </property>
                   </widget>
                  </item>
-                 <item row="3" column="1">
-                  <widget class="QSpinBox" name="emailPort">
-                   <property name="maximum">
-                    <number>65535</number>
+                 <item>
+                  <spacer name="horizontalSpacer_4">
+                   <property name="orientation">
+                    <enum>Qt::Horizontal</enum>
                    </property>
-                   <property name="value">
-                    <number>465</number>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>516</width>
+                     <height>20</height>
+                    </size>
                    </property>
-                  </widget>
-                 </item>
-                 <item row="5" column="0">
-                  <widget class="QLabel" name="label_2">
-                   <property name="text">
-                    <string>Username</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="5" column="1">
-                  <widget class="QLineEdit" name="emailUsername">
-                   <property name="placeholderText">
-                    <string>you@company.com</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="6" column="0">
-                  <widget class="QLabel" name="label_3">
-                   <property name="text">
-                    <string>Password</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="6" column="1">
-                  <widget class="QLineEdit" name="emailPassword">
-                   <property name="echoMode">
-                    <enum>QLineEdit::PasswordEchoOnEdit</enum>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="7" column="0">
-                  <widget class="QLabel" name="label_8">
-                   <property name="text">
-                    <string>From field</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="7" column="1">
-                  <widget class="QLineEdit" name="emailFrom">
-                   <property name="text">
-                    <string>Sense Monitoring System</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="8" column="0">
-                  <widget class="QLabel" name="label_4">
-                   <property name="text">
-                    <string>Recipients</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="8" column="1">
-                  <widget class="QListWidget" name="emailRecipientList"/>
-                 </item>
-                 <item row="9" column="1">
-                  <widget class="QWidget" name="widget_8" native="true">
-                   <layout class="QHBoxLayout" name="horizontalLayout_5">
-                    <property name="leftMargin">
-                     <number>0</number>
-                    </property>
-                    <property name="topMargin">
-                     <number>0</number>
-                    </property>
-                    <property name="rightMargin">
-                     <number>0</number>
-                    </property>
-                    <property name="bottomMargin">
-                     <number>0</number>
-                    </property>
-                    <item>
-                     <widget class="QPushButton" name="emailAddRecipient">
-                      <property name="text">
-                       <string/>
-                      </property>
-                      <property name="icon">
-                       <iconset resource="../res/res.qrc">
-                        <normaloff>:/icons/ui/add.png</normaloff>:/icons/ui/add.png</iconset>
-                      </property>
-                      <property name="iconSize">
-                       <size>
-                        <width>24</width>
-                        <height>24</height>
-                       </size>
-                      </property>
-                     </widget>
-                    </item>
-                    <item>
-                     <widget class="QPushButton" name="emailRemoveRecipient">
-                      <property name="text">
-                       <string/>
-                      </property>
-                      <property name="icon">
-                       <iconset resource="../res/res.qrc">
-                        <normaloff>:/icons/ui/error.png</normaloff>:/icons/ui/error.png</iconset>
-                      </property>
-                      <property name="iconSize">
-                       <size>
-                        <width>24</width>
-                        <height>24</height>
-                       </size>
-                      </property>
-                     </widget>
-                    </item>
-                    <item>
-                     <spacer name="horizontalSpacer_4">
-                      <property name="orientation">
-                       <enum>Qt::Horizontal</enum>
-                      </property>
-                      <property name="sizeHint" stdset="0">
-                       <size>
-                        <width>516</width>
-                        <height>20</height>
-                       </size>
-                      </property>
-                     </spacer>
-                    </item>
-                   </layout>
-                  </widget>
+                  </spacer>
                  </item>
                 </layout>
                </widget>
@@ -513,46 +526,6 @@
               <property name="verticalSpacing">
                <number>6</number>
               </property>
-              <item row="2" column="0">
-               <widget class="QLabel" name="label_6">
-                <property name="text">
-                 <string>Measurement Period</string>
-                </property>
-               </widget>
-              </item>
-              <item row="2" column="1">
-               <widget class="QDoubleSpinBox" name="sensorsMeasurementPeriod">
-                <property name="suffix">
-                 <string> minutes</string>
-                </property>
-                <property name="decimals">
-                 <number>1</number>
-                </property>
-                <property name="minimum">
-                 <double>0.100000000000000</double>
-                </property>
-               </widget>
-              </item>
-              <item row="3" column="0">
-               <widget class="QLabel" name="label_7">
-                <property name="text">
-                 <string>Comms Period</string>
-                </property>
-               </widget>
-              </item>
-              <item row="3" column="1">
-               <widget class="QDoubleSpinBox" name="sensorsCommsPeriod">
-                <property name="suffix">
-                 <string> minutes</string>
-                </property>
-                <property name="decimals">
-                 <number>1</number>
-                </property>
-                <property name="minimum">
-                 <double>0.100000000000000</double>
-                </property>
-               </widget>
-              </item>
               <item row="4" column="0">
                <widget class="QLabel" name="label_9">
                 <property name="text">
@@ -607,6 +580,46 @@
                 </property>
                 <property name="text">
                  <string>To wake them up, uncheck the box and press the sensor button briefly</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="0">
+               <widget class="QLabel" name="label_6">
+                <property name="text">
+                 <string>Measurement Period</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QDoubleSpinBox" name="sensorsMeasurementPeriod">
+                <property name="suffix">
+                 <string> minutes</string>
+                </property>
+                <property name="decimals">
+                 <number>1</number>
+                </property>
+                <property name="minimum">
+                 <double>0.100000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="label_7">
+                <property name="text">
+                 <string>Comms Period</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QDoubleSpinBox" name="sensorsCommsPeriod">
+                <property name="suffix">
+                 <string> minutes</string>
+                </property>
+                <property name="decimals">
+                 <number>1</number>
+                </property>
+                <property name="minimum">
+                 <double>0.100000000000000</double>
                 </property>
                </widget>
               </item>
@@ -708,12 +721,6 @@
   </customwidget>
  </customwidgets>
  <tabstops>
-  <tabstop>emailHost</tabstop>
-  <tabstop>emailPort</tabstop>
-  <tabstop>emailUsername</tabstop>
-  <tabstop>emailPassword</tabstop>
-  <tabstop>emailFrom</tabstop>
-  <tabstop>emailRecipientList</tabstop>
   <tabstop>emailAddRecipient</tabstop>
   <tabstop>emailRemoveRecipient</tabstop>
   <tabstop>emailTest</tabstop>
@@ -729,8 +736,6 @@
   <tabstop>ftpReset</tabstop>
   <tabstop>scrollArea</tabstop>
   <tabstop>tabWidget</tabstop>
-  <tabstop>sensorsMeasurementPeriod</tabstop>
-  <tabstop>sensorsCommsPeriod</tabstop>
   <tabstop>sensorsComputedCommsPeriod</tabstop>
   <tabstop>sensorsSleeping</tabstop>
   <tabstop>sensorsApply</tabstop>

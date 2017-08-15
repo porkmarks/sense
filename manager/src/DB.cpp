@@ -599,6 +599,11 @@ bool DB::load(std::string const& name)
                 return false;
             }
 
+            std::sort(storedMeasurements.begin(), storedMeasurements.end(), [](StoredMeasurement const& a, StoredMeasurement const& b)
+            {
+                return a.timePoint < b.timePoint;
+            });
+
             for (auto it = storedMeasurements.begin(); it != storedMeasurements.end();)
             {
                 StoredMeasurement& sm = *it;
@@ -1348,8 +1353,23 @@ bool DB::addMeasurement(MeasurementDescriptor const& md)
     measurement.triggeredAlarms = computeTriggeredAlarm(md);
 
     emit measurementsWillBeAdded(md.sensorId);
-    m_mainData.measurements[md.sensorId].push_back(pack(measurement));
+
+    //insert sorted id
     m_mainData.sortedMeasurementIds.insert(it, id);
+
+    //insert sorted data
+    {
+        StoredMeasurements& storedMeasurements = m_mainData.measurements[md.sensorId];
+
+        uint64_t mdtp = Clock::to_time_t(md.timePoint);
+        auto smit = std::lower_bound(storedMeasurements.begin(), storedMeasurements.end(), mdtp, [](StoredMeasurement const& sm, uint64_t mdtp)
+        {
+            return sm.timePoint < mdtp;
+        });
+
+        storedMeasurements.insert(smit, pack(measurement));
+    }
+
     emit measurementsAdded(md.sensorId);
 
     Sensor& sensor = m_mainData.sensors[sensorIndex];
@@ -1400,18 +1420,7 @@ std::vector<DB::Measurement> DB::getFilteredMeasurements(Filter const& filter) c
 {
     std::vector<DB::Measurement> result;
     result.reserve(8192);
-
-    for (auto const& pair : m_mainData.measurements)
-    {
-        for (StoredMeasurement const& sm: pair.second)
-        {
-            Measurement m = unpack(pair.first, sm);
-            if (cull(m, filter))
-            {
-                result.push_back(m);
-            }
-        }
-    }
+    _getFilteredMeasurements(filter, &result);
     return result;
 }
 
@@ -1419,15 +1428,69 @@ std::vector<DB::Measurement> DB::getFilteredMeasurements(Filter const& filter) c
 
 size_t DB::getFilteredMeasurementCount(Filter const& filter) const
 {
+    return _getFilteredMeasurements(filter, nullptr);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+size_t DB::_getFilteredMeasurements(Filter const& filter, std::vector<DB::Measurement>* result) const
+{
     size_t count = 0;
     for (auto const& pair : m_mainData.measurements)
     {
-        for (StoredMeasurement const& sm: pair.second)
+        SensorId sensorId = pair.first;
+        if (filter.useSensorFilter)
         {
-            Measurement m = unpack(pair.first, sm);
-            if (cull(m, filter))
+            if (std::find(filter.sensorIds.begin(), filter.sensorIds.end(), sensorId) == filter.sensorIds.end())
             {
-                count++;
+                continue;
+            }
+        }
+
+        StoredMeasurements const& storedMeasurements = pair.second;
+        auto beginIt = storedMeasurements.begin();
+
+        //find the first date
+        if (filter.useTimePointFilter)
+        {
+            uint64_t mintp = Clock::to_time_t(filter.timePointFilter.min);
+            uint64_t maxtp = Clock::to_time_t(filter.timePointFilter.max);
+            auto smit = std::lower_bound(storedMeasurements.begin(), storedMeasurements.end(), mintp, [](StoredMeasurement const& sm, uint64_t mintp)
+            {
+                return sm.timePoint < mintp;
+            });
+            if (smit != storedMeasurements.end())
+            {
+                beginIt = smit;
+            }
+
+            //get all results
+            for (auto it = beginIt; it != storedMeasurements.end() && it->timePoint <= maxtp; ++it)
+            {
+                Measurement m = unpack(sensorId, *it);
+                if (cull(m, filter))
+                {
+                    if (result)
+                    {
+                        result->push_back(m);
+                    }
+                    count++;
+                }
+            }
+        }
+        else
+        {
+            for (StoredMeasurement const& sm: pair.second)
+            {
+                Measurement m = unpack(sensorId, sm);
+                if (cull(m, filter))
+                {
+                    if (result)
+                    {
+                        result->push_back(m);
+                    }
+                    count++;
+                }
             }
         }
     }
@@ -1463,13 +1526,13 @@ bool DB::getLastMeasurementForSensor(SensorId sensor_id, Measurement& measuremen
 
 bool DB::cull(Measurement const& m, Filter const& filter) const
 {
-    if (filter.useSensorFilter)
-    {
-        if (std::find(filter.sensorIds.begin(), filter.sensorIds.end(), m.descriptor.sensorId) == filter.sensorIds.end())
-        {
-            return false;
-        }
-    }
+//    if (filter.useSensorFilter)
+//    {
+//        if (std::find(filter.sensorIds.begin(), filter.sensorIds.end(), m.descriptor.sensorId) == filter.sensorIds.end())
+//        {
+//            return false;
+//        }
+//    }
     if (filter.useIndexFilter)
     {
         if (m.descriptor.index < filter.indexFilter.min || m.descriptor.index > filter.indexFilter.max)
@@ -1477,13 +1540,13 @@ bool DB::cull(Measurement const& m, Filter const& filter) const
             return false;
         }
     }
-    if (filter.useTimePointFilter)
-    {
-        if (m.descriptor.timePoint < filter.timePointFilter.min || m.descriptor.timePoint > filter.timePointFilter.max)
-        {
-            return false;
-        }
-    }
+//    if (filter.useTimePointFilter)
+//    {
+//        if (m.descriptor.timePoint < filter.timePointFilter.min || m.descriptor.timePoint > filter.timePointFilter.max)
+//        {
+//            return false;
+//        }
+//    }
     if (filter.useTemperatureFilter)
     {
         if (m.descriptor.temperature < filter.temperatureFilter.min || m.descriptor.temperature > filter.temperatureFilter.max)

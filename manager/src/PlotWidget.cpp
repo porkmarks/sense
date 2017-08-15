@@ -504,6 +504,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
             m_chart->addSeries(series);
             QPen pen = series->pen();
             //pen.setWidth(4);
+            //series->setUseOpenGL(true);
             series->setPen(pen);
             series->setName(QString("%1 °C").arg(plotData.sensor.descriptor.name.c_str()));
             series->attachAxis(m_axisX);
@@ -528,6 +529,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
             m_chart->addSeries(series);
             QPen pen = series->pen();
             //pen.setWidth(2);
+            //series->setUseOpenGL(true);
             series->setPen(pen);
             series->setName(QString("%1 %RH").arg(plotData.sensor.descriptor.name.c_str()));
             series->attachAxis(m_axisX);

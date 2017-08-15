@@ -2,6 +2,7 @@
 #include "ConfigureAlarmDialog.h"
 #include <QMessageBox>
 #include <QInputDialog>
+#include <QProgressDialog>
 #include "Smtp/SmtpMime"
 #include "qftp.h"
 
@@ -150,6 +151,7 @@ void SettingsWidget::setEmailSettings(Settings::EmailSettings const& settings)
 {
     m_ui.emailHost->setText(settings.host.c_str());
     m_ui.emailPort->setValue(settings.port);
+    m_ui.emailConnection->setCurrentIndex(static_cast<int>(settings.connection));
     m_ui.emailUsername->setText(settings.username.c_str());
     m_ui.emailPassword->setText(settings.password.c_str());
     m_ui.emailFrom->setText(settings.from.c_str());
@@ -168,6 +170,7 @@ bool SettingsWidget::getEmailSettings(Settings::EmailSettings& settings)
 {
     settings.host = m_ui.emailHost->text().toUtf8().data();
     settings.port = static_cast<uint16_t>(m_ui.emailPort->value());
+    settings.connection = static_cast<Settings::EmailSettings::Connection>(m_ui.emailConnection->currentIndex());
     settings.username = m_ui.emailUsername->text().toUtf8().data();
     settings.password = m_ui.emailPassword->text().toUtf8().data();
     settings.from = m_ui.emailFrom->text().toUtf8().data();
@@ -218,74 +221,164 @@ void SettingsWidget::sendTestEmail()
     {
         return;
     }
-    SmtpClient smtp(QString::fromUtf8(settings.host.c_str()), settings.port, SmtpClient::SslConnection);
 
-    bool hasError = false;
-    connect(&smtp, &SmtpClient::smtpError, [this, &hasError](SmtpClient::SmtpError error)
+    std::array<const char*, 5> stepMessages = { "Initializing...", "Connecting...", "Authenticating...", "Sending Email...", "Done" };
+
+    QProgressDialog progress("Sending email...", "Abort", 0, stepMessages.size() - 1, this);
+    progress.setWindowModality(Qt::WindowModal);
+    progress.setAutoClose(false);
+    progress.setAutoReset(false);
+    progress.setMinimumDuration(0);
+
+    std::mutex errorMessageMutex;
+    QString errorMessage;
+
+    std::atomic_int step = { 0 };
+    std::thread thread([this, &errorMessage, &errorMessageMutex, &step, settings]()
     {
-        switch (error)
+        SmtpClient::ConnectionType connectionType = SmtpClient::SslConnection;
+        switch (settings.connection)
         {
-        case SmtpClient::ConnectionTimeoutError:
-            QMessageBox::critical(this, "Error", "Connection timeout.");
-            break;
-        case SmtpClient::ResponseTimeoutError:
-            QMessageBox::critical(this, "Error", "Response timeout.");
-            break;
-        case SmtpClient::SendDataTimeoutError:
-            QMessageBox::critical(this, "Error", "Send data timeout.");
-            break;
-        case SmtpClient::AuthenticationFailedError:
-            QMessageBox::critical(this, "Error", "Authentication failed.");
-            break;
-        case SmtpClient::ServerError:
-            QMessageBox::critical(this, "Error", "Server error.");
-            break;
-        case SmtpClient::ClientError:
-            QMessageBox::critical(this, "Error", "Client error.");
-            break;
-        default:
-            QMessageBox::critical(this, "Error", "Unknown error.");
-            break;
+        case Emailer::EmailSettings::Connection::Ssl: connectionType = SmtpClient::SslConnection; break;
+        case Emailer::EmailSettings::Connection::Tcp: connectionType = SmtpClient::TcpConnection; break;
+        case Emailer::EmailSettings::Connection::Tls: connectionType = SmtpClient::TlsConnection; break;
         }
 
-        hasError = true;
+        SmtpClient smtp(QString::fromUtf8(settings.host.c_str()), settings.port, connectionType);
+
+        step = 0;
+
+        connect(&smtp, &SmtpClient::smtpError, [this, &errorMessageMutex, &errorMessage, &step](SmtpClient::SmtpError error)
+        {
+            switch (error)
+            {
+            case SmtpClient::ConnectionTimeoutError:
+            {
+                std::lock_guard<std::mutex> lg(errorMessageMutex);
+                errorMessage += "Connection timeout.\n";
+            }
+                break;
+            case SmtpClient::ResponseTimeoutError:
+            {
+                std::lock_guard<std::mutex> lg(errorMessageMutex);
+                errorMessage += "Response timeout.\n";
+            }
+                break;
+            case SmtpClient::SendDataTimeoutError:
+            {
+                std::lock_guard<std::mutex> lg(errorMessageMutex);
+                errorMessage += "Send data timeout.\n";
+            }
+                break;
+            case SmtpClient::AuthenticationFailedError:
+            {
+                std::lock_guard<std::mutex> lg(errorMessageMutex);
+                errorMessage += "Authentication failed.\n";
+            }
+                break;
+            case SmtpClient::ServerError:
+            {
+                std::lock_guard<std::mutex> lg(errorMessageMutex);
+                errorMessage += "Server error.\n";
+            }
+                break;
+            case SmtpClient::ClientError:
+            {
+                std::lock_guard<std::mutex> lg(errorMessageMutex);
+                errorMessage += "Client error.\n";
+            }
+                break;
+            default:
+            {
+                std::lock_guard<std::mutex> lg(errorMessageMutex);
+                errorMessage += "Unknown error.\n";
+            }
+                break;
+            }
+            step = -1;
+        });
+
+        smtp.setUser(QString::fromUtf8(settings.username.c_str()));
+        smtp.setPassword(QString::fromUtf8(settings.password.c_str()));
+
+        MimeMessage message;
+
+        message.setSender(new EmailAddress(QString::fromUtf8(settings.from.c_str()), QString::fromUtf8(settings.from.c_str())));
+        for (std::string const& recipient: settings.recipients)
+        {
+            message.addRecipient(new EmailAddress(QString::fromUtf8(recipient.c_str())));
+        }
+        message.setSubject(QString::fromUtf8("Test Email: Sensor 'Sensor1' triggered alarm 'Alarm1'"));
+
+        MimeHtml body;
+        body.setHtml(QString::fromUtf8(
+                         "<p><span style=\"color: #ff0000; font-size: 12pt;\">&lt;&lt;&lt; This is a test email! &gt;&gt;&gt;</span></p>"
+                         "<p>Alarm '<strong>Alarm1</strong>' was triggered by sensor '<strong>Sensor1</strong>.</p>"
+                         "<p>Measurement:</p>"
+                         "<ul>"
+                         "<li>Temperature: <strong>23 &deg;C</strong></li>"
+                         "<li>Humidity: <strong>77 %RH</strong></li>"
+                         "<li>Sensor Errors: <strong>None</strong></li>"
+                         "<li>Battery: <strong>55&nbsp;%</strong></li>"
+                         "</ul>"
+                         "<p>Timestamp: <strong>12-23-2017 12:00</strong> <span style=\"font-size: 8pt;\"><em>(dd-mm-yyyy hh:mm)</em></span></p>"
+                         "<p><span style=\"font-size: 12pt; color: #ff0000;\">&lt;&lt;&lt; This is a test email! &gt;&gt;&gt;</span></p>"
+                         "<p><span style=\"font-size: 10pt;\"><em>- Sense -</em></span></p>"
+                         ));
+
+        message.addPart(&body);
+
+        step = 1;
+        if (!smtp.connectToHost() || step < 0)
+        {
+            step = -1;
+            smtp.quit();
+            return;
+        }
+        step = 2;
+        if (!smtp.login() || step < 0)
+        {
+            step = -1;
+            smtp.quit();
+            return;
+        }
+        step = 3;
+        if (!smtp.sendMail(message) || step < 0)
+        {
+            step = -1;
+            smtp.quit();
+            return;
+        }
+        step = 4;
+        smtp.quit();
+        return;
     });
 
-    smtp.setUser(QString::fromUtf8(settings.username.c_str()));
-    smtp.setPassword(QString::fromUtf8(settings.password.c_str()));
-
-    MimeMessage message;
-
-    message.setSender(new EmailAddress(QString::fromUtf8(settings.from.c_str()), QString::fromUtf8(settings.from.c_str())));
-    for (std::string const& recipient: settings.recipients)
+    do
     {
-        message.addRecipient(new EmailAddress(QString::fromUtf8(recipient.c_str())));
-    }
-    message.setSubject(QString::fromUtf8("Test Email: Sensor 'Sensor1' triggered alarm 'Alarm1'"));
+        if (step >= 0 && step < static_cast<int>(stepMessages.size()))
+        {
+            progress.setLabelText(stepMessages[step]);
+            progress.setValue(step);
+            if (step == static_cast<int>(stepMessages.size()) - 1)
+            {
+                progress.setCancelButtonText("Ok");
+            }
+        }
+        else
+        {
+            std::lock_guard<std::mutex> lg(errorMessageMutex);
+            progress.setLabelText(QString("Error: %1").arg(errorMessage.isEmpty() ? QString("Unknown") : errorMessage));
+            progress.setValue(progress.maximum());
+        }
+        QApplication::processEvents();
+    } while (!progress.wasCanceled());
 
-    MimeHtml body;
-    body.setHtml(QString::fromUtf8(
-                "<p><span style=\"color: #ff0000; font-size: 12pt;\">&lt;&lt;&lt; This is a test email! &gt;&gt;&gt;</span></p>"
-                "<p>Alarm '<strong>Alarm1</strong>' was triggered by sensor '<strong>Sensor1</strong>.</p>"
-                "<p>Measurement:</p>"
-                "<ul>"
-                "<li>Temperature: <strong>23 &deg;C</strong></li>"
-                "<li>Humidity: <strong>77 %RH</strong></li>"
-                "<li>Sensor Errors: <strong>None</strong></li>"
-                "<li>Battery: <strong>55&nbsp;%</strong></li>"
-                "</ul>"
-                "<p>Timestamp: <strong>12-23-2017 12:00</strong> <span style=\"font-size: 8pt;\"><em>(dd-mm-yyyy hh:mm)</em></span></p>"
-                "<p><span style=\"font-size: 12pt; color: #ff0000;\">&lt;&lt;&lt; This is a test email! &gt;&gt;&gt;</span></p>"
-                "<p><span style=\"font-size: 10pt;\"><em>- Sense -</em></span></p>"
-                     ));
 
-    message.addPart(&body);
-
-    if (smtp.connectToHost() && smtp.login() && smtp.sendMail(message))
+    while (thread.joinable())
     {
-        QMessageBox::information(this, "Done", QString("Email sent."));
+        thread.join();
     }
-    smtp.quit();
 }
 
 //////////////////////////////////////////////////////////////////////////
