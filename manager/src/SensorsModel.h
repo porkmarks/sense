@@ -22,7 +22,6 @@ public:
         Name,
         Id,
         SerialNumber,
-        Address,
         Temperature,
         Humidity,
         Battery,
