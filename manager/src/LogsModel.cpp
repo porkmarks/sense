@@ -11,7 +11,7 @@ static std::array<const char*, 3> s_headerNames = {"Timestamp", "Type", "Message
 LogsModel::LogsModel(Logger& logger)
     : m_logger(logger)
 {
-    connect(&logger, &Logger::logLinesAdded, this, &LogsModel::refreshLogLines);
+    //connect(&logger, &Logger::logLinesAdded, this, &LogsModel::refreshLogLines);
 }
 
 //////////////////////////////////////////////////////////////////////////

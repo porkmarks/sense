@@ -8,8 +8,8 @@ static std::array<const char*, 10> s_headerNames = {"Id", "Sensor", "Index", "Ti
 
 float getBatteryLevel(float vcc)
 {
-    constexpr float max = 3.2f;
-    constexpr float min = 2.f;
+    constexpr float max = 3.0f;
+    constexpr float min = 1.9f;
     float level = std::max(std::min(vcc, max) - min, 0.f) / (max - min);
     return level;
 }

@@ -1448,7 +1448,6 @@ size_t DB::_getFilteredMeasurements(Filter const& filter, std::vector<DB::Measur
         }
 
         StoredMeasurements const& storedMeasurements = pair.second;
-        auto beginIt = storedMeasurements.begin();
 
         //find the first date
         if (filter.useTimePointFilter)
@@ -1459,13 +1458,9 @@ size_t DB::_getFilteredMeasurements(Filter const& filter, std::vector<DB::Measur
             {
                 return sm.timePoint < mintp;
             });
-            if (smit != storedMeasurements.end())
-            {
-                beginIt = smit;
-            }
 
             //get all results
-            for (auto it = beginIt; it != storedMeasurements.end() && it->timePoint <= maxtp; ++it)
+            for (auto it = smit; it != storedMeasurements.end() && it->timePoint <= maxtp; ++it)
             {
                 Measurement m = unpack(sensorId, *it);
                 if (cull(m, filter))
@@ -1480,7 +1475,7 @@ size_t DB::_getFilteredMeasurements(Filter const& filter, std::vector<DB::Measur
         }
         else
         {
-            for (StoredMeasurement const& sm: pair.second)
+            for (StoredMeasurement const& sm: storedMeasurements)
             {
                 Measurement m = unpack(sensorId, sm);
                 if (cull(m, filter))

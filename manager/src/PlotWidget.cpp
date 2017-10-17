@@ -517,10 +517,10 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
             });
 
             QList<QPointF> const& points = plotData.temperaturePoints;
-            if (points.size() < 400)
-            {
-                series->setPointsVisible();
-            }
+//            if (points.size() < 400)
+//            {
+//                series->setPointsVisible();
+//            }
             series->append(points);
             plotData.temperatureSeries.reset(series);
         }
@@ -542,10 +542,10 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
             });
 
             QList<QPointF> const& points = plotData.humidityPoints;
-            if (points.size() < 400)
-            {
-                series->setPointsVisible();
-            }
+//            if (points.size() < 400)
+//            {
+//                series->setPointsVisible();
+//            }
             series->append(points);
             plotData.humiditySeries.reset(series);
         }
