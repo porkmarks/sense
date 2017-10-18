@@ -478,7 +478,7 @@ end:
 
 void Comms::process()
 {
-    static DB::Clock::time_point lastFakeDiscovery = DB::Clock::now();
+/*    static DB::Clock::time_point lastFakeDiscovery = DB::Clock::now();
     if (DB::Clock::now() - lastFakeDiscovery >= std::chrono::seconds(1))
     {
         lastFakeDiscovery = DB::Clock::now();
@@ -494,7 +494,7 @@ void Comms::process()
             }
         }
     }
-
+*/
     data::Server_Message message;
     for (std::unique_ptr<ConnectedBaseStation>& cbs: m_connectedBaseStations)
     {
