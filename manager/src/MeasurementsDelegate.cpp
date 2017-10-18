@@ -59,12 +59,12 @@ void MeasurementsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& 
             painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
             pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
         }
-        if (triggeredAlarms & DB::TriggeredAlarm::SensorErrors)
-        {
-            static QIcon icon(":/icons/ui/sensor-error.png");
-            painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
-            pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
-        }
+//        if (triggeredAlarms & DB::TriggeredAlarm::SensorErrors)
+//        {
+//            static QIcon icon(":/icons/ui/sensor-error.png");
+//            painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
+//            pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
+//        }
         if (triggeredAlarms & DB::TriggeredAlarm::LowSignal)
         {
             static QIcon icon(":/icons/ui/signal-0.png");
@@ -75,32 +75,32 @@ void MeasurementsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& 
         painter->restore();
         return;
     }
-    else if (column == MeasurementsModel::Column::SensorErrors)
-    {
-        uint8_t sensorErrors = m_model.data(index).toUInt();
+//    else if (column == MeasurementsModel::Column::SensorErrors)
+//    {
+//        uint8_t sensorErrors = m_model.data(index).toUInt();
 
-        QApplication::style()->drawControl(QStyle::CE_ItemViewItem, &option, painter);
+//        QApplication::style()->drawControl(QStyle::CE_ItemViewItem, &option, painter);
 
-        painter->save();
+//        painter->save();
 
-        QPoint pos = option.rect.topLeft();
+//        QPoint pos = option.rect.topLeft();
 
-        if (sensorErrors & DB::SensorErrors::Comms)
-        {
-            static QIcon icon(":/icons/ui/comms-error.png");
-            painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
-            pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
-        }
-        if (sensorErrors & DB::SensorErrors::Hardware)
-        {
-            static QIcon icon(":/icons/ui/hardware-error.png");
-            painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
-            pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
-        }
+//        if (sensorErrors & DB::SensorErrors::Comms)
+//        {
+//            static QIcon icon(":/icons/ui/comms-error.png");
+//            painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
+//            pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
+//        }
+//        if (sensorErrors & DB::SensorErrors::Hardware)
+//        {
+//            static QIcon icon(":/icons/ui/hardware-error.png");
+//            painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
+//            pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
+//        }
 
-        painter->restore();
-        return;
-    }
+//        painter->restore();
+//        return;
+//    }
 
     return QStyledItemDelegate::paint(painter, option, index);
 }
@@ -132,10 +132,10 @@ QSize MeasurementsDelegate::sizeHint(const QStyleOptionViewItem& option, const Q
         {
             width += k_iconSize.width() + k_iconMargin;
         }
-        if (triggeredAlarms & DB::TriggeredAlarm::SensorErrors)
-        {
-            width += k_iconSize.width() + k_iconMargin;
-        }
+//        if (triggeredAlarms & DB::TriggeredAlarm::SensorErrors)
+//        {
+//            width += k_iconSize.width() + k_iconMargin;
+//        }
         if (triggeredAlarms & DB::TriggeredAlarm::LowSignal)
         {
             width += k_iconSize.width() + k_iconMargin;
@@ -143,22 +143,22 @@ QSize MeasurementsDelegate::sizeHint(const QStyleOptionViewItem& option, const Q
 
         return QSize(width, k_iconSize.height());
     }
-    else if (column == MeasurementsModel::Column::SensorErrors)
-    {
-        uint8_t sensorErrors = m_model.data(index).toUInt();
+//    else if (column == MeasurementsModel::Column::SensorErrors)
+//    {
+//        uint8_t sensorErrors = m_model.data(index).toUInt();
 
-        int32_t width = 0;
-        if (sensorErrors & DB::SensorErrors::Comms)
-        {
-            width += k_iconSize.width() + k_iconMargin;
-        }
-        if (sensorErrors & DB::SensorErrors::Hardware)
-        {
-            width += k_iconSize.width() + k_iconMargin;
-        }
+//        int32_t width = 0;
+//        if (sensorErrors & DB::SensorErrors::Comms)
+//        {
+//            width += k_iconSize.width() + k_iconMargin;
+//        }
+//        if (sensorErrors & DB::SensorErrors::Hardware)
+//        {
+//            width += k_iconSize.width() + k_iconMargin;
+//        }
 
-        return QSize(width, k_iconSize.height());
-    }
+//        return QSize(width, k_iconSize.height());
+//    }
 
     return QStyledItemDelegate::sizeHint(option, index);
 }

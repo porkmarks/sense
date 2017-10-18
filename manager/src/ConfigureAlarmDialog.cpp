@@ -77,7 +77,6 @@ void ConfigureAlarmDialog::setAlarm(DB::Alarm const& alarm)
     m_ui.lowHumidityWatch->setChecked(descriptor.lowHumidityWatch);
     m_ui.lowHumidity->setValue(descriptor.lowHumidity);
 
-    m_ui.sensorErrorsWatch->setChecked(descriptor.sensorErrorsWatch);
     m_ui.lowSignalWatch->setChecked(descriptor.lowSignalWatch);
     m_ui.lowBatteryWatch->setChecked(descriptor.lowVccWatch);
 
@@ -117,7 +116,6 @@ void ConfigureAlarmDialog::accept()
     descriptor.lowHumidityWatch = m_ui.lowHumidityWatch->isChecked();
     descriptor.lowHumidity = m_ui.lowHumidity->value();
 
-    descriptor.sensorErrorsWatch = m_ui.sensorErrorsWatch->isChecked();
     descriptor.lowSignalWatch = m_ui.lowSignalWatch->isChecked();
     descriptor.lowVccWatch = m_ui.lowBatteryWatch->isChecked();
 
@@ -148,7 +146,6 @@ void ConfigureAlarmDialog::accept()
     }
     if (!descriptor.highTemperatureWatch && !descriptor.lowTemperatureWatch &&
             !descriptor.highHumidityWatch && !descriptor.lowHumidityWatch &&
-            !descriptor.sensorErrorsWatch &&
             !descriptor.lowSignalWatch &&
             !descriptor.lowVccWatch)
     {

@@ -30,7 +30,6 @@ public:
         Humidity,
         Battery,
         Signal,
-        SensorErrors,
         Alarms
     };
 

@@ -6,7 +6,7 @@
 #include <QDateTime>
 #include <cassert>
 
-static std::array<const char*, 10> s_headerNames = {"Name", "Id", "Serial Number", "Temperature", "Humidity", "Battery", "Signal", "State", "Sensor Errors", "Alarms"};
+static std::array<const char*, 10> s_headerNames = {"Name", "Id", "Serial Number", "Temperature", "Humidity", "Battery", "Signal", "State", "Alarms"};
 
 extern float getBatteryLevel(float vcc);
 extern QIcon getBatteryIcon(float vcc);
@@ -345,10 +345,10 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         {
             return sensor.isLastMeasurementValid ? sensor.lastMeasurement.triggeredAlarms : -1;
         }
-        else if (column == Column::SensorErrors)
-        {
-            return sensor.isLastMeasurementValid ? sensor.lastMeasurement.descriptor.sensorErrors : -1;
-        }
+//        else if (column == Column::SensorErrors)
+//        {
+//            return sensor.isLastMeasurementValid ? sensor.lastMeasurement.descriptor.sensorErrors : -1;
+//        }
         else
         {
             if (sensor.isLastMeasurementValid)

@@ -4,7 +4,7 @@
 #include <QIcon>
 #include <bitset>
 
-static std::array<const char*, 10> s_headerNames = {"Id", "Sensor", "Index", "Timestamp", "Temperature", "Humidity", "Battery", "Signal", "Sensor Errors", "Alarms"};
+static std::array<const char*, 10> s_headerNames = {"Id", "Sensor", "Index", "Timestamp", "Temperature", "Humidity", "Battery", "Signal", "Alarms"};
 
 float getBatteryLevel(float vcc)
 {
@@ -169,10 +169,10 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         {
             return getSignalLevel(std::min(measurement.descriptor.b2s, measurement.descriptor.s2b));
         }
-        else if (column == Column::SensorErrors)
-        {
-            return static_cast<uint32_t>(std::bitset<8>(measurement.descriptor.sensorErrors).count());
-        }
+//        else if (column == Column::SensorErrors)
+//        {
+//            return static_cast<uint32_t>(std::bitset<8>(measurement.descriptor.sensorErrors).count());
+//        }
         else if (column == Column::Alarms)
         {
             return static_cast<uint32_t>(std::bitset<8>(measurement.triggeredAlarms).count());
@@ -251,10 +251,10 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
             return QString("%1 %").arg(static_cast<int>(getSignalLevel(std::min(measurement.descriptor.b2s, measurement.descriptor.s2b)) * 100.f));
             //return QString("%1 %").arg(std::min(measurement.descriptor.b2s, measurement.descriptor.s2b));
         }
-        else if (column == Column::SensorErrors)
-        {
-            return measurement.descriptor.sensorErrors;
-        }
+//        else if (column == Column::SensorErrors)
+//        {
+//            return measurement.descriptor.sensorErrors;
+//        }
         else if (column == Column::Alarms)
         {
             return measurement.triggeredAlarms;

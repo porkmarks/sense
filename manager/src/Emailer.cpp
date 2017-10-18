@@ -12,27 +12,27 @@ extern float getBatteryLevel(float vcc);
 
 //////////////////////////////////////////////////////////////////////////
 
-static std::string getSensorErrors(uint8_t errors)
-{
-    std::string sensorErrors;
-    if (errors & DB::SensorErrors::Comms)
-    {
-        sensorErrors += "Comms";
-    }
-    if (errors & DB::SensorErrors::Hardware)
-    {
-        if (!sensorErrors.empty())
-        {
-            sensorErrors += ", ";
-        }
-        sensorErrors += "Hardware";
-    }
-    if (sensorErrors.empty())
-    {
-        sensorErrors = "None";
-    }
-    return sensorErrors;
-}
+//static std::string getSensorErrors(uint8_t errors)
+//{
+//    std::string sensorErrors;
+//    if (errors & DB::SensorErrors::Comms)
+//    {
+//        sensorErrors += "Comms";
+//    }
+//    if (errors & DB::SensorErrors::Hardware)
+//    {
+//        if (!sensorErrors.empty())
+//        {
+//            sensorErrors += ", ";
+//        }
+//        sensorErrors += "Hardware";
+//    }
+//    if (sensorErrors.empty())
+//    {
+//        sensorErrors = "None";
+//    }
+//    return sensorErrors;
+//}
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -160,15 +160,13 @@ void Emailer::sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor co
                           <ul>
                           <li>Temperature: <strong>%1 &deg;C</strong></li>
                           <li>Humidity: <strong>%2 %RH</strong></li>
-                          <li>Sensor Errors: <strong>%3</strong></li>
-                          <li>Battery: <strong>%4 %</strong></li>
+                          <li>Battery: <strong>%3 %</strong></li>
                           </ul>
-                          <p>Timestamp: <strong>%5</strong> <span style="font-size: 8pt;"><em>(dd-mm-yyyy hh:mm)</em></span></p>
+                          <p>Timestamp: <strong>%4</strong> <span style="font-size: 8pt;"><em>(dd-mm-yyyy hh:mm)</em></span></p>
                           <p>&nbsp;</p>
                           <p><span style="font-size: 10pt;"><em>- Sense -</em></span></p>)X")
             .arg(md.temperature, 0, 'f', 1)
             .arg(md.humidity, 0, 'f', 1)
-            .arg(getSensorErrors(md.sensorErrors).c_str())
             .arg(static_cast<int>(getBatteryLevel(md.vcc)*100.f))
             .arg(dt.toString("dd-MM-yyyy HH:mm"))
             .toUtf8().data();
@@ -274,15 +272,15 @@ void Emailer::sendReportEmail(DB::Report const& report)
                                       <th style="width: 81.3333px; text-align: center; white-space: nowrap;"><strong>Alerts</strong></th>
                                   </tr>)X").toUtf8().data();
 
-                struct SensorData
+        struct SensorData
         {
-                std::string name;
-                float minTemperature = std::numeric_limits<float>::max();
-                float maxTemperature = std::numeric_limits<float>::lowest();
-                float minHumidity = std::numeric_limits<float>::max();
-                float maxHumidity = std::numeric_limits<float>::lowest();
-                uint8_t sensorErrors = 0;
-    };
+            std::string name;
+            float minTemperature = std::numeric_limits<float>::max();
+            float maxTemperature = std::numeric_limits<float>::lowest();
+            float minHumidity = std::numeric_limits<float>::max();
+            float maxHumidity = std::numeric_limits<float>::lowest();
+            uint8_t triggeredAlarms = 0;
+        };
 
         std::vector<SensorData> sensorDatas;
         for (DB::Measurement const& m: measurements)
@@ -305,7 +303,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
             sd.minTemperature = std::min(sd.minTemperature, m.descriptor.temperature);
             sd.maxHumidity = std::max(sd.maxHumidity, m.descriptor.humidity);
             sd.minHumidity = std::min(sd.minHumidity, m.descriptor.humidity);
-            sd.sensorErrors |= m.descriptor.sensorErrors;
+            sd.triggeredAlarms |= m.triggeredAlarms;
         }
 
         for (SensorData const& sd: sensorDatas)
@@ -325,7 +323,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
                     .arg(sd.maxTemperature, 0, 'f', 1)
                     .arg(sd.minHumidity, 0, 'f', 1)
                     .arg(sd.maxHumidity, 0, 'f', 1)
-                    .arg(getSensorErrors(sd.sensorErrors).c_str())
+                    .arg(sd.triggeredAlarms == 0 ? "no" : "yes")
                     .toUtf8().data();
         }
 

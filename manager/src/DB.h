@@ -151,7 +151,7 @@ public:
 
         bool lowVccWatch = false;
         bool lowSignalWatch = false;
-        bool sensorErrorsWatch = false;
+//        bool sensorErrorsWatch = false;
 
         bool sendEmailAction = false;
     };
@@ -183,9 +183,9 @@ public:
             Humidity        = 1 << 1,
             LowVcc          = 1 << 2,
             LowSignal       = 1 << 3,
-            SensorErrors    = 1 << 4,
+//            SensorErrors    = 1 << 4,
 
-            All             = Temperature | Humidity | LowVcc | LowSignal | SensorErrors
+            All             = Temperature | Humidity | LowVcc | LowSignal/* | SensorErrors*/
         };
     };
 
@@ -271,8 +271,8 @@ public:
         bool useS2BFilter = false;
         Range<int8_t> s2bFilter;
 
-        bool useSensorErrorsFilter = false;
-        bool sensorErrorsFilter = true;
+//        bool useSensorErrorsFilter = false;
+//        bool sensorErrorsFilter = true;
     };
 
     std::vector<Measurement> getAllMeasurements() const;

@@ -418,13 +418,13 @@ bool DB::load(std::string const& name)
                 }
                 alarm.descriptor.lowSignalWatch = it->value.GetBool();
 
-                it = alarmj.FindMember("sensor_errors_watch");
-                if (it == alarmj.MemberEnd() || !it->value.IsBool())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm sensor_errors_watch").arg(dataFilename.c_str()));
-                    return false;
-                }
-                alarm.descriptor.sensorErrorsWatch = it->value.GetBool();
+//                it = alarmj.FindMember("sensor_errors_watch");
+//                if (it == alarmj.MemberEnd() || !it->value.IsBool())
+//                {
+//                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm sensor_errors_watch").arg(dataFilename.c_str()));
+//                    return false;
+//                }
+//                alarm.descriptor.sensorErrorsWatch = it->value.GetBool();
 
                 it = alarmj.FindMember("send_email_action");
                 if (it == alarmj.MemberEnd() || !it->value.IsBool())
@@ -610,6 +610,9 @@ bool DB::load(std::string const& name)
                 Measurement measurement = unpack(sensorId, sm);
                 MeasurementId id = computeMeasurementId(measurement.descriptor);
 
+//                std::cout << "index: " << std::to_string(measurement.descriptor.index) << " s: " << std::to_string(measurement.descriptor.sensorId) << "\n";
+
+
                 //check for duplicates
                 auto lbit = std::lower_bound(data.sortedMeasurementIds.begin(), data.sortedMeasurementIds.end(), id);
                 if (lbit != data.sortedMeasurementIds.end() && *lbit == id)
@@ -634,6 +637,8 @@ bool DB::load(std::string const& name)
             }
         }
     }
+
+    std::flush(std::cout);
 
     std::pair<std::string, time_t> bkf = getMostRecentBackup(dbFilename, s_dataFolder + "/backups/daily");
     if (bkf.first.empty())
@@ -1110,10 +1115,10 @@ uint8_t DB::computeTriggeredAlarm(MeasurementDescriptor const& md)
         {
             triggered |= TriggeredAlarm::LowVcc;
         }
-        if (ad.sensorErrorsWatch && md.sensorErrors != 0)
-        {
-            triggered |= TriggeredAlarm::SensorErrors;
-        }
+//        if (ad.sensorErrorsWatch && md.sensorErrors != 0)
+//        {
+//            triggered |= TriggeredAlarm::SensorErrors;
+//        }
         if (ad.lowSignalWatch && std::min(md.s2b, md.b2s) <= k_alertSignal)
         {
             triggered |= TriggeredAlarm::LowSignal;
@@ -1577,14 +1582,14 @@ bool DB::cull(Measurement const& m, Filter const& filter) const
             return false;
         }
     }
-    if (filter.useSensorErrorsFilter)
-    {
-        bool has_errors = m.descriptor.sensorErrors != 0;
-        if (has_errors != filter.sensorErrorsFilter)
-        {
-            return false;
-        }
-    }
+//    if (filter.useSensorErrorsFilter)
+//    {
+//        bool has_errors = m.descriptor.sensorErrors != 0;
+//        if (has_errors != filter.sensorErrorsFilter)
+//        {
+//            return false;
+//        }
+//    }
 
     return true;
 }
@@ -1741,7 +1746,7 @@ void DB::save(Data const& data) const
                 alarmj.AddMember("high_humidity", alarm.descriptor.highHumidity, document.GetAllocator());
                 alarmj.AddMember("low_vcc_watch", alarm.descriptor.lowVccWatch, document.GetAllocator());
                 alarmj.AddMember("low_signal_watch", alarm.descriptor.lowSignalWatch, document.GetAllocator());
-                alarmj.AddMember("sensor_errors_watch", alarm.descriptor.sensorErrorsWatch, document.GetAllocator());
+//                alarmj.AddMember("sensor_errors_watch", alarm.descriptor.sensorErrorsWatch, document.GetAllocator());
                 alarmj.AddMember("send_email_action", alarm.descriptor.sendEmailAction, document.GetAllocator());
                 alarmsj.PushBack(alarmj, document.GetAllocator());
             }

@@ -3,7 +3,7 @@
 #include <QWidget>
 #include <QIcon>
 
-static std::array<const char*, 8> s_headerNames = {"Id", "Name", "Temperature", "Humidity", "Low Battery", "Sensor Errors", "Low Signal", "Action"};
+static std::array<const char*, 8> s_headerNames = {"Id", "Name", "Temperature", "Humidity", "Low Battery", "Low Signal", "Action"};
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -120,13 +120,13 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
                 return Qt::Checked;
             }
         }
-        else if (column == Column::SensorErrors)
-        {
-            if (descriptor.sensorErrorsWatch)
-            {
-                return Qt::Checked;
-            }
-        }
+//        else if (column == Column::SensorErrors)
+//        {
+//            if (descriptor.sensorErrorsWatch)
+//            {
+//                return Qt::Checked;
+//            }
+//        }
     }
     else if (role == Qt::DisplayRole)
     {
@@ -202,10 +202,10 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
         {
             return QIcon(":/icons/ui/signal-0.png");
         }
-        else if (column == Column::SensorErrors && descriptor.sensorErrorsWatch)
-        {
-            return QIcon(":/icons/ui/sensor-error.png");
-        }
+//        else if (column == Column::SensorErrors && descriptor.sensorErrorsWatch)
+//        {
+//            return QIcon(":/icons/ui/sensor-error.png");
+//        }
         else if (column == Column::Action)
         {
             if (descriptor.sendEmailAction)

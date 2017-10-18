@@ -318,7 +318,6 @@ void SettingsWidget::sendTestEmail()
                          "<ul>"
                          "<li>Temperature: <strong>23 &deg;C</strong></li>"
                          "<li>Humidity: <strong>77 %RH</strong></li>"
-                         "<li>Sensor Errors: <strong>None</strong></li>"
                          "<li>Battery: <strong>55&nbsp;%</strong></li>"
                          "</ul>"
                          "<p>Timestamp: <strong>12-23-2017 12:00</strong> <span style=\"font-size: 8pt;\"><em>(dd-mm-yyyy hh:mm)</em></span></p>"

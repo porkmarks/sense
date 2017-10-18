@@ -27,7 +27,6 @@ public:
         Battery,
         Signal,
         State,
-        SensorErrors,
         Alarms
     };
 

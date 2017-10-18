@@ -18,7 +18,6 @@ public:
         Temperature,
         Humidity,
         LowBattery,
-        SensorErrors,
         LowSignal,
         Action
     };
