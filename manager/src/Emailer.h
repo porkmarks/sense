@@ -28,9 +28,9 @@ public:
     {
         enum class Connection
         {
-            Tcp,
             Ssl,
-            Tls
+            Tls,
+            Tcp,
         };
 
         std::string host;

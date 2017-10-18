@@ -156,6 +156,9 @@
               </item>
               <item row="1" column="3">
                <widget class="QComboBox" name="emailConnection">
+                <property name="currentIndex">
+                 <number>0</number>
+                </property>
                 <item>
                  <property name="text">
                   <string>SSL</string>
@@ -163,12 +166,12 @@
                 </item>
                 <item>
                  <property name="text">
-                  <string>TSL</string>
+                  <string>TLS</string>
                  </property>
                 </item>
                 <item>
                  <property name="text">
-                  <string>TCP</string>
+                  <string>Standard (Unencrypted)</string>
                  </property>
                 </item>
                </widget>
