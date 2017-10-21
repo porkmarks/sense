@@ -29,7 +29,7 @@ void MeasurementsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& 
         return QStyledItemDelegate::paint(painter, option, index);
     }
 
-    MeasurementsModel::Column column = static_cast<MeasurementsModel::Column>(index.column());
+    MeasurementsModel::Column column = static_cast<MeasurementsModel::Column>(m_model.data(index, MeasurementsModel::RealColumnRole).toULongLong());
     if (column == MeasurementsModel::Column::Alarms)
     {
         uint8_t triggeredAlarms = m_model.data(index).toUInt();
@@ -114,7 +114,7 @@ QSize MeasurementsDelegate::sizeHint(const QStyleOptionViewItem& option, const Q
         return QStyledItemDelegate::sizeHint(option, index);
     }
 
-    MeasurementsModel::Column column = static_cast<MeasurementsModel::Column>(index.column());
+    MeasurementsModel::Column column = static_cast<MeasurementsModel::Column>(m_model.data(index, MeasurementsModel::RealColumnRole).toULongLong());
     if (column == MeasurementsModel::Column::Alarms)
     {
         uint8_t triggeredAlarms = m_model.data(index).toUInt();

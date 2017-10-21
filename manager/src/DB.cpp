@@ -817,6 +817,32 @@ bool DB::addSensor(SensorDescriptor const& descriptor)
 
 //////////////////////////////////////////////////////////////////////////
 
+bool DB::setSensor(SensorId id, SensorDescriptor const& descriptor)
+{
+    int32_t index = findSensorIndexByName(descriptor.name);
+    if (index >= 0 && getSensor(index).id != id)
+    {
+        return false;
+    }
+
+    index = findSensorIndexById(id);
+    if (index < 0)
+    {
+        return false;
+    }
+
+    m_mainData.sensors[index].descriptor = descriptor;
+    emit sensorChanged(id);
+
+    s_logger.logInfo(QString("Changed sensor '%1'").arg(descriptor.name.c_str()));
+
+    triggerSave();
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 bool DB::bindSensor(SensorId id, SensorAddress address, uint32_t serialNumber, Sensor::Calibration const& calibration)
 {
     int32_t index = findSensorIndexById(id);

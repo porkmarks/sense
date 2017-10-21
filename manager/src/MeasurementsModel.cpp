@@ -4,6 +4,7 @@
 #include <QIcon>
 #include <bitset>
 #include <array>
+#include <cassert>
 
 static std::array<const char*, 10> s_headerNames = {"Id", "Sensor", "Index", "Timestamp", "Temperature", "Humidity", "Battery", "Signal", "Alarms"};
 
@@ -70,6 +71,11 @@ MeasurementsModel::MeasurementsModel(DB& db)
 
     connect(&db, &DB::measurementsAdded, this, &MeasurementsModel::startAutoRefresh);
     connect(m_refreshTimer, &QTimer::timeout, this, &MeasurementsModel::refresh);
+
+    for (size_t i = 0; i < s_headerNames.size(); i++)
+    {
+        m_columnsEnabled[i] = true;
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -118,7 +124,27 @@ int MeasurementsModel::rowCount(QModelIndex const& index) const
 
 int MeasurementsModel::columnCount(QModelIndex const& index) const
 {
-    return static_cast<int>(s_headerNames.size());
+    return static_cast<int>(m_columnsEnabled.count());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+MeasurementsModel::Column MeasurementsModel::computeRealColumnFromVisibleColumn(size_t visibleColumn) const
+{
+    size_t count = 0;
+    for (size_t i = 0; i < s_headerNames.size(); i++)
+    {
+        if (m_columnsEnabled[i] == true)
+        {
+            if (count == visibleColumn)
+            {
+                return static_cast<Column>(i);
+            }
+            count++;
+        }
+    }
+    assert(0);
+    return Column::Id;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -127,10 +153,7 @@ QVariant MeasurementsModel::headerData(int section, Qt::Orientation orientation,
 {
     if (orientation == Qt::Horizontal && role == Qt::DisplayRole)
     {
-        if (static_cast<size_t>(section) < s_headerNames.size())
-        {
-            return s_headerNames[section];
-        }
+        return s_headerNames[static_cast<size_t>(computeRealColumnFromVisibleColumn(static_cast<size_t>(section)))];
     }
     return QAbstractItemModel::headerData(section, orientation, role);
 }
@@ -151,9 +174,14 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
 
     DB::Measurement const& measurement = m_measurements[index.row()];
 
-    Column column = static_cast<Column>(index.column());
+    //code to skip over disabled columns
+    Column column = computeRealColumnFromVisibleColumn(static_cast<size_t>(index.column()));
 
-    if (role == Qt::UserRole + 5) // sorting
+    if (role == UserRole::RealColumnRole)
+    {
+        return static_cast<size_t>(column);
+    }
+    else if (role == UserRole::SortingRole)
     {
         if (column == Column::Timestamp)
         {
@@ -287,6 +315,13 @@ void MeasurementsModel::setFilter(DB::Filter const& filter)
     endResetModel();
 
     Q_EMIT layoutChanged();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsModel::setColumnVisibility(Column column, bool visibility)
+{
+    m_columnsEnabled[static_cast<size_t>(column)] = visibility;
 }
 
 //////////////////////////////////////////////////////////////////////////

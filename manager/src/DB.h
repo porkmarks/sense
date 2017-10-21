@@ -121,6 +121,7 @@ public:
     size_t getSensorCount() const;
     Sensor const& getSensor(size_t index) const;
     bool addSensor(SensorDescriptor const& descriptor);
+    bool setSensor(SensorId id, SensorDescriptor const& descriptor);
     bool bindSensor(SensorId id, SensorAddress address, uint32_t serialNumber, Sensor::Calibration const& calibration);
     bool setSensorState(SensorId id, Sensor::State state);
     bool setSensorNextTimePoints(SensorId id, Clock::time_point nextMeasurementTimePoint, Clock::time_point nextCommsTimePoint);

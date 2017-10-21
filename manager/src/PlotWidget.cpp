@@ -28,17 +28,20 @@ void PlotWidget::init(DB& db)
     m_db = &db;
 
     connect(m_ui.clearAnnotations, &QPushButton::released, this, &PlotWidget::clearAnnotations);
-    connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &PlotWidget::refresh);
-    connect(m_ui.selectSensors, &QPushButton::released, this, &PlotWidget::selectSensors);
+    connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &PlotWidget::refresh, Qt::QueuedConnection);
+    connect(m_ui.selectSensors, &QPushButton::released, this, &PlotWidget::selectSensors, Qt::QueuedConnection);
     connect(m_ui.exportData, &QPushButton::released, this, &PlotWidget::exportData);
 
-    connect(m_ui.fitMeasurements, &QCheckBox::stateChanged, this, &PlotWidget::refresh);
-    connect(m_ui.minTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh);
-    connect(m_ui.maxTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh);
-    connect(m_ui.minHumidity, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh);
-    connect(m_ui.maxHumidity, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh);
+    connect(m_ui.fitMeasurements, &QCheckBox::stateChanged, this, &PlotWidget::refresh, Qt::QueuedConnection);
+    connect(m_ui.minTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh, Qt::QueuedConnection);
+    connect(m_ui.maxTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh, Qt::QueuedConnection);
+    connect(m_ui.minHumidity, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh, Qt::QueuedConnection);
+    connect(m_ui.maxHumidity, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh, Qt::QueuedConnection);
 
-    connect(m_ui.useSmoothing, &QCheckBox::stateChanged, this, &PlotWidget::refresh);
+    connect(m_ui.useSmoothing, &QCheckBox::stateChanged, this, &PlotWidget::refresh, Qt::QueuedConnection);
+
+    connect(m_ui.showTemperature, &QCheckBox::stateChanged, this, &PlotWidget::refresh, Qt::QueuedConnection);
+    connect(m_ui.showHumidity, &QCheckBox::stateChanged, this, &PlotWidget::refresh, Qt::QueuedConnection);
 
     refresh();
 }
@@ -200,25 +203,33 @@ void PlotWidget::createPlotWidgets()
         chart->addAxis(axisX, Qt::AlignBottom);
         //m_series->attachAxis(axisX);
 
-        QValueAxis* axisTY = new QValueAxis(chart);
-        axisTY->setLabelsFont(font);
-        axisTY->setTitleFont(font);
-        axisTY->setLabelFormat("%.1f");
-        axisTY->setTitleText(u8"°C");
-        axisTY->setTickCount(10);
-        chart->addAxis(axisTY, Qt::AlignLeft);
+        m_axisTY = nullptr;
+        if (m_ui.showTemperature->isChecked())
+        {
+            QValueAxis* axisTY = new QValueAxis(chart);
+            axisTY->setLabelsFont(font);
+            axisTY->setTitleFont(font);
+            axisTY->setLabelFormat("%.1f");
+            axisTY->setTitleText(u8"°C");
+            axisTY->setTickCount(10);
+            chart->addAxis(axisTY, Qt::AlignLeft);
+            m_axisTY = axisTY;
+        }
 
-        QValueAxis* axisHY = new QValueAxis(chart);
-        axisHY->setLabelsFont(font);
-        axisHY->setTitleFont(font);
-        axisHY->setLabelFormat("%.1f");
-        axisHY->setTitleText("%RH");
-        axisHY->setTickCount(10);
-        chart->addAxis(axisHY, Qt::AlignRight);
+        m_axisHY = nullptr;
+        if (m_ui.showHumidity->isChecked())
+        {
+            QValueAxis* axisHY = new QValueAxis(chart);
+            axisHY->setLabelsFont(font);
+            axisHY->setTitleFont(font);
+            axisHY->setLabelFormat("%.1f");
+            axisHY->setTitleText("%RH");
+            axisHY->setTickCount(10);
+            chart->addAxis(axisHY, Qt::AlignRight);
+            m_axisHY = axisHY;
+        }
 
         m_axisX = axisX;
-        m_axisTY = axisTY;
-        m_axisHY = axisHY;
 
         QChartView* chartView = new QChartView(chart);
         chartView->setRenderHint(QPainter::Antialiasing);
@@ -291,23 +302,27 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         }
         PlotData& plotData = it->second;
 
-        qreal value = m.descriptor.temperature;
-        if (m_useSmoothing)
         {
-            plotData.temperatureLpf.process(value);
+            qreal value = m.descriptor.temperature;
+            if (m_useSmoothing)
+            {
+                plotData.temperatureLpf.process(value);
+            }
+            plotData.temperaturePoints.append(QPointF(millis, value));
+            minT = std::min(minT, value);
+            maxT = std::max(maxT, value);
         }
-        plotData.temperaturePoints.append(QPointF(millis, value));
-        minT = std::min(minT, value);
-        maxT = std::max(maxT, value);
 
-        value = m.descriptor.humidity;
-        if (m_useSmoothing)
         {
-            plotData.humidityLpf.process(value);
+            qreal value = m.descriptor.humidity;
+            if (m_useSmoothing)
+            {
+                plotData.humidityLpf.process(value);
+            }
+            plotData.humidityPoints.append(QPointF(millis, value));
+            minH = std::min(minH, value);
+            maxH = std::max(maxH, value);
         }
-        plotData.humidityPoints.append(QPointF(millis, value));
-        minH = std::min(minH, value);
-        maxH = std::max(maxH, value);
     }
 
     QDateTime minDT, maxDT;
@@ -340,13 +355,20 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         minH = std::min(m_ui.minHumidity->value(), m_ui.maxHumidity->value());
     }
 
-    m_axisTY->setRange(minT, maxT);
-    m_axisHY->setRange(minH, maxH);
+    if (m_axisTY)
+    {
+        m_axisTY->setRange(minT, maxT);
+    }
+    if (m_axisHY)
+    {
+        m_axisHY->setRange(minH, maxH);
+    }
 
 
     for (auto& pair : m_series)
     {
         PlotData& plotData = pair.second;
+        if (m_axisTY)
         {
             QLineSeries* series = new QLineSeries(m_chart);
             m_chart->addSeries(series);
@@ -372,6 +394,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
             series->append(points);
             plotData.temperatureSeries.reset(series);
         }
+        if (m_axisHY)
         {
             QLineSeries* series = new QLineSeries(m_chart);
             m_chart->addSeries(series);

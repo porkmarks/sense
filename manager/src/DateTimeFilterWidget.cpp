@@ -7,7 +7,7 @@ DateTimeFilterWidget::DateTimeFilterWidget(QWidget *parent)
 {
     m_ui.setupUi(this);
 
-    connect(m_ui.usePreset, &QCheckBox::toggled, this, &DateTimeFilterWidget::togglePreset);
+    connect(m_ui.usePreset, &QCheckBox::stateChanged, this, &DateTimeFilterWidget::togglePreset);
     connect(m_ui.preset, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &DateTimeFilterWidget::setPreset);
     connect(m_ui.from, &QDateTimeEdit::editingFinished, this, &DateTimeFilterWidget::fromChanged);
     connect(m_ui.from->calendarWidget(), &QCalendarWidget::clicked, this, &DateTimeFilterWidget::fromChanged);

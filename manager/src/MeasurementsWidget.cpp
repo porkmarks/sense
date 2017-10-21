@@ -41,7 +41,7 @@ void MeasurementsWidget::init(DB& db)
 
     m_model.reset(new MeasurementsModel(*m_db));
     m_sortingModel.setSourceModel(m_model.get());
-    m_sortingModel.setSortRole(Qt::UserRole + 5);
+    m_sortingModel.setSortRole(MeasurementsModel::SortingRole);
 
     m_delegate.reset(new MeasurementsDelegate(m_sortingModel));
 
@@ -78,8 +78,8 @@ void MeasurementsWidget::init(DB& db)
 
     refresh();
 
-    connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &MeasurementsWidget::refresh);
-    connect(m_ui.selectSensors, &QPushButton::released, this, &MeasurementsWidget::selectSensors);
+    connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
+    connect(m_ui.selectSensors, &QPushButton::released, this, &MeasurementsWidget::selectSensors, Qt::QueuedConnection);
     connect(m_ui.exportData, &QPushButton::released, this, &MeasurementsWidget::exportData);
 
     connect(m_ui.minTemperature, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::minTemperatureChanged);
@@ -89,12 +89,17 @@ void MeasurementsWidget::init(DB& db)
     connect(m_ui.maxHumidity, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::maxHumidityChanged);
 
 
-    connect(m_ui.useTemperature, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh);
-    connect(m_ui.minTemperature, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh);
-    connect(m_ui.maxTemperature, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh);
-    connect(m_ui.useHumidity, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh);
-    connect(m_ui.minHumidity, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh);
-    connect(m_ui.maxHumidity, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh);
+    connect(m_ui.useTemperature, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
+    connect(m_ui.minTemperature, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
+    connect(m_ui.maxTemperature, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
+    connect(m_ui.useHumidity, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
+    connect(m_ui.minHumidity, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
+    connect(m_ui.maxHumidity, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
+
+    connect(m_ui.showTemperature, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
+    connect(m_ui.showHumidity, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
+    connect(m_ui.showBattery, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
+    connect(m_ui.showSignal, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -143,6 +148,11 @@ DB::Filter MeasurementsWidget::createFilter() const
 void MeasurementsWidget::refresh()
 {
     DB::Clock::time_point start = DB::Clock::now();
+
+    m_model->setColumnVisibility(MeasurementsModel::Column::Temperature, m_ui.showTemperature->isChecked());
+    m_model->setColumnVisibility(MeasurementsModel::Column::Humidity, m_ui.showHumidity->isChecked());
+    m_model->setColumnVisibility(MeasurementsModel::Column::Battery, m_ui.showBattery->isChecked());
+    m_model->setColumnVisibility(MeasurementsModel::Column::Signal, m_ui.showSignal->isChecked());
 
     DB::Filter filter = createFilter();
     m_model->setFilter(filter);

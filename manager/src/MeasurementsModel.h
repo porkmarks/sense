@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <vector>
+#include <bitset>
 #include <QAbstractItemModel>
 #include <QStyledItemDelegate>
 #include <QTimer>
@@ -36,6 +37,14 @@ public:
         Alarms
     };
 
+    enum UserRole
+    {
+        SortingRole = Qt::UserRole + 5,
+        RealColumnRole = Qt::UserRole + 6,
+    };
+
+    void setColumnVisibility(Column column, bool visibility);
+
 public slots:
     void refresh();
 
@@ -63,9 +72,13 @@ protected:
     virtual bool insertRows(int position, int rows, QModelIndex const& parent = QModelIndex());
     virtual bool removeRows(int position, int rows, QModelIndex const& parent = QModelIndex());
 
+    Column computeRealColumnFromVisibleColumn(size_t visibleColumn) const;
+
 private:
     DB& m_db;
     DB::Filter m_filter;
     std::vector<DB::Measurement> m_measurements;
     QTimer* m_refreshTimer = nullptr;
+
+    std::bitset<32> m_columnsEnabled;
 };

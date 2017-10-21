@@ -77,8 +77,8 @@ private:
         Clock::time_point timePoint;
         uint64_t index;
         Type type;
-        size_t messageOffset = 0;
-        size_t messageSize = 0;
+        size_t messageOffset;
+        size_t messageSize;
     };
 
     struct Data

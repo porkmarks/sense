@@ -201,7 +201,7 @@ void Logger::logVerbose(std::string const& message)
 {
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        StoredLogLine storedLine {Clock::now(), ++m_mainData.lastLineIndex, Type::VERBOSE};
+        StoredLogLine storedLine {Clock::now(), ++m_mainData.lastLineIndex, Type::VERBOSE, 0, 0};
         storedLine.messageOffset = m_mainData.logs.size();
         storedLine.messageSize = message.size();
         m_mainData.logs.append(message);
@@ -235,7 +235,7 @@ void Logger::logInfo(std::string const& message)
 {
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        StoredLogLine storedLine {Clock::now(), ++m_mainData.lastLineIndex, Type::INFO};
+        StoredLogLine storedLine {Clock::now(), ++m_mainData.lastLineIndex, Type::INFO, 0, 0};
         storedLine.messageOffset = m_mainData.logs.size();
         storedLine.messageSize = message.size();
         m_mainData.logs.append(message);
@@ -269,7 +269,7 @@ void Logger::logWarning(std::string const& message)
 {
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        StoredLogLine storedLine {Clock::now(), ++m_mainData.lastLineIndex, Type::WARNING};
+        StoredLogLine storedLine {Clock::now(), ++m_mainData.lastLineIndex, Type::WARNING, 0, 0};
         storedLine.messageOffset = m_mainData.logs.size();
         storedLine.messageSize = message.size();
         m_mainData.logs.append(message);
@@ -303,7 +303,7 @@ void Logger::logCritical(std::string const& message)
 {
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        StoredLogLine storedLine {Clock::now(), ++m_mainData.lastLineIndex, Type::CRITICAL};
+        StoredLogLine storedLine {Clock::now(), ++m_mainData.lastLineIndex, Type::CRITICAL, 0, 0};
         storedLine.messageOffset = m_mainData.logs.size();
         storedLine.messageSize = message.size();
         m_mainData.logs.append(message);

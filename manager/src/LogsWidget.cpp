@@ -42,11 +42,11 @@ void LogsWidget::init()
     refresh();
 
     connect(m_ui.exportLogs, &QPushButton::released, this, &LogsWidget::exportData);
-    connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &LogsWidget::refresh);
-    connect(m_ui.verbose, &QCheckBox::stateChanged, this, &LogsWidget::refresh);
-    connect(m_ui.info, &QCheckBox::stateChanged, this, &LogsWidget::refresh);
-    connect(m_ui.warning, &QCheckBox::stateChanged, this, &LogsWidget::refresh);
-    connect(m_ui.error, &QCheckBox::stateChanged, this, &LogsWidget::refresh);
+    connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &LogsWidget::refresh, Qt::QueuedConnection);
+    connect(m_ui.verbose, &QCheckBox::stateChanged, this, &LogsWidget::refresh, Qt::QueuedConnection);
+    connect(m_ui.info, &QCheckBox::stateChanged, this, &LogsWidget::refresh, Qt::QueuedConnection);
+    connect(m_ui.warning, &QCheckBox::stateChanged, this, &LogsWidget::refresh, Qt::QueuedConnection);
+    connect(m_ui.error, &QCheckBox::stateChanged, this, &LogsWidget::refresh, Qt::QueuedConnection);
 }
 
 //////////////////////////////////////////////////////////////////////////

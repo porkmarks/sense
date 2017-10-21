@@ -30,6 +30,7 @@ SensorsWidget::SensorsWidget(QWidget *parent)
 
     connect(m_ui.add, &QPushButton::released, this, &SensorsWidget::bindSensor);
     connect(m_ui.remove, &QPushButton::released, this, &SensorsWidget::unbindSensor);
+    connect(m_ui.list, &QTreeView::activated, this, &SensorsWidget::configureSensor);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -154,5 +155,48 @@ void SensorsWidget::unbindSensor()
     }
 }
 
+//////////////////////////////////////////////////////////////////////////
+
+void SensorsWidget::configureSensor(QModelIndex const& index)
+{
+    QModelIndex mi = m_sortingModel.index(index.row(), static_cast<int>(SensorsModel::Column::Id));
+    DB::SensorId id = m_sortingModel.data(mi).toUInt();
+    int32_t sensorIndex = m_db->findSensorIndexById(id);
+    if (sensorIndex < 0)
+    {
+        QMessageBox::critical(this, "Error", "Invalid sensor selected.");
+        return;
+    }
+
+    DB::Sensor sensor = m_db->getSensor(sensorIndex);
+
+    while (true)
+    {
+        bool ok = false;
+        QString text = QInputDialog::getText(this, tr("Input Sensor Name"), tr("Name:"), QLineEdit::Normal, sensor.descriptor.name.c_str(), &ok);
+        if (!ok)
+        {
+            return;
+        }
+        if (text.isEmpty())
+        {
+            QMessageBox::critical(this, "Error", "Please enter a name.");
+            continue;
+        }
+        sensor.descriptor.name = text.toUtf8().data();
+
+        if (!m_db->setSensor(sensor.id, sensor.descriptor))
+        {
+            QMessageBox::critical(this, "Error", QString("Cannot rename sensor to '%1'.").arg(sensor.descriptor.name.c_str()));
+            continue;
+        }
+        break;
+    }
+
+    for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
+    {
+        m_ui.list->resizeColumnToContents(i);
+    }
+}
 //////////////////////////////////////////////////////////////////////////
 
