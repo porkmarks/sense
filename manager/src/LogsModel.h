@@ -4,6 +4,7 @@
 #include <vector>
 #include <QAbstractItemModel>
 #include <QStyledItemDelegate>
+#include <QTimer>
 
 #include "Logger.h"
 
@@ -38,6 +39,7 @@ public:
     virtual QVariant data(QModelIndex const& index, int role = Qt::DisplayRole) const;
 
 private slots:
+    void startAutoRefreshLogLines();
     void refreshLogLines();
 
 private:
@@ -56,4 +58,5 @@ private:
     Logger& m_logger;
     Logger::Filter m_filter;
     std::vector<Logger::LogLine> m_logLines;
+    QTimer* m_refreshTimer = nullptr;
 };

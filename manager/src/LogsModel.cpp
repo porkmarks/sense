@@ -11,7 +11,11 @@ static std::array<const char*, 3> s_headerNames = {"Timestamp", "Type", "Message
 LogsModel::LogsModel(Logger& logger)
     : m_logger(logger)
 {
-    //connect(&logger, &Logger::logLinesAdded, this, &LogsModel::refreshLogLines);
+    m_refreshTimer = new QTimer();
+    m_refreshTimer->setSingleShot(true);
+
+    connect(&logger, &Logger::logLinesAdded, this, &LogsModel::startAutoRefreshLogLines);
+    connect(m_refreshTimer, &QTimer::timeout, this, &LogsModel::refreshLogLines);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -171,6 +175,13 @@ void LogsModel::setFilter(Logger::Filter const& filter)
 {
     m_filter = filter;
     refreshLogLines();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void LogsModel::startAutoRefreshLogLines()
+{
+    m_refreshTimer->start(5000);
 }
 
 //////////////////////////////////////////////////////////////////////////

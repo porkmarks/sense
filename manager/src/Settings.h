@@ -8,6 +8,7 @@
 #include <mutex>
 #include <thread>
 #include <atomic>
+#include <array>
 #include <condition_variable>
 #include <QHostAddress>
 
@@ -21,7 +22,7 @@ public:
     Settings();
     ~Settings();
 
-    typedef std::chrono::high_resolution_clock Clock;
+    typedef std::chrono::system_clock Clock;
 
     bool create(std::string const& name);
     bool load(std::string const& name);

@@ -17,7 +17,7 @@ public:
     DB();
     ~DB();
 
-    typedef std::chrono::high_resolution_clock Clock;
+    typedef std::chrono::system_clock Clock;
 
     void test();
 

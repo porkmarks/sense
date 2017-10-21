@@ -5,8 +5,7 @@
 #include <QIcon>
 #include <bitset>
 
-constexpr QSize k_iconSize(16, 16);
-constexpr int32_t k_iconMargin = 4;
+constexpr QSize k_iconMargin(4, 2);
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -39,37 +38,38 @@ void MeasurementsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& 
 
         painter->save();
 
-        QPoint pos = option.rect.topLeft();
+        QPoint pos = option.rect.topLeft() + QPoint(k_iconMargin.width(), k_iconMargin.height());
+        int32_t iconSize = option.rect.height();
 
         if (triggeredAlarms & DB::TriggeredAlarm::Temperature)
         {
             static QIcon icon(":/icons/ui/temperature.png");
-            painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
-            pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
+            painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
+            pos.setX(pos.x() + iconSize + k_iconMargin.width());
         }
         if (triggeredAlarms & DB::TriggeredAlarm::Humidity)
         {
             static QIcon icon(":/icons/ui/humidity.png");
-            painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
-            pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
+            painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
+            pos.setX(pos.x() + iconSize + k_iconMargin.width());
         }
         if (triggeredAlarms & DB::TriggeredAlarm::LowVcc)
         {
             static QIcon icon(":/icons/ui/battery-0.png");
-            painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
-            pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
+            painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
+            pos.setX(pos.x() + iconSize + k_iconMargin.width());
         }
 //        if (triggeredAlarms & DB::TriggeredAlarm::SensorErrors)
 //        {
 //            static QIcon icon(":/icons/ui/sensor-error.png");
-//            painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
+//          painter->drawPixmap(option.rect, icon.pixmap(option.rect.size() - QSize(2, 2)));
 //            pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
 //        }
         if (triggeredAlarms & DB::TriggeredAlarm::LowSignal)
         {
             static QIcon icon(":/icons/ui/signal-0.png");
-            painter->drawPixmap(QRect(pos, k_iconSize), icon.pixmap(k_iconSize));
-            pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
+            painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
+            pos.setX(pos.x() + iconSize + k_iconMargin.width());
         }
 
         painter->restore();
@@ -120,28 +120,30 @@ QSize MeasurementsDelegate::sizeHint(const QStyleOptionViewItem& option, const Q
         uint8_t triggeredAlarms = m_model.data(index).toUInt();
 
         int32_t width = 0;
+        int32_t iconSize = option.rect.height();
+
         if (triggeredAlarms & DB::TriggeredAlarm::Temperature)
         {
-            width += k_iconSize.width() + k_iconMargin;
+            width += iconSize + k_iconMargin.width();
         }
         if (triggeredAlarms & DB::TriggeredAlarm::Humidity)
         {
-            width += k_iconSize.width() + k_iconMargin;
+            width += iconSize + k_iconMargin.width();
         }
         if (triggeredAlarms & DB::TriggeredAlarm::LowVcc)
         {
-            width += k_iconSize.width() + k_iconMargin;
+            width += iconSize + k_iconMargin.width();
         }
 //        if (triggeredAlarms & DB::TriggeredAlarm::SensorErrors)
 //        {
-//            width += k_iconSize.width() + k_iconMargin;
+//            width += iconSize + k_iconMargin.width();
 //        }
         if (triggeredAlarms & DB::TriggeredAlarm::LowSignal)
         {
-            width += k_iconSize.width() + k_iconMargin;
+            width += iconSize + k_iconMargin.width();
         }
 
-        return QSize(width, k_iconSize.height());
+        return QSize(width, iconSize);
     }
 //    else if (column == MeasurementsModel::Column::SensorErrors)
 //    {
@@ -150,7 +152,7 @@ QSize MeasurementsDelegate::sizeHint(const QStyleOptionViewItem& option, const Q
 //        int32_t width = 0;
 //        if (sensorErrors & DB::SensorErrors::Comms)
 //        {
-//            width += k_iconSize.width() + k_iconMargin;
+//            width += iconSize + k_iconMargin.width();
 //        }
 //        if (sensorErrors & DB::SensorErrors::Hardware)
 //        {

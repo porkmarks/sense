@@ -83,7 +83,7 @@ bool Logger::load(std::string const& name)
     std::string dataFilename = (m_dataFolder + "/" + m_dataName);
 
     Data data;
-    data.logLines.reserve(8192);
+    data.storedLogLines.reserve(8192);
 
     {
         std::ifstream file(dataFilename, std::ios_base::binary);
@@ -119,7 +119,7 @@ bool Logger::load(std::string const& name)
 
         for (size_t i = 0; i < document.Size(); i++)
         {
-            LogLine line;
+            StoredLogLine storedLine;
             rapidjson::Value const& linej = document[i];
             auto it = linej.FindMember("timestamp");
             if (it == linej.MemberEnd() || !it->value.IsUint64())
@@ -127,7 +127,7 @@ bool Logger::load(std::string const& name)
                 std::cerr << "Bad or missing log timestamp\n";
                 return false;
             }
-            line.timePoint = Clock::time_point(std::chrono::milliseconds(it->value.GetUint64()));
+            storedLine.timePoint = Clock::time_point(std::chrono::milliseconds(it->value.GetUint64()));
 
             it = linej.FindMember("index");
             if (it == linej.MemberEnd() || !it->value.IsUint64())
@@ -135,7 +135,7 @@ bool Logger::load(std::string const& name)
                 std::cerr << "Bad or missing log index\n";
                 return false;
             }
-            line.index = it->value.GetUint64();
+            storedLine.index = it->value.GetUint64();
 
             it = linej.FindMember("type");
             if (it == linej.MemberEnd() || !it->value.IsInt())
@@ -143,7 +143,7 @@ bool Logger::load(std::string const& name)
                 std::cerr << "Bad or missing log type\n";
                 return false;
             }
-            line.type = static_cast<Type>(it->value.GetInt());
+            storedLine.type = static_cast<Type>(it->value.GetInt());
 
             it = linej.FindMember("message");
             if (it == linej.MemberEnd() || !it->value.IsString())
@@ -151,10 +151,12 @@ bool Logger::load(std::string const& name)
                 std::cerr << "Bad or missing sensor settings name\n";
                 return false;
             }
-            line.message = it->value.GetString();
+            storedLine.messageOffset = data.logs.size();
+            storedLine.messageSize = it->value.GetStringLength();
+            data.logs.append(it->value.GetString(), storedLine.messageSize);
 
-            data.lastLineIndex = std::max(data.lastLineIndex, line.index);
-            data.logLines.push_back(line);
+            data.lastLineIndex = std::max(data.lastLineIndex, storedLine.index);
+            data.storedLogLines.push_back(storedLine);
         }
     }
 
@@ -199,7 +201,11 @@ void Logger::logVerbose(std::string const& message)
 {
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        m_mainData.logLines.emplace_back(LogLine{ Clock::now(), ++m_mainData.lastLineIndex, Type::VERBOSE, message });
+        StoredLogLine storedLine {Clock::now(), ++m_mainData.lastLineIndex, Type::VERBOSE};
+        storedLine.messageOffset = m_mainData.logs.size();
+        storedLine.messageSize = message.size();
+        m_mainData.logs.append(message);
+        m_mainData.storedLogLines.emplace_back(storedLine);
     }
 
     std::cout << "VERBOSE: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
@@ -229,7 +235,11 @@ void Logger::logInfo(std::string const& message)
 {
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        m_mainData.logLines.emplace_back(LogLine{ Clock::now(), ++m_mainData.lastLineIndex, Type::INFO, message });
+        StoredLogLine storedLine {Clock::now(), ++m_mainData.lastLineIndex, Type::INFO};
+        storedLine.messageOffset = m_mainData.logs.size();
+        storedLine.messageSize = message.size();
+        m_mainData.logs.append(message);
+        m_mainData.storedLogLines.emplace_back(storedLine);
     }
 
     std::cout << "INFO: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
@@ -259,7 +269,11 @@ void Logger::logWarning(std::string const& message)
 {
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        m_mainData.logLines.emplace_back(LogLine{ Clock::now(), ++m_mainData.lastLineIndex, Type::WARNING, message });
+        StoredLogLine storedLine {Clock::now(), ++m_mainData.lastLineIndex, Type::WARNING};
+        storedLine.messageOffset = m_mainData.logs.size();
+        storedLine.messageSize = message.size();
+        m_mainData.logs.append(message);
+        m_mainData.storedLogLines.emplace_back(storedLine);
     }
 
     std::cout << "WARNING: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
@@ -289,7 +303,11 @@ void Logger::logCritical(std::string const& message)
 {
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        m_mainData.logLines.emplace_back(LogLine{ Clock::now(), ++m_mainData.lastLineIndex, Type::CRITICAL, message });
+        StoredLogLine storedLine {Clock::now(), ++m_mainData.lastLineIndex, Type::CRITICAL};
+        storedLine.messageOffset = m_mainData.logs.size();
+        storedLine.messageSize = message.size();
+        m_mainData.logs.append(message);
+        m_mainData.storedLogLines.emplace_back(storedLine);
     }
 
     std::cout << "ERROR: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
@@ -322,20 +340,26 @@ std::vector<Logger::LogLine> Logger::getFilteredLogLines(Filter const& filter) c
 
     std::lock_guard<std::mutex> lg(m_mainDataMutex);
 
-    for (LogLine const& line: m_mainData.logLines)
+    for (StoredLogLine const& storedLine: m_mainData.storedLogLines)
     {
-        if (line.timePoint < filter.minTimePoint || line.timePoint > filter.maxTimePoint)
+        if (storedLine.timePoint < filter.minTimePoint || storedLine.timePoint > filter.maxTimePoint)
         {
             continue;
         }
-        if ((!filter.allowVerbose && line.type == Type::VERBOSE) ||
-            (!filter.allowInfo && line.type == Type::INFO) ||
-            (!filter.allowWarning && line.type == Type::WARNING) ||
-            (!filter.allowError && line.type == Type::CRITICAL))
+        if ((!filter.allowVerbose && storedLine.type == Type::VERBOSE) ||
+            (!filter.allowInfo && storedLine.type == Type::INFO) ||
+            (!filter.allowWarning && storedLine.type == Type::WARNING) ||
+            (!filter.allowError && storedLine.type == Type::CRITICAL))
         {
             continue;
         }
 
+        LogLine line;
+        line.index = storedLine.index;
+        line.timePoint = storedLine.timePoint;
+        line.type = storedLine.type;
+        assert(storedLine.messageOffset + storedLine.messageSize <= m_mainData.logs.size());
+        line.message = m_mainData.logs.substr(storedLine.messageOffset, storedLine.messageSize);
         result.push_back(line);
     }
 
@@ -347,7 +371,7 @@ std::vector<Logger::LogLine> Logger::getFilteredLogLines(Filter const& filter) c
 size_t Logger::getAllLogLineCount() const
 {
     std::lock_guard<std::mutex> lg(m_mainDataMutex);
-    return m_mainData.logLines.size();
+    return m_mainData.storedLogLines.size();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -363,7 +387,7 @@ void Logger::triggerSave()
 
     {
         std::unique_lock<std::mutex> lg(m_storeMutex);
-        m_storeData = mainDataCopy;
+        m_storeData = std::move(mainDataCopy);
         m_storeThreadTriggered = true;
     }
     m_storeCV.notify_all();
@@ -394,14 +418,15 @@ void Logger::save(Data const& data) const
     {
         rapidjson::Document document;
         document.SetArray();
-        for (LogLine const& line: data.logLines)
+        for (StoredLogLine const& storedLine: data.storedLogLines)
         {
             rapidjson::Value linej;
             linej.SetObject();
-            linej.AddMember("timestamp", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(line.timePoint.time_since_epoch()).count()), document.GetAllocator());
-            linej.AddMember("index", line.index, document.GetAllocator());
-            linej.AddMember("type", static_cast<int>(line.type), document.GetAllocator());
-            linej.AddMember("message", rapidjson::Value(line.message.c_str(), document.GetAllocator()), document.GetAllocator());
+            linej.AddMember("timestamp", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(storedLine.timePoint.time_since_epoch()).count()), document.GetAllocator());
+            linej.AddMember("index", storedLine.index, document.GetAllocator());
+            linej.AddMember("type", static_cast<int>(storedLine.type), document.GetAllocator());
+
+            linej.AddMember("message", rapidjson::Value(data.logs.data() + storedLine.messageOffset, storedLine.messageSize), document.GetAllocator());
             document.PushBack(linej, document.GetAllocator());
         }
 

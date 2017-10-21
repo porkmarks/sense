@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <numeric>
 #include <deque>
+#include <array>
 #include <unordered_map>
 
 #include <QtCore>
@@ -47,13 +48,13 @@
 #include <QtCore/QSettings>
 #include <QFileDialog>
 
-namespace std
-{
-    template<typename T, typename ...Args>
-    std::unique_ptr<T> make_unique( Args&& ...args )
-    {
-        return std::unique_ptr<T>( new T( std::forward<Args>(args)... ) );
-    }
-}
+//namespace std
+//{
+//    template<typename T, typename ...Args>
+//    std::unique_ptr<T> make_unique( Args&& ...args )
+//    {
+//        return std::unique_ptr<T>( new T( std::forward<Args>(args)... ) );
+//    }
+//}
 
 #endif

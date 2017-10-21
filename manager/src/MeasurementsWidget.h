@@ -21,21 +21,8 @@ signals:
 
 private slots:
     void refresh();
-    void setMinDateTimeNow();
-    void setMaxDateTimeNow();
     void selectSensors();
     void exportData();
-
-    void setDateTimePreset(int preset);
-    void setDateTimePresetToday();
-    void setDateTimePresetYesterday();
-    void setDateTimePresetThisWeek();
-    void setDateTimePresetLastWeek();
-    void setDateTimePresetThisMonth();
-    void setDateTimePresetLastMonth();
-
-    void minDateTimeChanged();
-    void maxDateTimeChanged();
 
     void minTemperatureChanged();
     void maxTemperatureChanged();

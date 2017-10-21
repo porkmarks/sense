@@ -35,17 +35,6 @@ private slots:
     void selectSensors();
     void exportData();
 
-    void setDateTimePreset(int preset);
-    void setDateTimePresetToday();
-    void setDateTimePresetYesterday();
-    void setDateTimePresetThisWeek();
-    void setDateTimePresetLastWeek();
-    void setDateTimePresetThisMonth();
-    void setDateTimePresetLastMonth();
-
-    void minDateTimeChanged();
-    void maxDateTimeChanged();
-
 private:
     DB::Filter createFilter() const;
     void clearAnnotations();

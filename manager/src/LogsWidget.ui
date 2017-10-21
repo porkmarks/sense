@@ -48,7 +48,7 @@
        <number>0</number>
       </property>
       <item>
-       <widget class="QWidget" name="widget_3" native="true">
+       <widget class="DateTimeFilterWidget" name="dateTimeFilter" native="true">
         <layout class="QGridLayout" name="gridLayout">
          <property name="leftMargin">
           <number>4</number>
@@ -62,130 +62,6 @@
          <property name="bottomMargin">
           <number>4</number>
          </property>
-         <item row="5" column="1">
-          <widget class="QDateTimeEdit" name="maxDateTime">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="showGroupSeparator" stdset="0">
-            <bool>false</bool>
-           </property>
-           <property name="maximumDate">
-            <date>
-             <year>7930</year>
-             <month>12</month>
-             <day>31</day>
-            </date>
-           </property>
-           <property name="minimumDate">
-            <date>
-             <year>1780</year>
-             <month>9</month>
-             <day>14</day>
-            </date>
-           </property>
-           <property name="displayFormat">
-            <string>dd-MM-yyyy HH:mm</string>
-           </property>
-           <property name="calendarPopup">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="1">
-          <widget class="QComboBox" name="dateTimePreset">
-           <item>
-            <property name="text">
-             <string>Today</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>Yesterday</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>This Week</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>Last Week</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>This Month</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>Last Month</string>
-            </property>
-           </item>
-          </widget>
-         </item>
-         <item row="3" column="0">
-          <widget class="QLabel" name="label_2">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="text">
-            <string>From</string>
-           </property>
-          </widget>
-         </item>
-         <item row="3" column="1">
-          <widget class="QDateTimeEdit" name="minDateTime">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="showGroupSeparator" stdset="0">
-            <bool>false</bool>
-           </property>
-           <property name="maximumDate">
-            <date>
-             <year>7930</year>
-             <month>12</month>
-             <day>31</day>
-            </date>
-           </property>
-           <property name="minimumDate">
-            <date>
-             <year>1780</year>
-             <month>9</month>
-             <day>14</day>
-            </date>
-           </property>
-           <property name="displayFormat">
-            <string>dd-MM-yyyy HH:mm</string>
-           </property>
-           <property name="calendarPopup">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-         <item row="5" column="0">
-          <widget class="QLabel" name="label">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="text">
-            <string>To</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="0">
-          <widget class="QCheckBox" name="useDateTimePreset">
-           <property name="text">
-            <string>Preset</string>
-           </property>
-           <property name="checked">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
         </layout>
        </widget>
       </item>
@@ -305,11 +181,15 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>DateTimeFilterWidget</class>
+   <extends>QWidget</extends>
+   <header>DateTimeFilterWidget.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <tabstops>
-  <tabstop>useDateTimePreset</tabstop>
-  <tabstop>dateTimePreset</tabstop>
-  <tabstop>maxDateTime</tabstop>
-  <tabstop>minDateTime</tabstop>
   <tabstop>verbose</tabstop>
   <tabstop>info</tabstop>
   <tabstop>warning</tabstop>
@@ -319,86 +199,5 @@
  <resources>
   <include location="../res/res.qrc"/>
  </resources>
- <connections>
-  <connection>
-   <sender>useDateTimePreset</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>dateTimePreset</receiver>
-   <slot>setEnabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>40</x>
-     <y>21</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>125</x>
-     <y>15</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>useDateTimePreset</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>label_2</receiver>
-   <slot>setDisabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>44</x>
-     <y>22</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>62</x>
-     <y>52</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>useDateTimePreset</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>label</receiver>
-   <slot>setDisabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>26</x>
-     <y>11</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>30</x>
-     <y>88</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>useDateTimePreset</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>minDateTime</receiver>
-   <slot>setDisabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>12</x>
-     <y>17</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>115</x>
-     <y>50</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>useDateTimePreset</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>maxDateTime</receiver>
-   <slot>setDisabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>43</x>
-     <y>19</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>115</x>
-     <y>96</y>
-    </hint>
-   </hints>
-  </connection>
- </connections>
+ <connections/>
 </ui>

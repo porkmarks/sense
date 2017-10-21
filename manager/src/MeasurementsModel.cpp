@@ -3,6 +3,7 @@
 #include <QWidget>
 #include <QIcon>
 #include <bitset>
+#include <array>
 
 static std::array<const char*, 10> s_headerNames = {"Id", "Sensor", "Index", "Timestamp", "Temperature", "Humidity", "Battery", "Signal", "Alarms"};
 
@@ -64,6 +65,11 @@ QIcon getSignalIcon(int8_t dBm)
 MeasurementsModel::MeasurementsModel(DB& db)
     : m_db(db)
 {
+    m_refreshTimer = new QTimer();
+    m_refreshTimer->setSingleShot(true);
+
+    connect(&db, &DB::measurementsAdded, this, &MeasurementsModel::startAutoRefresh);
+    connect(m_refreshTimer, &QTimer::timeout, this, &MeasurementsModel::refresh);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -281,6 +287,33 @@ void MeasurementsModel::setFilter(DB::Filter const& filter)
     endResetModel();
 
     Q_EMIT layoutChanged();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsModel::refresh()
+{
+    beginResetModel();
+    m_measurements = m_db.getFilteredMeasurements(m_filter);
+    endResetModel();
+
+    Q_EMIT layoutChanged();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsModel::startAutoRefresh(DB::SensorId sensorId)
+{
+    //see if the sensor is in the filter
+    if (m_filter.useSensorFilter)
+    {
+        if (std::find(m_filter.sensorIds.begin(), m_filter.sensorIds.end(), sensorId) == m_filter.sensorIds.end())
+        {
+            return;
+        }
+    }
+
+    m_refreshTimer->start(5000);
 }
 
 //////////////////////////////////////////////////////////////////////////

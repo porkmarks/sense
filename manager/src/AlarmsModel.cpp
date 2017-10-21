@@ -143,7 +143,7 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
             QString str;
             if (descriptor.lowTemperatureWatch)
             {
-                str += QString("Below %1 °C").arg(descriptor.lowTemperature, 0, 'f', 1);
+                str += QString("< %1 °C").arg(descriptor.lowTemperature, 0, 'f', 1);
             }
             if (descriptor.highTemperatureWatch)
             {
@@ -151,7 +151,7 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
                 {
                     str += " and ";
                 }
-                str += QString("Above %1 °C").arg(descriptor.highTemperature, 0, 'f', 1);
+                str += QString("> %1 °C").arg(descriptor.highTemperature, 0, 'f', 1);
             }
             return str;
         }
@@ -160,7 +160,7 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
             QString str;
             if (descriptor.lowHumidityWatch)
             {
-                str += QString("Below %1 %RH").arg(descriptor.lowHumidity, 0, 'f', 1);
+                str += QString("< %1 %RH").arg(descriptor.lowHumidity, 0, 'f', 1);
             }
             if (descriptor.highHumidityWatch)
             {
@@ -168,7 +168,7 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
                 {
                     str += " and ";
                 }
-                str += QString("Above %1 %RH").arg(descriptor.highHumidity, 0, 'f', 1);
+                str += QString("> %1 %RH").arg(descriptor.highHumidity, 0, 'f', 1);
             }
             return str;
         }

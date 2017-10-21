@@ -2,6 +2,7 @@
 
 #include <QWidget>
 #include <QIcon>
+#include <array>
 
 static std::array<const char*, 5> s_headerNames = {"Id", "Name", "Period", "Data"};
 

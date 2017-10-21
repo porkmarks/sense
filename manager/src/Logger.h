@@ -15,7 +15,7 @@ public:
     Logger();
     ~Logger();
 
-    typedef std::chrono::high_resolution_clock Clock;
+    typedef std::chrono::system_clock Clock;
 
     void shutdown();
 
@@ -72,9 +72,19 @@ signals:
 
 private:
 
+    struct StoredLogLine
+    {
+        Clock::time_point timePoint;
+        uint64_t index;
+        Type type;
+        size_t messageOffset = 0;
+        size_t messageSize = 0;
+    };
+
     struct Data
     {
-        std::vector<LogLine> logLines;
+        std::string logs;
+        std::vector<StoredLogLine> storedLogLines;
         uint64_t lastLineIndex = 0;
     };
 

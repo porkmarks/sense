@@ -12,6 +12,8 @@
 
 #include "Crypt.h"
 
+static const std::string s_version = "1.0.1";
+
 Logger s_logger;
 
 extern std::string k_passwordHashReferenceText;
@@ -29,6 +31,8 @@ Manager::Manager(QWidget *parent)
     : QMainWindow(parent)
 {
     m_ui.setupUi(this);
+
+    statusBar()->showMessage(("Version: " + s_version).c_str(), 0);
 
     if (!s_logger.load("log"))
     {

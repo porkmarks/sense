@@ -22,6 +22,12 @@
 #include "Crypt.h"
 #include "Logger.h"
 
+#ifdef _MSC_VER
+//not #if defined(_WIN32) || defined(_WIN64) because we have strncasecmp in mingw
+#define strncasecmp _strnicmp
+#define strcasecmp _stricmp
+#endif
+
 extern Logger s_logger;
 
 extern std::string s_dataFolder;
@@ -384,7 +390,7 @@ bool Settings::load(std::string const& name)
         if (id != 0)
         {
             auto it = std::find_if(data.baseStations.begin(), data.baseStations.end(), [id](BaseStation const& baseStation) { return baseStation.id == id; });
-            if (it == m_mainData.baseStations.end())
+            if (it == data.baseStations.end())
             {
                 s_logger.logWarning(QString("Cannot find active base station id %1. No base station will be active").arg(id));
                 id = 0;

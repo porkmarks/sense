@@ -113,7 +113,10 @@
        <widget class="QTreeView" name="list">
         <property name="font">
          <font>
+          <family>Calibri</family>
           <pointsize>16</pointsize>
+          <weight>75</weight>
+          <bold>true</bold>
          </font>
         </property>
         <property name="alternatingRowColors">

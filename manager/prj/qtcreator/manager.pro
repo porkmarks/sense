@@ -23,8 +23,8 @@ INCLUDEPATH += ../../src/qftp
 INCLUDEPATH += ../../../common/src
 INCLUDEPATH += ../../../common/src/rapidjson/include
 
-QMAKE_CXXFLAGS += -Wno-unused-variable -Wno-unused-parameter
-QMAKE_CFLAGS += -Wno-unused-variable -Wno-unused-parameter
+#QMAKE_CXXFLAGS += -Wno-unused-variable -Wno-unused-parameter
+#QMAKE_CFLAGS += -Wno-unused-variable -Wno-unused-parameter
 #QMAKE_LFLAGS += -Wl,-subsystem,windows
 
 PRECOMPILED_HEADER = ../../src/stdafx.h
@@ -115,7 +115,8 @@ HEADERS += \
     ../../src/ExportLogsDialog.h \
     ../../src/PlotToolTip.h \
     ../../src/qftp/qftp.h \
-    ../../src/qftp/qurlinfo.h
+    ../../src/qftp/qurlinfo.h \
+    ../../src/DateTimeFilterWidget.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -168,7 +169,8 @@ SOURCES += \
     ../../src/ExportLogsDialog.cpp \
     ../../src/PlotToolTip.cpp \
     ../../src/qftp/qftp.cpp \
-    ../../src/qftp/qurlinfo.cpp
+    ../../src/qftp/qurlinfo.cpp \
+    ../../src/DateTimeFilterWidget.cpp
 
 FORMS += \
     ../../src/Manager.ui \
@@ -191,7 +193,8 @@ FORMS += \
     ../../src/UsersWidget.ui \
     ../../src/LoginDialog.ui \
     ../../src/LogsWidget.ui \
-    ../../src/ExportLogsDialog.ui
+    ../../src/ExportLogsDialog.ui \
+    ../../src/DateTimeFilterWidget.ui
 
 DISTFILES += \
 
