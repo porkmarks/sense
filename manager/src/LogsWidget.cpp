@@ -3,6 +3,7 @@
 #include <QDateTime>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QSettings>
 
 #include "Logger.h"
 #include "ExportLogsDialog.h"
@@ -29,6 +30,12 @@ LogsWidget::~LogsWidget()
 
 void LogsWidget::init()
 {
+    for (const QMetaObject::Connection& connection: m_uiConnections)
+    {
+        QObject::disconnect(connection);
+    }
+    m_uiConnections.clear();
+
     setEnabled(true);
 
     m_model.reset(new LogsModel(s_logger));
@@ -36,17 +43,27 @@ void LogsWidget::init()
     m_sortingModel.setSortRole(Qt::UserRole + 5);
 
     m_ui.list->setModel(&m_sortingModel);
-
     m_ui.list->setUniformRowHeights(true);
+
+    connect(m_ui.list->header(), &QHeaderView::sectionResized, [this]()
+    {
+        QSettings settings;
+        settings.setValue("logs/list/state", m_ui.list->header()->saveState());
+    });
+
+    {
+        QSettings settings;
+        m_ui.list->header()->restoreState(settings.value("logs/list/state").toByteArray());
+    }
 
     refresh();
 
-    connect(m_ui.exportLogs, &QPushButton::released, this, &LogsWidget::exportData);
-    connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &LogsWidget::refresh, Qt::QueuedConnection);
-    connect(m_ui.verbose, &QCheckBox::stateChanged, this, &LogsWidget::refresh, Qt::QueuedConnection);
-    connect(m_ui.info, &QCheckBox::stateChanged, this, &LogsWidget::refresh, Qt::QueuedConnection);
-    connect(m_ui.warning, &QCheckBox::stateChanged, this, &LogsWidget::refresh, Qt::QueuedConnection);
-    connect(m_ui.error, &QCheckBox::stateChanged, this, &LogsWidget::refresh, Qt::QueuedConnection);
+    m_uiConnections.push_back(connect(m_ui.exportLogs, &QPushButton::released, this, &LogsWidget::exportData));
+    m_uiConnections.push_back(connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &LogsWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.verbose, &QCheckBox::stateChanged, this, &LogsWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.info, &QCheckBox::stateChanged, this, &LogsWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.warning, &QCheckBox::stateChanged, this, &LogsWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.error, &QCheckBox::stateChanged, this, &LogsWidget::refresh, Qt::QueuedConnection));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -90,11 +107,6 @@ void LogsWidget::refresh()
                         .arg(std::chrono::duration_cast<std::chrono::milliseconds>(Logger::Clock::now() - start).count()));
 
     //m_ui.resultCount->setText(QString("%1 out of %2 results.").arg(m_model->getLinesCount()).arg(s_logger->getAllLinesCount()));
-
-    for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
-    {
-        m_ui.list->resizeColumnToContents(i);
-    }
 
     m_ui.exportLogs->setEnabled(m_model->getLineCount() > 0);
 }

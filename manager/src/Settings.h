@@ -35,7 +35,7 @@ public:
 
         std::string name;
         Mac mac;
-        QHostAddress address;
+        //QHostAddress address;
     };
 
     typedef uint32_t BaseStationId;

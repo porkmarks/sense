@@ -342,13 +342,13 @@ bool Settings::load(std::string const& name)
                 }
                 bs.descriptor.name = it->value.GetString();
 
-                it = bsj.FindMember("address");
-                if (it == bsj.MemberEnd() || !it->value.IsString())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing base station address").arg(dataFilename.c_str()));
-                    return false;
-                }
-                bs.descriptor.address = QHostAddress(it->value.GetString());
+//                it = bsj.FindMember("address");
+//                if (it == bsj.MemberEnd() || !it->value.IsString())
+//                {
+//                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing base station address").arg(dataFilename.c_str()));
+//                    return false;
+//                }
+//                bs.descriptor.address = QHostAddress(it->value.GetString());
 
                 it = bsj.FindMember("id");
                 if (it == bsj.MemberEnd() || !it->value.IsUint())
@@ -1034,7 +1034,7 @@ void Settings::save(Data const& data) const
                 bsj.SetObject();
                 bsj.AddMember("id", baseStation.id, document.GetAllocator());
                 bsj.AddMember("name", rapidjson::Value(baseStation.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
-                bsj.AddMember("address", rapidjson::Value(baseStation.descriptor.address.toString().toUtf8().data(), document.GetAllocator()), document.GetAllocator());
+                //bsj.AddMember("address", rapidjson::Value(baseStation.descriptor.address.toString().toUtf8().data(), document.GetAllocator()), document.GetAllocator());
 
                 BaseStationDescriptor::Mac const& mac = baseStation.descriptor.mac;
                 bsj.AddMember("mac", rapidjson::Value(getMacStr(mac).c_str(), document.GetAllocator()), document.GetAllocator());

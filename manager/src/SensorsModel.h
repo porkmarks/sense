@@ -9,6 +9,7 @@
 
 class SensorsModel : public QAbstractItemModel
 {
+    Q_OBJECT
 public:
     SensorsModel(DB& db);
     ~SensorsModel();
@@ -32,6 +33,9 @@ public:
 
     size_t getSensorCount() const;
     DB::Sensor const& getSensor(size_t index) const;
+
+signals:
+    void sensorCheckedChanged(DB::SensorId id);
 
 public:
     virtual QModelIndex parent(QModelIndex const& index) const;

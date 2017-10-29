@@ -3,10 +3,10 @@
 #include <QNetworkProxyFactory>
 #include <QLocale>
 #include <QLockFile>
+#include "StackWalker.h"
 
 std::string s_programFolder;
 std::string s_dataFolder;
-
 
 /* This prints an "Assertion failed" message and aborts.  */
 void __assert_fail(const char *__assertion, const char *__file, unsigned int __line, const char *__function)
@@ -18,6 +18,13 @@ void __assert_fail(const char *__assertion, const char *__file, unsigned int __l
     }
 }
 
+LONG WINAPI MyUnhandledExceptionFilter(PEXCEPTION_POINTERS pExceptionPtrs)
+{
+    StackWalker sw;
+    sw.ShowCallstack();
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
 int main(int argc, char *argv[])
 {
     Q_INIT_RESOURCE(res);
@@ -27,6 +34,10 @@ int main(int argc, char *argv[])
     s_programFolder = a.applicationDirPath().toUtf8().data();
     s_dataFolder = s_programFolder + "/data";
     QDir().mkpath(s_dataFolder.c_str());
+
+    SetUnhandledExceptionFilter(MyUnhandledExceptionFilter);
+
+    //delete reinterpret_cast<QString*>(0xFEE1DEAD);
 
     QString lockFileName = (s_dataFolder + "/lock").c_str();
     QLockFile lockFile(lockFileName);

@@ -2,6 +2,7 @@
 #include "ConfigureAlarmDialog.h"
 #include "Settings.h"
 #include <QMessageBox>
+#include <QSettings>
 
 #include "DB.h"
 
@@ -29,6 +30,12 @@ AlarmsWidget::~AlarmsWidget()
 
 void AlarmsWidget::init(Settings& settings, DB& db)
 {
+    for (const QMetaObject::Connection& connection: m_uiConnections)
+    {
+        QObject::disconnect(connection);
+    }
+    m_uiConnections.clear();
+
     setEnabled(true);
 
     m_db = &db;
@@ -36,14 +43,21 @@ void AlarmsWidget::init(Settings& settings, DB& db)
 
     m_model.reset(new AlarmsModel(db));
     m_ui.list->setModel(m_model.get());
+    m_ui.list->setUniformRowHeights(true);
 
-    for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
+    connect(m_ui.list->header(), &QHeaderView::sectionResized, [this]()
     {
-        m_ui.list->resizeColumnToContents(i);
+        QSettings settings;
+        settings.setValue("alarms/list/state", m_ui.list->header()->saveState());
+    });
+
+    {
+        QSettings settings;
+        m_ui.list->header()->restoreState(settings.value("alarms/list/state").toByteArray());
     }
 
     setRW();
-    connect(&settings, &Settings::userLoggedIn, this, &AlarmsWidget::setRW);
+    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &AlarmsWidget::setRW));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -86,11 +100,6 @@ void AlarmsWidget::configureAlarm(QModelIndex const& index)
         alarm = dialog.getAlarm();
         m_db->setAlarm(alarm.id, alarm.descriptor);
         m_model->refresh();
-
-        for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
-        {
-            m_ui.list->resizeColumnToContents(i);
-        }
     }
 }
 
@@ -110,11 +119,6 @@ void AlarmsWidget::addAlarm()
         alarm = dialog.getAlarm();
         m_db->addAlarm(alarm.descriptor);
         m_model->refresh();
-
-        for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
-        {
-            m_ui.list->resizeColumnToContents(i);
-        }
     }
 }
 
@@ -147,11 +151,6 @@ void AlarmsWidget::removeAlarms()
     }
 
     m_db->removeAlarm(index);
-
-    for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
-    {
-        m_ui.list->resizeColumnToContents(i);
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////

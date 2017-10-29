@@ -137,6 +137,9 @@ void SensorsModel::setSensorChecked(DB::SensorId id, bool checked)
         return;
     }
     it->isChecked = checked;
+
+    int32_t sensorIndex = std::distance(m_sensors.begin(), it);
+    emit dataChanged(index(sensorIndex, 0), index(sensorIndex, columnCount() - 1));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -410,6 +413,7 @@ bool SensorsModel::setData(QModelIndex const& index, QVariant const& value, int 
     if (role == Qt::CheckStateRole && column == Column::Name)
     {
         sensorData.isChecked = value.toInt() == Qt::Checked;
+        emit sensorCheckedChanged(sensorData.sensorId);
         return true;
     }
 

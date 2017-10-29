@@ -48,5 +48,6 @@ private:
     Ui::SettingsWidget m_ui;
     Settings* m_settings = nullptr;
     DB* m_db = nullptr;
+    std::vector<QMetaObject::Connection> m_uiConnections;
 };
 

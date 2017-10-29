@@ -71,5 +71,6 @@ private:
     std::vector<DB::SensorId> m_selectedSensorIds;
 
     Ui::PlotWidget m_ui;
+    std::vector<QMetaObject::Connection> m_uiConnections;
 };
 

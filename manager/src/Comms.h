@@ -23,8 +23,9 @@ public:
 
     typedef std::array<uint8_t, 6> Mac;
 
-    bool isBaseStationConnected(Mac mac);
-    bool connectToBaseStation(DB& db, QHostAddress const& address);
+    QHostAddress getBaseStationAddress(Mac const& mac) const;
+    bool isBaseStationConnected(Mac const& mac) const;
+    bool connectToBaseStation(DB& db, Mac const& mac);
 
     struct BaseStationDescriptor
     {

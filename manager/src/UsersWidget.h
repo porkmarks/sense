@@ -27,5 +27,6 @@ private:
     Ui::UsersWidget m_ui;
     std::unique_ptr<UsersModel> m_model;
     Settings* m_settings = nullptr;
+    std::vector<QMetaObject::Connection> m_uiConnections;
 };
 

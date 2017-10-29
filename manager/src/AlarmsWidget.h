@@ -33,5 +33,6 @@ private:
     std::unique_ptr<AlarmsModel> m_model;
     DB* m_db = nullptr;
     Settings* m_settings = nullptr;
+    std::vector<QMetaObject::Connection> m_uiConnections;
 };
 

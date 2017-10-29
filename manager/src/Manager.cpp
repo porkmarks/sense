@@ -12,7 +12,7 @@
 
 #include "Crypt.h"
 
-static const std::string s_version = "1.0.1";
+static const std::string s_version = "1.0.3";
 
 Logger s_logger;
 

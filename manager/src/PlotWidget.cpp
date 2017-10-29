@@ -24,24 +24,30 @@ PlotWidget::PlotWidget(QWidget* parent)
 
 void PlotWidget::init(DB& db)
 {
+    for (const QMetaObject::Connection& connection: m_uiConnections)
+    {
+        QObject::disconnect(connection);
+    }
+    m_uiConnections.clear();
+
     setEnabled(true);
     m_db = &db;
 
-    connect(m_ui.clearAnnotations, &QPushButton::released, this, &PlotWidget::clearAnnotations);
-    connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &PlotWidget::refresh, Qt::QueuedConnection);
-    connect(m_ui.selectSensors, &QPushButton::released, this, &PlotWidget::selectSensors, Qt::QueuedConnection);
-    connect(m_ui.exportData, &QPushButton::released, this, &PlotWidget::exportData);
+    m_uiConnections.push_back(connect(m_ui.clearAnnotations, &QPushButton::released, this, &PlotWidget::clearAnnotations));
+    m_uiConnections.push_back(connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &PlotWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.selectSensors, &QPushButton::released, this, &PlotWidget::selectSensors, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.exportData, &QPushButton::released, this, &PlotWidget::exportData));
 
-    connect(m_ui.fitMeasurements, &QCheckBox::stateChanged, this, &PlotWidget::refresh, Qt::QueuedConnection);
-    connect(m_ui.minTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh, Qt::QueuedConnection);
-    connect(m_ui.maxTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh, Qt::QueuedConnection);
-    connect(m_ui.minHumidity, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh, Qt::QueuedConnection);
-    connect(m_ui.maxHumidity, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh, Qt::QueuedConnection);
+    m_uiConnections.push_back(connect(m_ui.fitMeasurements, &QCheckBox::stateChanged, this, &PlotWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.minTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.maxTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.minHumidity, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.maxHumidity, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh, Qt::QueuedConnection));
 
-    connect(m_ui.useSmoothing, &QCheckBox::stateChanged, this, &PlotWidget::refresh, Qt::QueuedConnection);
+    m_uiConnections.push_back(connect(m_ui.useSmoothing, &QCheckBox::stateChanged, this, &PlotWidget::refresh, Qt::QueuedConnection));
 
-    connect(m_ui.showTemperature, &QCheckBox::stateChanged, this, &PlotWidget::refresh, Qt::QueuedConnection);
-    connect(m_ui.showHumidity, &QCheckBox::stateChanged, this, &PlotWidget::refresh, Qt::QueuedConnection);
+    m_uiConnections.push_back(connect(m_ui.showTemperature, &QCheckBox::stateChanged, this, &PlotWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.showHumidity, &QCheckBox::stateChanged, this, &PlotWidget::refresh, Qt::QueuedConnection));
 
     refresh();
 }
@@ -129,6 +135,35 @@ void PlotWidget::selectSensors()
             model.setSensorChecked(id, true);
         }
     }
+
+    auto updateSelectionCheckboxes = [this, &model, &ui, sensorCount]()
+    {
+        bool allSensorsChecked = true;
+        bool anySensorsChecked = false;
+        for (size_t i = 0; i < sensorCount; i++)
+        {
+            bool isChecked = model.isSensorChecked(m_db->getSensor(i).id);
+            allSensorsChecked &= isChecked;
+            anySensorsChecked |= isChecked;
+        }
+        ui.selectAll->blockSignals(true);
+        ui.selectAll->setCheckState(allSensorsChecked ? Qt::Checked : (anySensorsChecked ? Qt::PartiallyChecked : Qt::Unchecked));
+        ui.selectAll->blockSignals(false);
+    };
+    updateSelectionCheckboxes();
+
+    connect(&model, &SensorsModel::sensorCheckedChanged, updateSelectionCheckboxes);
+    connect(ui.selectAll, &QCheckBox::stateChanged, [sensorCount, &model, &ui, this]()
+    {
+        if (ui.selectAll->checkState() != Qt::PartiallyChecked)
+        {
+            for (size_t i = 0; i < sensorCount; i++)
+            {
+                model.setSensorChecked(m_db->getSensor(i).id, ui.selectAll->isChecked());
+            }
+        }
+    });
+
 
     ui.list->setModel(&sortingModel);
     ui.list->setItemDelegate(&delegate);

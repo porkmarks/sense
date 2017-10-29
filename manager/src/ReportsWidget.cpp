@@ -1,6 +1,7 @@
 #include "ReportsWidget.h"
 #include "ConfigureReportDialog.h"
 #include "Settings.h"
+#include <QSettings>
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -26,6 +27,12 @@ ReportsWidget::~ReportsWidget()
 
 void ReportsWidget::init(Settings& settings, DB& db)
 {
+    for (const QMetaObject::Connection& connection: m_uiConnections)
+    {
+        QObject::disconnect(connection);
+    }
+    m_uiConnections.clear();
+
     setEnabled(true);
 
     m_settings = &settings;
@@ -33,14 +40,21 @@ void ReportsWidget::init(Settings& settings, DB& db)
 
     m_model.reset(new ReportsModel(db));
     m_ui.list->setModel(m_model.get());
+    m_ui.list->setUniformRowHeights(true);
 
-    for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
+    connect(m_ui.list->header(), &QHeaderView::sectionResized, [this]()
     {
-        m_ui.list->resizeColumnToContents(i);
+        QSettings settings;
+        settings.setValue("reports/list/state", m_ui.list->header()->saveState());
+    });
+
+    {
+        QSettings settings;
+        m_ui.list->header()->restoreState(settings.value("reports/list/state").toByteArray());
     }
 
     setRW();
-    connect(&settings, &Settings::userLoggedIn, this, &ReportsWidget::setRW);
+    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &ReportsWidget::setRW));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -83,11 +97,6 @@ void ReportsWidget::configureReport(QModelIndex const& index)
         report = dialog.getReport();
         m_db->setReport(report.id, report.descriptor);
         m_model->refresh();
-
-        for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
-        {
-            m_ui.list->resizeColumnToContents(i);
-        }
     }
 }
 
@@ -107,11 +116,6 @@ void ReportsWidget::addReport()
         report = dialog.getReport();
         m_db->addReport(report.descriptor);
         m_model->refresh();
-
-        for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
-        {
-            m_ui.list->resizeColumnToContents(i);
-        }
     }
 }
 
@@ -144,11 +148,6 @@ void ReportsWidget::removeReports()
     }
 
     m_db->removeReport(index);
-
-    for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
-    {
-        m_ui.list->resizeColumnToContents(i);
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////

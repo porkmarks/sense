@@ -1,5 +1,6 @@
 #include "SensorsWidget.h"
 #include "Settings.h"
+#include <QSettings>
 
 #include <QMessageBox>
 #include <QInputDialog>
@@ -14,19 +15,6 @@ SensorsWidget::SensorsWidget(QWidget *parent)
 {
     m_ui.setupUi(this);
     setEnabled(false);
-
-//    m_ui.list->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-//    m_ui.list->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
-//    m_ui.list->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
-//    m_ui.list->header()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
-//    m_ui.list->header()->setSectionResizeMode(4, QHeaderView::ResizeToContents);
-//    m_ui.list->header()->setSectionResizeMode(5, QHeaderView::ResizeToContents);
-//    m_ui.list->header()->setSectionResizeMode(6, QHeaderView::ResizeToContents);
-//    m_ui.list->header()->setSectionResizeMode(7, QHeaderView::ResizeToContents);
-//    m_ui.list->header()->setSectionResizeMode(8, QHeaderView::ResizeToContents);
-//    m_ui.list->header()->setSectionResizeMode(9, QHeaderView::Stretch);
-
-    //connect(m_ui.list, &QTreeView::doubleClicked, this, &BaseStationsWidget::activateBaseStation);
 
     connect(m_ui.add, &QPushButton::released, this, &SensorsWidget::bindSensor);
     connect(m_ui.remove, &QPushButton::released, this, &SensorsWidget::unbindSensor);
@@ -44,6 +32,12 @@ SensorsWidget::~SensorsWidget()
 
 void SensorsWidget::init(Settings& settings, DB& db)
 {
+    for (const QMetaObject::Connection& connection: m_uiConnections)
+    {
+        QObject::disconnect(connection);
+    }
+    m_uiConnections.clear();
+
     setEnabled(true);
 
     m_settings = &settings;
@@ -54,14 +48,21 @@ void SensorsWidget::init(Settings& settings, DB& db)
 
     m_ui.list->setModel(&m_sortingModel);
     m_ui.list->setItemDelegate(m_delegate.get());
+    m_ui.list->setUniformRowHeights(true);
 
-    for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
+    connect(m_ui.list->header(), &QHeaderView::sectionResized, [this]()
     {
-        m_ui.list->resizeColumnToContents(i);
+        QSettings settings;
+        settings.setValue("sensors/list/state", m_ui.list->header()->saveState());
+    });
+
+    {
+        QSettings settings;
+        m_ui.list->header()->restoreState(settings.value("sensors/list/state").toByteArray());
     }
 
     setRW();
-    connect(&settings, &Settings::userLoggedIn, this, &SensorsWidget::setRW);
+    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &SensorsWidget::setRW));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -148,11 +149,6 @@ void SensorsWidget::unbindSensor()
     }
 
     m_db->removeSensor(index);
-
-    for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
-    {
-        m_ui.list->resizeColumnToContents(i);
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -191,11 +187,6 @@ void SensorsWidget::configureSensor(QModelIndex const& index)
             continue;
         }
         break;
-    }
-
-    for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
-    {
-        m_ui.list->resizeColumnToContents(i);
     }
 }
 //////////////////////////////////////////////////////////////////////////

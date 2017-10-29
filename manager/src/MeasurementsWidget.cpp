@@ -4,6 +4,7 @@
 #include <QFileDialog>
 #include <QCalendarWidget>
 #include <QMessageBox>
+#include <QSettings>
 
 #include "ExportDataDialog.h"
 #include "SensorsModel.h"
@@ -36,6 +37,12 @@ MeasurementsWidget::~MeasurementsWidget()
 
 void MeasurementsWidget::init(DB& db)
 {
+    for (const QMetaObject::Connection& connection: m_uiConnections)
+    {
+        QObject::disconnect(connection);
+    }
+    m_uiConnections.clear();
+
     setEnabled(true);
     m_db = &db;
 
@@ -49,6 +56,17 @@ void MeasurementsWidget::init(DB& db)
     m_ui.list->setItemDelegate(m_delegate.get());
 
     m_ui.list->setUniformRowHeights(true);
+
+    connect(m_ui.list->header(), &QHeaderView::sectionResized, [this]()
+    {
+        QSettings settings;
+        settings.setValue("measurements/list/state", m_ui.list->header()->saveState());
+    });
+
+    {
+        QSettings settings;
+        m_ui.list->header()->restoreState(settings.value("measurements/list/state").toByteArray());
+    }
 
 //    DB::SensorDescriptor sd;
 //    sd.name = "test1";
@@ -78,28 +96,28 @@ void MeasurementsWidget::init(DB& db)
 
     refresh();
 
-    connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
-    connect(m_ui.selectSensors, &QPushButton::released, this, &MeasurementsWidget::selectSensors, Qt::QueuedConnection);
-    connect(m_ui.exportData, &QPushButton::released, this, &MeasurementsWidget::exportData);
+    m_uiConnections.push_back(connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.selectSensors, &QPushButton::released, this, &MeasurementsWidget::selectSensors, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.exportData, &QPushButton::released, this, &MeasurementsWidget::exportData));
 
-    connect(m_ui.minTemperature, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::minTemperatureChanged);
-    connect(m_ui.maxTemperature, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::maxTemperatureChanged);
+    m_uiConnections.push_back(connect(m_ui.minTemperature, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::minTemperatureChanged));
+    m_uiConnections.push_back(connect(m_ui.maxTemperature, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::maxTemperatureChanged));
 
-    connect(m_ui.minHumidity, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::minHumidityChanged);
-    connect(m_ui.maxHumidity, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::maxHumidityChanged);
+    m_uiConnections.push_back(connect(m_ui.minHumidity, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::minHumidityChanged));
+    m_uiConnections.push_back(connect(m_ui.maxHumidity, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::maxHumidityChanged));
 
 
-    connect(m_ui.useTemperature, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
-    connect(m_ui.minTemperature, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
-    connect(m_ui.maxTemperature, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
-    connect(m_ui.useHumidity, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
-    connect(m_ui.minHumidity, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
-    connect(m_ui.maxHumidity, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
+    m_uiConnections.push_back(connect(m_ui.useTemperature, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.minTemperature, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.maxTemperature, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.useHumidity, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.minHumidity, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.maxHumidity, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
 
-    connect(m_ui.showTemperature, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
-    connect(m_ui.showHumidity, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
-    connect(m_ui.showBattery, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
-    connect(m_ui.showSignal, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection);
+    m_uiConnections.push_back(connect(m_ui.showTemperature, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.showHumidity, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.showBattery, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.showSignal, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -163,11 +181,6 @@ void MeasurementsWidget::refresh()
                         .arg(std::chrono::duration_cast<std::chrono::milliseconds>(DB::Clock::now() - start).count()));
 
     m_ui.resultCount->setText(QString("%1 out of %2 results.").arg(m_model->getMeasurementCount()).arg(m_db->getAllMeasurementCount()));
-
-    for (int i = 0; i < m_model->columnCount(QModelIndex()); i++)
-    {
-        m_ui.list->resizeColumnToContents(i);
-    }
 
     m_ui.exportData->setEnabled(m_model->getMeasurementCount() > 0);
 }
@@ -263,6 +276,35 @@ void MeasurementsWidget::selectSensors()
             model.setSensorChecked(id, true);
         }
     }
+
+    auto updateSelectionCheckboxes = [this, &model, &ui, sensorCount]()
+    {
+        bool allSensorsChecked = true;
+        bool anySensorsChecked = false;
+        for (size_t i = 0; i < sensorCount; i++)
+        {
+            bool isChecked = model.isSensorChecked(m_db->getSensor(i).id);
+            allSensorsChecked &= isChecked;
+            anySensorsChecked |= isChecked;
+        }
+        ui.selectAll->blockSignals(true);
+        ui.selectAll->setCheckState(allSensorsChecked ? Qt::Checked : (anySensorsChecked ? Qt::PartiallyChecked : Qt::Unchecked));
+        ui.selectAll->blockSignals(false);
+    };
+    updateSelectionCheckboxes();
+
+    connect(&model, &SensorsModel::sensorCheckedChanged, updateSelectionCheckboxes);
+    connect(ui.selectAll, &QCheckBox::stateChanged, [sensorCount, &model, &ui, this]()
+    {
+        if (ui.selectAll->checkState() != Qt::PartiallyChecked)
+        {
+            for (size_t i = 0; i < sensorCount; i++)
+            {
+                model.setSensorChecked(m_db->getSensor(i).id, ui.selectAll->isChecked());
+            }
+        }
+    });
+
 
     ui.list->setModel(&sortingModel);
     ui.list->setItemDelegate(&delegate);

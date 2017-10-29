@@ -30,6 +30,7 @@ private slots:
 
 private:
     void setStatus(int row, std::string const& status);
+    void setAddress(int row, QHostAddress const& address);
 
 
     Ui::BaseStationsWidget m_ui;
@@ -38,6 +39,7 @@ private:
     QStandardItemModel m_model;
 
     std::vector<Comms::BaseStationDescriptor> m_unregisteredBaseStations;
+    std::vector<QMetaObject::Connection> m_uiConnections;
 };
 
 

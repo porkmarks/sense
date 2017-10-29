@@ -33,5 +33,6 @@ private:
     std::unique_ptr<ReportsModel> m_model;
     Settings* m_settings = nullptr;
     DB* m_db = nullptr;
+    std::vector<QMetaObject::Connection> m_uiConnections;
 };
 

@@ -28,6 +28,12 @@ SettingsWidget::~SettingsWidget()
 
 void SettingsWidget::init(Comms& comms, Settings& settings)
 {
+    for (const QMetaObject::Connection& connection: m_uiConnections)
+    {
+        QObject::disconnect(connection);
+    }
+    m_uiConnections.clear();
+
     setEnabled(true);
     m_settings = &settings;
     m_db = nullptr;
@@ -36,21 +42,21 @@ void SettingsWidget::init(Comms& comms, Settings& settings)
     m_ui.usersWidget->init(settings);
 
     setRW();
-    connect(&settings, &Settings::userLoggedIn, this, &SettingsWidget::setRW);
+    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &SettingsWidget::setRW));
 
     setEmailSettings(m_settings->getEmailSettings());
-    connect(m_ui.emailAddRecipient, &QPushButton::released, this, &SettingsWidget::addEmailRecipient);
-    connect(m_ui.emailRemoveRecipient, &QPushButton::released, this, &SettingsWidget::removeEmailRecipient);
-    connect(m_ui.emailApply, &QPushButton::released, this, &SettingsWidget::applyEmailSettings);
-    connect(m_ui.emailReset, &QPushButton::released, [this]() { setEmailSettings(m_settings->getEmailSettings()); });
-    connect(m_ui.emailTest, &QPushButton::released, this, &SettingsWidget::sendTestEmail);
+    m_uiConnections.push_back(connect(m_ui.emailAddRecipient, &QPushButton::released, this, &SettingsWidget::addEmailRecipient));
+    m_uiConnections.push_back(connect(m_ui.emailRemoveRecipient, &QPushButton::released, this, &SettingsWidget::removeEmailRecipient));
+    m_uiConnections.push_back(connect(m_ui.emailApply, &QPushButton::released, this, &SettingsWidget::applyEmailSettings));
+    m_uiConnections.push_back(connect(m_ui.emailReset, &QPushButton::released, [this]() { setEmailSettings(m_settings->getEmailSettings()); }));
+    m_uiConnections.push_back(connect(m_ui.emailTest, &QPushButton::released, this, &SettingsWidget::sendTestEmail));
 
-    connect(m_ui.ftpApply, &QPushButton::released, this, &SettingsWidget::applyFtpSettings);
-    connect(m_ui.ftpReset, &QPushButton::released, [this]() { setFtpSettings(m_settings->getFtpSettings()); });
-    connect(m_ui.ftpTest, &QPushButton::released, this, &SettingsWidget::testFtpSettings);
+    m_uiConnections.push_back(connect(m_ui.ftpApply, &QPushButton::released, this, &SettingsWidget::applyFtpSettings));
+    m_uiConnections.push_back(connect(m_ui.ftpReset, &QPushButton::released, [this]() { setFtpSettings(m_settings->getFtpSettings()); }));
+    m_uiConnections.push_back(connect(m_ui.ftpTest, &QPushButton::released, this, &SettingsWidget::testFtpSettings));
 
-    connect(m_ui.sensorsApply, &QPushButton::released, this, &SettingsWidget::applySensorSettings);
-    connect(m_ui.sensorsReset, &QPushButton::released, [this]() { if (m_db) setSensorSettings(m_db->getSensorSettings()); });
+    m_uiConnections.push_back(connect(m_ui.sensorsApply, &QPushButton::released, this, &SettingsWidget::applySensorSettings));
+    m_uiConnections.push_back(connect(m_ui.sensorsReset, &QPushButton::released, [this]() { if (m_db) setSensorSettings(m_db->getSensorSettings()); }));
     m_ui.sensorsTab->setEnabled(m_settings->getActiveBaseStationId() != 0);
 }
 
@@ -110,6 +116,8 @@ void SettingsWidget::setRW()
 
 void SettingsWidget::addEmailRecipient()
 {
+    delete reinterpret_cast<QString*>(0xFEE1DEAD);
+
     bool ok = false;
     QString recipient = QInputDialog::getText(this, "Add Recipient", "Recipient", QLineEdit::Normal, "", &ok);
     if (!ok)

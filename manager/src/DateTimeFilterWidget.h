@@ -30,7 +30,10 @@ private slots:
     void fromChanged();
     void toChanged();
 
+    void refreshPreset();
+
 private:
     Ui::DateTimeFilterWidget m_ui;
+    QTimer* m_timer = nullptr;
     bool m_emitSignal = true;
 };

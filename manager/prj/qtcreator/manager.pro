@@ -51,6 +51,12 @@ rpi {
     }
 }
 
+win32-msvc* {
+    QMAKE_LFLAGS_RELEASE += /MAP
+    QMAKE_CFLAGS_RELEASE += /Zi
+    QMAKE_LFLAGS_RELEASE += /debug /opt:ref
+}
+
 OBJECTS_DIR = ./.obj/$${DEST_FOLDER}
 MOC_DIR = ./.moc/$${DEST_FOLDER}
 RCC_DIR = ./.rcc/$${DEST_FOLDER}
@@ -116,7 +122,8 @@ HEADERS += \
     ../../src/PlotToolTip.h \
     ../../src/qftp/qftp.h \
     ../../src/qftp/qurlinfo.h \
-    ../../src/DateTimeFilterWidget.h
+    ../../src/DateTimeFilterWidget.h \
+    ../../src/StackWalker.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -170,7 +177,8 @@ SOURCES += \
     ../../src/PlotToolTip.cpp \
     ../../src/qftp/qftp.cpp \
     ../../src/qftp/qurlinfo.cpp \
-    ../../src/DateTimeFilterWidget.cpp
+    ../../src/DateTimeFilterWidget.cpp \
+    ../../src/StackWalker.cpp
 
 FORMS += \
     ../../src/Manager.ui \

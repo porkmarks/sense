@@ -29,5 +29,6 @@ private:
     Ui::LogsWidget m_ui;
     std::unique_ptr<LogsModel> m_model;
     QSortFilterProxyModel m_sortingModel;
+    std::vector<QMetaObject::Connection> m_uiConnections;
 };
 

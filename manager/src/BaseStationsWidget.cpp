@@ -2,6 +2,7 @@
 #include "Settings.h"
 #include <cassert>
 #include <QMessageBox>
+#include <QSettings>
 
 extern std::string getMacStr(Settings::BaseStationDescriptor::Mac const& mac);
 
@@ -12,14 +13,26 @@ BaseStationsWidget::BaseStationsWidget(QWidget *parent)
 {
     m_ui.setupUi(this);
     m_ui.list->setModel(&m_model);
+    m_ui.list->setUniformRowHeights(true);
 
     m_model.setColumnCount(4);
     m_model.setHorizontalHeaderLabels({"Name", "MAC", "IP", "Status"});
 
-    m_ui.list->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-    m_ui.list->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
-    m_ui.list->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
-    m_ui.list->header()->setSectionResizeMode(3, QHeaderView::Stretch);
+//    m_ui.list->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+//    m_ui.list->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+//    m_ui.list->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+//    m_ui.list->header()->setSectionResizeMode(3, QHeaderView::Stretch);
+
+    connect(m_ui.list->header(), &QHeaderView::sectionResized, [this]()
+    {
+        QSettings settings;
+        settings.setValue("baseStations/list/state", m_ui.list->header()->saveState());
+    });
+
+    {
+        QSettings settings;
+        m_ui.list->header()->restoreState(settings.value("baseStations/list/state").toByteArray());
+    }
 
     connect(m_ui.list, &QTreeView::doubleClicked, this, &BaseStationsWidget::activateBaseStation);
 }
@@ -37,13 +50,19 @@ BaseStationsWidget::~BaseStationsWidget()
 
 void BaseStationsWidget::init(Comms& comms, Settings& settings)
 {
+    for (const QMetaObject::Connection& connection: m_uiConnections)
+    {
+        QObject::disconnect(connection);
+    }
+    m_uiConnections.clear();
+
     setEnabled(true);
 
     m_comms = &comms;
     m_settings = &settings;
 
-    connect(m_comms, &Comms::baseStationDiscovered, this, &BaseStationsWidget::baseStationDiscovered);
-    connect(m_comms, &Comms::baseStationDisconnected, this, &BaseStationsWidget::baseStationDisconnected);
+    m_uiConnections.push_back(connect(m_comms, &Comms::baseStationDiscovered, this, &BaseStationsWidget::baseStationDiscovered));
+    m_uiConnections.push_back(connect(m_comms, &Comms::baseStationDisconnected, this, &BaseStationsWidget::baseStationDisconnected));
 
     for (size_t i = 0; i < settings.getBaseStationCount(); i++)
     {
@@ -66,16 +85,12 @@ void BaseStationsWidget::init(Comms& comms, Settings& settings)
             macItem->setEditable(false);
         }
 
-        {
-            char buf[128];
-            sprintf(buf, "  %s  ", bs.descriptor.address.toString().toLatin1().data());
-            ipItem->setText(buf);
-            ipItem->setEditable(false);
-        }
-
         m_model.appendRow({ nameItem, macItem, ipItem, statusItem });
 
-        bool connected = m_comms->connectToBaseStation(m_settings->getBaseStationDB(i), bs.descriptor.address);
+        QHostAddress address = m_comms->getBaseStationAddress(bs.descriptor.mac);
+        setAddress(i, address);
+
+        bool connected = m_comms->connectToBaseStation(m_settings->getBaseStationDB(i), bs.descriptor.mac);
         if (settings.getActiveBaseStationId() == bs.id)
         {
             setStatus(i, connected ? "Active / Connected" : "Active / Disconnected");
@@ -87,7 +102,7 @@ void BaseStationsWidget::init(Comms& comms, Settings& settings)
     }
 
     setRW();
-    connect(&settings, &Settings::userLoggedIn, this, &BaseStationsWidget::setRW);
+    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &BaseStationsWidget::setRW));
 }
 
 
@@ -103,8 +118,19 @@ void BaseStationsWidget::setRW()
 
 void BaseStationsWidget::setStatus(int row, std::string const& status)
 {
-    QStandardItem* statusItem = m_model.item(row, 3);
-    statusItem->setText(status.c_str());
+    QStandardItem* item = m_model.item(row, 3);
+    item->setText(status.c_str());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void BaseStationsWidget::setAddress(int row, QHostAddress const& address)
+{
+    QStandardItem* item = m_model.item(row, 2);
+    char buf[128];
+    sprintf(buf, "  %s  ", address.isNull() ? "N/A" : address.toString().toLatin1().data());
+    item->setText(buf);
+    item->setEditable(false);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -139,13 +165,13 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
     Settings::BaseStationDescriptor descriptor;
     descriptor.mac = commsBSDescriptor.mac;
     descriptor.name = commsBSDescriptor.name;
-    descriptor.address = commsBSDescriptor.address;
+    //descriptor.address = commsBSDescriptor.address;
     if (m_settings->addBaseStation(descriptor))
     {
         int32_t index = m_settings->findBaseStationIndexByMac(descriptor.mac);
         if (index >= 0)
         {
-            bool connected = m_comms->connectToBaseStation(m_settings->getBaseStationDB(index), commsBSDescriptor.address);
+            bool connected = m_comms->connectToBaseStation(m_settings->getBaseStationDB(index), commsBSDescriptor.mac);
             setStatus(bsIndex, connected ? "Added / Connected" : "Added / Disconnected");
         }
     }
@@ -155,10 +181,10 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
 
 //////////////////////////////////////////////////////////////////////////
 
-void BaseStationsWidget::baseStationDisconnected(Comms::BaseStationDescriptor const& bs)
+void BaseStationsWidget::baseStationDisconnected(Comms::BaseStationDescriptor const& commsBS)
 {
     {
-        int32_t bsIndex = m_settings->findBaseStationIndexByMac(bs.mac);
+        int32_t bsIndex = m_settings->findBaseStationIndexByMac(commsBS.mac);
         if (bsIndex >= 0)
         {
             Settings::BaseStation const& bs = m_settings->getBaseStation(bsIndex);
@@ -172,12 +198,14 @@ void BaseStationsWidget::baseStationDisconnected(Comms::BaseStationDescriptor co
                 setStatus(bsIndex, "Added / Disconnected");
             }
 
+            setAddress(bsIndex, commsBS.address);
+
             return;
         }
     }
 
     {
-        auto it = std::find_if(m_unregisteredBaseStations.begin(), m_unregisteredBaseStations.end(), [&bs](Comms::BaseStationDescriptor const& descriptor) { return descriptor == bs; });
+        auto it = std::find_if(m_unregisteredBaseStations.begin(), m_unregisteredBaseStations.end(), [&commsBS](Comms::BaseStationDescriptor const& descriptor) { return descriptor == commsBS; });
         if (it == m_unregisteredBaseStations.end())
         {
             return;
@@ -192,14 +220,14 @@ void BaseStationsWidget::baseStationDisconnected(Comms::BaseStationDescriptor co
 
 //////////////////////////////////////////////////////////////////////////
 
-void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor const& bs)
+void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor const& commsBS)
 {
-    int32_t bsIndex = m_settings->findBaseStationIndexByMac(bs.mac);
+    int32_t bsIndex = m_settings->findBaseStationIndexByMac(commsBS.mac);
     if (bsIndex >= 0)
     {
         Settings::BaseStation const& bs = m_settings->getBaseStation(bsIndex);
 
-        bool connected = m_comms->connectToBaseStation(m_settings->getBaseStationDB(bsIndex), bs.descriptor.address);
+        bool connected = m_comms->connectToBaseStation(m_settings->getBaseStationDB(bsIndex), bs.descriptor.mac);
         if (m_settings->getActiveBaseStationId() == bs.id)
         {
             setStatus(bsIndex, connected ? "Active / Connected" : "Active / Disconnected");
@@ -209,15 +237,17 @@ void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor cons
             setStatus(bsIndex, connected ? "Added / Connected" : "Added / Disconnected");
         }
 
+        setAddress(bsIndex, commsBS.address);
+
         return;
     }
 
-    auto it = std::find_if(m_unregisteredBaseStations.begin(), m_unregisteredBaseStations.end(), [&bs](Comms::BaseStationDescriptor const& descriptor) { return descriptor == bs; });
+    auto it = std::find_if(m_unregisteredBaseStations.begin(), m_unregisteredBaseStations.end(), [&commsBS](Comms::BaseStationDescriptor const& descriptor) { return descriptor == commsBS; });
     if (it != m_unregisteredBaseStations.end())
     {
         return;
     }
-    m_unregisteredBaseStations.push_back(bs);
+    m_unregisteredBaseStations.push_back(commsBS);
 
     QStandardItem* nameItem = new QStandardItem();
     QStandardItem* macItem = new QStandardItem();
@@ -225,19 +255,19 @@ void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor cons
     QStandardItem* statusItem = new QStandardItem();
 
     {
-        nameItem->setText(bs.name.c_str());
+        nameItem->setText(commsBS.name.c_str());
         nameItem->setIcon(QIcon(":/icons/ui/station.png"));
         nameItem->setEditable(false);
     }
 
     {
-        macItem->setText(QString("   %1   ").arg(getMacStr(bs.mac).c_str()));
+        macItem->setText(QString("   %1   ").arg(getMacStr(commsBS.mac).c_str()));
         macItem->setEditable(false);
     }
 
     {
         char buf[128];
-        sprintf(buf, "  %s  ", bs.address.toString().toLatin1().data());
+        sprintf(buf, "  %s  ", commsBS.address.toString().toLatin1().data());
         ipItem->setText(buf);
         ipItem->setEditable(false);
     }

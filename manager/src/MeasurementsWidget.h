@@ -41,5 +41,7 @@ private:
     QSortFilterProxyModel m_sortingModel;
     std::unique_ptr<MeasurementsDelegate> m_delegate;
     std::vector<DB::SensorId> m_selectedSensorIds;
+
+    std::vector<QMetaObject::Connection> m_uiConnections;
 };
 
