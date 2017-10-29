@@ -55,16 +55,18 @@ void ExportDataDialog::accept()
         return;
     }
 
-    std::ofstream file(fileName.toUtf8().data());
-    if (!file.is_open())
     {
-        QMessageBox::critical(this, "Error", QString("Cannot open file '%1' for writing:\n%2").arg(fileName).arg(std::strerror(errno)));
-        return;
+        std::ofstream file(fileName.toUtf8().data());
+        if (!file.is_open())
+        {
+            QMessageBox::critical(this, "Error", QString("Cannot open file '%1' for writing:\n%2").arg(fileName).arg(std::strerror(errno)));
+            return;
+        }
+
+        exportTo(file, size_t(-1));
+
+        file.close();
     }
-
-    exportTo(file, size_t(-1));
-
-    file.close();
 
     QMessageBox::information(this, "Success", QString("Data was exported to file '%1'").arg(fileName));
 

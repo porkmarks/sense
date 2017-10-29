@@ -47,7 +47,7 @@ Emailer::Emailer(Settings& settings, DB& db)
 
     m_timer.setSingleShot(false);
     m_timer.setInterval(60 * 1000); //every minute
-    m_timer.start(1);
+    m_timer.start();
     connect(&m_timer, &QTimer::timeout, this, &Emailer::checkReports);
 }
 

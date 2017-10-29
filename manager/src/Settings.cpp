@@ -90,14 +90,17 @@ bool Settings::load(std::string const& name)
     Data data;
 
     {
-        std::ifstream file(dataFilename, std::ios_base::binary);
-        if (!file.is_open())
+        std::string streamData;
         {
-            s_logger.logCritical(QString("Failed to open '%1': %2").arg(dataFilename.c_str()).arg(std::strerror(errno)));
-            return false;
-        }
+            std::ifstream file(dataFilename, std::ios_base::binary);
+            if (!file.is_open())
+            {
+                s_logger.logCritical(QString("Failed to open '%1': %2").arg(dataFilename.c_str()).arg(std::strerror(errno)));
+                return false;
+            }
 
-        std::string streamData((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+            streamData = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        }
 
         Crypt crypt;
         crypt.setKey(k_fileEncryptionKey);
@@ -397,8 +400,6 @@ bool Settings::load(std::string const& name)
             }
         }
         data.activeBaseStationId = id;
-
-        file.close();
     }
 
     //load the databases
@@ -1055,17 +1056,19 @@ void Settings::save(Data const& data) const
 //        QByteArray encryptedData = QByteArray(buffer.GetString(), buffer.GetSize());
 
         std::string tempFilename = (s_dataFolder + "/" + m_dataName + "_temp");
-        std::ofstream file(tempFilename, std::ios_base::binary);
-        if (!file.is_open())
         {
-            s_logger.logCritical(QString("Failed to open '%1': %2").arg(tempFilename.c_str()).arg(std::strerror(errno)));
+            std::ofstream file(tempFilename, std::ios_base::binary);
+            if (!file.is_open())
+            {
+                s_logger.logCritical(QString("Failed to open '%1': %2").arg(tempFilename.c_str()).arg(std::strerror(errno)));
+            }
+            else
+            {
+                file.write(encryptedData.data(), encryptedData.size());
+            }
+            file.flush();
+            file.close();
         }
-        else
-        {
-            file.write(encryptedData.data(), encryptedData.size());
-        }
-        file.flush();
-        file.close();
 
         copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/incremental", 50);
 

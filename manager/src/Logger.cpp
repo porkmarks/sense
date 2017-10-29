@@ -86,15 +86,18 @@ bool Logger::load(std::string const& name)
     data.storedLogLines.reserve(8192);
 
     {
-        std::ifstream file(dataFilename, std::ios_base::binary);
-        if (!file.is_open())
+        std::string streamData;
         {
-            std::cerr << "Failed to open " << dataFilename << " file: " << std::strerror(errno) << "\n";
-            return false;
-        }
+            std::ifstream file(dataFilename, std::ios_base::binary);
+            if (!file.is_open())
+            {
+                std::cerr << "Failed to open " << dataFilename << " file: " << std::strerror(errno) << "\n";
+                return false;
+            }
 
-        std::string streamData((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-        file.close();
+            streamData = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+            file.close();
+        }
 
         Crypt crypt;
         crypt.setKey(k_fileEncryptionKey);
@@ -441,17 +444,19 @@ void Logger::save(Data const& data) const
 //        QByteArray encryptedData = QByteArray(buffer.GetString(), buffer.GetSize());
 
         std::string tempFilename = (m_dataFolder + "/" + m_dataName + "_temp");
-        std::ofstream file(tempFilename, std::ios_base::binary);
-        if (!file.is_open())
         {
-            std::cerr << "Failed to open " << tempFilename << " file: " << std::strerror(errno) << "\n";
+            std::ofstream file(tempFilename, std::ios_base::binary);
+            if (!file.is_open())
+            {
+                std::cerr << "Failed to open " << tempFilename << " file: " << std::strerror(errno) << "\n";
+            }
+            else
+            {
+                file.write(encryptedData.data(), encryptedData.size());
+            }
+            file.flush();
+            file.close();
         }
-        else
-        {
-            file.write(encryptedData.data(), encryptedData.size());
-        }
-        file.flush();
-        file.close();
 
         if (!renameFile(tempFilename.c_str(), dataFilename.c_str()))
         {
