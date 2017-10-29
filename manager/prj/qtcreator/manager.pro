@@ -30,6 +30,8 @@ INCLUDEPATH += ../../../common/src/rapidjson/include
 PRECOMPILED_HEADER = ../../src/stdafx.h
 CONFIG *= precompile_header
 
+win32: RC_ICONS = ../../res/icons/ui/manager.ico
+
 ROOT_LIBS_PATH = ../../../..
 
 rpi {
@@ -123,7 +125,8 @@ HEADERS += \
     ../../src/qftp/qftp.h \
     ../../src/qftp/qurlinfo.h \
     ../../src/DateTimeFilterWidget.h \
-    ../../src/StackWalker.h
+    ../../src/StackWalker.h \
+    ../../src/SensorsFilterWidget.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -178,7 +181,8 @@ SOURCES += \
     ../../src/qftp/qftp.cpp \
     ../../src/qftp/qurlinfo.cpp \
     ../../src/DateTimeFilterWidget.cpp \
-    ../../src/StackWalker.cpp
+    ../../src/StackWalker.cpp \
+    ../../src/SensorsFilterWidget.cpp
 
 FORMS += \
     ../../src/Manager.ui \
@@ -202,7 +206,8 @@ FORMS += \
     ../../src/LoginDialog.ui \
     ../../src/LogsWidget.ui \
     ../../src/ExportLogsDialog.ui \
-    ../../src/DateTimeFilterWidget.ui
+    ../../src/DateTimeFilterWidget.ui \
+    ../../src/SensorsFilterWidget.ui
 
 DISTFILES += \
 
