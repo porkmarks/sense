@@ -1,4 +1,5 @@
 #include "PlotWidget.h"
+#include <QSettings>
 
 #include "ExportPicDialog.h"
 #include "ExportDataDialog.h"
@@ -49,6 +50,8 @@ void PlotWidget::init(DB& db)
     m_uiConnections.push_back(connect(m_ui.showTemperature, &QCheckBox::stateChanged, this, &PlotWidget::refresh, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.showHumidity, &QCheckBox::stateChanged, this, &PlotWidget::refresh, Qt::QueuedConnection));
 
+    loadSettings();
+
     refresh();
 }
 
@@ -56,9 +59,105 @@ void PlotWidget::init(DB& db)
 
 void PlotWidget::shutdown()
 {
+    saveSettings();
+
     setEnabled(false);
     m_series.clear();
     m_db = nullptr;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::loadSettings()
+{
+    m_ui.dateTimeFilter->loadSettings();
+
+    bool showTemperature = m_ui.showTemperature->isChecked();
+    bool showHumidity = m_ui.showHumidity->isChecked();
+    bool fitMeasurements = m_ui.fitMeasurements->isChecked();
+    bool useSmoothing = m_ui.useSmoothing->isChecked();
+    double minHumidity = m_ui.minHumidity->value();
+    double maxHumidity = m_ui.maxHumidity->value();
+    double minTemperature = m_ui.minTemperature->value();
+    double maxTemperature = m_ui.maxTemperature->value();
+    std::set<DB::SensorId> selectedSensorIds = m_selectedSensorIds;
+
+    m_ui.showTemperature->blockSignals(true);
+    m_ui.showHumidity->blockSignals(true);
+    m_ui.fitMeasurements->blockSignals(true);
+    m_ui.useSmoothing->blockSignals(true);
+    m_ui.minHumidity->blockSignals(true);
+    m_ui.maxHumidity->blockSignals(true);
+    m_ui.minTemperature->blockSignals(true);
+    m_ui.maxTemperature->blockSignals(true);
+
+    QSettings settings;
+    m_ui.showTemperature->setChecked(settings.value("filter/showTemperature", true).toBool());
+    m_ui.showHumidity->setChecked(settings.value("filter/showHumidity", true).toBool());
+    m_ui.fitMeasurements->setChecked(settings.value("filter/fitMeasurements", true).toBool());
+    m_ui.useSmoothing->setChecked(settings.value("rendering/useSmoothing", true).toBool());
+    m_ui.minHumidity->setValue(settings.value("rendering/minHumidity", 0.0).toDouble());
+    m_ui.maxHumidity->setValue(settings.value("rendering/maxHumidity", 100.0).toDouble());
+    m_ui.minTemperature->setValue(settings.value("rendering/minTemperature", 0.0).toDouble());
+    m_ui.maxTemperature->setValue(settings.value("rendering/maxTemperature", 100.0).toDouble());
+
+    m_ui.showTemperature->blockSignals(false);
+    m_ui.showHumidity->blockSignals(false);
+    m_ui.fitMeasurements->blockSignals(false);
+    m_ui.useSmoothing->blockSignals(false);
+    m_ui.minHumidity->blockSignals(false);
+    m_ui.maxHumidity->blockSignals(false);
+    m_ui.minTemperature->blockSignals(false);
+    m_ui.maxTemperature->blockSignals(false);
+
+    m_selectedSensorIds.clear();
+    QList<QVariant> ssid = settings.value("filter/selectedSensors", QList<QVariant>()).toList();
+    for (QVariant const& v: ssid)
+    {
+        bool ok = true;
+        DB::SensorId id = v.toUInt(&ok);
+        if (ok)
+        {
+            m_selectedSensorIds.insert(id);
+        }
+    }
+
+    if (showTemperature != m_ui.showTemperature->isChecked() ||
+            showHumidity != m_ui.showHumidity->isChecked() ||
+            fitMeasurements != m_ui.fitMeasurements->isChecked() ||
+            useSmoothing != m_ui.useSmoothing->isChecked() ||
+            minHumidity != m_ui.minHumidity->value() ||
+            maxHumidity != m_ui.maxHumidity->value() ||
+            minTemperature != m_ui.minTemperature->value() ||
+            maxTemperature != m_ui.maxTemperature->value() ||
+            selectedSensorIds != m_selectedSensorIds)
+    {
+        refresh();
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::saveSettings()
+{
+    m_ui.dateTimeFilter->saveSettings();
+
+    QSettings settings;
+    settings.setValue("filter/showTemperature", m_ui.showTemperature->isChecked());
+    settings.setValue("filter/showHumidity", m_ui.showHumidity->isChecked());
+    settings.setValue("filter/fitMeasurements", m_ui.fitMeasurements->isChecked());
+    settings.setValue("rendering/useSmoothing", m_ui.useSmoothing->isChecked());
+    settings.setValue("rendering/minHumidity", m_ui.minHumidity->value());
+    settings.setValue("rendering/maxHumidity", m_ui.maxHumidity->value());
+    settings.setValue("rendering/minTemperature", m_ui.minTemperature->value());
+    settings.setValue("rendering/maxTemperature", m_ui.maxTemperature->value());
+
+    QList<QVariant> ssid;
+    for (DB::SensorId id: m_selectedSensorIds)
+    {
+        ssid.append(id);
+    }
+    settings.setValue("filter/selectedSensors", ssid);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -112,67 +211,23 @@ void PlotWidget::selectSensors()
     Ui::SensorsFilterDialog ui;
     ui.setupUi(&dialog);
 
-    SensorsModel model(*m_db);
-    model.setShowCheckboxes(true);
-
-    QSortFilterProxyModel sortingModel;
-    sortingModel.setSourceModel(&model);
-
-    SensorsDelegate delegate(sortingModel);
+    ui.filter->init(*m_db);
 
     size_t sensorCount = m_db->getSensorCount();
     if (m_selectedSensorIds.empty())
     {
         for (size_t i = 0; i < sensorCount; i++)
         {
-            model.setSensorChecked(m_db->getSensor(i).id, true);
+            ui.filter->getSensorModel().setSensorChecked(m_db->getSensor(i).id, true);
         }
     }
     else
     {
         for (DB::SensorId id: m_selectedSensorIds)
         {
-            model.setSensorChecked(id, true);
+            ui.filter->getSensorModel().setSensorChecked(id, true);
         }
     }
-
-    auto updateSelectionCheckboxes = [this, &model, &ui, sensorCount]()
-    {
-        bool allSensorsChecked = true;
-        bool anySensorsChecked = false;
-        for (size_t i = 0; i < sensorCount; i++)
-        {
-            bool isChecked = model.isSensorChecked(m_db->getSensor(i).id);
-            allSensorsChecked &= isChecked;
-            anySensorsChecked |= isChecked;
-        }
-        ui.selectAll->blockSignals(true);
-        ui.selectAll->setCheckState(allSensorsChecked ? Qt::Checked : (anySensorsChecked ? Qt::PartiallyChecked : Qt::Unchecked));
-        ui.selectAll->blockSignals(false);
-    };
-    updateSelectionCheckboxes();
-
-    connect(&model, &SensorsModel::sensorCheckedChanged, updateSelectionCheckboxes);
-    connect(ui.selectAll, &QCheckBox::stateChanged, [sensorCount, &model, &ui, this]()
-    {
-        if (ui.selectAll->checkState() != Qt::PartiallyChecked)
-        {
-            for (size_t i = 0; i < sensorCount; i++)
-            {
-                model.setSensorChecked(m_db->getSensor(i).id, ui.selectAll->isChecked());
-            }
-        }
-    });
-
-
-    ui.list->setModel(&sortingModel);
-    ui.list->setItemDelegate(&delegate);
-
-    for (int i = 0; i < model.columnCount(); i++)
-    {
-        ui.list->header()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
-    }
-    ui.list->header()->setStretchLastSection(true);
 
     int result = dialog.exec();
     if (result == QDialog::Accepted)
@@ -181,9 +236,9 @@ void PlotWidget::selectSensors()
         for (size_t i = 0; i < sensorCount; i++)
         {
             DB::Sensor const& sensor = m_db->getSensor(i);
-            if (model.isSensorChecked(sensor.id))
+            if (ui.filter->getSensorModel().isSensorChecked(sensor.id))
             {
-                m_selectedSensorIds.push_back(sensor.id);
+                m_selectedSensorIds.insert(sensor.id);
             }
         }
     }

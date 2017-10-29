@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>911</width>
+    <width>733</width>
     <height>758</height>
    </rect>
   </property>
@@ -31,6 +31,12 @@
       </property>
       <item>
        <widget class="QGroupBox" name="groupBox">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="title">
          <string>Triggers</string>
         </property>
@@ -450,11 +456,7 @@
           <number>2</number>
          </property>
          <item>
-          <widget class="QTreeView" name="sensorList">
-           <property name="alternatingRowColors">
-            <bool>true</bool>
-           </property>
-          </widget>
+          <widget class="SensorsFilterWidget" name="sensorFilter" native="true"/>
          </item>
         </layout>
        </widget>
@@ -474,6 +476,14 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>SensorsFilterWidget</class>
+   <extends>QWidget</extends>
+   <header>SensorsFilterWidget.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <tabstops>
   <tabstop>name</tabstop>
   <tabstop>lowTemperatureWatch</tabstop>
@@ -488,7 +498,6 @@
   <tabstop>lowSignalWatch</tabstop>
   <tabstop>sendEmailAction</tabstop>
   <tabstop>sensorGroup</tabstop>
-  <tabstop>sensorList</tabstop>
  </tabstops>
  <resources>
   <include location="../res/res.qrc"/>

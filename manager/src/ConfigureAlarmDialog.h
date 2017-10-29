@@ -5,8 +5,6 @@
 #include "ui_ConfigureAlarmDialog.h"
 
 #include "DB.h"
-#include "SensorsModel.h"
-#include "SensorsDelegate.h"
 
 class ConfigureAlarmDialog : public QDialog
 {
@@ -24,7 +22,4 @@ private:
 
     DB& m_db;
     DB::Alarm m_alarm;
-    SensorsModel m_model;
-    QSortFilterProxyModel m_sortingModel;
-    SensorsDelegate m_delegate;
 };

@@ -118,12 +118,16 @@ void MeasurementsWidget::init(DB& db)
     m_uiConnections.push_back(connect(m_ui.showHumidity, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.showBattery, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.showSignal, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
+
+    loadSettings();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void MeasurementsWidget::shutdown()
 {
+    saveSettings();
+
     setEnabled(false);
     m_ui.list->setModel(nullptr);
     m_ui.list->setItemDelegate(nullptr);
@@ -131,6 +135,112 @@ void MeasurementsWidget::shutdown()
     m_model.reset();
     m_delegate.reset();
     m_db = nullptr;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsWidget::loadSettings()
+{
+    m_ui.dateTimeFilter->loadSettings();
+
+    bool showTemperature = m_ui.showTemperature->isChecked();
+    bool showHumidity = m_ui.showHumidity->isChecked();
+    bool showBattery = m_ui.showBattery->isChecked();
+    bool showSignal = m_ui.showSignal->isChecked();
+    bool useTemperature = m_ui.useTemperature->isChecked();
+    bool useHumidity = m_ui.useHumidity->isChecked();
+    double minHumidity = m_ui.minHumidity->value();
+    double maxHumidity = m_ui.maxHumidity->value();
+    double minTemperature = m_ui.minTemperature->value();
+    double maxTemperature = m_ui.maxTemperature->value();
+    std::set<DB::SensorId> selectedSensorIds = m_selectedSensorIds;
+
+    m_ui.showTemperature->blockSignals(true);
+    m_ui.showHumidity->blockSignals(true);
+    m_ui.showBattery->blockSignals(true);
+    m_ui.showSignal->blockSignals(true);
+    m_ui.useTemperature->blockSignals(true);
+    m_ui.useHumidity->blockSignals(true);
+    m_ui.minHumidity->blockSignals(true);
+    m_ui.maxHumidity->blockSignals(true);
+    m_ui.minTemperature->blockSignals(true);
+    m_ui.maxTemperature->blockSignals(true);
+
+    QSettings settings;
+    m_ui.showTemperature->setChecked(settings.value("filter/showTemperature", true).toBool());
+    m_ui.showHumidity->setChecked(settings.value("filter/showHumidity", true).toBool());
+    m_ui.showBattery->setChecked(settings.value("filter/showBattery", true).toBool());
+    m_ui.showSignal->setChecked(settings.value("filter/showSignal", true).toBool());
+    m_ui.useTemperature->setChecked(settings.value("filter/useTemperature", true).toBool());
+    m_ui.useHumidity->setChecked(settings.value("filter/useHumidity", true).toBool());
+    m_ui.minHumidity->setValue(settings.value("filter/minHumidity", 0.0).toDouble());
+    m_ui.maxHumidity->setValue(settings.value("filter/maxHumidity", 100.0).toDouble());
+    m_ui.minTemperature->setValue(settings.value("filter/minTemperature", 0.0).toDouble());
+    m_ui.maxTemperature->setValue(settings.value("filter/maxTemperature", 100.0).toDouble());
+
+    m_ui.showTemperature->blockSignals(false);
+    m_ui.showHumidity->blockSignals(false);
+    m_ui.showBattery->blockSignals(false);
+    m_ui.showSignal->blockSignals(false);
+    m_ui.useTemperature->blockSignals(false);
+    m_ui.useHumidity->blockSignals(false);
+    m_ui.minHumidity->blockSignals(false);
+    m_ui.maxHumidity->blockSignals(false);
+    m_ui.minTemperature->blockSignals(false);
+    m_ui.maxTemperature->blockSignals(false);
+
+    m_selectedSensorIds.clear();
+    QList<QVariant> ssid = settings.value("filter/selectedSensors", QList<QVariant>()).toList();
+    for (QVariant const& v: ssid)
+    {
+        bool ok = true;
+        DB::SensorId id = v.toUInt(&ok);
+        if (ok)
+        {
+            m_selectedSensorIds.insert(id);
+        }
+    }
+
+    if (showTemperature != m_ui.showTemperature->isChecked() ||
+            showHumidity != m_ui.showHumidity->isChecked() ||
+            showBattery != m_ui.showBattery->isChecked() ||
+            showSignal != m_ui.showSignal->isChecked() ||
+            useTemperature != m_ui.useTemperature->isChecked() ||
+            useHumidity != m_ui.useHumidity->isChecked() ||
+            minHumidity != m_ui.minHumidity->value() ||
+            maxHumidity != m_ui.maxHumidity->value() ||
+            minTemperature != m_ui.minTemperature->value() ||
+            maxTemperature != m_ui.maxTemperature->value() ||
+            selectedSensorIds != m_selectedSensorIds)
+    {
+        refresh();
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsWidget::saveSettings()
+{
+    m_ui.dateTimeFilter->saveSettings();
+
+    QSettings settings;
+    settings.setValue("filter/showTemperature", m_ui.showTemperature->isChecked());
+    settings.setValue("filter/showHumidity", m_ui.showHumidity->isChecked());
+    settings.setValue("filter/showBattery", m_ui.showBattery->isChecked());
+    settings.setValue("filter/showSignal", m_ui.showSignal->isChecked());
+    settings.setValue("filter/useTemperature", m_ui.useTemperature->isChecked());
+    settings.setValue("filter/useHumidity", m_ui.useHumidity->isChecked());
+    settings.setValue("filter/minHumidity", m_ui.minHumidity->value());
+    settings.setValue("filter/maxHumidity", m_ui.maxHumidity->value());
+    settings.setValue("filter/minTemperature", m_ui.minTemperature->value());
+    settings.setValue("filter/maxTemperature", m_ui.maxTemperature->value());
+
+    QList<QVariant> ssid;
+    for (DB::SensorId id: m_selectedSensorIds)
+    {
+        ssid.append(id);
+    }
+    settings.setValue("filter/selectedSensors", ssid);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -253,67 +363,23 @@ void MeasurementsWidget::selectSensors()
     Ui::SensorsFilterDialog ui;
     ui.setupUi(&dialog);
 
-    SensorsModel model(*m_db);
-    model.setShowCheckboxes(true);
-
-    QSortFilterProxyModel sortingModel;
-    sortingModel.setSourceModel(&model);
-
-    SensorsDelegate delegate(sortingModel);
+    ui.filter->init(*m_db);
 
     size_t sensorCount = m_db->getSensorCount();
     if (m_selectedSensorIds.empty())
     {
         for (size_t i = 0; i < sensorCount; i++)
         {
-            model.setSensorChecked(m_db->getSensor(i).id, true);
+            ui.filter->getSensorModel().setSensorChecked(m_db->getSensor(i).id, true);
         }
     }
     else
     {
         for (DB::SensorId id: m_selectedSensorIds)
         {
-            model.setSensorChecked(id, true);
+            ui.filter->getSensorModel().setSensorChecked(id, true);
         }
     }
-
-    auto updateSelectionCheckboxes = [this, &model, &ui, sensorCount]()
-    {
-        bool allSensorsChecked = true;
-        bool anySensorsChecked = false;
-        for (size_t i = 0; i < sensorCount; i++)
-        {
-            bool isChecked = model.isSensorChecked(m_db->getSensor(i).id);
-            allSensorsChecked &= isChecked;
-            anySensorsChecked |= isChecked;
-        }
-        ui.selectAll->blockSignals(true);
-        ui.selectAll->setCheckState(allSensorsChecked ? Qt::Checked : (anySensorsChecked ? Qt::PartiallyChecked : Qt::Unchecked));
-        ui.selectAll->blockSignals(false);
-    };
-    updateSelectionCheckboxes();
-
-    connect(&model, &SensorsModel::sensorCheckedChanged, updateSelectionCheckboxes);
-    connect(ui.selectAll, &QCheckBox::stateChanged, [sensorCount, &model, &ui, this]()
-    {
-        if (ui.selectAll->checkState() != Qt::PartiallyChecked)
-        {
-            for (size_t i = 0; i < sensorCount; i++)
-            {
-                model.setSensorChecked(m_db->getSensor(i).id, ui.selectAll->isChecked());
-            }
-        }
-    });
-
-
-    ui.list->setModel(&sortingModel);
-    ui.list->setItemDelegate(&delegate);
-
-    for (int i = 0; i < model.columnCount(); i++)
-    {
-        ui.list->header()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
-    }
-    ui.list->header()->setStretchLastSection(true);
 
     int result = dialog.exec();
     if (result == QDialog::Accepted)
@@ -322,9 +388,9 @@ void MeasurementsWidget::selectSensors()
         for (size_t i = 0; i < sensorCount; i++)
         {
             DB::Sensor const& sensor = m_db->getSensor(i);
-            if (model.isSensorChecked(sensor.id))
+            if (ui.filter->getSensorModel().isSensorChecked(sensor.id))
             {
-                m_selectedSensorIds.push_back(sensor.id);
+                m_selectedSensorIds.insert(sensor.id);
             }
         }
     }

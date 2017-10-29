@@ -27,7 +27,7 @@ public:
         Humidity,
         Battery,
         Signal,
-        State,
+        NextComms,
         Alarms
     };
 

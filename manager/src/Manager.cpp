@@ -67,6 +67,9 @@ Manager::Manager(QWidget *parent)
     connect(&m_settings, &Settings::baseStationActivated, this, &Manager::activateBaseStation);
     connect(&m_settings, &Settings::baseStationDeactivated, this, &Manager::deactivateBaseStation);
 
+    connect(m_ui.tabWidget, &QTabWidget::currentChanged, this, &Manager::tabChanged);
+    m_currentTabIndex = m_ui.tabWidget->currentIndex();
+
     readSettings();
 
     show();
@@ -96,6 +99,7 @@ Manager::~Manager()
     delete m_ui.alarmsWidget;
     delete m_ui.logsWidget;
 //    delete m_ui.reportsWidget;
+    delete m_ui.tabWidget;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -224,6 +228,24 @@ void Manager::userLoggedIn(Settings::UserId id)
         Settings::User const& user = m_settings.getUser(index);
         setWindowTitle(QString("Manager (%1)").arg(user.descriptor.name.c_str()));
     }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Manager::tabChanged()
+{
+    if (m_currentTabIndex == 1 && m_ui.tabWidget->currentIndex() == 2) //measurements to plots
+    {
+        m_ui.measurementsWidget->saveSettings();
+        m_ui.plotWidget->loadSettings();
+    }
+    else if (m_currentTabIndex == 2 && m_ui.tabWidget->currentIndex() == 1) //plots to measurements
+    {
+        m_ui.plotWidget->saveSettings();
+        m_ui.measurementsWidget->loadSettings();
+    }
+
+    m_currentTabIndex = m_ui.tabWidget->currentIndex();
 }
 
 //////////////////////////////////////////////////////////////////////////

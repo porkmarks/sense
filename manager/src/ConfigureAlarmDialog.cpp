@@ -4,28 +4,9 @@
 
 ConfigureAlarmDialog::ConfigureAlarmDialog(DB& db)
     : m_db(db)
-    , m_model(db)
-    , m_delegate(m_sortingModel)
 {
     m_ui.setupUi(this);
-
-    m_model.setShowCheckboxes(true);
-    m_sortingModel.setSourceModel(&m_model);
-
-    size_t sensorCount = m_db.getSensorCount();
-    for (size_t i = 0; i < sensorCount; i++)
-    {
-        m_model.setSensorChecked(m_db.getSensor(i).id, true);
-    }
-
-    m_ui.sensorList->setModel(&m_sortingModel);
-    m_ui.sensorList->setItemDelegate(&m_delegate);
-
-    for (int i = 0; i < m_model.columnCount(); i++)
-    {
-        m_ui.sensorList->header()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
-    }
-    m_ui.sensorList->header()->setStretchLastSection(true);
+    m_ui.sensorFilter->init(db);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -50,12 +31,12 @@ void ConfigureAlarmDialog::setAlarm(DB::Alarm const& alarm)
         size_t sensorCount = m_db.getSensorCount();
         for (size_t i = 0; i < sensorCount; i++)
         {
-            m_model.setSensorChecked(m_db.getSensor(i).id, false);
+            m_ui.sensorFilter->getSensorModel().setSensorChecked(m_db.getSensor(i).id, false);
         }
 
         for (DB::SensorId id: descriptor.sensors)
         {
-            m_model.setSensorChecked(id, true);
+            m_ui.sensorFilter->getSensorModel().setSensorChecked(id, true);
         }
     }
     else
@@ -63,7 +44,7 @@ void ConfigureAlarmDialog::setAlarm(DB::Alarm const& alarm)
         size_t sensorCount = m_db.getSensorCount();
         for (size_t i = 0; i < sensorCount; i++)
         {
-            m_model.setSensorChecked(m_db.getSensor(i).id, true);
+            m_ui.sensorFilter->getSensorModel().setSensorChecked(m_db.getSensor(i).id, true);
         }
     }
 
@@ -99,7 +80,7 @@ void ConfigureAlarmDialog::accept()
         for (size_t i = 0; i < sensorCount; i++)
         {
             DB::Sensor const& sensor = m_db.getSensor(i);
-            if (m_model.isSensorChecked(sensor.id))
+            if (m_ui.sensorFilter->getSensorModel().isSensorChecked(sensor.id))
             {
                 descriptor.sensors.push_back(sensor.id);
             }

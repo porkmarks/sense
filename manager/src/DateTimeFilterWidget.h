@@ -12,6 +12,9 @@ public:
     QDateTime getFromDateTime();
     QDateTime getToDateTime();
 
+    void loadSettings();
+    void saveSettings();
+
 signals:
     void filterChanged();
 

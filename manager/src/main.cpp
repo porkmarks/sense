@@ -84,6 +84,7 @@ int main(int argc, char *argv[])
     QLocale::setDefault(QLocale(QLocale::English, QLocale::Romania));
 
     a.setQuitOnLastWindowClosed(true);
+    a.setWindowIcon(QIcon(":/icons/ui/manager.png"));
 
     Manager w;
     w.show();

@@ -31,6 +31,12 @@
       </property>
       <item>
        <widget class="QGroupBox" name="groupBox">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="title">
          <string>Triggers</string>
         </property>
@@ -246,11 +252,7 @@
           <number>2</number>
          </property>
          <item>
-          <widget class="QTreeView" name="sensorList">
-           <property name="alternatingRowColors">
-            <bool>true</bool>
-           </property>
-          </widget>
+          <widget class="SensorsFilterWidget" name="sensorFilter" native="true"/>
          </item>
         </layout>
        </widget>
@@ -270,6 +272,14 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>SensorsFilterWidget</class>
+   <extends>QWidget</extends>
+   <header>SensorsFilterWidget.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <tabstops>
   <tabstop>name</tabstop>
   <tabstop>period</tabstop>
@@ -279,7 +289,6 @@
   <tabstop>allData</tabstop>
   <tabstop>sendNow</tabstop>
   <tabstop>sensorGroup</tabstop>
-  <tabstop>sensorList</tabstop>
  </tabstops>
  <resources/>
  <connections>

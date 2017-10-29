@@ -387,7 +387,6 @@ void Emailer::sendEmail(Email const& email)
     {
         std::unique_lock<std::mutex> lg(m_emailMutex);
         m_emails.push_back(email);
-        m_emailThreadTriggered = true;
     }
     m_emailCV.notify_all();
 }
@@ -463,9 +462,9 @@ void Emailer::emailThreadProc()
         {
             //wait for data
             std::unique_lock<std::mutex> lg(m_emailMutex);
-            if (!m_emailThreadTriggered)
+            if (m_emails.empty())
             {
-                m_emailCV.wait(lg, [this]{ return m_emailThreadTriggered || m_threadsExit; });
+                m_emailCV.wait(lg, [this]{ return !m_emails.empty() || m_threadsExit; });
             }
             if (m_threadsExit)
             {
@@ -474,7 +473,6 @@ void Emailer::emailThreadProc()
 
             emails = m_emails;
             m_emails.clear();
-            m_emailThreadTriggered = false;
         }
 
         sendEmails(emails);

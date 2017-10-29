@@ -29,7 +29,4 @@ private:
     Settings& m_settings;
     DB& m_db;
     DB::Report m_report;
-    SensorsModel m_model;
-    QSortFilterProxyModel m_sortingModel;
-    SensorsDelegate m_delegate;
 };

@@ -2,6 +2,7 @@
 
 #include <map>
 #include <memory>
+#include <set>
 #include <QWidget>
 #include <QtCharts>
 
@@ -20,7 +21,9 @@ public:
 
     void init(DB& db);
     void shutdown();
-    void applyFilter(DB::Filter const& filter);
+
+    void loadSettings();
+    void saveSettings();
 
     QSize getPlotSize() const;
     QPixmap grabPic(bool showLegend);
@@ -36,6 +39,8 @@ private slots:
     void exportData();
 
 private:
+    void applyFilter(DB::Filter const& filter);
+
     DB::Filter createFilter() const;
     void clearAnnotations();
     void setMarkerVisible(QLegendMarker* marker, bool visible);
@@ -68,7 +73,7 @@ private:
 
     bool m_useSmoothing = true;
     bool m_fitMeasurements = true;
-    std::vector<DB::SensorId> m_selectedSensorIds;
+    std::set<DB::SensorId> m_selectedSensorIds;
 
     Ui::PlotWidget m_ui;
     std::vector<QMetaObject::Connection> m_uiConnections;

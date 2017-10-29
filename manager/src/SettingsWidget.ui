@@ -47,7 +47,7 @@
        <item>
         <widget class="QTabWidget" name="tabWidget">
          <property name="currentIndex">
-          <number>3</number>
+          <number>0</number>
          </property>
          <widget class="QWidget" name="baseStationsTab">
           <attribute name="icon">
@@ -64,6 +64,10 @@
           </layout>
          </widget>
          <widget class="QWidget" name="usersTab">
+          <attribute name="icon">
+           <iconset resource="../res/res.qrc">
+            <normaloff>:/icons/ui/users.png</normaloff>:/icons/ui/users.png</iconset>
+          </attribute>
           <attribute name="title">
            <string>Users</string>
           </attribute>
@@ -334,6 +338,9 @@
           </layout>
          </widget>
          <widget class="QWidget" name="ftpTab">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
           <attribute name="icon">
            <iconset resource="../res/res.qrc">
             <normaloff>:/icons/ui/ftp.png</normaloff>:/icons/ui/ftp.png</iconset>
@@ -604,6 +611,9 @@
                 <property name="minimum">
                  <double>0.100000000000000</double>
                 </property>
+                <property name="value">
+                 <double>5.000000000000000</double>
+                </property>
                </widget>
               </item>
               <item row="1" column="0">
@@ -623,6 +633,9 @@
                 </property>
                 <property name="minimum">
                  <double>0.100000000000000</double>
+                </property>
+                <property name="value">
+                 <double>15.000000000000000</double>
                 </property>
                </widget>
               </item>

@@ -1,6 +1,7 @@
 #include "DateTimeFilterWidget.h"
 #include <QDateTime>
 #include <QCalendarWidget>
+#include <QSettings>
 
 DateTimeFilterWidget::DateTimeFilterWidget(QWidget *parent)
     : QWidget(parent)
@@ -290,4 +291,42 @@ void DateTimeFilterWidget::toChanged()
     {
         emit filterChanged();
     }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void DateTimeFilterWidget::loadSettings()
+{
+    QSettings settings;
+
+    QDateTime from = getFromDateTime();
+    QDateTime to = getToDateTime();
+
+    m_emitSignal = false;
+
+    m_ui.usePreset->setChecked(settings.value("filter/dateTimeFilter/usePreset", true).toBool());
+    m_ui.preset->setCurrentIndex(settings.value("filter/dateTimeFilter/preset", 0).toUInt());
+    if (!m_ui.usePreset->isChecked())
+    {
+        m_ui.from->setDateTime(QDateTime::fromTime_t(settings.value("filter/dateTimeFilter/from", QDateTime::currentDateTime().toTime_t()).toUInt()));
+        m_ui.to->setDateTime(QDateTime::fromTime_t(settings.value("filter/dateTimeFilter/to", QDateTime::currentDateTime().toTime_t()).toUInt()));
+    }
+
+    m_emitSignal = true;
+
+    if (from != getFromDateTime() || to != getToDateTime())
+    {
+        emit filterChanged();
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void DateTimeFilterWidget::saveSettings()
+{
+    QSettings settings;
+    settings.setValue("filter/dateTimeFilter/usePreset", m_ui.usePreset->isChecked());
+    settings.setValue("filter/dateTimeFilter/preset", m_ui.preset->currentIndex());
+    settings.setValue("filter/dateTimeFilter/from", m_ui.from->dateTime().toTime_t());
+    settings.setValue("filter/dateTimeFilter/to", m_ui.to->dateTime().toTime_t());
 }

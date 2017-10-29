@@ -69,7 +69,6 @@ private:
     void sendEmail(Email const& email);
     void emailThreadProc();
     static void sendEmails(std::vector<Email> const& emails);
-    std::atomic_bool m_emailThreadTriggered = { false };
     std::thread m_emailThread;
     std::condition_variable m_emailCV;
     std::mutex m_emailMutex;

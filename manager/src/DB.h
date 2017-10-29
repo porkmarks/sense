@@ -4,6 +4,7 @@
 #include <chrono>
 #include <string>
 #include <vector>
+#include <set>
 #include <map>
 #include <mutex>
 #include <thread>
@@ -249,7 +250,7 @@ public:
     struct Filter
     {
         bool useSensorFilter = false;
-        std::vector<SensorId> sensorIds;
+        std::set<SensorId> sensorIds;
 
         bool useIndexFilter = false;
         Range<uint32_t> indexFilter;

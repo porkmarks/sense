@@ -6,7 +6,7 @@
 #include <QDateTime>
 #include <cassert>
 
-static std::array<const char*, 10> s_headerNames = {"Name", "Id", "Serial Number", "Temperature", "Humidity", "Battery", "Signal", "State", "Alarms"};
+static std::array<const char*, 10> s_headerNames = {"Name", "Id", "Serial Number", "Temperature", "Humidity", "Battery", "Signal", "Next Comms", "Alarms"};
 
 extern float getBatteryLevel(float vcc);
 extern QIcon getBatteryIcon(float vcc);
@@ -246,7 +246,18 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
     {
         if (column == Column::Name)
         {
-            return QIcon(":/icons/ui/sensor.png");
+            if (sensor.state == DB::Sensor::State::Active)
+            {
+                return QIcon(":/icons/ui/sensor.png");
+            }
+            if (sensor.state == DB::Sensor::State::Sleeping)
+            {
+                return QIcon(":/icons/ui/sleeping.png");
+            }
+            if (sensor.state == DB::Sensor::State::Unbound)
+            {
+                return QIcon(":/icons/ui/unbound.png");
+            }
         }
 //        else if (column == Column::NextMeasurement)
 //        {
@@ -255,13 +266,13 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
 //                return QIcon(":/icons/ui/question.png");
 //            }
 //        }
-//        else if (column == Column::NextComms)
-//        {
-//            if (sensor.nextCommsTimePoint.time_since_epoch().count() == 0)
-//            {
-//                return QIcon(":/icons/ui/question.png");
-//            }
-//        }
+        else if (column == Column::NextComms)
+        {
+            if (sensor.nextCommsTimePoint.time_since_epoch().count() == 0)
+            {
+                return QIcon(":/icons/ui/question.png");
+            }
+        }
         else
         {
             if (sensor.isLastMeasurementValid)
@@ -309,21 +320,6 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         {
             return QString("%1").arg(sensor.serialNumber, 8, 16, QChar('0'));
         }
-        else if (column == Column::State)
-        {
-            if (sensor.state == DB::Sensor::State::Active)
-            {
-                return "Active";
-            }
-            if (sensor.state == DB::Sensor::State::Sleeping)
-            {
-                return "Sleeping";
-            }
-            if (sensor.state == DB::Sensor::State::Unbound)
-            {
-                return "Not bound";
-            }
-        }
 //        else if (column == Column::NextMeasurement)
 //        {
 //            if (sensor.nextMeasurementTimePoint.time_since_epoch().count() != 0)
@@ -334,16 +330,16 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
 //                return dt;
 //            }
 //        }
-//        else if (column == Column::NextComms)
-//        {
-//            if (sensor.nextCommsTimePoint.time_since_epoch().count() != 0)
-//            {
-//                time_t next = DB::Clock::to_time_t(sensor.nextCommsTimePoint);
-//                QDateTime dt;
-//                dt.setTime_t(next);
-//                return dt;
-//            }
-//        }
+        else if (column == Column::NextComms)
+        {
+            if (sensor.nextCommsTimePoint.time_since_epoch().count() != 0)
+            {
+                time_t next = DB::Clock::to_time_t(sensor.nextCommsTimePoint);
+                QDateTime dt;
+                dt.setTime_t(next);
+                return dt;
+            }
+        }
         else if (column == Column::Alarms)
         {
             return sensor.isLastMeasurementValid ? sensor.lastMeasurement.triggeredAlarms : -1;

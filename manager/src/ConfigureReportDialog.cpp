@@ -6,28 +6,9 @@
 ConfigureReportDialog::ConfigureReportDialog(Settings& settings, DB& db)
     : m_settings(settings)
     , m_db(db)
-    , m_model(db)
-    , m_delegate(m_sortingModel)
 {
     m_ui.setupUi(this);
-
-    m_model.setShowCheckboxes(true);
-    m_sortingModel.setSourceModel(&m_model);
-
-    size_t sensorCount = m_db.getSensorCount();
-    for (size_t i = 0; i < sensorCount; i++)
-    {
-        m_model.setSensorChecked(m_db.getSensor(i).id, true);
-    }
-
-    m_ui.sensorList->setModel(&m_sortingModel);
-    m_ui.sensorList->setItemDelegate(&m_delegate);
-
-    for (int i = 0; i < m_model.columnCount(); i++)
-    {
-        m_ui.sensorList->header()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
-    }
-    m_ui.sensorList->header()->setStretchLastSection(true);
+    m_ui.sensorFilter->init(db);
 
     connect(m_ui.sendNow, &QPushButton::released, this, &ConfigureReportDialog::sendReportNow);
 }
@@ -41,6 +22,7 @@ void ConfigureReportDialog::sendReportNow()
     {
         Emailer emailer(m_settings, m_db);
         emailer.sendReportEmail(report);
+        QMessageBox::information(this, "Done", "The report email was scheduled to be sent.");
     }
 }
 
@@ -60,18 +42,20 @@ void ConfigureReportDialog::setReport(DB::Report const& report)
 
     m_ui.name->setText(descriptor.name.c_str());
 
+    m_ui.allData->setChecked(descriptor.data == DB::ReportDescriptor::Data::All);
+
     m_ui.sensorGroup->setChecked(descriptor.filterSensors);
     if (descriptor.filterSensors)
     {
         size_t sensorCount = m_db.getSensorCount();
         for (size_t i = 0; i < sensorCount; i++)
         {
-            m_model.setSensorChecked(m_db.getSensor(i).id, false);
+            m_ui.sensorFilter->getSensorModel().setSensorChecked(m_db.getSensor(i).id, false);
         }
 
         for (DB::SensorId id: descriptor.sensors)
         {
-            m_model.setSensorChecked(id, true);
+            m_ui.sensorFilter->getSensorModel().setSensorChecked(id, true);
         }
     }
     else
@@ -79,7 +63,7 @@ void ConfigureReportDialog::setReport(DB::Report const& report)
         size_t sensorCount = m_db.getSensorCount();
         for (size_t i = 0; i < sensorCount; i++)
         {
-            m_model.setSensorChecked(m_db.getSensor(i).id, true);
+            m_ui.sensorFilter->getSensorModel().setSensorChecked(m_db.getSensor(i).id, true);
         }
     }
 
@@ -111,7 +95,7 @@ bool ConfigureReportDialog::getDescriptor(DB::ReportDescriptor& descriptor)
         for (size_t i = 0; i < sensorCount; i++)
         {
             DB::Sensor const& sensor = m_db.getSensor(i);
-            if (m_model.isSensorChecked(sensor.id))
+            if (m_ui.sensorFilter->getSensorModel().isSensorChecked(sensor.id))
             {
                 descriptor.sensors.push_back(sensor.id);
             }

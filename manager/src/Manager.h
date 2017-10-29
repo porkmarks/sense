@@ -27,11 +27,14 @@ private:
 
     void readSettings();
 
+    void tabChanged();
+
     Comms m_comms;
     Settings m_settings;
     DB* m_activeDB = nullptr;
 
     Ui::Manager m_ui;
+    int m_currentTabIndex = 0;
 };
 
 
