@@ -223,6 +223,42 @@ void Server::broadcast_thread_func()
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
+std::string Server::compute_sensor_details_response() const
+{
+    rapidjson::Document document;
+    document.SetArray();
+
+    for (Sensors::Sensor const& sensor: m_sensors.get_sensors())
+    {
+        rapidjson::Value sensorj;
+        sensorj.SetObject();
+        sensorj.AddMember("id", sensor.id, document.GetAllocator());
+        sensorj.AddMember("serial_number", sensor.serial_number, document.GetAllocator());
+        sensorj.AddMember("b2s", sensor.b2s_input_dBm, document.GetAllocator());
+        sensorj.AddMember("first_recorded_measurement_index", sensor.first_recorded_measurement_index, document.GetAllocator());
+        sensorj.AddMember("max_confirmed_measurement_index", sensor.max_confirmed_measurement_index, document.GetAllocator());
+        sensorj.AddMember("humidity_bias", sensor.calibration.humidity_bias, document.GetAllocator());
+        sensorj.AddMember("temperature_bias", sensor.calibration.temperature_bias, document.GetAllocator());
+        sensorj.AddMember("recorded_measurement_count", sensor.recorded_measurement_count, document.GetAllocator());
+
+        uint32_t dt = std::chrono::duration_cast<std::chrono::seconds>(m_sensors.compute_next_measurement_time_point(sensor.id) - Clock::now()).count();
+        sensorj.AddMember("next_measurement_dt", dt, document.GetAllocator());
+
+        dt = std::chrono::duration_cast<std::chrono::seconds>(m_sensors.compute_next_comms_time_point(sensor.id) - Clock::now()).count();
+        sensorj.AddMember("next_comms_dt", dt, document.GetAllocator());
+
+        document.PushBack(std::move(value), document.GetAllocator());
+    }
+
+    rapidjson::StringBuffer buffer;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    document.Accept(writer);
+
+    return std::string(buffer.GetString(), buffer.GetSize());
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
 void Server::report_measurement(Sensors::Sensor_Id sensor_id, Clock::time_point time_point, Sensors::Measurement const& measurement)
 {
     rapidjson::Document document;
@@ -242,6 +278,11 @@ void Server::report_measurement(Sensors::Sensor_Id sensor_id, Clock::time_point 
     document.Accept(writer);
 
     m_channel.send(data::Server_Message::REPORT_MEASUREMENT_REQ, buffer.GetString(), buffer.GetSize());
+
+    {
+        std::string details = compute_sensor_details_response();
+        m_channel.send(data::Server_Message::REPORT_SENSORS_DETAILS, details.data(), details.size());
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -341,6 +382,7 @@ void Server::process_set_config_req()
     }
 
 end:
+
     m_channel.send(data::Server_Message::SET_CONFIG_RES, &ok, 1);
 }
 
@@ -440,7 +482,14 @@ void Server::process_set_sensors_req()
     }
 
 end:
-    m_channel.send(data::Server_Message::SET_SENSORS_RES, &ok, 1);
+
+    std::string details;
+    if (ok)
+    {
+        details = compute_sensor_details_response();
+    }
+
+    m_channel.send(data::Server_Message::SET_SENSORS_RES, details.data(), details.size());
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////

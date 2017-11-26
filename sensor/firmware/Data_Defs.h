@@ -162,6 +162,7 @@ enum class Server_Message
     SENSOR_BOUND_REQ,       //base station
     SENSOR_BOUND_RES,       //manager
     POWER_OFF_REQ,          //manager
+    REPORT_SENSORS_DETAILS, //base station
 };
 
 
