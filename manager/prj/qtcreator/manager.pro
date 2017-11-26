@@ -22,6 +22,8 @@ INCLUDEPATH += ../../src/Smtp
 INCLUDEPATH += ../../src/qftp
 INCLUDEPATH += ../../../common/src
 INCLUDEPATH += ../../../common/src/rapidjson/include
+INCLUDEPATH += ../../../sensor/firmware
+
 
 #QMAKE_CXXFLAGS += -Wno-unused-variable -Wno-unused-parameter
 #QMAKE_CFLAGS += -Wno-unused-variable -Wno-unused-parameter
@@ -77,7 +79,6 @@ HEADERS += \
     ../../src/AlarmsWidget.h \
     ../../../common/src/Channel.h \
     ../../../common/src/QTcpSocketAdapter.h \
-    ../../../common/src/CRC.h \
     ../../src/SensorsWidget.h \
     ../../src/SensorsModel.h \
     ../../src/AlarmsModel.h \
@@ -97,8 +98,6 @@ HEADERS += \
     ../../../common/src/Crypt.h \
     ../../src/Emailer.h \
     ../../src/SensorSettingsDialog.h \
-    ../../src/EmailSettingsDialog.h \
-    ../../src/FtpSettingsDialog.h \
     ../../src/Smtp/emailaddress.h \
     ../../src/Smtp/mimeattachment.h \
     ../../src/Smtp/mimecontentformatter.h \
@@ -126,7 +125,9 @@ HEADERS += \
     ../../src/qftp/qurlinfo.h \
     ../../src/DateTimeFilterWidget.h \
     ../../src/StackWalker.h \
-    ../../src/SensorsFilterWidget.h
+    ../../src/SensorsFilterWidget.h \
+    ../../../sensor/firmware/CRC.h \
+    ../../../sensor/firmware/Data_Defs.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -135,7 +136,6 @@ SOURCES += \
     ../../src/BaseStationsWidget.cpp \
     ../../src/MeasurementsWidget.cpp \
     ../../src/AlarmsWidget.cpp \
-    ../../../common/src/CRC.cpp \
     ../../src/DB.cpp \
     ../../src/SensorsWidget.cpp \
     ../../src/SensorsModel.cpp \
@@ -154,8 +154,6 @@ SOURCES += \
     ../../../common/src/Crypt.cpp \
     ../../src/Emailer.cpp \
     ../../src/SensorSettingsDialog.cpp \
-    ../../src/EmailSettingsDialog.cpp \
-    ../../src/FtpSettingsDialog.cpp \
     ../../src/Smtp/emailaddress.cpp \
     ../../src/Smtp/mimeattachment.cpp \
     ../../src/Smtp/mimecontentformatter.cpp \
@@ -182,7 +180,8 @@ SOURCES += \
     ../../src/qftp/qurlinfo.cpp \
     ../../src/DateTimeFilterWidget.cpp \
     ../../src/StackWalker.cpp \
-    ../../src/SensorsFilterWidget.cpp
+    ../../src/SensorsFilterWidget.cpp \
+    ../../../sensor/firmware/CRC.cpp
 
 FORMS += \
     ../../src/Manager.ui \
@@ -198,8 +197,6 @@ FORMS += \
     ../../src/ReportsWidget.ui \
     ../../src/ConfigureReportDialog.ui \
     ../../src/SensorSettingsDialog.ui \
-    ../../src/EmailSettingsDialog.ui \
-    ../../src/FtpSettingsDialog.ui \
     ../../src/SettingsWidget.ui \
     ../../src/ConfigureUserDialog.ui \
     ../../src/UsersWidget.ui \
