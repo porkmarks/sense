@@ -67,6 +67,12 @@ public:
     typedef uint32_t SensorAddress;
     typedef uint64_t MeasurementId;
 
+    struct SignalStrength
+    {
+        int8_t s2b = 0;
+        int8_t b2s = 0;
+    };
+
     struct MeasurementDescriptor
     {
         SensorId sensorId = 0;
@@ -75,8 +81,7 @@ public:
         float temperature = 0;
         float humidity = 0;
         float vcc = 0;
-        int8_t b2s = 0;
-        int8_t s2b = 0;
+        SignalStrength signalStrength;
         uint8_t sensorErrors = 0;
     };
     struct Measurement
@@ -114,6 +119,9 @@ public:
         State state = State::Active;
         Clock::time_point nextCommsTimePoint = Clock::time_point(Clock::duration::zero());
         Clock::time_point nextMeasurementTimePoint = Clock::time_point(Clock::duration::zero());
+        int32_t storedMeasurementCount = -1;
+
+        SignalStrength averageSignalStrength;
 
         bool isLastMeasurementValid = false;
         Measurement lastMeasurement;
@@ -125,7 +133,7 @@ public:
     bool setSensor(SensorId id, SensorDescriptor const& descriptor);
     bool bindSensor(SensorId id, SensorAddress address, uint32_t serialNumber, Sensor::Calibration const& calibration);
     bool setSensorState(SensorId id, Sensor::State state);
-    bool setSensorNextTimePoints(SensorId id, Clock::time_point nextMeasurementTimePoint, Clock::time_point nextCommsTimePoint);
+    bool setSensorDetails(SensorId id, Clock::time_point nextMeasurementTimePoint, Clock::time_point nextCommsTimePoint, uint32_t storedMeasurementCount);
     void removeSensor(size_t index);
     int32_t findSensorIndexByName(std::string const& name) const;
     int32_t findSensorIndexById(SensorId id) const;
@@ -367,6 +375,8 @@ private:
     };
 
     Data m_mainData;
+
+    SignalStrength computeAverageSignalStrength(SensorId sensorId, Data const& data) const;
 
     std::atomic_bool m_threadsExit = { false };
 

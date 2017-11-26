@@ -164,6 +164,122 @@ QHostAddress Comms::getBaseStationAddress(Mac const& mac) const
 
 //////////////////////////////////////////////////////////////////////////
 
+void Comms::processSensorDetails(ConnectedBaseStation& cbs, std::vector<uint8_t> const& data)
+{
+    rapidjson::Document document;
+    document.Parse(reinterpret_cast<const char*>(data.data()), data.size());
+    if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
+    {
+        s_logger.logCritical(QString("Cannot deserialize sensor details: %1").arg(rapidjson::GetParseError_En(document.GetParseError())));
+        return;
+    }
+    if (!document.IsArray())
+    {
+        s_logger.logCritical(QString("Cannot deserialize sensor details: Bad document."));
+        return;
+    }
+
+    for (size_t i = 0; i < document.Size(); i++)
+    {
+        rapidjson::Value const& sensorj = document[i];
+
+        auto it = sensorj.FindMember("id");
+        if (it == sensorj.MemberEnd() || !it->value.IsUint())
+        {
+            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing id."));
+            continue;
+        }
+        DB::SensorId id = it->value.GetUint();
+
+        int32_t sensorIndex = cbs.db.findSensorIndexById(id);
+        if (sensorIndex < 0)
+        {
+            s_logger.logCritical(QString("Cannot deserialize sensor details: cannot find sensor id %1.").arg(id));
+            continue;
+        }
+
+        it = sensorj.FindMember("serial_number");
+        if (it == sensorj.MemberEnd() || !it->value.IsUint())
+        {
+            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing serial_number."));
+            continue;
+        }
+        uint32_t serialNumber = it->value.GetUint();
+
+        DB::Sensor::Calibration calibration;
+        it = sensorj.FindMember("temperature_bias");
+        if (it == sensorj.MemberEnd() || !it->value.IsNumber())
+        {
+            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing temperature_bias."));
+            continue;
+        }
+        calibration.temperatureBias = static_cast<float>(it->value.GetDouble());
+
+        it = sensorj.FindMember("humidity_bias");
+        if (it == sensorj.MemberEnd() || !it->value.IsNumber())
+        {
+            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing humidity_bias."));
+            continue;
+        }
+        calibration.humidityBias = static_cast<float>(it->value.GetDouble());
+
+        it = sensorj.FindMember("b2s");
+        if (it == sensorj.MemberEnd() || !it->value.IsInt())
+        {
+            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing b2s."));
+            continue;
+        }
+        int8_t b2s = static_cast<int8_t>(it->value.GetInt());
+
+        it = sensorj.FindMember("first_recorded_measurement_index");
+        if (it == sensorj.MemberEnd() || !it->value.IsUint())
+        {
+            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing first_recorded_measurement_index."));
+            continue;
+        }
+        uint32_t firstRecordedMeasurementIndex = it->value.GetUint();
+
+        it = sensorj.FindMember("max_confirmed_measurement_index");
+        if (it == sensorj.MemberEnd() || !it->value.IsUint())
+        {
+            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing max_confirmed_measurement_index."));
+            continue;
+        }
+        uint32_t maxConfirmedMeasurementIndex = it->value.GetUint();
+
+        it = sensorj.FindMember("recorded_measurement_count");
+        if (it == sensorj.MemberEnd() || !it->value.IsUint())
+        {
+            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing recorded_measurement_count."));
+            continue;
+        }
+        uint32_t recordedMeasurementCount = it->value.GetUint();
+
+        it = sensorj.FindMember("next_measurement_dt");
+        if (it == sensorj.MemberEnd() || !it->value.IsInt())
+        {
+            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing next_measurement_dt."));
+            continue;
+        }
+        DB::Clock::time_point nmtp = DB::Clock::now() + std::chrono::seconds(it->value.GetInt());
+
+        it = sensorj.FindMember("next_comms_dt");
+        if (it == sensorj.MemberEnd() || !it->value.IsInt())
+        {
+            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing next_comms_dt."));
+            continue;
+        }
+        DB::Clock::time_point nctp = DB::Clock::now() + std::chrono::seconds(it->value.GetInt());
+
+        if (!cbs.db.setSensorDetails(id, nmtp, nctp, recordedMeasurementCount))
+        {
+            s_logger.logCritical(QString("Cannot deserialize sensor details: failed to set sensor details."));
+        }
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void Comms::sendSensorSettings(ConnectedBaseStation& cbs)
 {
     DB::SensorSettings const& sensorSettings = cbs.db.getSensorSettings();
@@ -251,20 +367,15 @@ void Comms::processSetSensorsRes(ConnectedBaseStation& cbs)
     std::vector<uint8_t> buffer;
     cbs.channel.unpack(buffer);
 
-    if (buffer.size() != 1)
-    {
-        s_logger.logCritical(QString("Cannot deserialize request: Bad data."));
-        return;
-    }
-
-    bool ok = *reinterpret_cast<bool const*>(buffer.data());
-    if (!ok)
+    if (buffer.size() == 0)
     {
         s_logger.logCritical(QString("Setting the sensors FAILED."));
         return;
     }
 
     s_logger.logInfo(QString("Setting the sensors succeded."));
+
+    processSensorDetails(cbs, buffer);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -274,20 +385,14 @@ void Comms::processSetConfigRes(ConnectedBaseStation& cbs)
     std::vector<uint8_t> buffer;
     cbs.channel.unpack(buffer);
 
-    if (buffer.size() != 1)
-    {
-        s_logger.logCritical(QString("Cannot deserialize request: Bad data."));
-        return;
-    }
-
-    bool ok = *reinterpret_cast<bool const*>(buffer.data());
-    if (!ok)
+    if (buffer.size() == 0)
     {
         s_logger.logCritical(QString("Setting the config FAILED."));
         return;
     }
 
     s_logger.logInfo(QString("Setting the config succeded."));
+    processSensorDetails(cbs, buffer);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -297,20 +402,14 @@ void Comms::processAddSensorRes(ConnectedBaseStation& cbs)
     std::vector<uint8_t> buffer;
     cbs.channel.unpack(buffer);
 
-    if (buffer.size() != 1)
-    {
-        s_logger.logCritical(QString("Cannot deserialize request: Bad data."));
-        return;
-    }
-
-    bool ok = *reinterpret_cast<bool const*>(buffer.data());
-    if (!ok)
+    if (buffer.size() == 0)
     {
         s_logger.logCritical(QString("Adding the sensor FAILED."));
         return;
     }
 
     s_logger.logInfo(QString("Adding the sensor succeded."));
+    processSensorDetails(cbs, buffer);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -391,7 +490,7 @@ void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
             s_logger.logCritical(QString("Cannot deserialize request: Missing b2s."));
             goto end;
         }
-        descriptor.b2s = static_cast<int8_t>(it->value.GetInt());
+        descriptor.signalStrength.b2s = static_cast<int8_t>(it->value.GetInt());
 
         it = document.FindMember("s2b");
         if (it == document.MemberEnd() || !it->value.IsInt())
@@ -399,7 +498,7 @@ void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
             s_logger.logCritical(QString("Cannot deserialize request: Missing s2b."));
             goto end;
         }
-        descriptor.s2b = static_cast<int8_t>(it->value.GetInt());
+        descriptor.signalStrength.s2b = static_cast<int8_t>(it->value.GetInt());
 
         it = document.FindMember("sensor_errors");
         if (it == document.MemberEnd() || !it->value.IsUint())
@@ -434,6 +533,16 @@ end:
 
         cbs.channel.send(data::Server_Message::REPORT_MEASUREMENT_RES, buffer.GetString(), buffer.GetSize());
     }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Comms::processReportSensorDetails(ConnectedBaseStation& cbs)
+{
+    std::vector<uint8_t> buffer;
+    cbs.channel.unpack(buffer);
+
+    processSensorDetails(cbs, buffer);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -555,6 +664,9 @@ void Comms::process()
                 break;
             case data::Server_Message::SENSOR_BOUND_REQ:
                 processSensorBoundReq(*cbs);
+                break;
+            case data::Server_Message::REPORT_SENSORS_DETAILS:
+                processReportSensorDetails(*cbs);
                 break;
             default:
                 s_logger.logCritical(QString("Invalid message received: %1").arg((int)message));

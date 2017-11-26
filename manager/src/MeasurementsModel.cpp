@@ -38,7 +38,7 @@ float getSignalLevel(int8_t dBm)
     {
         return 0.f;
     }
-    constexpr float max = -70.f;
+    constexpr float max = -50.f;
     constexpr float min = -110.f;
     float level = std::max(std::min(static_cast<float>(dBm), max) - min, 0.f) / (max - min);
     return level;
@@ -101,7 +101,7 @@ QModelIndex MeasurementsModel::index(int row, int column, QModelIndex const& par
 
 //////////////////////////////////////////////////////////////////////////
 
-QModelIndex MeasurementsModel::parent(QModelIndex const& index) const
+QModelIndex MeasurementsModel::parent(QModelIndex const& /*index*/) const
 {
     return QModelIndex();
 }
@@ -122,9 +122,10 @@ int MeasurementsModel::rowCount(QModelIndex const& index) const
 
 //////////////////////////////////////////////////////////////////////////
 
-int MeasurementsModel::columnCount(QModelIndex const& index) const
+int MeasurementsModel::columnCount(QModelIndex const& /*index*/) const
 {
-    return static_cast<int>(m_columnsEnabled.count());
+    int cc = static_cast<int>(m_columnsEnabled.count());
+    return cc;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -179,7 +180,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
 
     if (role == UserRole::RealColumnRole)
     {
-        return static_cast<size_t>(column);
+        return QVariant(static_cast<qlonglong>(column));
     }
     else if (role == UserRole::SortingRole)
     {
@@ -201,7 +202,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Signal)
         {
-            return getSignalLevel(std::min(measurement.descriptor.b2s, measurement.descriptor.s2b));
+            return getSignalLevel(std::min(measurement.descriptor.signalStrength.b2s, measurement.descriptor.signalStrength.s2b));
         }
 //        else if (column == Column::SensorErrors)
 //        {
@@ -237,7 +238,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Signal)
         {
-            return getSignalIcon(std::min(measurement.descriptor.b2s, measurement.descriptor.s2b));
+            return getSignalIcon(std::min(measurement.descriptor.signalStrength.b2s, measurement.descriptor.signalStrength.s2b));
         }
     }
     else if (role == Qt::DisplayRole)
@@ -270,7 +271,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Temperature)
         {
-            return QString("%1 °C").arg(measurement.descriptor.temperature, 0, 'f', 1);
+            return QString("%1°C").arg(measurement.descriptor.temperature, 0, 'f', 1);
         }
         else if (column == Column::Humidity)
         {
@@ -282,7 +283,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Signal)
         {
-            return QString("%1 %").arg(static_cast<int>(getSignalLevel(std::min(measurement.descriptor.b2s, measurement.descriptor.s2b)) * 100.f));
+            return QString("%1 %").arg(static_cast<int>(getSignalLevel(std::min(measurement.descriptor.signalStrength.b2s, measurement.descriptor.signalStrength.s2b)) * 100.f));
             //return QString("%1 %").arg(std::min(measurement.descriptor.b2s, measurement.descriptor.s2b));
         }
 //        else if (column == Column::SensorErrors)
@@ -300,7 +301,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
 
 //////////////////////////////////////////////////////////////////////////
 
-Qt::ItemFlags MeasurementsModel::flags(QModelIndex const& index) const
+Qt::ItemFlags MeasurementsModel::flags(QModelIndex const& /*index*/) const
 {
     return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
 }
@@ -367,42 +368,42 @@ DB::Measurement const& MeasurementsModel::getMeasurement(size_t index) const
 
 //////////////////////////////////////////////////////////////////////////
 
-bool MeasurementsModel::setData(QModelIndex const& index, QVariant const& value, int role)
+bool MeasurementsModel::setData(QModelIndex const& /*index*/, QVariant const& /*value*/, int /*role*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool MeasurementsModel::setHeaderData(int section, Qt::Orientation orientation, QVariant const& value, int role)
+bool MeasurementsModel::setHeaderData(int /*section*/, Qt::Orientation /*orientation*/, QVariant const& /*value*/, int /*role*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool MeasurementsModel::insertColumns(int position, int columns, QModelIndex const& parent)
+bool MeasurementsModel::insertColumns(int /*position*/, int /*columns*/, QModelIndex const& /*parent*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool MeasurementsModel::removeColumns(int position, int columns, QModelIndex const& parent)
+bool MeasurementsModel::removeColumns(int /*position*/, int /*columns*/, QModelIndex const& /*parent*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool MeasurementsModel::insertRows(int position, int rows, QModelIndex const& parent)
+bool MeasurementsModel::insertRows(int /*position*/, int /*rows*/, QModelIndex const& /*parent*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool MeasurementsModel::removeRows(int position, int rows, QModelIndex const& parent)
+bool MeasurementsModel::removeRows(int /*position*/, int /*rows*/, QModelIndex const& /*parent*/)
 {
     return false;
 }

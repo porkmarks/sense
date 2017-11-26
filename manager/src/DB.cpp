@@ -644,6 +644,12 @@ bool DB::load(std::string const& name)
         }
     }
 
+    //refresh signal strengths
+    for (Sensor& sensor: data.sensors)
+    {
+        sensor.averageSignalStrength = computeAverageSignalStrength(sensor.id, data);
+    }
+
     std::flush(std::cout);
 
     std::pair<std::string, time_t> bkf = getMostRecentBackup(dbFilename, s_dataFolder + "/backups/daily");
@@ -911,7 +917,7 @@ bool DB::setSensorState(SensorId id, Sensor::State state)
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::setSensorNextTimePoints(SensorId id, Clock::time_point nextMeasurementTimePoint, Clock::time_point nextCommsTimePoint)
+bool DB::setSensorDetails(SensorId id, Clock::time_point nextMeasurementTimePoint, Clock::time_point nextCommsTimePoint, uint32_t storedMeasurementCount)
 {
     int32_t index = findSensorIndexById(id);
     if (index < 0)
@@ -927,6 +933,7 @@ bool DB::setSensorNextTimePoints(SensorId id, Clock::time_point nextMeasurementT
 
     sensor.nextMeasurementTimePoint = nextMeasurementTimePoint;
     sensor.nextCommsTimePoint = nextCommsTimePoint;
+    sensor.storedMeasurementCount = storedMeasurementCount;
 
     emit sensorDataChanged(sensor.id);
 
@@ -1151,7 +1158,7 @@ uint8_t DB::computeTriggeredAlarm(MeasurementDescriptor const& md)
 //        {
 //            triggered |= TriggeredAlarm::SensorErrors;
 //        }
-        if (ad.lowSignalWatch && std::min(md.s2b, md.b2s) <= k_alertSignal)
+        if (ad.lowSignalWatch && std::min(md.signalStrength.s2b, md.signalStrength.b2s) <= k_alertSignal)
         {
             triggered |= TriggeredAlarm::LowSignal;
         }
@@ -1412,6 +1419,7 @@ bool DB::addMeasurement(MeasurementDescriptor const& md)
     Sensor& sensor = m_mainData.sensors[sensorIndex];
     sensor.isLastMeasurementValid = true;
     sensor.lastMeasurement = measurement;
+    sensor.averageSignalStrength = computeAverageSignalStrength(sensor.id, m_mainData);
 
     s_logger.logInfo(QString("Added measurement index %1, sensor '%2'").arg(md.index).arg(sensor.descriptor.name.c_str()));
 
@@ -1602,14 +1610,14 @@ bool DB::cull(Measurement const& m, Filter const& filter) const
     }
     if (filter.useB2SFilter)
     {
-        if (m.descriptor.b2s < filter.b2sFilter.min || m.descriptor.b2s > filter.b2sFilter.max)
+        if (m.descriptor.signalStrength.b2s < filter.b2sFilter.min || m.descriptor.signalStrength.b2s > filter.b2sFilter.max)
         {
             return false;
         }
     }
     if (filter.useS2BFilter)
     {
-        if (m.descriptor.s2b < filter.s2bFilter.min || m.descriptor.s2b > filter.s2bFilter.max)
+        if (m.descriptor.signalStrength.s2b < filter.s2bFilter.min || m.descriptor.signalStrength.s2b > filter.s2bFilter.max)
         {
             return false;
         }
@@ -1636,8 +1644,8 @@ inline DB::StoredMeasurement DB::pack(Measurement const& m)
     sm.temperature = static_cast<int16_t>(std::max(std::min(m.descriptor.temperature, 320.f), -320.f) * 100.f);
     sm.humidity = static_cast<int16_t>(std::max(std::min(m.descriptor.humidity, 320.f), -320.f) * 100.f);
     sm.vcc = static_cast<uint8_t>(std::max(std::min((m.descriptor.vcc - 2.f), 2.55f), 0.f) * 100.f);
-    sm.b2s = m.descriptor.b2s;
-    sm.s2b = m.descriptor.s2b;
+    sm.b2s = m.descriptor.signalStrength.b2s;
+    sm.s2b = m.descriptor.signalStrength.s2b;
     sm.sensorErrors = m.descriptor.sensorErrors;
     sm.triggeredAlarms = m.triggeredAlarms;
     return sm;
@@ -1655,8 +1663,8 @@ inline DB::Measurement DB::unpack(SensorId sensorId, StoredMeasurement const& sm
     m.descriptor.temperature = static_cast<float>(sm.temperature) / 100.f;
     m.descriptor.humidity = static_cast<float>(sm.humidity) / 100.f;
     m.descriptor.vcc = static_cast<float>(sm.vcc) / 100.f + 2.f;
-    m.descriptor.b2s = sm.b2s;
-    m.descriptor.s2b = sm.s2b;
+    m.descriptor.signalStrength.b2s = sm.b2s;
+    m.descriptor.signalStrength.s2b = sm.s2b;
     m.descriptor.sensorErrors = sm.sensorErrors;
     m.triggeredAlarms = sm.triggeredAlarms;
     return m;
@@ -1674,6 +1682,54 @@ inline DB::MeasurementId DB::computeMeasurementId(MeasurementDescriptor const& m
 inline DB::MeasurementId DB::computeMeasurementId(SensorId sensor_id, StoredMeasurement const& m)
 {
     return (MeasurementId(sensor_id) << 32) | MeasurementId(m.index);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+DB::SignalStrength DB::computeAverageSignalStrength(SensorId sensorId, Data const& data) const
+{
+    auto sit = data.measurements.find(sensorId);
+    if (sit == data.measurements.end())
+    {
+        assert(false);
+        return SignalStrength();
+    }
+
+    int64_t counts2b = 0;
+    int64_t avgs2b = 0;
+    int64_t countb2s = 0;
+    int64_t avgb2s = 0;
+    for (auto it = sit->second.rbegin(); it != sit->second.rend(); ++it)
+    {
+        Measurement m = unpack(sensorId, *it);
+        if (m.descriptor.signalStrength.b2s != 0)
+        {
+            avgb2s += m.descriptor.signalStrength.b2s;
+            countb2s++;
+        }
+        if (m.descriptor.signalStrength.s2b != 0)
+        {
+            avgs2b += m.descriptor.signalStrength.s2b;
+            counts2b++;
+        }
+        if (counts2b >= 100 && countb2s >= 100)
+        {
+            break;
+        }
+    }
+
+    if (countb2s > 0)
+    {
+        avgb2s /= countb2s;
+    }
+    if (counts2b > 0)
+    {
+        avgs2b /= counts2b;
+    }
+    SignalStrength avg;
+    avg.b2s = static_cast<int8_t>(avgb2s);
+    avg.s2b = static_cast<int8_t>(avgs2b);
+    return avg;
 }
 
 //////////////////////////////////////////////////////////////////////////

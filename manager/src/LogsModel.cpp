@@ -41,7 +41,7 @@ QModelIndex LogsModel::index(int row, int column, QModelIndex const& parent) con
 
 //////////////////////////////////////////////////////////////////////////
 
-QModelIndex LogsModel::parent(QModelIndex const& index) const
+QModelIndex LogsModel::parent(QModelIndex const& /*index*/) const
 {
     return QModelIndex();
 }
@@ -62,7 +62,7 @@ int LogsModel::rowCount(QModelIndex const& index) const
 
 //////////////////////////////////////////////////////////////////////////
 
-int LogsModel::columnCount(QModelIndex const& index) const
+int LogsModel::columnCount(QModelIndex const& /*index*/) const
 {
     return static_cast<int>(s_headerNames.size());
 }
@@ -164,7 +164,7 @@ QVariant LogsModel::data(QModelIndex const& index, int role) const
 
 //////////////////////////////////////////////////////////////////////////
 
-Qt::ItemFlags LogsModel::flags(QModelIndex const& index) const
+Qt::ItemFlags LogsModel::flags(QModelIndex const& /*index*/) const
 {
     return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
 }
@@ -211,42 +211,42 @@ Logger::LogLine const& LogsModel::getLine(size_t index) const
 
 //////////////////////////////////////////////////////////////////////////
 
-bool LogsModel::setData(QModelIndex const& index, QVariant const& value, int role)
+bool LogsModel::setData(QModelIndex const& /*index*/, QVariant const& /*value*/, int /*role*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool LogsModel::setHeaderData(int section, Qt::Orientation orientation, QVariant const& value, int role)
+bool LogsModel::setHeaderData(int /*section*/, Qt::Orientation /*orientation*/, QVariant const& /*value*/, int /*role*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool LogsModel::insertColumns(int position, int columns, QModelIndex const& parent)
+bool LogsModel::insertColumns(int /*position*/, int /*columns*/, QModelIndex const& /*parent*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool LogsModel::removeColumns(int position, int columns, QModelIndex const& parent)
+bool LogsModel::removeColumns(int /*position*/, int /*columns*/, QModelIndex const& /*parent*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool LogsModel::insertRows(int position, int rows, QModelIndex const& parent)
+bool LogsModel::insertRows(int /*position*/, int /*rows*/, QModelIndex const& /*parent*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool LogsModel::removeRows(int position, int rows, QModelIndex const& parent)
+bool LogsModel::removeRows(int /*position*/, int /*rows*/, QModelIndex const& /*parent*/)
 {
     return false;
 }

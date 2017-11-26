@@ -68,6 +68,9 @@ private:
     void processAddSensorRes(ConnectedBaseStation& cbs);
     void processReportMeasurementReq(ConnectedBaseStation& cbs);
     void processSensorBoundReq(ConnectedBaseStation& cbs);
+    void processReportSensorDetails(ConnectedBaseStation& cbs);
+
+    void processSensorDetails(ConnectedBaseStation& cbs, std::vector<uint8_t> const& data);
 
     void sendSensorSettings(ConnectedBaseStation& cbs);
     void sendSensors(ConnectedBaseStation& cbs);

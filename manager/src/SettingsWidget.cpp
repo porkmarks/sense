@@ -83,7 +83,7 @@ void SettingsWidget::initBaseStation(Settings::BaseStationId id)
         return;
     }
 
-    Settings::BaseStation const& bs = m_settings->getBaseStation(index);
+    //Settings::BaseStation const& bs = m_settings->getBaseStation(index);
     DB& db = m_settings->getBaseStationDB(index);
     m_db = &db;
     m_ui.reportsWidget->init(*m_settings, db);
@@ -95,7 +95,7 @@ void SettingsWidget::initBaseStation(Settings::BaseStationId id)
 
 //////////////////////////////////////////////////////////////////////////
 
-void SettingsWidget::shutdownBaseStation(Settings::BaseStationId id)
+void SettingsWidget::shutdownBaseStation(Settings::BaseStationId /*id*/)
 {
     m_db = nullptr;
     m_ui.reportsWidget->shutdown();
@@ -116,7 +116,7 @@ void SettingsWidget::setRW()
 
 void SettingsWidget::addEmailRecipient()
 {
-    delete reinterpret_cast<QString*>(0xFEE1DEAD);
+    //delete reinterpret_cast<QString*>(0xFEE1DEAD);
 
     bool ok = false;
     QString recipient = QInputDialog::getText(this, "Add Recipient", "Recipient", QLineEdit::Normal, "", &ok);

@@ -36,6 +36,8 @@
 // so we need not to check the version (because we only support _MSC_VER >= 1100)!
 #pragma once
 
+#ifdef _WIN32
+
 #include <windows.h>
 
 #if _MSC_VER >= 1900
@@ -215,4 +217,6 @@ protected:
     c.ContextFlags = contextFlags; \
     RtlCaptureContext(&c); \
 } while(0);
+#endif
+
 #endif

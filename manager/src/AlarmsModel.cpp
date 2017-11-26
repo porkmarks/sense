@@ -46,7 +46,7 @@ QModelIndex AlarmsModel::index(int row, int column, QModelIndex const& parent) c
 
 //////////////////////////////////////////////////////////////////////////
 
-QModelIndex AlarmsModel::parent(QModelIndex const& index) const
+QModelIndex AlarmsModel::parent(QModelIndex const& /*index*/) const
 {
     return QModelIndex();
 }
@@ -67,7 +67,7 @@ int AlarmsModel::rowCount(QModelIndex const& index) const
 
 //////////////////////////////////////////////////////////////////////////
 
-int AlarmsModel::columnCount(QModelIndex const& index) const
+int AlarmsModel::columnCount(QModelIndex const& /*index*/) const
 {
     return static_cast<int>(s_headerNames.size());
 }
@@ -143,7 +143,7 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
             QString str;
             if (descriptor.lowTemperatureWatch)
             {
-                str += QString("< %1 °C").arg(descriptor.lowTemperature, 0, 'f', 1);
+                str += QString("< %1°C").arg(descriptor.lowTemperature, 0, 'f', 1);
             }
             if (descriptor.highTemperatureWatch)
             {
@@ -151,7 +151,7 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
                 {
                     str += " and ";
                 }
-                str += QString("> %1 °C").arg(descriptor.highTemperature, 0, 'f', 1);
+                str += QString("> %1°C").arg(descriptor.highTemperature, 0, 'f', 1);
             }
             return str;
         }
@@ -220,49 +220,49 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
 
 //////////////////////////////////////////////////////////////////////////
 
-Qt::ItemFlags AlarmsModel::flags(QModelIndex const& index) const
+Qt::ItemFlags AlarmsModel::flags(QModelIndex const& /*index*/) const
 {
     return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool AlarmsModel::setData(QModelIndex const& index, QVariant const& value, int role)
+bool AlarmsModel::setData(QModelIndex const& /*index*/, QVariant const& /*value*/, int /*role*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool AlarmsModel::setHeaderData(int section, Qt::Orientation orientation, QVariant const& value, int role)
+bool AlarmsModel::setHeaderData(int /*section*/, Qt::Orientation /*orientation*/, QVariant const& /*value*/, int /*role*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool AlarmsModel::insertColumns(int position, int columns, QModelIndex const& parent)
+bool AlarmsModel::insertColumns(int /*position*/, int /*columns*/, QModelIndex const& /*parent*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool AlarmsModel::removeColumns(int position, int columns, QModelIndex const& parent)
+bool AlarmsModel::removeColumns(int /*position*/, int /*columns*/, QModelIndex const& /*parent*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool AlarmsModel::insertRows(int position, int rows, QModelIndex const& parent)
+bool AlarmsModel::insertRows(int /*position*/, int /*rows*/, QModelIndex const& /*parent*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool AlarmsModel::removeRows(int position, int rows, QModelIndex const& parent)
+bool AlarmsModel::removeRows(int /*position*/, int /*rows*/, QModelIndex const& /*parent*/)
 {
     return false;
 }

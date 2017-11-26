@@ -19,6 +19,8 @@ void __assert_fail(const char *__assertion, const char *__file, unsigned int __l
     }
 }
 
+#ifdef _WIN32
+
 LONG WINAPI MyUnhandledExceptionFilter(PEXCEPTION_POINTERS pExceptionPtrs)
 {
     StackWalker sw;
@@ -48,6 +50,8 @@ void MyAbortHandler(int signal)
     sw.ShowCallstack();
 }
 
+#endif
+
 int main(int argc, char *argv[])
 {
     Q_INIT_RESOURCE(res);
@@ -58,6 +62,8 @@ int main(int argc, char *argv[])
     s_dataFolder = s_programFolder + "/data";
     QDir().mkpath(s_dataFolder.c_str());
 
+#ifdef _WIN32
+
     SetUnhandledExceptionFilter(MyUnhandledExceptionFilter);
     set_terminate(MyTerminateHandler);
     set_unexpected(MyUnexpectedHandler);
@@ -65,6 +71,7 @@ int main(int argc, char *argv[])
 
     signal(SIGABRT, MyAbortHandler);
     _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
 
     //delete reinterpret_cast<QString*>(0xFEE1DEAD);
 

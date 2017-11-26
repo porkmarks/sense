@@ -31,9 +31,9 @@
 
 __extension__ typedef int __guard __attribute__((mode (__DI__)));
 
-extern "C" int __cxa_guard_acquire(__guard *g) {return !*(char *)(g);};
-extern "C" void __cxa_guard_release (__guard *g) {*(char *)g = 1;};
-extern "C" void __cxa_guard_abort (__guard *) {};
+//extern "C" int __cxa_guard_acquire(__guard *g) {return !*(char *)(g);};
+//extern "C" void __cxa_guard_release (__guard *g) {*(char *)g = 1;};
+//extern "C" void __cxa_guard_abort (__guard *) {};
 //extern "C" void __cxa_pure_virtual() { while (1); }
 
 #include <stdlib.h>
@@ -314,7 +314,7 @@ void setup()
 
     LOG(PSTR("Starting rfm22b setup..."));
     
-    while (!s_comms.init(5, 7))
+    while (!s_comms.init(5, 15))
     {
         LOG(PSTR("failed\n"));
         blink_leds(RED_LED, 3, chrono::millis(100));
@@ -351,7 +351,7 @@ void setup()
         if (ok)
         {
             s_comms.set_address(address);
-            LOG(PSTR("Loaded settings. Addr: %lu. S/N: %lu.\n"), address, s_serial_number);
+            LOG(PSTR("Loaded settings. Addr: %lu. S/N: %lx.\n"), address, s_serial_number);
             s_state = State::FIRST_CONFIG;
         }
         else
@@ -855,7 +855,7 @@ static void measurement_loop()
         chrono::millis sleep_duration(1000);
 
         now = chrono::now();
-        if (next_time_point > now)
+        if (next_time_point >= now)
         {
             sleep_duration = next_time_point - now;
         }
@@ -864,7 +864,7 @@ static void measurement_loop()
             LOG(PSTR("Timing error!\n"));
         }
 
-        LOG(PSTR("tp: %ul, nm: %ul, nc: %ul\n"), uint32_t(now.ticks), uint32_t(s_next_measurement_time_point.ticks), uint32_t(s_next_comms_time_point.ticks));
+        LOG(PSTR("tp: %lu, nm: %lu, nc: %lu\n"), uint32_t(now.ticks), uint32_t(s_next_measurement_time_point.ticks), uint32_t(s_next_comms_time_point.ticks));
         LOG(PSTR("Sleeping for %lu ms\n"), sleep_duration.count);
 
         chrono::millis remaining = Low_Power::power_down_int(sleep_duration);

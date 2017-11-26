@@ -336,6 +336,10 @@ void PlotWidget::createPlotWidgets()
 
 void PlotWidget::applyFilter(DB::Filter const& filter)
 {
+    if (!m_db)
+    {
+        return;
+    }
     m_filter = filter;
     foreach (QLegendMarker* marker, m_chart->legend()->markers())
     {
@@ -466,7 +470,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
             //pen.setWidth(4);
             //series->setUseOpenGL(true);
             series->setPen(pen);
-            series->setName(QString("%1 °C").arg(plotData.sensor.descriptor.name.c_str()));
+            series->setName(QString("%1°C").arg(plotData.sensor.descriptor.name.c_str()));
             series->attachAxis(m_axisX);
             series->attachAxis(m_axisTY);
 
@@ -578,7 +582,7 @@ void PlotWidget::createAnnotation(QLineSeries* series, QPointF point, bool state
         dt.setMSecsSinceEpoch(point.x());
         if (temperature)
         {
-            m_annotation->setText(QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Temperature: <b>%3 °C</b>")
+            m_annotation->setText(QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Temperature: <b>%3°C</b>")
                                .arg(sensor.descriptor.name.c_str())
                                .arg(dt.toString("dd-MM-yyyy h:mm"))
                                .arg(point.y(), 0, 'f', 1)

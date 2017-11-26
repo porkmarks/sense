@@ -28,6 +28,7 @@ public:
         Battery,
         Signal,
         NextComms,
+        Stored,
         Alarms
     };
 
@@ -67,6 +68,8 @@ protected:
     virtual bool removeRows(int position, int rows, QModelIndex const& parent = QModelIndex());
 
 private:
+    void refreshDetails();
+
     DB& m_db;
 
     bool m_showCheckboxes = false;
@@ -76,6 +79,8 @@ private:
         bool isChecked = false;
         DB::SensorId sensorId;
     };
+
+    QTimer m_timer;
 
     std::vector<SensorData> m_sensors;
 };

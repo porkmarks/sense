@@ -46,7 +46,7 @@ QModelIndex UsersModel::index(int row, int column, QModelIndex const& parent) co
 
 //////////////////////////////////////////////////////////////////////////
 
-QModelIndex UsersModel::parent(QModelIndex const& index) const
+QModelIndex UsersModel::parent(QModelIndex const& /*index*/) const
 {
     return QModelIndex();
 }
@@ -67,7 +67,7 @@ int UsersModel::rowCount(QModelIndex const& index) const
 
 //////////////////////////////////////////////////////////////////////////
 
-int UsersModel::columnCount(QModelIndex const& index) const
+int UsersModel::columnCount(QModelIndex const& /*index*/) const
 {
     return static_cast<int>(s_headerNames.size());
 }
@@ -136,49 +136,49 @@ QVariant UsersModel::data(QModelIndex const& index, int role) const
 
 //////////////////////////////////////////////////////////////////////////
 
-Qt::ItemFlags UsersModel::flags(QModelIndex const& index) const
+Qt::ItemFlags UsersModel::flags(QModelIndex const& /*index*/) const
 {
     return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool UsersModel::setData(QModelIndex const& index, QVariant const& value, int role)
+bool UsersModel::setData(QModelIndex const& /*index*/, QVariant const& /*value*/, int /*role*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool UsersModel::setHeaderData(int section, Qt::Orientation orientation, QVariant const& value, int role)
+bool UsersModel::setHeaderData(int /*section*/, Qt::Orientation /*orientation*/, QVariant const& /*value*/, int /*role*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool UsersModel::insertColumns(int position, int columns, QModelIndex const& parent)
+bool UsersModel::insertColumns(int /*position*/, int /*columns*/, QModelIndex const& /*parent*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool UsersModel::removeColumns(int position, int columns, QModelIndex const& parent)
+bool UsersModel::removeColumns(int /*position*/, int /*columns*/, QModelIndex const& /*parent*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool UsersModel::insertRows(int position, int rows, QModelIndex const& parent)
+bool UsersModel::insertRows(int /*position*/, int /*rows*/, QModelIndex const& /*parent*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool UsersModel::removeRows(int position, int rows, QModelIndex const& parent)
+bool UsersModel::removeRows(int /*position*/, int /*rows*/, QModelIndex const& /*parent*/)
 {
     return false;
 }

@@ -6,12 +6,57 @@
 #include <QDateTime>
 #include <cassert>
 
-static std::array<const char*, 10> s_headerNames = {"Name", "Id", "Serial Number", "Temperature", "Humidity", "Battery", "Signal", "Next Comms", "Alarms"};
+static std::array<const char*, 10> s_headerNames = {"Name", "Id", "Serial Number", "Temperature", "Humidity", "Battery", "Signal (Current/Avg)", "Next Comms", "Stored", "Alarms"};
 
 extern float getBatteryLevel(float vcc);
 extern QIcon getBatteryIcon(float vcc);
 extern float getSignalLevel(int8_t dBm);
 extern QIcon getSignalIcon(int8_t dBm);
+
+std::pair<std::string, int32_t> computeNextTimePointString(DB::Clock::time_point tp)
+{
+    int32_t totalSeconds = std::chrono::duration_cast<std::chrono::seconds>(tp - DB::Clock::now()).count();
+
+    int32_t seconds = std::abs(totalSeconds);
+
+    int32_t hours = seconds / 3600;
+    seconds -= hours * 3600;
+
+    int32_t minutes = seconds / 60;
+    seconds -= minutes * 60;
+
+    char buf[256] = { '\0' };
+    if (hours > 0)
+    {
+        sprintf(buf, "%02d:%02d:%02d", hours, minutes, seconds);
+    }
+    else if (minutes > 0)
+    {
+        sprintf(buf, "%02d:%02d", minutes, seconds);
+    }
+    else if (seconds > 0)
+    {
+        sprintf(buf, "%02d", seconds);
+    }
+
+    std::string str(buf);
+
+    if (totalSeconds > 0)
+    {
+        str = "In " + str;
+    }
+    else
+    {
+        str = str + " ago";
+    }
+
+    return std::make_pair(str, totalSeconds);
+}
+
+constexpr int32_t k_imminentMaxSecond = 5;
+constexpr int32_t k_imminentMinSecond = -60;
+
+constexpr int32_t k_alertStoredMeasurementCount = 600;
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -30,12 +75,27 @@ SensorsModel::SensorsModel(DB& db)
     {
         sensorAdded(m_db.getSensor(i).id);
     }
+
+    m_timer.setSingleShot(false);
+    m_timer.setInterval(1000);
+    m_timer.start();
+    connect(&m_timer, &QTimer::timeout, this, &SensorsModel::refreshDetails);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 SensorsModel::~SensorsModel()
 {
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SensorsModel::refreshDetails()
+{
+    for (size_t i = 0; i < m_db.getSensorCount(); i++)
+    {
+        emit dataChanged(index(i, 0), index(i, columnCount() - 1));
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -171,7 +231,7 @@ QModelIndex SensorsModel::index(int row, int column, QModelIndex const& parent) 
 
 //////////////////////////////////////////////////////////////////////////
 
-QModelIndex SensorsModel::parent(QModelIndex const& index) const
+QModelIndex SensorsModel::parent(QModelIndex const& /*index*/) const
 {
     return QModelIndex();
 }
@@ -192,7 +252,7 @@ int SensorsModel::rowCount(QModelIndex const& index) const
 
 //////////////////////////////////////////////////////////////////////////
 
-int SensorsModel::columnCount(QModelIndex const& index) const
+int SensorsModel::columnCount(QModelIndex const& /*index*/) const
 {
     return static_cast<int>(s_headerNames.size());
 }
@@ -242,6 +302,31 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
             return sensorData.isChecked ? Qt::Checked : Qt::Unchecked;
         }
     }
+    else if (role == Qt::BackgroundColorRole)
+    {
+        if (column == Column::NextComms)
+        {
+            if (sensor.nextCommsTimePoint.time_since_epoch().count() != 0)
+            {
+                auto p = computeNextTimePointString(sensor.nextCommsTimePoint);
+                if (p.second < k_imminentMaxSecond && p.second > k_imminentMinSecond)
+                {
+                    return QVariant(QColor(255, 255, 100));
+                }
+                if (p.second < k_imminentMinSecond)
+                {
+                    return QVariant(QColor(255, 100, 100));
+                }
+            }
+        }
+        else if (column == Column::Stored)
+        {
+            if (sensor.storedMeasurementCount > k_alertStoredMeasurementCount)
+            {
+                return QVariant(QColor(255, 255, 100));
+            }
+        }
+    }
     else if (role == Qt::DecorationRole)
     {
         if (column == Column::Name)
@@ -259,16 +344,16 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                 return QIcon(":/icons/ui/unbound.png");
             }
         }
-//        else if (column == Column::NextMeasurement)
-//        {
-//            if (sensor.nextMeasurementTimePoint.time_since_epoch().count() == 0)
-//            {
-//                return QIcon(":/icons/ui/question.png");
-//            }
-//        }
         else if (column == Column::NextComms)
         {
             if (sensor.nextCommsTimePoint.time_since_epoch().count() == 0)
+            {
+                return QIcon(":/icons/ui/question.png");
+            }
+        }
+        else if (column == Column::Stored)
+        {
+            if (sensor.storedMeasurementCount < 0)
             {
                 return QIcon(":/icons/ui/question.png");
             }
@@ -283,7 +368,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                 }
                 else if (column == Column::Signal)
                 {
-                    return getSignalIcon(std::min(sensor.lastMeasurement.descriptor.b2s, sensor.lastMeasurement.descriptor.s2b));
+                    return getSignalIcon(std::min(sensor.averageSignalStrength.b2s, sensor.averageSignalStrength.s2b));
                 }
                 else if (column == Column::Temperature)
                 {
@@ -320,24 +405,23 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         {
             return QString("%1").arg(sensor.serialNumber, 8, 16, QChar('0'));
         }
-//        else if (column == Column::NextMeasurement)
-//        {
-//            if (sensor.nextMeasurementTimePoint.time_since_epoch().count() != 0)
-//            {
-//                time_t next = DB::Clock::to_time_t(sensor.nextMeasurementTimePoint);
-//                QDateTime dt;
-//                dt.setTime_t(next);
-//                return dt;
-//            }
-//        }
         else if (column == Column::NextComms)
         {
             if (sensor.nextCommsTimePoint.time_since_epoch().count() != 0)
             {
-                time_t next = DB::Clock::to_time_t(sensor.nextCommsTimePoint);
-                QDateTime dt;
-                dt.setTime_t(next);
-                return dt;
+                auto p = computeNextTimePointString(sensor.nextCommsTimePoint);
+                if (p.second < k_imminentMaxSecond && p.second > k_imminentMinSecond)
+                {
+                    return "Imminent";
+                }
+                return p.first.c_str();
+            }
+        }
+        else if (column == Column::Stored)
+        {
+            if (sensor.storedMeasurementCount >= 0)
+            {
+                return sensor.storedMeasurementCount;
             }
         }
         else if (column == Column::Alarms)
@@ -354,19 +438,21 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
             {
                 if (column == Column::Temperature)
                 {
-                    return QString("%1 °C").arg(sensor.lastMeasurement.descriptor.temperature, 0, 'f', 1);
+                    return QString("%1°C").arg(sensor.lastMeasurement.descriptor.temperature, 0, 'f', 1);
                 }
                 else if (column == Column::Humidity)
                 {
-                    return QString("%1 % RH").arg(sensor.lastMeasurement.descriptor.humidity, 0, 'f', 1);
+                    return QString("%1%RH").arg(sensor.lastMeasurement.descriptor.humidity, 0, 'f', 1);
                 }
                 else if (column == Column::Battery)
                 {
-                    return QString("%1 %").arg(static_cast<int>(getBatteryLevel(sensor.lastMeasurement.descriptor.vcc) * 100.f));
+                    return QString("%1%").arg(static_cast<int>(getBatteryLevel(sensor.lastMeasurement.descriptor.vcc) * 100.f));
                 }
                 else if (column == Column::Signal)
                 {
-                    return QString("%1 %").arg(static_cast<int>(getSignalLevel(std::min(sensor.lastMeasurement.descriptor.b2s, sensor.lastMeasurement.descriptor.s2b)) * 100.f));
+                    int last = static_cast<int>(getSignalLevel(std::min(sensor.lastMeasurement.descriptor.signalStrength.b2s, sensor.lastMeasurement.descriptor.signalStrength.s2b)) * 100.f);
+                    int average = static_cast<int>(getSignalLevel(std::min(sensor.averageSignalStrength.b2s, sensor.averageSignalStrength.s2b)) * 100.f);
+                    return QString("%1% / %2%").arg(last).arg(average);
                 }
             }
         }
@@ -418,7 +504,7 @@ bool SensorsModel::setData(QModelIndex const& index, QVariant const& value, int 
 
 //////////////////////////////////////////////////////////////////////////
 
-bool SensorsModel::setHeaderData(int section, Qt::Orientation orientation, QVariant const& value, int role)
+bool SensorsModel::setHeaderData(int /*section*/, Qt::Orientation /*orientation*/, QVariant const& /*value*/, int /*role*/)
 {
 
     return false;
@@ -426,28 +512,28 @@ bool SensorsModel::setHeaderData(int section, Qt::Orientation orientation, QVari
 
 //////////////////////////////////////////////////////////////////////////
 
-bool SensorsModel::insertColumns(int position, int columns, QModelIndex const& parent)
+bool SensorsModel::insertColumns(int /*position*/, int /*columns*/, QModelIndex const& /*parent*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool SensorsModel::removeColumns(int position, int columns, QModelIndex const& parent)
+bool SensorsModel::removeColumns(int /*position*/, int /*columns*/, QModelIndex const& /*parent*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool SensorsModel::insertRows(int position, int rows, QModelIndex const& parent)
+bool SensorsModel::insertRows(int /*position*/, int /*rows*/, QModelIndex const& /*parent*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool SensorsModel::removeRows(int position, int rows, QModelIndex const& parent)
+bool SensorsModel::removeRows(int /*position*/, int /*rows*/, QModelIndex const& /*parent*/)
 {
     return false;
 }

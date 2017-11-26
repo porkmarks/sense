@@ -47,7 +47,7 @@ QModelIndex ReportsModel::index(int row, int column, QModelIndex const& parent) 
 
 //////////////////////////////////////////////////////////////////////////
 
-QModelIndex ReportsModel::parent(QModelIndex const& index) const
+QModelIndex ReportsModel::parent(QModelIndex const& /*index*/) const
 {
     return QModelIndex();
 }
@@ -68,7 +68,7 @@ int ReportsModel::rowCount(QModelIndex const& index) const
 
 //////////////////////////////////////////////////////////////////////////
 
-int ReportsModel::columnCount(QModelIndex const& index) const
+int ReportsModel::columnCount(QModelIndex const& /*index*/) const
 {
     return static_cast<int>(s_headerNames.size());
 }
@@ -163,49 +163,49 @@ QVariant ReportsModel::data(QModelIndex const& index, int role) const
 
 //////////////////////////////////////////////////////////////////////////
 
-Qt::ItemFlags ReportsModel::flags(QModelIndex const& index) const
+Qt::ItemFlags ReportsModel::flags(QModelIndex const& /*index*/) const
 {
     return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool ReportsModel::setData(QModelIndex const& index, QVariant const& value, int role)
+bool ReportsModel::setData(QModelIndex const& /*index*/, QVariant const& /*value*/, int /*role*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool ReportsModel::setHeaderData(int section, Qt::Orientation orientation, QVariant const& value, int role)
+bool ReportsModel::setHeaderData(int /*section*/, Qt::Orientation /*orientation*/, QVariant const& /*value*/, int /*role*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool ReportsModel::insertColumns(int position, int columns, QModelIndex const& parent)
+bool ReportsModel::insertColumns(int /*position*/, int /*columns*/, QModelIndex const& /*parent*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool ReportsModel::removeColumns(int position, int columns, QModelIndex const& parent)
+bool ReportsModel::removeColumns(int /*position*/, int /*columns*/, QModelIndex const& /*parent*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool ReportsModel::insertRows(int position, int rows, QModelIndex const& parent)
+bool ReportsModel::insertRows(int /*position*/, int /*rows*/, QModelIndex const& /*parent*/)
 {
     return false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool ReportsModel::removeRows(int position, int rows, QModelIndex const& parent)
+bool ReportsModel::removeRows(int /*position*/, int /*rows*/, QModelIndex const& /*parent*/)
 {
     return false;
 }
