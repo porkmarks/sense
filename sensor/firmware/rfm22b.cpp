@@ -854,7 +854,7 @@ uint8_t* RFM22B::receive_raw(uint8_t* dst, uint8_t& length, uint32_t timeout)
     length = rxLength;
 
     // Set FIFO register address
-    memset(dst, rxLength + 1, 0);
+    memset(dst, 0, rxLength + 1);
     dst[0] = (uint8_t)Register::FIFO_ACCESS_7F;
 
     // Make the transfer
