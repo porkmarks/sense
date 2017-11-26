@@ -288,7 +288,7 @@ void PlotWidget::createPlotWidgets()
         axisX->setLabelsFont(font);
         axisX->setTitleFont(font);
         axisX->setTickCount(10);
-        axisX->setFormat("MM yy h:mm");
+        axisX->setFormat("dd-MMM-yy h:mm");
         axisX->setTitleText("Date");
         chart->addAxis(axisX, Qt::AlignBottom);
         //m_series->attachAxis(axisX);
