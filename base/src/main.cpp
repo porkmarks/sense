@@ -20,9 +20,6 @@
 #include "Sensors.h"
 #include "Server.h"
 
-#include "rfm22b/rfm22b.h"
-
-
 #define LOG(x) std::cout << x
 #define LOG_LN(x) std::cout << x << std::endl
 
