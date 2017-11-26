@@ -3,7 +3,7 @@
 *.pro.user
 *.user.*
 *.user
-Makefile
+xxxMakefile
 Makefile.base
 *.d
 *.lst
@@ -15,7 +15,7 @@ sensor.map
 sensor.sym
 README.md
 .projectile
-base
+xxxbase
 server
 living
 data.tsv
