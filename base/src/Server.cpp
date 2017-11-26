@@ -241,7 +241,7 @@ std::string Server::compute_sensor_details_response() const
         sensorj.AddMember("temperature_bias", sensor.calibration.temperature_bias, document.GetAllocator());
         sensorj.AddMember("recorded_measurement_count", sensor.recorded_measurement_count, document.GetAllocator());
 
-        uint32_t dt = std::chrono::duration_cast<std::chrono::seconds>(m_sensors.compute_next_measurement_time_point(sensor.id) - Clock::now()).count();
+        int32_t dt = std::chrono::duration_cast<std::chrono::seconds>(m_sensors.compute_next_measurement_time_point(sensor.id) - Clock::now()).count();
         sensorj.AddMember("next_measurement_dt", dt, document.GetAllocator());
 
         dt = std::chrono::duration_cast<std::chrono::seconds>(m_sensors.compute_next_comms_time_point(sensor.id) - Clock::now()).count();
