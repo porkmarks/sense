@@ -383,7 +383,13 @@ void Server::process_set_config_req()
 
 end:
 
-    m_channel.send(data::Server_Message::SET_CONFIG_RES, &ok, 1);
+    std::string details;
+    if (ok)
+    {
+        details = compute_sensor_details_response();
+    }
+
+    m_channel.send(data::Server_Message::SET_CONFIG_RES, details.data(), details.size());
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -539,7 +545,13 @@ void Server::process_add_sensor_req()
     }
 
 end:
-    m_channel.send(data::Server_Message::SET_SENSORS_RES, &ok, 1);
+    std::string details;
+    if (ok)
+    {
+        details = compute_sensor_details_response();
+    }
+
+    m_channel.send(data::Server_Message::ADD_SENSOR_RES, details.data(), details.size());
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
