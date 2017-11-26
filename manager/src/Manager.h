@@ -29,6 +29,8 @@ private:
 
     void tabChanged();
 
+    QMetaObject::Connection m_tabChangedConnection;
+
     Comms m_comms;
     Settings m_settings;
     DB* m_activeDB = nullptr;

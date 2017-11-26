@@ -2,17 +2,12 @@
 
 #include <QInputDialog>
 #include <QMessageBox>
+#include "ConfigureUserDialog.h"
 
 #include "ui_LoginDialog.h"
-
-#include "ConfigureUserDialog.h"
-#include "SensorSettingsDialog.h"
-#include "EmailSettingsDialog.h"
-#include "FtpSettingsDialog.h"
-
 #include "Crypt.h"
 
-static const std::string s_version = "1.0.3";
+static const std::string s_version = "1.0.4";
 
 Logger s_logger;
 
@@ -67,7 +62,7 @@ Manager::Manager(QWidget *parent)
     connect(&m_settings, &Settings::baseStationActivated, this, &Manager::activateBaseStation);
     connect(&m_settings, &Settings::baseStationDeactivated, this, &Manager::deactivateBaseStation);
 
-    connect(m_ui.tabWidget, &QTabWidget::currentChanged, this, &Manager::tabChanged);
+    m_tabChangedConnection = connect(m_ui.tabWidget, &QTabWidget::currentChanged, this, &Manager::tabChanged);
     m_currentTabIndex = m_ui.tabWidget->currentIndex();
 
     readSettings();
@@ -93,12 +88,12 @@ Manager::~Manager()
     s_logger.logInfo("Program exit");
     s_logger.shutdown();
 
-//    delete m_ui.baseStationsWidget;
+    QObject::disconnect(m_tabChangedConnection);
+
     delete m_ui.sensorsWidget;
     delete m_ui.measurementsWidget;
     delete m_ui.alarmsWidget;
     delete m_ui.logsWidget;
-//    delete m_ui.reportsWidget;
     delete m_ui.tabWidget;
 }
 
