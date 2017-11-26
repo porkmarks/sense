@@ -1870,8 +1870,8 @@ void DB::save(Data const& data) const
 //        QByteArray encryptedData = QByteArray(buffer.GetString(), buffer.GetSize());
 
         std::string tempFilename = (s_dataFolder + "/" + m_dbName + "_temp");
-        std::ofstream file(tempFilename, std::ios_base::binary);
         {
+            std::ofstream file(tempFilename, std::ios_base::binary);
             if (!file.is_open())
             {
                 s_logger.logCritical(QString("Failed to open '%1': %2").arg(tempFilename.c_str()).arg(std::strerror(errno)));
