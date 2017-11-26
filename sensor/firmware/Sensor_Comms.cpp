@@ -8,6 +8,8 @@
 
 #else
 
+#    include <chrono>
+#    include <stream>
 #   include <thread>
 #   include <string.h>
 #   define delay(x) std::this_thread::sleep_for(std::chrono::milliseconds(x))
