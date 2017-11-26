@@ -4,6 +4,7 @@
 #include <QLocale>
 #include <QLockFile>
 #include "StackWalker.h"
+#include <signal.h>
 
 std::string s_programFolder;
 std::string s_dataFolder;
@@ -25,6 +26,28 @@ LONG WINAPI MyUnhandledExceptionFilter(PEXCEPTION_POINTERS pExceptionPtrs)
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
+void MyTerminateHandler()
+{
+    StackWalker sw;
+    sw.ShowCallstack();
+}
+
+void MyUnexpectedHandler()
+{
+    StackWalker sw;
+    sw.ShowCallstack();
+}
+void MyPureCallHandler()
+{
+    StackWalker sw;
+    sw.ShowCallstack();
+}
+void MyAbortHandler(int signal)
+{
+    StackWalker sw;
+    sw.ShowCallstack();
+}
+
 int main(int argc, char *argv[])
 {
     Q_INIT_RESOURCE(res);
@@ -36,6 +59,12 @@ int main(int argc, char *argv[])
     QDir().mkpath(s_dataFolder.c_str());
 
     SetUnhandledExceptionFilter(MyUnhandledExceptionFilter);
+    set_terminate(MyTerminateHandler);
+    set_unexpected(MyUnexpectedHandler);
+    _set_purecall_handler(MyPureCallHandler);
+
+    signal(SIGABRT, MyAbortHandler);
+    _set_abort_behavior(0, _WRITE_ABORT_MSG);
 
     //delete reinterpret_cast<QString*>(0xFEE1DEAD);
 
