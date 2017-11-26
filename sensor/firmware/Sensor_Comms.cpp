@@ -9,9 +9,10 @@
 #else
 
 #    include <chrono>
-#    include <stream>
+#    include <iostream>
 #   include <thread>
-#   include <string.h>
+#   include <cstring>
+#   include <cmath>
 #   define delay(x) std::this_thread::sleep_for(std::chrono::milliseconds(x))
 #   define printf_P printf
 #   define F
