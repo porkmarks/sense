@@ -234,7 +234,7 @@ std::string Server::compute_sensor_details_response() const
         sensorj.SetObject();
         sensorj.AddMember("id", sensor.id, document.GetAllocator());
         sensorj.AddMember("serial_number", sensor.serial_number, document.GetAllocator());
-        sensorj.AddMember("b2s", sensor.b2s_input_dBm, document.GetAllocator());
+        sensorj.AddMember("b2s", static_cast<int>(sensor.b2s_input_dBm), document.GetAllocator());
         sensorj.AddMember("first_recorded_measurement_index", sensor.first_recorded_measurement_index, document.GetAllocator());
         sensorj.AddMember("max_confirmed_measurement_index", sensor.max_confirmed_measurement_index, document.GetAllocator());
         sensorj.AddMember("humidity_bias", sensor.calibration.humidity_bias, document.GetAllocator());
