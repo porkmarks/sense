@@ -1369,5 +1369,7 @@ void StackWalker::OnOutput(LPCSTR buffer)
         fflush(f);
         fclose(f);
     }
+    printf("%s\n", buffer);
+    fflush(stdout);
     OutputDebugStringA(buffer);
 }
