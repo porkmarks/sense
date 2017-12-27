@@ -52,6 +52,8 @@ public:
         uint32_t first_recorded_measurement_index = 0;
         uint32_t recorded_measurement_count = 0;
 
+        Clock::time_point last_comms_tp = Clock::time_point(Clock::duration::zero());
+
         Calibration calibration;
         uint32_t serial_number = 0;
     };
@@ -97,6 +99,7 @@ public:
 
     Clock::time_point compute_next_measurement_time_point(Sensor_Id id) const;
     Clock::time_point compute_next_comms_time_point(Sensor_Id id) const;
+    Clock::time_point compute_next_real_comms_time_point(Sensor_Id id) const; //when this specific sensor will communicte, or was supposed to communicate in case it went dark.
 
     //sensor manipulation
     struct Unbound_Sensor_Data
@@ -124,6 +127,7 @@ public:
 
     void set_sensor_measurement_range(Sensor_Id id, uint32_t first_measurement_index, uint32_t last_measurement_index);
     void set_sensor_b2s_input_dBm(Sensor_Id id, int8_t dBm);
+    void set_sensor_last_comms_time_point(Sensor_Id id, Clock::time_point tp);
 
     //measurement manipulation
     void report_measurements(Sensor_Id id, std::vector<Measurement> const& measurements);

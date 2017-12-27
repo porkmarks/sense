@@ -244,7 +244,7 @@ std::string Server::compute_sensor_details_response() const
         int32_t dt = std::chrono::duration_cast<std::chrono::seconds>(m_sensors.compute_next_measurement_time_point(sensor.id) - Clock::now()).count();
         sensorj.AddMember("next_measurement_dt", dt, document.GetAllocator());
 
-        dt = std::chrono::duration_cast<std::chrono::seconds>(m_sensors.compute_next_comms_time_point(sensor.id) - Clock::now()).count();
+        dt = std::chrono::duration_cast<std::chrono::seconds>(m_sensors.compute_next_real_comms_time_point(sensor.id) - Clock::now()).count();
         sensorj.AddMember("next_comms_dt", dt, document.GetAllocator());
 
         document.PushBack(std::move(sensorj), document.GetAllocator());

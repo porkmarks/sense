@@ -143,6 +143,7 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
                     measurements.push_back(m);
                 }
 
+                s_sensors.set_sensor_last_comms_time_point(sensor->id, Clock::now());
                 s_sensors.report_measurements(sensor->id, measurements);
             }
             else

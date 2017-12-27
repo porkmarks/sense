@@ -229,6 +229,26 @@ void Sensors::set_sensor_b2s_input_dBm(Sensor_Id id, int8_t dBm)
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
+void Sensors::set_sensor_last_comms_time_point(Sensor_Id id, Clock::time_point tp)
+{
+    if (!is_initialized())
+    {
+        std::cerr << "Sensors not initialized\n";
+        return;
+    }
+
+    Sensor* sensor = _find_sensor_by_id(id);
+    if (!sensor)
+    {
+        std::cerr << "Cannot find sensor id " << id << "\n";
+        return;
+    }
+
+    sensor->last_comms_tp = tp;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
 Sensors::Sensor const* Sensors::add_sensor(Sensor_Id id, std::string const& name, Sensor_Address address, uint32_t serial_number, Calibration const& calibration)
 {
     if (!is_initialized())
@@ -412,6 +432,27 @@ Sensors::Clock::time_point Sensors::compute_next_comms_time_point(Sensor_Id id) 
 
     Clock::time_point start = m_config.baseline_time_point + period * index;
     return start + std::distance(m_sensors.begin(), it) * COMMS_DURATION;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+Sensors::Clock::time_point Sensors::compute_next_real_comms_time_point(Sensor_Id id) const
+{
+    if (!is_initialized())
+    {
+        std::cerr << "Sensors not initialized\n";
+        return Clock::time_point(Clock::duration::zero());
+    }
+
+    Sensor* sensor = _find_sensor_by_id(id);
+    if (!sensor)
+    {
+        std::cerr << "Cannot find sensor id " << id << "\n";
+        return Clock::now() + std::chrono::hours(99999999);
+    }
+
+    Clock::duration period = compute_comms_period();
+    return sensor->last_comms_tp + duration;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
