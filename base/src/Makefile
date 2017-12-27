@@ -1,11 +1,11 @@
 CXX      := -c++
-CXXFLAGS := -pedantic-errors -Wall -Wextra -Werror -O3
-LDFLAGS  := -L/usr/lib -lstdc++ -lm
+CXXFLAGS := -Wall -Wextra -std=c++11 -DRASPBERRY_PI
+LDFLAGS  := -L/usr/lib -lstdc++ -lm -lboost_thread -lboost_system -lpthread -lpigpio
 BUILD    := build
 OBJ_DIR  := $(BUILD)/objects
 APP_DIR  := $(BUILD)/apps
 TARGET   := base
-INCLUDE  := -I../../base -I. -I../../sensor/firmware -I../../common/src/rapidjson/include
+INCLUDE  := -I../../base -I. -I../../sensor/firmware -I../../common/src/rapidjson/include -I../../common/src
 
 SRC      := ../src/main.cpp \
 	    ../src/tests.cpp \
@@ -20,15 +20,15 @@ SRC      := ../src/main.cpp \
 
 OBJECTS := $(SRC:%.cpp=$(OBJ_DIR)/%.o)
 
-all: build $(APP_DIR)/$(TARGET)
+all: build base
 
 $(OBJ_DIR)/%.o: %.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) $(INCLUDE) -o $@ -c $<
 
-$(APP_DIR)/$(TARGET): $(OBJECTS)
-	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) $(INCLUDE) $(LDFLAGS) -o $(APP_DIR)/$(TARGET) $(OBJECTS)
+base: $(OBJECTS)
+	$(CXX) $(CXXFLAGS) $(INCLUDE) $(LDFLAGS) -o base $(OBJECTS)
+	@chmod +x base
 
 .PHONY: all build clean
 
