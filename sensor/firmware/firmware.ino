@@ -1,12 +1,12 @@
 //#include <Arduino.h>
 #include <HardwareSerial.h>
-#include "Wire.h"
 #include <avr/eeprom.h>
 #include <avr/interrupt.h>
 #include <avr/io.h>
 #include <avr/pgmspace.h>
 #include <avr/wdt.h>
 
+#include "Wire.h"
 #include "SPI.h"
 #include "Low_Power.h"
 #include "LEDs.h"
@@ -443,7 +443,7 @@ static bool request_config()
         req.b2s_input_dBm = s_comms.get_input_dBm();
         req.calibration = s_calibration;
         s_comms.pack(raw_buffer, req);
-        send_successful = s_comms.send_packet(raw_buffer, 5);
+        send_successful = s_comms.send_packet(raw_buffer, 2);
     }
 
     if (send_successful)
@@ -488,7 +488,7 @@ static bool request_first_config()
         uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::sensor::First_Config_Request))];
         s_comms.begin_packet(raw_buffer, data::sensor::Type::FIRST_CONFIG_REQUEST);
         s_comms.pack(raw_buffer, data::sensor::First_Config_Request());
-        send_successful = s_comms.send_packet(raw_buffer, 5);
+        send_successful = s_comms.send_packet(raw_buffer, 2);
     }
 
     if (send_successful)
@@ -549,7 +549,7 @@ static void pair()
                     request.calibration = s_calibration;
                     request.serial_number = s_serial_number;
                     s_comms.pack(raw_buffer, request);
-                    send_successful = s_comms.send_packet(raw_buffer, 5);
+                    send_successful = s_comms.send_packet(raw_buffer, 2);
                 }
 
                 if (send_successful)
@@ -749,7 +749,7 @@ static void do_comms()
             {
                 LOG(PSTR("Sending measurement batch of %d..."), (int)batch.count);
                 s_comms.begin_packet(raw_buffer, data::sensor::Type::MEASUREMENT_BATCH);
-                if (s_comms.send_packet(raw_buffer, sizeof(data::sensor::Measurement_Batch), 3) == true)
+                if (s_comms.send_packet(raw_buffer, sizeof(data::sensor::Measurement_Batch), 1) == true)
                 {
                     s_error_flags = 0;
                     LOG(PSTR("done.\n"));
