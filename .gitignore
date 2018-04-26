@@ -1,3 +1,6 @@
+*.obj
+*.dll
+*.pdb
 *.o
 *.pro.user.*
 *.pro.user
@@ -20,6 +23,9 @@ server
 living
 data.tsv
 manager/bin/data
+manager/bin/*.exe
+manager/bin_build/data
+manager/bin_build/*.exe
 moc_*.cpp
 ui_*.h
 c++
@@ -27,3 +33,4 @@ qrc_*.cpp
 .qmake.stash
 Makefile.manager
 moc_predefs.h
+manager/prj/build-*
