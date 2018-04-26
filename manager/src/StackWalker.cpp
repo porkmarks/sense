@@ -296,7 +296,7 @@ public:
     // But before wqe do this, we first check if the ".local" file exists
     if (GetModuleFileNameA(NULL, szTemp, 4096) > 0)
     {
-      _tcscat_s(szTemp, _T(".local"));
+      strcat(szTemp, (".local"));
       if (GetFileAttributesA(szTemp) == INVALID_FILE_ATTRIBUTES)
       {
         // ".local" file does not exist, so we can try to load the dbghelp.dll from the "Debugging Tools for Windows"
@@ -314,7 +314,7 @@ public:
 #elif _M_X64
         if ( (m_hDbhHelp == NULL) && (GetEnvironmentVariableA("ProgramFiles", szTemp, 4096) > 0) )
         {
-          _tcscat_s(szTemp, _T("\\Debugging Tools for Windows (x64)\\dbghelp.dll"));
+          strcat(szTemp, ("\\Debugging Tools for Windows (x64)\\dbghelp.dll"));
           // now check if the file exists:
           if (GetFileAttributesA(szTemp) != INVALID_FILE_ATTRIBUTES)
           {
@@ -333,9 +333,9 @@ public:
         }
 #endif
         // If still not found, try the old directories...
-        if ( (m_hDbhHelp == NULL) && (GetEnvironmentVariableA(_T("ProgramFiles"), szTemp, 4096) > 0) )
+        if ( (m_hDbhHelp == NULL) && (GetEnvironmentVariableA(("ProgramFiles"), szTemp, 4096) > 0) )
         {
-          _tcscat_s(szTemp, "\\Debugging Tools for Windows\\dbghelp.dll");
+          strcat(szTemp, "\\Debugging Tools for Windows\\dbghelp.dll");
           // now check if the file exists:
           if (GetFileAttributesA(szTemp) != INVALID_FILE_ATTRIBUTES)
           {
@@ -346,7 +346,7 @@ public:
         // Still not found? Then try to load the (old) 64-Bit version:
         if ( (m_hDbhHelp == NULL) && (GetEnvironmentVariableA(("ProgramFiles"), szTemp, 4096) > 0) )
         {
-          _tcscat_s(szTemp, ("\\Debugging Tools for Windows 64-Bit\\dbghelp.dll"));
+          strcat(szTemp, ("\\Debugging Tools for Windows 64-Bit\\dbghelp.dll"));
           if (GetFileAttributesA(szTemp) != INVALID_FILE_ATTRIBUTES)
           {
             m_hDbhHelp = LoadLibraryA(szTemp);
@@ -559,7 +559,7 @@ private:
     typedef BOOL (__stdcall *tM32N)(HANDLE hSnapshot, LPMODULEENTRY32 lpme);
 
     // try both dlls...
-    const char *dllname[] = { _T("kernel32.dll"), _T("tlhelp32.dll") };
+    const char *dllname[] = { ("kernel32.dll"), ("tlhelp32.dll") };
     HINSTANCE hToolhelp = NULL;
     tCT32S pCT32S = NULL;
     tM32F pM32F = NULL;
@@ -644,7 +644,7 @@ private:
     const SIZE_T TTBUFLEN = 8096;
     int cnt = 0;
 
-    hPsapi = LoadLibraryA( _T("psapi.dll") );
+    hPsapi = LoadLibraryA(("psapi.dll") );
     if (hPsapi == NULL)
       return FALSE;
 
@@ -732,7 +732,7 @@ private:
             if (GetFileVersionInfoA(szImg, dwHandle, dwSize, vData) != 0)
             {
               UINT len;
-              char szSubBlock[] = _T("\\");
+              char szSubBlock[] = ("\\");
               if (VerQueryValueA(vData, szSubBlock, (LPVOID*) &fInfo, &len) == 0)
                 fInfo = NULL;
               else
