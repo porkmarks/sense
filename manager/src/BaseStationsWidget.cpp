@@ -3,6 +3,7 @@
 #include <cassert>
 #include <QMessageBox>
 #include <QSettings>
+#include <QInputDialog>
 
 extern std::string getMacStr(Settings::BaseStationDescriptor::Mac const& mac);
 
@@ -124,6 +125,14 @@ void BaseStationsWidget::setStatus(int row, std::string const& status)
 
 //////////////////////////////////////////////////////////////////////////
 
+void BaseStationsWidget::setName(int row, std::string const& name)
+{
+    QStandardItem* item = m_model.item(row, 0);
+    item->setText(name.c_str());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void BaseStationsWidget::setAddress(int row, QHostAddress const& address)
 {
     QStandardItem* item = m_model.item(row, 2);
@@ -162,9 +171,15 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
 
     Comms::BaseStationDescriptor const& commsBSDescriptor = m_unregisteredBaseStations[bsIndex];
 
+    QString qname = QInputDialog::getText(this, "Base Station Name", "Name");
+    if (qname.isEmpty())
+    {
+        return;
+    }
+
     Settings::BaseStationDescriptor descriptor;
     descriptor.mac = commsBSDescriptor.mac;
-    descriptor.name = commsBSDescriptor.name;
+    descriptor.name = qname.toUtf8().data();
     //descriptor.address = commsBSDescriptor.address;
     if (m_settings->addBaseStation(descriptor))
     {
@@ -173,10 +188,18 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
         {
             bool connected = m_comms->connectToBaseStation(m_settings->getBaseStationDB(index), commsBSDescriptor.mac);
             setStatus(bsIndex, connected ? "Added / Connected" : "Added / Disconnected");
+            setName(bsIndex, descriptor.name);
         }
+        else
+        {
+            QMessageBox::critical(this, "Error", "Failed to add base station: internal consistency error.");
+        }
+        m_unregisteredBaseStations.erase(m_unregisteredBaseStations.begin() + bsIndex);
     }
-
-    m_unregisteredBaseStations.erase(m_unregisteredBaseStations.begin() + bsIndex);
+    else
+    {
+        QMessageBox::critical(this, "Error", "Failed to add base station.");
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -255,7 +278,7 @@ void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor cons
     QStandardItem* statusItem = new QStandardItem();
 
     {
-        nameItem->setText(commsBS.name.c_str());
+        nameItem->setText("");
         nameItem->setIcon(QIcon(":/icons/ui/station.png"));
         nameItem->setEditable(false);
     }

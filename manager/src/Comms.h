@@ -29,10 +29,9 @@ public:
 
     struct BaseStationDescriptor
     {
-        std::string name;
         Mac mac;
         QHostAddress address;
-        bool operator==(BaseStationDescriptor const& other) const { return name == other.name && mac == other.mac && address == other.address; }
+        bool operator==(BaseStationDescriptor const& other) const { return mac == other.mac && address == other.address; }
     };
 
     void process();
@@ -96,7 +95,6 @@ struct hash<Comms::BaseStationDescriptor>
                 hash<uint8_t>()(bs.mac[3]) ^
                 hash<uint8_t>()(bs.mac[4]) ^
                 hash<uint8_t>()(bs.mac[5]) ^
-                hash<std::string>()(bs.name) ^
                 hash<std::string>()(std::string(bs.address.toString().toUtf8().data()));
     }
 };

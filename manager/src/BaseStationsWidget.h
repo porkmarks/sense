@@ -29,6 +29,7 @@ private slots:
     void activateBaseStation(QModelIndex const& index);
 
 private:
+    void setName(int row, std::string const& name);
     void setStatus(int row, std::string const& status);
     void setAddress(int row, QHostAddress const& address);
 
