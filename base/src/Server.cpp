@@ -1,5 +1,6 @@
 #include "Server.h"
 
+#include <iostream>
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/writer.h"
@@ -110,12 +111,21 @@ bool Server::init(uint16_t port, uint16_t broadcast_port)
     m_broadcast_port = broadcast_port;
     try
     {
-        m_io_service_work.reset(new boost::asio::io_service::work(m_io_service));
-        m_io_service_thread = boost::thread(boost::bind(&boost::asio::io_service::run, &m_io_service));
+        m_io_service_work.reset(new asio::io_service::work(m_io_service));
+        m_io_service_thread = std::thread([this]()
+        {
+            std::cout << "Started io service thread.\n";
+            m_io_service.run();
+            std::cout << "Stopping io service thread.\n";
+        });
+        m_broadcast_thread = std::thread([this]
+        {
+            std::cout << "Started broadcast thread.\n";
+            broadcast_thread_func();
+            std::cout << "Stopping broadcast thread.\n";
+        });
 
-        m_broadcast_thread = boost::thread([this] { broadcast_thread_func(); });
-
-        m_acceptor.reset(new boost::asio::ip::tcp::acceptor(m_io_service, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port)));
+        m_acceptor.reset(new asio::ip::tcp::acceptor(m_io_service, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port)));
 
         start_accept();
     }
@@ -134,11 +144,12 @@ bool Server::init(uint16_t port, uint16_t broadcast_port)
 
 void Server::start_accept()
 {
+    std::cout << "Started accepting connections.\n";
     try
     {
         m_is_accepting = true;
         m_socket.close();
-        m_acceptor->async_accept(m_socket, boost::bind(&Server::accept_func, this, boost::asio::placeholders::error));
+        m_acceptor->async_accept(m_socket, std::bind(&Server::accept_func, this, std::placeholders::_1));
     }
     catch (std::exception const& e)
     {
@@ -148,7 +159,7 @@ void Server::start_accept()
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-void Server::accept_func(boost::system::error_code ec)
+void Server::accept_func(asio::error_code ec)
 {
     if (ec)
     {
@@ -175,10 +186,10 @@ void Server::init_broadcast()
             m_broadcast_socket.close();
         }
 
-        m_broadcast_socket.open(boost::asio::ip::udp::v4());
-        m_broadcast_socket.set_option(boost::asio::ip::udp::socket::reuse_address(true));
-        m_broadcast_socket.set_option(boost::asio::socket_base::broadcast(true));
-        m_broadcast_endpoint = boost::asio::ip::udp::endpoint(boost::asio::ip::address_v4::broadcast(), m_broadcast_port);
+        m_broadcast_socket.open(asio::ip::udp::v4());
+        m_broadcast_socket.set_option(asio::ip::udp::socket::reuse_address(true));
+        m_broadcast_socket.set_option(asio::socket_base::broadcast(true));
+        m_broadcast_endpoint = asio::ip::udp::endpoint(asio::ip::address_v4::broadcast(), m_broadcast_port);
     }
     catch (std::exception const& e)
     {
@@ -197,7 +208,7 @@ void Server::broadcast_thread_func()
         {
             if (m_broadcast_socket.is_open())
             {
-                m_broadcast_socket.send_to(boost::asio::buffer(m_mac_address, 6), m_broadcast_endpoint);
+                m_broadcast_socket.send_to(asio::buffer(m_mac_address, 6), m_broadcast_endpoint);
             }
             else
             {
@@ -381,6 +392,8 @@ void Server::process_set_config_req()
         }
     }
 
+    std::cout << "Set config request.\n";
+
 end:
 
     std::string details;
@@ -487,6 +500,8 @@ void Server::process_set_sensors_req()
         ok = true;
     }
 
+    std::cout << "Set sensor request.\n";
+
 end:
 
     std::string details;
@@ -543,6 +558,8 @@ void Server::process_add_sensor_req()
 
         ok = true;
     }
+
+    std::cout << "Add sensor request.\n";
 
 end:
     std::string details;

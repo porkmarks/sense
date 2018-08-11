@@ -1,6 +1,6 @@
 CXX      := -c++
 CXXFLAGS := -Wall -Wextra -std=c++11 -DRASPBERRY_PI
-LDFLAGS  := -L/usr/lib -lstdc++ -lm -lboost_thread -lboost_system -lpthread -lpigpio
+LDFLAGS  := -L/usr/lib -lstdc++ -lm -lboost_thread -lboost_system -lpthread
 BUILD    := build
 OBJ_DIR  := $(BUILD)/objects
 APP_DIR  := $(BUILD)/apps
@@ -16,7 +16,9 @@ SRC      := ../src/main.cpp \
 	../../sensor/firmware/Sensor_Comms.cpp \
 	../../sensor/firmware/Storage.cpp \
 	../../sensor/firmware/CRC.cpp \
-	../../common/src/rfm22b_spi.cpp
+	../../common/src/rfm22b_spi.cpp \
+        ../src/pigpio.c \
+        ../src/commands.c \
 
 OBJECTS := $(SRC:%.cpp=$(OBJ_DIR)/%.o)
 

@@ -444,7 +444,7 @@ Sensors::Clock::time_point Sensors::compute_next_real_comms_time_point(Sensor_Id
         return Clock::time_point(Clock::duration::zero());
     }
 
-    Sensor* sensor = _find_sensor_by_id(id);
+    const Sensor* sensor = find_sensor_by_id(id);
     if (!sensor)
     {
         std::cerr << "Cannot find sensor id " << id << "\n";
@@ -452,7 +452,7 @@ Sensors::Clock::time_point Sensors::compute_next_real_comms_time_point(Sensor_Id
     }
 
     Clock::duration period = compute_comms_period();
-    return sensor->last_comms_tp + duration;
+    return sensor->last_comms_tp + period;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////

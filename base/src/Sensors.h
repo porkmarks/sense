@@ -4,7 +4,8 @@
 #include <vector>
 #include <map>
 #include <string>
-#include <boost/thread.hpp>
+#include <thread>
+#include <boost/optional.hpp>
 
 #include "Sensor_Comms.h"
 

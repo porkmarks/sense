@@ -12,7 +12,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
-#include <boost/thread.hpp>
 #include <pigpio.h>
 
 #include "CRC.h"
@@ -244,6 +243,7 @@ int main(int, const char**)
 
     gpioInitialise();
 
+    //restart RFM
     {
         gpioSetMode(6, PI_OUTPUT);
         gpioWrite(6, 1);
