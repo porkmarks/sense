@@ -191,13 +191,24 @@ void MeasurementsWidget::loadSettings()
 
     m_selectedSensorIds.clear();
     QList<QVariant> ssid = settings.value("filter/selectedSensors", QList<QVariant>()).toList();
-    for (QVariant const& v: ssid)
+    if (!ssid.empty())
     {
-        bool ok = true;
-        DB::SensorId id = v.toUInt(&ok);
-        if (ok)
+        for (QVariant const& v: ssid)
         {
-            m_selectedSensorIds.insert(id);
+            bool ok = true;
+            DB::SensorId id = v.toUInt(&ok);
+            if (ok)
+            {
+                m_selectedSensorIds.insert(id);
+            }
+        }
+    }
+    else
+    {
+        for (size_t i = 0; i < m_db->getSensorCount(); i++)
+        {
+            DB::Sensor const& sensor = m_db->getSensor(i);
+            m_selectedSensorIds.insert(sensor.id);
         }
     }
 

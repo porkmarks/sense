@@ -112,13 +112,24 @@ void PlotWidget::loadSettings()
 
     m_selectedSensorIds.clear();
     QList<QVariant> ssid = settings.value("filter/selectedSensors", QList<QVariant>()).toList();
-    for (QVariant const& v: ssid)
+    if (!ssid.empty())
     {
-        bool ok = true;
-        DB::SensorId id = v.toUInt(&ok);
-        if (ok)
+        for (QVariant const& v: ssid)
         {
-            m_selectedSensorIds.insert(id);
+            bool ok = true;
+            DB::SensorId id = v.toUInt(&ok);
+            if (ok)
+            {
+                m_selectedSensorIds.insert(id);
+            }
+        }
+    }
+    else
+    {
+        for (size_t i = 0; i < m_db->getSensorCount(); i++)
+        {
+            DB::Sensor const& sensor = m_db->getSensor(i);
+            m_selectedSensorIds.insert(sensor.id);
         }
     }
 
@@ -374,12 +385,15 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
     for (size_t i = 0; i < m_db->getSensorCount(); i++)
     {
         DB::Sensor const& sensor = m_db->getSensor(i);
-        PlotData& plotData = m_series[sensor.id];
-        plotData.sensor = sensor;
-        plotData.temperatureLpf.setup(1, 1, 0.15);
-        plotData.humidityLpf.setup(1, 1, 0.15);
-        plotData.temperaturePoints.reserve(8192);
-        plotData.humidityPoints.reserve(8192);
+        if (m_selectedSensorIds.find(sensor.id) != m_selectedSensorIds.end())
+        {
+            PlotData& plotData = m_series[sensor.id];
+            plotData.sensor = sensor;
+            plotData.temperatureLpf.setup(1, 1, 0.15);
+            plotData.humidityLpf.setup(1, 1, 0.15);
+            plotData.temperaturePoints.reserve(8192);
+            plotData.humidityPoints.reserve(8192);
+        }
     }
 
     for (DB::Measurement const& m : measurements)
