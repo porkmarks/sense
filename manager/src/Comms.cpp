@@ -28,7 +28,7 @@ Comms::Comms()
 Comms::~Comms()
 {
     m_discoveredBaseStations.clear();
-    for (std::unique_ptr<ConnectedBaseStation>& cbs: m_connectedBaseStations)
+    for (std::unique_ptr<InitializedBaseStation>& cbs: m_initializedBaseStations)
     {
         cbs->socketAdapter.getSocket().disconnect();
     }
@@ -45,11 +45,23 @@ void Comms::broadcastReceived()
             BaseStationDescriptor bs;
             if (m_broadcastSocket.readDatagram(reinterpret_cast<char*>(bs.mac.data()), bs.mac.size(), &bs.address, nullptr) == 6)
             {
-                auto it = std::find_if(m_discoveredBaseStations.begin(), m_discoveredBaseStations.end(), [&bs](Comms::BaseStationDescriptor const& _bs) { return _bs.mac == bs.mac; });
-                if (it == m_discoveredBaseStations.end())
+                //reconnect?
                 {
-                    m_discoveredBaseStations.push_back(bs);
-                    emit baseStationDiscovered(bs);
+                    auto it = std::find_if(m_initializedBaseStations.begin(), m_initializedBaseStations.end(), [&bs](std::unique_ptr<InitializedBaseStation> const& cbs) { return cbs->descriptor.mac == bs.mac; });
+                    if (it != m_initializedBaseStations.end() && (*it)->isConnected == false)
+                    {
+                        reconnectToBaseStation(it->get());
+                    }
+                }
+
+                //new BS?
+                {
+                    auto it = std::find_if(m_discoveredBaseStations.begin(), m_discoveredBaseStations.end(), [&bs](Comms::BaseStationDescriptor const& _bs) { return _bs.mac == bs.mac; });
+                    if (it == m_discoveredBaseStations.end())
+                    {
+                        m_discoveredBaseStations.push_back(bs);
+                        emit baseStationDiscovered(bs);
+                    }
                 }
             }
         }
@@ -67,28 +79,30 @@ bool Comms::connectToBaseStation(DB& db, Mac const& mac)
     auto it = std::find_if(m_discoveredBaseStations.begin(), m_discoveredBaseStations.end(), [&mac](Comms::BaseStationDescriptor const& _bs) { return _bs.mac == mac; });
     if (it == m_discoveredBaseStations.end())
     {
+        s_logger.logCritical(QString("Attempting to connect to undiscovered BS %1").arg(getMacStr(mac).c_str()));
         return false;
     }
 
     s_logger.logVerbose(QString("Attempting to connect to BS %1").arg(getMacStr(mac).c_str()));
 
-    ConnectedBaseStation* cbsPtr = new ConnectedBaseStation(db);
-    std::unique_ptr<ConnectedBaseStation> cbs(cbsPtr);
-    m_connectedBaseStations.push_back(std::move(cbs));
+    InitializedBaseStation* cbsPtr = new InitializedBaseStation(db, *it);
+    std::unique_ptr<InitializedBaseStation> cbs(cbsPtr);
+    m_initializedBaseStations.push_back(std::move(cbs));
 
-    connect(&cbsPtr->socketAdapter.getSocket(), &QTcpSocket::connected, [this, cbsPtr]() { connectedToBaseStation(cbsPtr); });
-    connect(&cbsPtr->socketAdapter.getSocket(), &QTcpSocket::disconnected, [this, cbsPtr]() { disconnectedFromBaseStation(cbsPtr); });
-    connect(&cbsPtr->socketAdapter.getSocket(), static_cast<void(QTcpSocket::*)(QAbstractSocket::SocketError)>(&QTcpSocket::error), [this, cbsPtr]()
+    cbsPtr->connections.push_back(connect(&cbsPtr->socketAdapter.getSocket(), &QTcpSocket::connected, [this, cbsPtr]() { connectedToBaseStation(cbsPtr); }));
+    cbsPtr->connections.push_back(connect(&cbsPtr->socketAdapter.getSocket(), &QTcpSocket::disconnected, [this, cbsPtr]() { disconnectedFromBaseStation(cbsPtr); }));
+    cbsPtr->connections.push_back(connect(&cbsPtr->socketAdapter.getSocket(), static_cast<void(QTcpSocket::*)(QAbstractSocket::SocketError)>(&QTcpSocket::error), [this, cbsPtr]()
     {
         s_logger.logCritical(QString("Socket error for BS %1: %2").arg(getMacStr(cbsPtr->descriptor.mac).c_str()).arg(cbsPtr->socketAdapter.getSocket().errorString()));
         disconnectedFromBaseStation(cbsPtr);
-    });
+    }));
 
-    connect(&db, &DB::sensorSettingsChanged, [this, cbsPtr]() { sendSensorSettings(*cbsPtr); });
-    connect(&db, &DB::sensorAdded, [this, cbsPtr](DB::SensorId id) { requestBindSensor(*cbsPtr, id); });
-    connect(&db, &DB::sensorChanged, [this, cbsPtr](DB::SensorId) { sendSensors(*cbsPtr); });
-    connect(&db, &DB::sensorRemoved, [this, cbsPtr](DB::SensorId) { sendSensors(*cbsPtr); });
+    cbsPtr->connections.push_back(connect(&db, &DB::sensorSettingsChanged, [this, cbsPtr]() { sendSensorSettings(*cbsPtr); }));
+    cbsPtr->connections.push_back(connect(&db, &DB::sensorAdded, [this, cbsPtr](DB::SensorId id) { requestBindSensor(*cbsPtr, id); }));
+    cbsPtr->connections.push_back(connect(&db, &DB::sensorChanged, [this, cbsPtr](DB::SensorId) { sendSensors(*cbsPtr); }));
+    cbsPtr->connections.push_back(connect(&db, &DB::sensorRemoved, [this, cbsPtr](DB::SensorId) { sendSensors(*cbsPtr); }));
 
+    cbsPtr->isConnecting = true;
     cbsPtr->socketAdapter.getSocket().connectToHost(it->address, 4444);
 
     return true;
@@ -96,11 +110,28 @@ bool Comms::connectToBaseStation(DB& db, Mac const& mac)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::connectedToBaseStation(ConnectedBaseStation* cbs)
+void Comms::reconnectToBaseStation(InitializedBaseStation* cbs)
+{
+    if (cbs->isConnecting)
+    {
+        return;
+    }
+    s_logger.logVerbose(QString("Attempting to reconnect to BS %1").arg(getMacStr(cbs->descriptor.mac).c_str()));
+
+    cbs->isConnecting = true;
+    cbs->socketAdapter.getSocket().connectToHost(cbs->descriptor.address, 4444);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Comms::connectedToBaseStation(InitializedBaseStation* cbs)
 {
     if (cbs)
     {
         s_logger.logVerbose(QString("Connected to BS %1").arg(getMacStr(cbs->descriptor.mac).c_str()));
+
+        cbs->isConnecting = false;
+        cbs->isConnected = true;
 
         emit baseStationConnected(cbs->descriptor);
         cbs->socketAdapter.start();
@@ -112,23 +143,15 @@ void Comms::connectedToBaseStation(ConnectedBaseStation* cbs)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::disconnectedFromBaseStation(ConnectedBaseStation* cbs)
+void Comms::disconnectedFromBaseStation(InitializedBaseStation* cbs)
 {
     if (cbs)
     {
         s_logger.logWarning(QString("Disconnected from BS %1").arg(getMacStr(cbs->descriptor.mac).c_str()));
 
+        cbs->isConnected = false;
+        cbs->isConnecting = false;
         emit baseStationDisconnected(cbs->descriptor);
-
-        auto it = std::find_if(m_connectedBaseStations.begin(), m_connectedBaseStations.end(), [cbs](std::unique_ptr<ConnectedBaseStation> const& _cbs) { return _cbs.get() == cbs; });
-        if (it == m_connectedBaseStations.end())
-        {
-            assert(false);
-        }
-        else
-        {
-            m_connectedBaseStations.erase(it);
-        }
     }
 }
 
@@ -136,8 +159,8 @@ void Comms::disconnectedFromBaseStation(ConnectedBaseStation* cbs)
 
 bool Comms::isBaseStationConnected(Mac const& mac) const
 {
-    auto it = std::find_if(m_connectedBaseStations.begin(), m_connectedBaseStations.end(), [&mac](std::unique_ptr<ConnectedBaseStation> const& cbs) { return cbs->descriptor.mac == mac; });
-    return (it != m_connectedBaseStations.end());
+    auto it = std::find_if(m_initializedBaseStations.begin(), m_initializedBaseStations.end(), [&mac](std::unique_ptr<InitializedBaseStation> const& cbs) { return cbs->descriptor.mac == mac; });
+    return (it != m_initializedBaseStations.end() && (*it)->isConnected == true);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -145,8 +168,8 @@ bool Comms::isBaseStationConnected(Mac const& mac) const
 QHostAddress Comms::getBaseStationAddress(Mac const& mac) const
 {
     {
-        auto it = std::find_if(m_connectedBaseStations.begin(), m_connectedBaseStations.end(), [&mac](std::unique_ptr<ConnectedBaseStation> const& cbs) { return cbs->descriptor.mac == mac; });
-        if (it != m_connectedBaseStations.end())
+        auto it = std::find_if(m_initializedBaseStations.begin(), m_initializedBaseStations.end(), [&mac](std::unique_ptr<InitializedBaseStation> const& cbs) { return cbs->descriptor.mac == mac; });
+        if (it != m_initializedBaseStations.end())
         {
             return (*it)->descriptor.address;
         }
@@ -164,7 +187,7 @@ QHostAddress Comms::getBaseStationAddress(Mac const& mac) const
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processSensorDetails(ConnectedBaseStation& cbs, std::vector<uint8_t> const& data)
+void Comms::processSensorDetails(InitializedBaseStation& cbs, std::vector<uint8_t> const& data)
 {
     rapidjson::Document document;
     document.Parse(reinterpret_cast<const char*>(data.data()), data.size());
@@ -173,114 +196,124 @@ void Comms::processSensorDetails(ConnectedBaseStation& cbs, std::vector<uint8_t>
         s_logger.logCritical(QString("Cannot deserialize sensor details: %1").arg(rapidjson::GetParseError_En(document.GetParseError())));
         return;
     }
-    if (!document.IsArray())
+    if (!document.IsObject())
     {
         s_logger.logCritical(QString("Cannot deserialize sensor details: Bad document."));
         return;
     }
 
-    for (size_t i = 0; i < document.Size(); i++)
     {
-        rapidjson::Value const& sensorj = document[i];
-
-        auto it = sensorj.FindMember("id");
-        if (it == sensorj.MemberEnd() || !it->value.IsUint())
+        auto it = document.FindMember("sensors");
+        if (it == document.MemberEnd() || !it->value.IsArray())
         {
-            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing id."));
-            continue;
-        }
-        DB::SensorId id = it->value.GetUint();
-
-        int32_t sensorIndex = cbs.db.findSensorIndexById(id);
-        if (sensorIndex < 0)
-        {
-            s_logger.logCritical(QString("Cannot deserialize sensor details: cannot find sensor id %1.").arg(id));
-            continue;
+            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing sensors array."));
+            return;
         }
 
-        it = sensorj.FindMember("serial_number");
-        if (it == sensorj.MemberEnd() || !it->value.IsUint())
+        rapidjson::Value const& sensorArrayj = it->value;
+        for (size_t i = 0; i < sensorArrayj.Size(); i++)
         {
-            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing serial_number."));
-            continue;
-        }
-        uint32_t serialNumber = it->value.GetUint();
+            rapidjson::Value const& sensorj = sensorArrayj[i];
 
-        DB::Sensor::Calibration calibration;
-        it = sensorj.FindMember("temperature_bias");
-        if (it == sensorj.MemberEnd() || !it->value.IsNumber())
-        {
-            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing temperature_bias."));
-            continue;
-        }
-        calibration.temperatureBias = static_cast<float>(it->value.GetDouble());
+            auto it = sensorj.FindMember("id");
+            if (it == sensorj.MemberEnd() || !it->value.IsUint())
+            {
+                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing id."));
+                continue;
+            }
+            DB::SensorId id = it->value.GetUint();
 
-        it = sensorj.FindMember("humidity_bias");
-        if (it == sensorj.MemberEnd() || !it->value.IsNumber())
-        {
-            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing humidity_bias."));
-            continue;
-        }
-        calibration.humidityBias = static_cast<float>(it->value.GetDouble());
+            int32_t sensorIndex = cbs.db.findSensorIndexById(id);
+            if (sensorIndex < 0)
+            {
+                s_logger.logCritical(QString("Cannot deserialize sensor details: cannot find sensor id %1.").arg(id));
+                continue;
+            }
 
-        it = sensorj.FindMember("b2s");
-        if (it == sensorj.MemberEnd() || !it->value.IsInt())
-        {
-            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing b2s."));
-            continue;
-        }
-        int8_t b2s = static_cast<int8_t>(it->value.GetInt());
+            it = sensorj.FindMember("serial_number");
+            if (it == sensorj.MemberEnd() || !it->value.IsUint())
+            {
+                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing serial_number."));
+                continue;
+            }
+            uint32_t serialNumber = it->value.GetUint();
 
-        it = sensorj.FindMember("first_recorded_measurement_index");
-        if (it == sensorj.MemberEnd() || !it->value.IsUint())
-        {
-            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing first_recorded_measurement_index."));
-            continue;
-        }
-        uint32_t firstRecordedMeasurementIndex = it->value.GetUint();
+            DB::Sensor::Calibration calibration;
+            it = sensorj.FindMember("temperature_bias");
+            if (it == sensorj.MemberEnd() || !it->value.IsNumber())
+            {
+                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing temperature_bias."));
+                continue;
+            }
+            calibration.temperatureBias = static_cast<float>(it->value.GetDouble());
 
-        it = sensorj.FindMember("max_confirmed_measurement_index");
-        if (it == sensorj.MemberEnd() || !it->value.IsUint())
-        {
-            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing max_confirmed_measurement_index."));
-            continue;
-        }
-        uint32_t maxConfirmedMeasurementIndex = it->value.GetUint();
+            it = sensorj.FindMember("humidity_bias");
+            if (it == sensorj.MemberEnd() || !it->value.IsNumber())
+            {
+                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing humidity_bias."));
+                continue;
+            }
+            calibration.humidityBias = static_cast<float>(it->value.GetDouble());
 
-        it = sensorj.FindMember("recorded_measurement_count");
-        if (it == sensorj.MemberEnd() || !it->value.IsUint())
-        {
-            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing recorded_measurement_count."));
-            continue;
-        }
-        uint32_t recordedMeasurementCount = it->value.GetUint();
+            it = sensorj.FindMember("b2s");
+            if (it == sensorj.MemberEnd() || !it->value.IsInt())
+            {
+                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing b2s."));
+                continue;
+            }
+            int8_t b2s = static_cast<int8_t>(it->value.GetInt());
 
-        it = sensorj.FindMember("next_measurement_dt");
-        if (it == sensorj.MemberEnd() || !it->value.IsInt())
-        {
-            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing next_measurement_dt."));
-            continue;
-        }
-        DB::Clock::time_point nmtp = DB::Clock::now() + std::chrono::seconds(it->value.GetInt());
+            it = sensorj.FindMember("first_recorded_measurement_index");
+            if (it == sensorj.MemberEnd() || !it->value.IsUint())
+            {
+                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing first_recorded_measurement_index."));
+                continue;
+            }
+            uint32_t firstRecordedMeasurementIndex = it->value.GetUint();
 
-        it = sensorj.FindMember("next_comms_dt");
-        if (it == sensorj.MemberEnd() || !it->value.IsInt())
-        {
-            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing next_comms_dt."));
-            continue;
-        }
-        DB::Clock::time_point nctp = DB::Clock::now() + std::chrono::seconds(it->value.GetInt());
+            it = sensorj.FindMember("max_confirmed_measurement_index");
+            if (it == sensorj.MemberEnd() || !it->value.IsUint())
+            {
+                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing max_confirmed_measurement_index."));
+                continue;
+            }
+            uint32_t maxConfirmedMeasurementIndex = it->value.GetUint();
 
-        if (!cbs.db.setSensorDetails(id, nmtp, nctp, recordedMeasurementCount))
-        {
-            s_logger.logCritical(QString("Cannot deserialize sensor details: failed to set sensor details."));
+            it = sensorj.FindMember("recorded_measurement_count");
+            if (it == sensorj.MemberEnd() || !it->value.IsUint())
+            {
+                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing recorded_measurement_count."));
+                continue;
+            }
+            uint32_t recordedMeasurementCount = it->value.GetUint();
+
+            it = sensorj.FindMember("next_measurement_dt");
+            if (it == sensorj.MemberEnd() || !it->value.IsInt())
+            {
+                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing next_measurement_dt."));
+                continue;
+            }
+            DB::Clock::time_point nmtp = DB::Clock::now() + std::chrono::seconds(it->value.GetInt());
+
+            it = sensorj.FindMember("last_comms_tp");
+            if (it == sensorj.MemberEnd() || !it->value.IsUint64())
+            {
+                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing last_comms_tp."));
+                continue;
+            }
+            DB::Clock::time_point lctp = DB::Clock::from_time_t(it->value.GetUint64());
+
+            if (!cbs.db.setSensorDetails(id, nmtp, lctp, recordedMeasurementCount))
+            {
+                s_logger.logCritical(QString("Cannot deserialize sensor details: failed to set sensor details."));
+            }
         }
     }
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::sendSensorSettings(ConnectedBaseStation& cbs)
+void Comms::sendSensorSettings(InitializedBaseStation& cbs)
 {
     DB::SensorSettings const& sensorSettings = cbs.db.getSensorSettings();
 
@@ -295,13 +328,12 @@ void Comms::sendSensorSettings(ConnectedBaseStation& cbs)
     rapidjson::StringBuffer buffer;
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
     document.Accept(writer);
-
     cbs.channel.send(data::Server_Message::SET_CONFIG_REQ, buffer.GetString(), buffer.GetSize());
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::sendSensors(ConnectedBaseStation& cbs)
+void Comms::sendSensors(InitializedBaseStation& cbs)
 {
     DB& db = cbs.db;
 
@@ -330,7 +362,7 @@ void Comms::sendSensors(ConnectedBaseStation& cbs)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::requestBindSensor(ConnectedBaseStation& cbs, DB::SensorId sensorId)
+void Comms::requestBindSensor(InitializedBaseStation& cbs, DB::SensorId sensorId)
 {
     DB& db = cbs.db;
 
@@ -362,7 +394,7 @@ void Comms::requestBindSensor(ConnectedBaseStation& cbs, DB::SensorId sensorId)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processSetSensorsRes(ConnectedBaseStation& cbs)
+void Comms::processSetSensorsRes(InitializedBaseStation& cbs)
 {
     std::vector<uint8_t> buffer;
     cbs.channel.unpack(buffer);
@@ -380,7 +412,7 @@ void Comms::processSetSensorsRes(ConnectedBaseStation& cbs)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processSetConfigRes(ConnectedBaseStation& cbs)
+void Comms::processSetConfigRes(InitializedBaseStation& cbs)
 {
     std::vector<uint8_t> buffer;
     cbs.channel.unpack(buffer);
@@ -397,7 +429,7 @@ void Comms::processSetConfigRes(ConnectedBaseStation& cbs)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processAddSensorRes(ConnectedBaseStation& cbs)
+void Comms::processAddSensorRes(InitializedBaseStation& cbs)
 {
     std::vector<uint8_t> buffer;
     cbs.channel.unpack(buffer);
@@ -414,7 +446,7 @@ void Comms::processAddSensorRes(ConnectedBaseStation& cbs)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processReportMeasurementReq(ConnectedBaseStation& cbs)
+void Comms::processReportMeasurementReq(InitializedBaseStation& cbs)
 {
     std::vector<uint8_t> buffer;
     cbs.channel.unpack(buffer);
@@ -537,7 +569,7 @@ end:
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processReportSensorDetails(ConnectedBaseStation& cbs)
+void Comms::processReportSensorDetails(InitializedBaseStation& cbs)
 {
     std::vector<uint8_t> buffer;
     cbs.channel.unpack(buffer);
@@ -547,7 +579,7 @@ void Comms::processReportSensorDetails(ConnectedBaseStation& cbs)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processSensorBoundReq(ConnectedBaseStation& cbs)
+void Comms::processSensorBoundReq(InitializedBaseStation& cbs)
 {
     std::vector<uint8_t> buffer;
     cbs.channel.unpack(buffer);
@@ -644,7 +676,7 @@ void Comms::process()
 //    }
 
     data::Server_Message message;
-    for (std::unique_ptr<ConnectedBaseStation>& cbs: m_connectedBaseStations)
+    for (std::unique_ptr<InitializedBaseStation>& cbs: m_initializedBaseStations)
     {
         while (cbs->channel.get_next_message(message))
         {

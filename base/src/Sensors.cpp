@@ -177,6 +177,11 @@ void Sensors::set_sensor_calibration(Sensor_Id id, Calibration const& calibratio
     }
 
     sensor->calibration = calibration;
+
+    if (cb_sensor_details_changed)
+    {
+        cb_sensor_details_changed(id);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -205,6 +210,11 @@ void Sensors::set_sensor_measurement_range(Sensor_Id id, uint32_t first_measurem
         //so at worst, max_confirmed_measurement_index = sensor->first_recorded_measurement_index - 1 (the one just before the first recorded index)
         sensor->max_confirmed_measurement_index = std::max(sensor->max_confirmed_measurement_index, sensor->first_recorded_measurement_index - 1);
     }
+
+    if (cb_sensor_details_changed)
+    {
+        cb_sensor_details_changed(id);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -225,6 +235,11 @@ void Sensors::set_sensor_b2s_input_dBm(Sensor_Id id, int8_t dBm)
     }
 
     sensor->b2s_input_dBm = dBm;
+
+    if (cb_sensor_details_changed)
+    {
+        cb_sensor_details_changed(id);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -245,6 +260,31 @@ void Sensors::set_sensor_last_comms_time_point(Sensor_Id id, Clock::time_point t
     }
 
     sensor->last_comms_tp = tp;
+
+    if (cb_sensor_details_changed)
+    {
+        cb_sensor_details_changed(id);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+Sensors::Clock::time_point Sensors::get_sensor_last_comms_time_point(Sensor_Id id) const
+{
+    if (!is_initialized())
+    {
+        std::cerr << "Sensors not initialized\n";
+        return Clock::time_point(Clock::duration::zero());
+    }
+
+    const Sensor* sensor = find_sensor_by_id(id);
+    if (!sensor)
+    {
+        std::cerr << "Cannot find sensor id " << id << "\n";
+        return Clock::time_point(Clock::duration::zero());
+    }
+
+    return sensor->last_comms_tp;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -300,14 +340,54 @@ void Sensors::set_config(Config const& config)
         return;
     }
 
-    m_config = config;
+    uint32_t next_measurement_index = 0;
+    if (!m_configHolders.empty())
+    {
+        next_measurement_index = compute_next_measurement_index();
+
+        m_configHolders.erase(std::remove_if(m_configHolders.begin(), m_configHolders.end(), [&next_measurement_index](ConfigHolder const& ch)
+                            {
+                                  return ch.first_measurement_index == next_measurement_index;
+                              }), m_configHolders.end());
+    }
+
+    ConfigHolder configHolder;
+    configHolder.config = config;
+    configHolder.first_measurement_index = next_measurement_index;
+
+    m_configHolders.push_back(configHolder);
+
+    //some insane number, but enough to avoid memory crashes in case someone goes nuts and starts spamming configs
+    while (m_configHolders.size() > 1000000)
+    {
+        m_configHolders.pop_front();
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-Sensors::Config const& Sensors::get_config()
+Sensors::Config Sensors::get_config() const
 {
-    return m_config;
+    if (!m_configHolders.empty())
+    {
+        return m_configHolders.back().config;
+    }
+    return Config();
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+Sensors::Config Sensors::find_config_for_measurement_index(uint32_t measurement_index) const
+{
+    for (auto it = m_configHolders.rbegin(); it != m_configHolders.rend(); ++it)
+    {
+        ConfigHolder const& ch = *it;
+        if (measurement_index >= ch.first_measurement_index)
+        {
+            return ch.config;
+        }
+    }
+    return get_config();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -320,10 +400,11 @@ Sensors::Clock::duration Sensors::compute_comms_period() const
         return Clock::duration::zero();
     }
 
+    Config config = get_config();
 
     Clock::duration max_period = m_sensors.size() * COMMS_DURATION;
-    Clock::duration period = std::max(m_config.comms_period, max_period);
-    return std::max(period, m_config.measurement_period + MEASUREMENT_JITTER);
+    Clock::duration period = std::max(config.comms_period, max_period);
+    return std::max(period, config.measurement_period + MEASUREMENT_JITTER);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -345,7 +426,9 @@ Sensors::Clock::time_point Sensors::compute_next_measurement_time_point(Sensor_I
 
     uint32_t next_measurement_index = compute_next_measurement_index(id);
 
-    Clock::time_point tp = m_config.baseline_time_point + m_config.measurement_period * next_measurement_index;
+    Config config = get_config();
+
+    Clock::time_point tp = config.baseline_time_point + config.measurement_period * next_measurement_index;
     return tp;
 }
 
@@ -380,8 +463,10 @@ uint32_t Sensors::compute_next_measurement_index() const
         return 0u;
     }
 
+    Config config = get_config();
+
     auto now = Clock::now();
-    uint32_t index = std::ceil((now - m_config.baseline_time_point) / m_config.measurement_period);
+    uint32_t index = std::ceil((now - config.baseline_time_point) / config.measurement_period);
     return index;
 }
 
@@ -425,34 +510,15 @@ Sensors::Clock::time_point Sensors::compute_next_comms_time_point(Sensor_Id id) 
         return Clock::now() + std::chrono::hours(99999999);
     }
 
+    Config config = get_config();
+
     Clock::duration period = compute_comms_period();
 
     auto now = Clock::now();
-    uint32_t index = std::ceil(((now - m_config.baseline_time_point) / period)) + 1;
+    uint32_t index = std::ceil(((now - config.baseline_time_point) / period)) + 1;
 
-    Clock::time_point start = m_config.baseline_time_point + period * index;
+    Clock::time_point start = config.baseline_time_point + period * index;
     return start + std::distance(m_sensors.begin(), it) * COMMS_DURATION;
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////
-
-Sensors::Clock::time_point Sensors::compute_next_real_comms_time_point(Sensor_Id id) const
-{
-    if (!is_initialized())
-    {
-        std::cerr << "Sensors not initialized\n";
-        return Clock::time_point(Clock::duration::zero());
-    }
-
-    const Sensor* sensor = find_sensor_by_id(id);
-    if (!sensor)
-    {
-        std::cerr << "Cannot find sensor id " << id << "\n";
-        return Clock::now() + std::chrono::hours(99999999);
-    }
-
-    Clock::duration period = compute_comms_period();
-    return sensor->last_comms_tp + period;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -577,7 +643,8 @@ void Sensors::report_measurements(Sensor_Id id, std::vector<Measurement> const& 
     {
         if (measurement.index > sensor->max_confirmed_measurement_index)
         {
-            cb_report_measurement(id, m_config.baseline_time_point + m_config.measurement_period * measurement.index, measurement);
+            Config const& config = find_config_for_measurement_index(measurement.index);
+            cb_report_measurement(id, config.baseline_time_point + config.measurement_period * measurement.index, measurement);
         }
         else
         {

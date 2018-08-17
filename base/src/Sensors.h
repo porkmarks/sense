@@ -4,6 +4,7 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <deque>
 #include <thread>
 #include <boost/optional.hpp>
 
@@ -76,8 +77,8 @@ public:
     {
         std::string name;
         bool sensors_sleeping = false;
-        Clock::duration measurement_period;
-        Clock::duration comms_period;
+        Clock::duration measurement_period = std::chrono::seconds(5 * 60);
+        Clock::duration comms_period = std::chrono::seconds(5 * 60);
 
         //This is computed when creating the config so that this equation holds for any config:
         // measurement_time_point = config.baseline_time_point + measurement_index * config.measurement_period
@@ -87,10 +88,10 @@ public:
         // config.baseline_time_point = m.time_point - m.index * config.measurement_period
         //
         //The reason for this is to keep the indices valid in all configs
-        Clock::time_point baseline_time_point;
+        Clock::time_point baseline_time_point = Clock::time_point(Clock::duration::zero());
     };
 
-    Config const& get_config();
+    Config get_config() const;
     void set_config(Config const& config);
 
     Clock::duration compute_comms_period() const;
@@ -100,7 +101,6 @@ public:
 
     Clock::time_point compute_next_measurement_time_point(Sensor_Id id) const;
     Clock::time_point compute_next_comms_time_point(Sensor_Id id) const;
-    Clock::time_point compute_next_real_comms_time_point(Sensor_Id id) const; //when this specific sensor will communicte, or was supposed to communicate in case it went dark.
 
     //sensor manipulation
     struct Unbound_Sensor_Data
@@ -129,6 +129,9 @@ public:
     void set_sensor_measurement_range(Sensor_Id id, uint32_t first_measurement_index, uint32_t last_measurement_index);
     void set_sensor_b2s_input_dBm(Sensor_Id id, int8_t dBm);
     void set_sensor_last_comms_time_point(Sensor_Id id, Clock::time_point tp);
+    Clock::time_point get_sensor_last_comms_time_point(Sensor_Id id) const;
+
+    std::function<void(Sensor_Id)> cb_sensor_details_changed;
 
     //measurement manipulation
     void report_measurements(Sensor_Id id, std::vector<Measurement> const& measurements);
@@ -136,8 +139,16 @@ public:
 
 private:
     Sensor* _find_sensor_by_id(Sensor_Id id);
+    Config find_config_for_measurement_index(uint32_t measurement_index) const;
 
-    Config m_config;
+    struct ConfigHolder
+    {
+        Config config;
+        uint32_t first_measurement_index = 0; //when does it become active?
+    };
+
+    std::deque<ConfigHolder> m_configHolders;
+
     bool m_is_initialized = false;
 
     boost::optional<Unbound_Sensor_Data> m_unbound_sensor_data_opt;

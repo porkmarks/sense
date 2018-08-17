@@ -269,18 +269,10 @@ int main(int, const char**)
         return -1;
     }
 
-//    std::streambuf* s_old_cerr = std::cout.rdbuf(s_cerr_buffer.rdbuf());
-//    size_t last_cerr_offset = 0;
-
     while (true)
     {
         process_sensor_requests(std::chrono::milliseconds(1000));
         s_server.process();
-
-//        if (s_cerr_buffer.gcount() > last_cerr_offset)
-//        {
-
-//        }
     }
 
     return 0;

@@ -43,6 +43,7 @@ private:
 
     void report_measurement(Sensors::Sensor_Id sensor_id, Clock::time_point time_point, Sensors::Measurement const& measurement);
     void sensor_bound(Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address sensor_address, uint32_t serial_number, Sensors::Calibration const& calibration);
+    void sensor_details_changed(Sensors::Sensor_Id sensor_id);
 
     Sensors& m_sensors;
 

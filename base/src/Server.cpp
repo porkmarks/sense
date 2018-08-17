@@ -17,6 +17,7 @@ Server::Server(Sensors& sensors)
 {
     m_sensors.cb_report_measurement = std::bind(&Server::report_measurement, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
     m_sensors.cb_sensor_bound = std::bind(&Server::sensor_bound, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4);
+    m_sensors.cb_sensor_details_changed = std::bind(&Server::sensor_details_changed, this, std::placeholders::_1);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -237,29 +238,34 @@ void Server::broadcast_thread_func()
 std::string Server::compute_sensor_details_response() const
 {
     rapidjson::Document document;
-    document.SetArray();
+    document.SetObject();
 
-    for (Sensors::Sensor const& sensor: m_sensors.get_sensors())
+
+    rapidjson::Value sensorArrayj;
     {
-        rapidjson::Value sensorj;
-        sensorj.SetObject();
-        sensorj.AddMember("id", sensor.id, document.GetAllocator());
-        sensorj.AddMember("serial_number", sensor.serial_number, document.GetAllocator());
-        sensorj.AddMember("b2s", static_cast<int>(sensor.b2s_input_dBm), document.GetAllocator());
-        sensorj.AddMember("first_recorded_measurement_index", sensor.first_recorded_measurement_index, document.GetAllocator());
-        sensorj.AddMember("max_confirmed_measurement_index", sensor.max_confirmed_measurement_index, document.GetAllocator());
-        sensorj.AddMember("humidity_bias", sensor.calibration.humidity_bias, document.GetAllocator());
-        sensorj.AddMember("temperature_bias", sensor.calibration.temperature_bias, document.GetAllocator());
-        sensorj.AddMember("recorded_measurement_count", sensor.recorded_measurement_count, document.GetAllocator());
+        sensorArrayj.SetArray();
+        for (Sensors::Sensor const& sensor: m_sensors.get_sensors())
+        {
+            rapidjson::Value sensorj;
+            sensorj.SetObject();
+            sensorj.AddMember("id", sensor.id, document.GetAllocator());
+            sensorj.AddMember("serial_number", sensor.serial_number, document.GetAllocator());
+            sensorj.AddMember("b2s", static_cast<int>(sensor.b2s_input_dBm), document.GetAllocator());
+            sensorj.AddMember("first_recorded_measurement_index", sensor.first_recorded_measurement_index, document.GetAllocator());
+            sensorj.AddMember("max_confirmed_measurement_index", sensor.max_confirmed_measurement_index, document.GetAllocator());
+            sensorj.AddMember("humidity_bias", sensor.calibration.humidity_bias, document.GetAllocator());
+            sensorj.AddMember("temperature_bias", sensor.calibration.temperature_bias, document.GetAllocator());
+            sensorj.AddMember("recorded_measurement_count", sensor.recorded_measurement_count, document.GetAllocator());
 
-        int32_t dt = std::chrono::duration_cast<std::chrono::seconds>(m_sensors.compute_next_measurement_time_point(sensor.id) - Clock::now()).count();
-        sensorj.AddMember("next_measurement_dt", dt, document.GetAllocator());
+            int32_t dt = std::chrono::duration_cast<std::chrono::seconds>(m_sensors.compute_next_measurement_time_point(sensor.id) - Clock::now()).count();
+            sensorj.AddMember("next_measurement_dt", dt, document.GetAllocator());
 
-        dt = std::chrono::duration_cast<std::chrono::seconds>(m_sensors.compute_next_real_comms_time_point(sensor.id) - Clock::now()).count();
-        sensorj.AddMember("next_comms_dt", dt, document.GetAllocator());
+            sensorj.AddMember("last_comms_tp", static_cast<uint64_t>(Clock::to_time_t(m_sensors.get_sensor_last_comms_time_point(sensor.id))), document.GetAllocator());
 
-        document.PushBack(std::move(sensorj), document.GetAllocator());
+            sensorArrayj.PushBack(std::move(sensorj), document.GetAllocator());
+        }
     }
+    document.AddMember("sensors", std::move(sensorArrayj), document.GetAllocator());
 
     rapidjson::StringBuffer buffer;
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
@@ -276,7 +282,7 @@ void Server::report_measurement(Sensors::Sensor_Id sensor_id, Clock::time_point 
     document.SetObject();
     document.AddMember("sensor_id", sensor_id, document.GetAllocator());
     document.AddMember("index", measurement.index, document.GetAllocator());
-    document.AddMember("time_point", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(time_point.time_since_epoch()).count()), document.GetAllocator());
+    document.AddMember("time_point", static_cast<int64_t>(Clock::to_time_t(time_point)), document.GetAllocator());
     document.AddMember("temperature", measurement.temperature, document.GetAllocator());
     document.AddMember("humidity", measurement.humidity, document.GetAllocator());
     document.AddMember("vcc", measurement.vcc, document.GetAllocator());
@@ -313,6 +319,14 @@ void Server::sensor_bound(Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address 
     document.Accept(writer);
 
     m_channel.send(data::Server_Message::SENSOR_BOUND_REQ, buffer.GetString(), buffer.GetSize());
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+void Server::sensor_details_changed(Sensors::Sensor_Id sensor_id)
+{
+    std::string details = compute_sensor_details_response();
+    m_channel.send(data::Server_Message::REPORT_SENSORS_DETAILS, details.data(), details.size());
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////

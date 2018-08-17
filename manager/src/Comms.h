@@ -42,43 +42,57 @@ signals:
     void baseStationDisconnected(BaseStationDescriptor const& bs);
 
 private:
-    struct ConnectedBaseStation
+    struct InitializedBaseStation
     {
-        ConnectedBaseStation(DB& db)
+        InitializedBaseStation(DB& db, const BaseStationDescriptor& descriptor)
             : db(db)
+            , descriptor(descriptor)
             , channel(socketAdapter)
         {
+        }
+        ~InitializedBaseStation()
+        {
+            for (QMetaObject::Connection& c : connections)
+            {
+                QObject::disconnect(c);
+            }
         }
 
         BaseStationDescriptor descriptor;
         DB& db;
         QTcpSocketAdapter socketAdapter;
         util::comms::Channel<data::Server_Message, QTcpSocketAdapter> channel;
+        bool isConnecting = false;
+        bool isConnected = false;
+
+        std::vector<QMetaObject::Connection> connections;
     };
 
 private slots:
     void broadcastReceived();
-    void connectedToBaseStation(ConnectedBaseStation* cbs);
-    void disconnectedFromBaseStation(ConnectedBaseStation* cbs);
+    void connectedToBaseStation(InitializedBaseStation* cbs);
+    void disconnectedFromBaseStation(InitializedBaseStation* cbs);
 
 private:
-    void processSetConfigRes(ConnectedBaseStation& cbs);
-    void processSetSensorsRes(ConnectedBaseStation& cbs);
-    void processAddSensorRes(ConnectedBaseStation& cbs);
-    void processReportMeasurementReq(ConnectedBaseStation& cbs);
-    void processSensorBoundReq(ConnectedBaseStation& cbs);
-    void processReportSensorDetails(ConnectedBaseStation& cbs);
+    void reconnectToBaseStation(InitializedBaseStation* cbs);
 
-    void processSensorDetails(ConnectedBaseStation& cbs, std::vector<uint8_t> const& data);
+    void processSetConfigRes(InitializedBaseStation& cbs);
+    void processSetSensorsRes(InitializedBaseStation& cbs);
+    void processAddSensorRes(InitializedBaseStation& cbs);
+    void processReportMeasurementReq(InitializedBaseStation& cbs);
+    void processSensorBoundReq(InitializedBaseStation& cbs);
+    void processReportSensorDetails(InitializedBaseStation& cbs);
 
-    void sendSensorSettings(ConnectedBaseStation& cbs);
-    void sendSensors(ConnectedBaseStation& cbs);
-    void requestBindSensor(ConnectedBaseStation& cbs, DB::SensorId sensorId);
+    void processSensorDetails(InitializedBaseStation& cbs, std::vector<uint8_t> const& data);
+
+    void sendSensorSettings(InitializedBaseStation& cbs);
+    void sendSensors(InitializedBaseStation& cbs);
+    void requestBindSensor(InitializedBaseStation& cbs, DB::SensorId sensorId);
 
     QUdpSocket m_broadcastSocket;
 
     std::vector<BaseStationDescriptor> m_discoveredBaseStations;
-    std::vector<std::unique_ptr<ConnectedBaseStation>> m_connectedBaseStations;
+    std::vector<std::unique_ptr<InitializedBaseStation>> m_initializedBaseStations;
 };
 
 namespace std

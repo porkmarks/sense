@@ -25,6 +25,7 @@ signals:
 private slots:
     void setRW();
     void baseStationDiscovered(Comms::BaseStationDescriptor const& bs);
+    void baseStationConnected(Comms::BaseStationDescriptor const& bs);
     void baseStationDisconnected(Comms::BaseStationDescriptor const& bs);
     void activateBaseStation(QModelIndex const& index);
 
@@ -39,7 +40,7 @@ private:
     Settings* m_settings = nullptr;
     QStandardItemModel m_model;
 
-    std::vector<Comms::BaseStationDescriptor> m_unregisteredBaseStations;
+    std::vector<Settings::BaseStationDescriptor> m_baseStationDescriptors;
     std::vector<QMetaObject::Connection> m_uiConnections;
 };
 

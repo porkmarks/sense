@@ -6,7 +6,7 @@
 #include <QDateTime>
 #include <cassert>
 
-static std::array<const char*, 10> s_headerNames = {"Name", "Id", "Serial Number", "Temperature", "Humidity", "Battery", "Signal (Current/Avg)", "Next Comms", "Stored", "Alarms"};
+static std::array<const char*, 10> s_headerNames = {"Name", "Id", "Serial Number", "Temperature", "Humidity", "Battery", "Signal (Current/Avg)", "Comms", "Stored", "Alarms"};
 
 extern float getBatteryLevel(float vcc);
 extern QIcon getBatteryIcon(float vcc);
@@ -306,16 +306,16 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
     {
         if (column == Column::NextComms)
         {
-            if (sensor.nextCommsTimePoint.time_since_epoch().count() != 0)
+            if (sensor.lastCommsTimePoint.time_since_epoch().count() != 0)
             {
-                auto p = computeNextTimePointString(sensor.nextCommsTimePoint);
+                auto p = computeNextTimePointString(sensor.lastCommsTimePoint + m_db.getSensorSettings().computedCommsPeriod);
                 if (p.second < k_imminentMaxSecond && p.second > k_imminentMinSecond)
                 {
-                    return QVariant(QColor(255, 255, 100));
+                    return QVariant(QColor(255, 255, 150));
                 }
                 if (p.second < k_imminentMinSecond)
                 {
-                    return QVariant(QColor(255, 100, 100));
+                    return QVariant(QColor(255, 150, 150));
                 }
             }
         }
@@ -323,7 +323,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         {
             if (sensor.storedMeasurementCount > k_alertStoredMeasurementCount)
             {
-                return QVariant(QColor(255, 255, 100));
+                return QVariant(QColor(255, 150, 150));
             }
         }
     }
@@ -346,7 +346,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::NextComms)
         {
-            if (sensor.nextCommsTimePoint.time_since_epoch().count() == 0)
+            if (sensor.lastCommsTimePoint.time_since_epoch().count() == 0)
             {
                 return QIcon(":/icons/ui/question.png");
             }
@@ -407,9 +407,9 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::NextComms)
         {
-            if (sensor.nextCommsTimePoint.time_since_epoch().count() != 0)
+            if (sensor.lastCommsTimePoint.time_since_epoch().count() != 0)
             {
-                auto p = computeNextTimePointString(sensor.nextCommsTimePoint);
+                auto p = computeNextTimePointString(sensor.lastCommsTimePoint + m_db.getSensorSettings().computedCommsPeriod);
                 if (p.second < k_imminentMaxSecond && p.second > k_imminentMinSecond)
                 {
                     return "Imminent";
