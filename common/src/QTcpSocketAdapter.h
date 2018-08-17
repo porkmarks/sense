@@ -20,9 +20,25 @@ public:
     {
     }
 
+    ~QTcpSocketAdapter()
+    {
+        for (QMetaObject::Connection& c : m_connections)
+        {
+            QObject::disconnect(c);
+        }
+        if (m_socket)
+        {
+            m_socket->deleteLater();
+        }
+    }
+
     void setSocket(QTcpSocket* socket)
     {
-        m_socket.reset(socket);
+        if (m_socket)
+        {
+            m_socket->deleteLater();
+        }
+        m_socket = socket;
     }
 
     QTcpSocket& getSocket()
@@ -36,8 +52,12 @@ public:
 
     void start()
     {
-        connect(m_socket.get(), &QIODevice::readyRead, this, &QTcpSocketAdapter::handleReceive);
-        connect(m_socket.get(), &QIODevice::bytesWritten, this, &QTcpSocketAdapter::handleSend);
+        for (QMetaObject::Connection& c : m_connections)
+        {
+            QObject::disconnect(c);
+        }
+        m_connections.push_back(connect(m_socket, &QIODevice::readyRead, this, &QTcpSocketAdapter::handleReceive));
+        m_connections.push_back(connect(m_socket, &QIODevice::bytesWritten, this, &QTcpSocketAdapter::handleSend));
     }
 
     template<class Container>
@@ -133,7 +153,8 @@ private:
         return buffer_ptr;
     }
 
-    std::unique_ptr<QTcpSocket> m_socket;
+    std::vector<QMetaObject::Connection> m_connections;
+    QTcpSocket* m_socket = nullptr;
     RX_Buffer_t m_rxBuffer;
     std::mutex m_rxMutex;
 
