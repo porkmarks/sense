@@ -117,7 +117,7 @@ public:
         Calibration calibration;
         uint32_t serialNumber = 0;
         State state = State::Active;
-        Clock::time_point nextCommsTimePoint = Clock::time_point(Clock::duration::zero());
+        Clock::time_point lastCommsTimePoint = Clock::time_point(Clock::duration::zero());
         Clock::time_point nextMeasurementTimePoint = Clock::time_point(Clock::duration::zero());
         int32_t storedMeasurementCount = -1;
 

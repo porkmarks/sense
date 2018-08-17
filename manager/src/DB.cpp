@@ -179,6 +179,7 @@ bool DB::load(std::string const& name)
                 return false;
             }
             data.sensorSettings.descriptor.commsPeriod = std::chrono::seconds(it->value.GetUint64());
+            data.sensorSettings.computedCommsPeriod = data.sensorSettings.descriptor.commsPeriod;
 
             it = ssj.FindMember("baseline");
             if (it == ssj.MemberEnd() || !it->value.IsUint64())
@@ -186,7 +187,7 @@ bool DB::load(std::string const& name)
                 s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings baseline").arg(dataFilename.c_str()));
                 return false;
             }
-            data.sensorSettings.baselineTimePoint = Clock::time_point(std::chrono::seconds(it->value.GetUint64()));
+            data.sensorSettings.baselineTimePoint = Clock::from_time_t(it->value.GetUint64());
         }
 
         it = document.FindMember("sensors");
@@ -248,15 +249,18 @@ bool DB::load(std::string const& name)
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor next_measurement").arg(dataFilename.c_str()));
                     return false;
                 }
-                sensor.nextMeasurementTimePoint = Clock::time_point(std::chrono::seconds(it->value.GetUint64()));
+                sensor.nextMeasurementTimePoint = Clock::from_time_t(it->value.GetUint64());
 
-                it = sensorj.FindMember("next_comms");
-                if (it == sensorj.MemberEnd() || !it->value.IsUint64())
+                it = sensorj.FindMember("last_comms");
+                if (it != sensorj.MemberEnd() && it->value.IsUint64())
                 {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor next_comms").arg(dataFilename.c_str()));
-                    return false;
+                    if (!it->value.IsUint64())
+                    {
+                        s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor next_comms").arg(dataFilename.c_str()));
+                        return false;
+                    }
+                    sensor.lastCommsTimePoint = Clock::from_time_t(it->value.GetUint64());
                 }
-                sensor.nextCommsTimePoint = Clock::time_point(std::chrono::seconds(it->value.GetUint64()));
 
                 it = sensorj.FindMember("temperature_bias");
                 if (it == sensorj.MemberEnd() || !it->value.IsNumber())
@@ -478,7 +482,7 @@ bool DB::load(std::string const& name)
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor report last_triggered").arg(dataFilename.c_str()));
                     return false;
                 }
-                report.lastTriggeredTimePoint = Clock::time_point(std::chrono::seconds(it->value.GetUint64()));
+                report.lastTriggeredTimePoint = Clock::from_time_t(it->value.GetUint64());
 
                 it = reportj.FindMember("filter_sensors");
                 if (it == reportj.MemberEnd() || !it->value.IsBool())
@@ -728,6 +732,7 @@ bool DB::setSensorSettings(SensorSettingsDescriptor const& descriptor)
     emit sensorSettingsWillBeChanged();
     m_mainData.sensorSettings.descriptor = descriptor;
     m_mainData.sensorSettings.baselineTimePoint = baselineTimePoint;
+    m_mainData.sensorSettings.computedCommsPeriod = descriptor.commsPeriod;
     emit sensorSettingsChanged();
 
     s_logger.logInfo("Changed sensor settings");
@@ -917,7 +922,7 @@ bool DB::setSensorState(SensorId id, Sensor::State state)
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::setSensorDetails(SensorId id, Clock::time_point nextMeasurementTimePoint, Clock::time_point nextCommsTimePoint, uint32_t storedMeasurementCount)
+bool DB::setSensorDetails(SensorId id, Clock::time_point nextMeasurementTimePoint, Clock::time_point lastCommsTimePoint, uint32_t storedMeasurementCount)
 {
     int32_t index = findSensorIndexById(id);
     if (index < 0)
@@ -932,7 +937,10 @@ bool DB::setSensorDetails(SensorId id, Clock::time_point nextMeasurementTimePoin
     }
 
     sensor.nextMeasurementTimePoint = nextMeasurementTimePoint;
-    sensor.nextCommsTimePoint = nextCommsTimePoint;
+    if (lastCommsTimePoint > sensor.lastCommsTimePoint)
+    {
+        sensor.lastCommsTimePoint = lastCommsTimePoint;
+    }
     sensor.storedMeasurementCount = storedMeasurementCount;
 
     emit sensorDataChanged(sensor.id);
@@ -1779,7 +1787,7 @@ void DB::save(Data const& data) const
             ssj.AddMember("sensors_sleeping", data.sensorSettings.descriptor.sensorsSleeping, document.GetAllocator());
             ssj.AddMember("measurement_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.sensorSettings.descriptor.measurementPeriod).count()), document.GetAllocator());
             ssj.AddMember("comms_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.sensorSettings.descriptor.commsPeriod).count()), document.GetAllocator());
-            ssj.AddMember("baseline", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.sensorSettings.baselineTimePoint.time_since_epoch()).count()), document.GetAllocator());
+            ssj.AddMember("baseline", static_cast<uint64_t>(Clock::to_time_t(data.sensorSettings.baselineTimePoint)), document.GetAllocator());
             document.AddMember("sensor_settings", ssj, document.GetAllocator());
         }
 
@@ -1794,8 +1802,8 @@ void DB::save(Data const& data) const
                 sensorj.AddMember("id", sensor.id, document.GetAllocator());
                 sensorj.AddMember("address", sensor.address, document.GetAllocator());
                 sensorj.AddMember("state", static_cast<int>(sensor.state), document.GetAllocator());
-                sensorj.AddMember("next_measurement", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(sensor.nextMeasurementTimePoint.time_since_epoch()).count()), document.GetAllocator());
-                sensorj.AddMember("next_comms", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(sensor.nextCommsTimePoint.time_since_epoch()).count()), document.GetAllocator());
+                sensorj.AddMember("next_measurement", static_cast<uint64_t>(Clock::to_time_t(sensor.nextMeasurementTimePoint)), document.GetAllocator());
+                sensorj.AddMember("last_comms", static_cast<uint64_t>(Clock::to_time_t(sensor.lastCommsTimePoint)), document.GetAllocator());
                 sensorj.AddMember("temperature_bias", sensor.calibration.temperatureBias, document.GetAllocator());
                 sensorj.AddMember("humidity_bias", sensor.calibration.humidityBias, document.GetAllocator());
                 sensorj.AddMember("serial_number", sensor.serialNumber, document.GetAllocator());
@@ -1849,7 +1857,7 @@ void DB::save(Data const& data) const
                 rapidjson::Value reportj;
                 reportj.SetObject();
                 reportj.AddMember("id", report.id, document.GetAllocator());
-                reportj.AddMember("last_triggered", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(report.lastTriggeredTimePoint.time_since_epoch()).count()), document.GetAllocator());
+                reportj.AddMember("last_triggered", static_cast<uint64_t>(Clock::to_time_t(report.lastTriggeredTimePoint)), document.GetAllocator());
                 reportj.AddMember("name", rapidjson::Value(report.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
                 reportj.AddMember("filter_sensors", report.descriptor.filterSensors, document.GetAllocator());
                 if (report.descriptor.filterSensors)
