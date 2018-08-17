@@ -7,7 +7,7 @@
 #include "ui_LoginDialog.h"
 #include "Crypt.h"
 
-static const std::string s_version = "1.0.5";
+static const std::string s_version = "1.0.6";
 
 Logger s_logger;
 
