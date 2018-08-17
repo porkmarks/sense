@@ -23,6 +23,8 @@ private slots:
     void setPreset(int preset);
     void setPresetToday();
     void setPresetYesterday();
+    void setPresetLastHour();
+    void setPresetLast24Hours();
     void setPresetThisWeek();
     void setPresetLastWeek();
     void setPresetThisMonth();
