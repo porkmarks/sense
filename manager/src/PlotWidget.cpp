@@ -124,7 +124,7 @@ void PlotWidget::loadSettings()
             }
         }
     }
-    else
+    else if (m_db)
     {
         for (size_t i = 0; i < m_db->getSensorCount(); i++)
         {
