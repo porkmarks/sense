@@ -119,6 +119,12 @@ int main(int argc, char *argv[])
 
     QLocale::setDefault(QLocale(QLocale::English, QLocale::Romania));
 
+    qDebug() << QStyleFactory::keys();
+#ifdef _WIN32
+    a.setStyle(QStyleFactory::create("Fusion"));
+#endif
+    //a.setStyle(QStyleFactory::create("Windows"));
+
     a.setQuitOnLastWindowClosed(true);
     a.setWindowIcon(QIcon(":/icons/ui/manager.png"));
 
