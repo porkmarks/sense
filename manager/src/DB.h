@@ -27,7 +27,7 @@ public:
 
     ////////////////////////////////////////////////////////////////////////////
 
-    struct SensorSettingsDescriptor
+    struct SensorsConfigDescriptor
     {
         std::string name = "Base Station";
         bool sensorsSleeping = false;
@@ -35,24 +35,22 @@ public:
         Clock::duration commsPeriod = std::chrono::minutes(10);
     };
 
-    struct SensorSettings
+    struct SensorsConfig
     {
-        SensorSettingsDescriptor descriptor;
-        Clock::duration computedCommsPeriod;
-
-        //This is computed when creating the config so that this equation holds for any config:
-        // measurement_time_point = config.baseline_time_point + measurement_index * config.measurement_period
-        //
-        //So when creating a new config, this is how to calculate the baseline:
-        // m = some measurement (any)
-        // config.baseline_time_point = m.time_point - m.index * config.measurement_period
-        //
-        //The reason for this is to keep the indices valid in all configs
-        Clock::time_point baselineTimePoint = Clock::now();
+        SensorsConfigDescriptor descriptor;
+        Clock::duration computedCommsPeriod = std::chrono::minutes(10);
+        //when did this config become active?
+        Clock::time_point baselineMeasurementTimePoint = Clock::time_point(Clock::duration::zero());
+        uint32_t baselineMeasurementIndex = 0;
     };
 
-    bool setSensorSettings(SensorSettingsDescriptor const& descriptor);
-    SensorSettings const& getSensorSettings() const;
+
+    bool addSensorsConfig(SensorsConfigDescriptor const& descriptor);
+    bool setSensorsConfigs(std::vector<SensorsConfig> const& configs);
+
+    size_t getSensorsConfigCount() const;
+    SensorsConfig const& getSensorsConfig(size_t index) const;
+    SensorsConfig const& getLastSensorsConfig() const;
 
     struct SensorErrors
     {
@@ -296,8 +294,11 @@ public:
     ////////////////////////////////////////////////////////////////////////////
 
 signals:
-    void sensorSettingsWillBeChanged();
-    void sensorSettingsChanged();
+    void sensorsConfigWillBeAdded();
+    void sensorsConfigAdded();
+
+    void sensorsConfigWillBeChanged();
+    void sensorsConfigChanged();
 
     void sensorWillBeAdded(SensorId id);
     void sensorAdded(SensorId id);
@@ -329,8 +330,6 @@ signals:
     void alarmWasUntriggered(AlarmId alarmId, SensorId sensorId, MeasurementDescriptor const& md);
 
 private:
-    Clock::time_point computeBaselineTimePoint(SensorSettings const& oldSensorSettings, SensorSettingsDescriptor const& newDescriptor);
-
     size_t _getFilteredMeasurements(Filter const& filter, std::vector<Measurement>* result) const;
     bool cull(Measurement const& measurement, Filter const& filter) const;
 
@@ -362,7 +361,7 @@ private:
 
     struct Data
     {
-        SensorSettings sensorSettings;
+        std::vector<SensorsConfig> sensorsConfigs;
         std::vector<Sensor> sensors;
         std::vector<Alarm> alarms;
         std::vector<Report> reports;

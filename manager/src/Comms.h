@@ -58,8 +58,8 @@ private:
             }
         }
 
-        BaseStationDescriptor descriptor;
         DB& db;
+        BaseStationDescriptor descriptor;
         QTcpSocketAdapter socketAdapter;
         util::comms::Channel<data::Server_Message, QTcpSocketAdapter> channel;
         bool isConnecting = false;
@@ -76,7 +76,8 @@ private slots:
 private:
     void reconnectToBaseStation(InitializedBaseStation* cbs);
 
-    void processSetConfigRes(InitializedBaseStation& cbs);
+    void processAddConfigRes(InitializedBaseStation& cbs);
+    void processSetConfigsRes(InitializedBaseStation& cbs);
     void processSetSensorsRes(InitializedBaseStation& cbs);
     void processAddSensorRes(InitializedBaseStation& cbs);
     void processReportMeasurementReq(InitializedBaseStation& cbs);
@@ -84,8 +85,10 @@ private:
     void processReportSensorDetails(InitializedBaseStation& cbs);
 
     void processSensorDetails(InitializedBaseStation& cbs, std::vector<uint8_t> const& data);
+    void processConfigs(InitializedBaseStation& cbs, std::vector<uint8_t> const& data);
 
-    void sendSensorSettings(InitializedBaseStation& cbs);
+    void sendSensorsConfigs(InitializedBaseStation& cbs);
+    void sendLastSensorsConfig(InitializedBaseStation& cbs);
     void sendSensors(InitializedBaseStation& cbs);
     void requestBindSensor(InitializedBaseStation& cbs, DB::SensorId sensorId);
 

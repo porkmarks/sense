@@ -55,8 +55,8 @@ void SettingsWidget::init(Comms& comms, Settings& settings)
     m_uiConnections.push_back(connect(m_ui.ftpReset, &QPushButton::released, [this]() { setFtpSettings(m_settings->getFtpSettings()); }));
     m_uiConnections.push_back(connect(m_ui.ftpTest, &QPushButton::released, this, &SettingsWidget::testFtpSettings));
 
-    m_uiConnections.push_back(connect(m_ui.sensorsApply, &QPushButton::released, this, &SettingsWidget::applySensorSettings));
-    m_uiConnections.push_back(connect(m_ui.sensorsReset, &QPushButton::released, [this]() { if (m_db) setSensorSettings(m_db->getSensorSettings()); }));
+    m_uiConnections.push_back(connect(m_ui.sensorsApply, &QPushButton::released, this, &SettingsWidget::applySensorsConfig));
+    m_uiConnections.push_back(connect(m_ui.sensorsReset, &QPushButton::released, [this]() { if (m_db) setSensorsConfig(m_db->getLastSensorsConfig()); }));
     m_ui.sensorsTab->setEnabled(m_settings->getActiveBaseStationId() != 0);
 }
 
@@ -88,7 +88,7 @@ void SettingsWidget::initBaseStation(Settings::BaseStationId id)
     m_db = &db;
     m_ui.reportsWidget->init(*m_settings, db);
 
-    setSensorSettings(m_db->getSensorSettings());
+    setSensorsConfig(m_db->getLastSensorsConfig());
 
     setRW();
 }
@@ -500,17 +500,17 @@ void SettingsWidget::testFtpSettings()
 
 //////////////////////////////////////////////////////////////////////////
 
-void SettingsWidget::setSensorSettings(DB::SensorSettings const& settings)
+void SettingsWidget::setSensorsConfig(DB::SensorsConfig const& config)
 {
-    m_ui.sensorsMeasurementPeriod->setValue(std::chrono::duration<float>(settings.descriptor.measurementPeriod).count() / 60.f);
-    m_ui.sensorsCommsPeriod->setValue(std::chrono::duration<float>(settings.descriptor.commsPeriod).count() / 60.f);
-    m_ui.sensorsComputedCommsPeriod->setValue(std::chrono::duration<float>(settings.computedCommsPeriod).count() / 60.f);
-    m_ui.sensorsSleeping->setChecked(settings.descriptor.sensorsSleeping);
+    m_ui.sensorsMeasurementPeriod->setValue(std::chrono::duration<float>(config.descriptor.measurementPeriod).count() / 60.f);
+    m_ui.sensorsCommsPeriod->setValue(std::chrono::duration<float>(config.descriptor.commsPeriod).count() / 60.f);
+    m_ui.sensorsComputedCommsPeriod->setValue(std::chrono::duration<float>(config.computedCommsPeriod).count() / 60.f);
+    m_ui.sensorsSleeping->setChecked(config.descriptor.sensorsSleeping);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool SettingsWidget::getSensorSettings(DB::SensorSettingsDescriptor& descriptor)
+bool SettingsWidget::getSensorsConfig(DB::SensorsConfigDescriptor& descriptor)
 {
     descriptor.measurementPeriod = std::chrono::seconds(static_cast<size_t>(m_ui.sensorsMeasurementPeriod->value() * 60.0));
     descriptor.commsPeriod = std::chrono::seconds(static_cast<size_t>(m_ui.sensorsCommsPeriod->value() * 60.0));
@@ -537,20 +537,20 @@ bool SettingsWidget::getSensorSettings(DB::SensorSettingsDescriptor& descriptor)
 
 //////////////////////////////////////////////////////////////////////////
 
-void SettingsWidget::applySensorSettings()
+void SettingsWidget::applySensorsConfig()
 {
     if (!m_db)
     {
         return;
     }
 
-    DB::SensorSettingsDescriptor settings;
-    if (!getSensorSettings(settings))
+    DB::SensorsConfigDescriptor config;
+    if (!getSensorsConfig(config))
     {
         return;
     }
 
-    if (!m_db->setSensorSettings(settings))
+    if (!m_db->addSensorsConfig(config))
     {
         QMessageBox::critical(this, "Error", "Cannot set sensor settings.");
     }

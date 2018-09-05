@@ -31,7 +31,7 @@ private slots:
     void testFtpSettings();
     void applyEmailSettings();
     void applyFtpSettings();
-    void applySensorSettings();
+    void applySensorsConfig();
     void addEmailRecipient();
     void removeEmailRecipient();
 
@@ -42,8 +42,8 @@ private:
     void setFtpSettings(Settings::FtpSettings const& settings);
     bool getFtpSettings(Settings::FtpSettings& settings);
 
-    void setSensorSettings(DB::SensorSettings const& settings);
-    bool getSensorSettings(DB::SensorSettingsDescriptor& settings);
+    void setSensorsConfig(DB::SensorsConfig const& config);
+    bool getSensorsConfig(DB::SensorsConfigDescriptor& config);
 
     Ui::SettingsWidget m_ui;
     Settings* m_settings = nullptr;

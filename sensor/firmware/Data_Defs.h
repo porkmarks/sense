@@ -151,8 +151,10 @@ static_assert(sizeof(Pair_Response) == 4, "");
 
 enum class Server_Message
 {
-    SET_CONFIG_REQ,         //manager
-    SET_CONFIG_RES,         //base station
+    SET_CONFIGS_REQ,         //manager
+    SET_CONFIGS_RES,         //base station
+    ADD_CONFIG_REQ,         //manager
+    ADD_CONFIG_RES,         //base station
     SET_SENSORS_REQ,        //manager
     SET_SENSORS_RES,        //base station
     ADD_SENSOR_REQ,         //manager

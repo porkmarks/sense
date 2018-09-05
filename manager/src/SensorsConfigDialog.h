@@ -1,18 +1,18 @@
 #pragma once
 
 #include <QDialog>
-#include "ui_SensorSettingsDialog.h"
+#include "ui_SensorsConfigDialog.h"
 #include "DB.h"
 
-class SensorSettingsDialog : public QDialog
+class SensorsConfigDialog : public QDialog
 {
     Q_OBJECT
 public:
-    explicit SensorSettingsDialog(QWidget *parent = 0);
-    ~SensorSettingsDialog();
+    explicit SensorsConfigDialog(QWidget *parent = 0);
+    ~SensorsConfigDialog();
 
-    void setSensorSettings(DB::SensorSettings const& settings);
-    DB::SensorSettings const& getSensorSettings() const;
+    void setSensorsConfig(DB::SensorsConfig const& config);
+    DB::SensorsConfig const& getSensorsConfig() const;
 
 signals:
 
@@ -20,7 +20,7 @@ private slots:
     void accept() override;
 
 private:
-    Ui::SensorSettingsDialog m_ui;
-    mutable DB::SensorSettings m_settings;
+    Ui::SensorsConfigDialog m_ui;
+    mutable DB::SensorsConfig m_config;
 };
 

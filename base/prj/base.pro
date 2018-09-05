@@ -63,7 +63,8 @@ HEADERS += \
     ../../sensor/firmware/rfm22b_enums.h \
     ../../sensor/firmware/Sensor_Comms.h \
     ../../sensor/firmware/CRC.h \
-    ../../sensor/firmware/Storage.h
+    ../../sensor/firmware/Storage.h \
+    ../src/Log.h
 
 SOURCES += \
     ../src/main.cpp \

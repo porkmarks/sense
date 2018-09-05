@@ -22,6 +22,9 @@
 #include "Crypt.h"
 #include "Logger.h"
 
+#define USE_DB_ENCRYPTION
+//#define USE_DATA_ENCRYPTION
+
 extern Logger s_logger;
 
 extern std::string s_dataFolder;
@@ -139,56 +142,130 @@ bool DB::load(std::string const& name)
             return false;
         }
 
-        auto it = document.FindMember("sensor_settings");
-        if (it == document.MemberEnd() || !it->value.IsObject())
+        //////////////////////////////////////////////////////////////////////////////////
+
+        auto it = document.FindMember("sensors_configs");
+        if (it == document.MemberEnd() || !it->value.IsArray())
         {
-            s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings object").arg(dataFilename.c_str()));
-            return false;
+            auto it = document.FindMember("sensor_settings");
+            if (it == document.MemberEnd() || !it->value.IsObject())
+            {
+                s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings object").arg(dataFilename.c_str()));
+                return false;
+            }
+
+            {
+                SensorsConfig config;
+
+                rapidjson::Value const& ssj = it->value;
+                auto it = ssj.FindMember("name");
+                if (it == ssj.MemberEnd() || !it->value.IsString())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings name").arg(dataFilename.c_str()));
+                    return false;
+                }
+                config.descriptor.name = it->value.GetString();
+
+                it = ssj.FindMember("sensors_sleeping");
+                if (it == ssj.MemberEnd() || !it->value.IsBool())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings sensors_sleeping").arg(dataFilename.c_str()));
+                    return false;
+                }
+                config.descriptor.sensorsSleeping = it->value.GetBool();
+
+                it = ssj.FindMember("measurement_period");
+                if (it == ssj.MemberEnd() || !it->value.IsUint64())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings measurement_period").arg(dataFilename.c_str()));
+                    return false;
+                }
+                config.descriptor.measurementPeriod = std::chrono::seconds(it->value.GetUint64());
+
+                it = ssj.FindMember("comms_period");
+                if (it == ssj.MemberEnd() || !it->value.IsUint64())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings comms_period").arg(dataFilename.c_str()));
+                    return false;
+                }
+                config.descriptor.commsPeriod = std::chrono::seconds(it->value.GetUint64());
+                config.computedCommsPeriod = config.descriptor.commsPeriod;
+
+                it = ssj.FindMember("baseline");
+                if (it == ssj.MemberEnd() || !it->value.IsUint64())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings baseline").arg(dataFilename.c_str()));
+                    return false;
+                }
+                config.baselineMeasurementTimePoint = Clock::from_time_t(it->value.GetUint64());
+                config.baselineMeasurementIndex = 0;
+
+                data.sensorsConfigs.push_back(config);
+            }
+
+//            s_logger.logCritical(QString("Failed to load '%1': Bad or missing base_sensor_configs array").arg(dataFilename.c_str()));
+//            return false;
+        }
+        else
+        {
+            rapidjson::Value const& configsj = it->value;
+            for (size_t i = 0; i < configsj.Size(); i++)
+            {
+                SensorsConfig config;
+                rapidjson::Value const& configj = configsj[i];
+                auto it = configj.FindMember("name");
+                if (it == configj.MemberEnd() || !it->value.IsString())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing config name").arg(dataFilename.c_str()));
+                    return false;
+                }
+                config.descriptor.name = it->value.GetString();
+
+                it = configj.FindMember("sensors_sleeping");
+                if (it == configj.MemberEnd() || !it->value.IsBool())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing config sensors_sleeping").arg(dataFilename.c_str()));
+                    return false;
+                }
+                config.descriptor.sensorsSleeping = it->value.GetBool();
+
+                it = configj.FindMember("measurement_period");
+                if (it == configj.MemberEnd() || !it->value.IsUint64())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing config measurement_period").arg(dataFilename.c_str()));
+                    return false;
+                }
+                config.descriptor.measurementPeriod = std::chrono::seconds(it->value.GetUint64());
+
+                it = configj.FindMember("comms_period");
+                if (it == configj.MemberEnd() || !it->value.IsUint64())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing config comms_period").arg(dataFilename.c_str()));
+                    return false;
+                }
+                config.descriptor.commsPeriod = std::chrono::seconds(it->value.GetUint64());
+                config.computedCommsPeriod = config.descriptor.commsPeriod;
+
+                it = configj.FindMember("baseline_measurement_tp");
+                if (it == configj.MemberEnd() || !it->value.IsUint64())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing config baseline_measurement_tp").arg(dataFilename.c_str()));
+                    return false;
+                }
+                config.baselineMeasurementTimePoint = Clock::from_time_t(it->value.GetUint64());
+
+                it = configj.FindMember("baseline_measurement_index");
+                if (it == configj.MemberEnd() || !it->value.IsUint())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing config baseline_measurement_index").arg(dataFilename.c_str()));
+                    return false;
+                }
+                config.baselineMeasurementIndex = it->value.GetUint();
+                data.sensorsConfigs.push_back(config);
+            }
         }
 
-        {
-            rapidjson::Value const& ssj = it->value;
-            auto it = ssj.FindMember("name");
-            if (it == ssj.MemberEnd() || !it->value.IsString())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings name").arg(dataFilename.c_str()));
-                return false;
-            }
-            data.sensorSettings.descriptor.name = it->value.GetString();
-
-            it = ssj.FindMember("sensors_sleeping");
-            if (it == ssj.MemberEnd() || !it->value.IsBool())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings sensors_sleeping").arg(dataFilename.c_str()));
-                return false;
-            }
-            data.sensorSettings.descriptor.sensorsSleeping = it->value.GetBool();
-
-            it = ssj.FindMember("measurement_period");
-            if (it == ssj.MemberEnd() || !it->value.IsUint64())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings measurement_period").arg(dataFilename.c_str()));
-                return false;
-            }
-            data.sensorSettings.descriptor.measurementPeriod = std::chrono::seconds(it->value.GetUint64());
-
-            it = ssj.FindMember("comms_period");
-            if (it == ssj.MemberEnd() || !it->value.IsUint64())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings comms_period").arg(dataFilename.c_str()));
-                return false;
-            }
-            data.sensorSettings.descriptor.commsPeriod = std::chrono::seconds(it->value.GetUint64());
-            data.sensorSettings.computedCommsPeriod = data.sensorSettings.descriptor.commsPeriod;
-
-            it = ssj.FindMember("baseline");
-            if (it == ssj.MemberEnd() || !it->value.IsUint64())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings baseline").arg(dataFilename.c_str()));
-                return false;
-            }
-            data.sensorSettings.baselineTimePoint = Clock::from_time_t(it->value.GetUint64());
-        }
+        //////////////////////////////////////////////////////////////////////////////////
 
         it = document.FindMember("sensors");
         if (it == document.MemberEnd() || !it->value.IsArray())
@@ -282,6 +359,8 @@ bool DB::load(std::string const& name)
                 data.sensors.push_back(sensor);
             }
         }
+
+        //////////////////////////////////////////////////////////////////////////////////
 
         it = document.FindMember("alarms");
         if (it == document.MemberEnd() || !it->value.IsArray())
@@ -446,6 +525,7 @@ bool DB::load(std::string const& name)
             }
         }
 
+        //////////////////////////////////////////////////////////////////////////////////
 
         it = document.FindMember("reports");
         if (it == document.MemberEnd() || !it->value.IsArray())
@@ -543,6 +623,7 @@ bool DB::load(std::string const& name)
         }
     }
 
+    //////////////////////////////////////////////////////////////////////////////////
 
     {
         std::string streamData;
@@ -567,8 +648,12 @@ bool DB::load(std::string const& name)
         uint32_t sensorCount = 0;
         if (!read(stream, sensorCount))
         {
-            s_logger.logCritical(QString("Failed to read '%1': %2").arg(dbFilename.c_str()).arg(std::strerror(errno)));
-            return false;
+            stream = std::stringstream(std::string(streamData.data(), streamData.size())); //try unencrypted
+            if (!read(stream, sensorCount))
+            {
+                s_logger.logCritical(QString("Failed to read '%1': %2").arg(dbFilename.c_str()).arg(std::strerror(errno)));
+                return false;
+            }
         }
         if (sensorCount > 10000)
         {
@@ -708,7 +793,7 @@ DB::Sensor const& DB::getSensor(size_t index) const
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::setSensorSettings(SensorSettingsDescriptor const& descriptor)
+bool DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
 {
     if (descriptor.name.empty())
     {
@@ -727,15 +812,13 @@ bool DB::setSensorSettings(SensorSettingsDescriptor const& descriptor)
         return false;
     }
 
-    Clock::time_point baselineTimePoint = computeBaselineTimePoint(m_mainData.sensorSettings, descriptor);
+    emit sensorsConfigWillBeAdded();
+    SensorsConfig config;
+    config.descriptor = descriptor;
+    m_mainData.sensorsConfigs.push_back(config);
+    emit sensorsConfigAdded();
 
-    emit sensorSettingsWillBeChanged();
-    m_mainData.sensorSettings.descriptor = descriptor;
-    m_mainData.sensorSettings.baselineTimePoint = baselineTimePoint;
-    m_mainData.sensorSettings.computedCommsPeriod = descriptor.commsPeriod;
-    emit sensorSettingsChanged();
-
-    s_logger.logInfo("Changed sensor settings");
+    s_logger.logInfo("Changed sensors config");
 
     triggerSave();
 
@@ -744,60 +827,45 @@ bool DB::setSensorSettings(SensorSettingsDescriptor const& descriptor)
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::SensorSettings const& DB::getSensorSettings() const
+bool DB::setSensorsConfigs(std::vector<SensorsConfig> const& configs)
 {
-    return m_mainData.sensorSettings;
+    emit sensorsConfigWillBeChanged();
+
+    m_mainData.sensorsConfigs = configs;
+    for (SensorsConfig& config: m_mainData.sensorsConfigs)
+    {
+        config.computedCommsPeriod = config.descriptor.commsPeriod;
+    }
+
+    emit sensorsConfigChanged();
+
+    s_logger.logInfo("Changed sensors configs");
+
+    triggerSave();
+    return true;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::Clock::time_point DB::computeBaselineTimePoint(SensorSettings const& oldSensorSettings, SensorSettingsDescriptor const& newDescriptor)
+DB::SensorsConfig const& DB::getLastSensorsConfig() const
 {
-    //This is computed when creating the config so that this equation holds for any config:
-    // measurement_time_point = config.baseline_time_point + measurement_index * config.measurement_period
-    //
-    //So when creating a new config, this is how to calculate the baseline:
-    // m = some measurement (any)
-    // config.baseline_time_point = m.time_point - m.index * config.measurement_period
-    //
-    //The reason for this is to keep the indices valid in all configs
+    static SensorsConfig s_empty;
+    return m_mainData.sensorsConfigs.empty() ? s_empty : m_mainData.sensorsConfigs.back();
+}
 
-    Clock::time_point newBaseline;
+//////////////////////////////////////////////////////////////////////////
 
-    bool found = false;
-    for (auto const& pair: m_mainData.measurements)
-    {
-        if (pair.second.empty())
-        {
-            continue;
-        }
+size_t DB::getSensorsConfigCount() const
+{
+    return m_mainData.sensorsConfigs.size();
+}
 
-        Measurement m = unpack(pair.first, pair.second.back());
-        Clock::time_point tp = m.descriptor.timePoint - m.descriptor.index * newDescriptor.measurementPeriod;
-        if (!found)
-        {
-            found = true;
-        }
-        else
-        {
-            Clock::duration d = tp - newBaseline;
+//////////////////////////////////////////////////////////////////////////
 
-            //std::abs doesn't work with durations
-            if (d < Clock::duration::zero())
-            {
-                d = -d;
-            }
-
-            //check for errors
-            if (d > std::chrono::minutes(1))
-            {
-                assert(false);
-            }
-        }
-        newBaseline = tp;
-    }
-
-    return found ? newBaseline : oldSensorSettings.baselineTimePoint;
+DB::SensorsConfig const& DB::getSensorsConfig(size_t index) const
+{
+    assert(index < m_mainData.sensorsConfigs.size());
+    return m_mainData.sensorsConfigs[index];
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1780,15 +1848,33 @@ void DB::save(Data const& data) const
     {
         rapidjson::Document document;
         document.SetObject();
+//        {
+//            rapidjson::Value ssj;
+//            ssj.SetObject();
+//            ssj.AddMember("name", rapidjson::Value(data.sensorSettings.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
+//            ssj.AddMember("sensors_sleeping", data.sensorSettings.descriptor.sensorsSleeping, document.GetAllocator());
+//            ssj.AddMember("measurement_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.sensorSettings.descriptor.measurementPeriod).count()), document.GetAllocator());
+//            ssj.AddMember("comms_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.sensorSettings.descriptor.commsPeriod).count()), document.GetAllocator());
+////            ssj.AddMember("baseline", static_cast<uint64_t>(Clock::to_time_t(data.sensorSettings.baselineTimePoint)), document.GetAllocator());
+//            document.AddMember("sensor_settings", ssj, document.GetAllocator());
+//        }
+
         {
-            rapidjson::Value ssj;
-            ssj.SetObject();
-            ssj.AddMember("name", rapidjson::Value(data.sensorSettings.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
-            ssj.AddMember("sensors_sleeping", data.sensorSettings.descriptor.sensorsSleeping, document.GetAllocator());
-            ssj.AddMember("measurement_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.sensorSettings.descriptor.measurementPeriod).count()), document.GetAllocator());
-            ssj.AddMember("comms_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.sensorSettings.descriptor.commsPeriod).count()), document.GetAllocator());
-            ssj.AddMember("baseline", static_cast<uint64_t>(Clock::to_time_t(data.sensorSettings.baselineTimePoint)), document.GetAllocator());
-            document.AddMember("sensor_settings", ssj, document.GetAllocator());
+            rapidjson::Value configsj;
+            configsj.SetArray();
+            for (SensorsConfig const& config: data.sensorsConfigs)
+            {
+                rapidjson::Value configj;
+                configj.SetObject();
+                configj.AddMember("name", rapidjson::Value(config.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
+                configj.AddMember("sensors_sleeping", config.descriptor.sensorsSleeping, document.GetAllocator());
+                configj.AddMember("measurement_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.measurementPeriod).count()), document.GetAllocator());
+                configj.AddMember("comms_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.commsPeriod).count()), document.GetAllocator());
+                configj.AddMember("baseline_measurement_tp", static_cast<uint64_t>(Clock::to_time_t(config.baselineMeasurementTimePoint)), document.GetAllocator());
+                configj.AddMember("baseline_measurement_index", config.baselineMeasurementIndex, document.GetAllocator());
+                configsj.PushBack(configj, document.GetAllocator());
+            }
+            document.AddMember("sensors_configs", configsj, document.GetAllocator());
         }
 
         {
@@ -1885,8 +1971,12 @@ void DB::save(Data const& data) const
         Crypt crypt;
         crypt.setCompressionLevel(1);
         crypt.setKey(k_fileEncryptionKey);
-        QByteArray encryptedData = crypt.encryptToByteArray(QByteArray(buffer.GetString(), buffer.GetSize()));
-//        QByteArray encryptedData = QByteArray(buffer.GetString(), buffer.GetSize());
+#ifdef USE_DATA_ENCRYPTION
+        QByteArray dataToWrite = crypt.encryptToByteArray(QByteArray(buffer.GetString(), buffer.GetSize()));
+#else
+        QByteArray dataToWrite = QByteArray(buffer.GetString(), buffer.GetSize());
+#endif
+
 
         std::string tempFilename = (s_dataFolder + "/" + m_dataName + "_temp");
         {
@@ -1897,7 +1987,7 @@ void DB::save(Data const& data) const
             }
             else
             {
-                file.write(encryptedData.data(), encryptedData.size());
+                file.write(dataToWrite.data(), dataToWrite.size());
             }
             file.flush();
             file.close();
@@ -1930,8 +2020,11 @@ void DB::save(Data const& data) const
         Crypt crypt;
         crypt.setCompressionLevel(1);
         crypt.setKey(k_fileEncryptionKey);
-        QByteArray encryptedData = crypt.encryptToByteArray(QByteArray(buffer.data(), buffer.size()));
-//        QByteArray encryptedData = QByteArray(buffer.GetString(), buffer.GetSize());
+#ifdef USE_DB_ENCRYPTION
+        QByteArray dataToWrite = crypt.encryptToByteArray(QByteArray(buffer.data(), buffer.size()));
+#else
+        QByteArray dataToWrite = QByteArray(buffer.data(), buffer.size());
+#endif
 
         std::string tempFilename = (s_dataFolder + "/" + m_dbName + "_temp");
         {
@@ -1942,7 +2035,7 @@ void DB::save(Data const& data) const
             }
             else
             {
-                file.write(encryptedData.data(), encryptedData.size());
+                file.write(dataToWrite.data(), dataToWrite.size());
             }
             file.flush();
             file.close();

@@ -251,7 +251,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
                           <body>
                           <p>This is an automated daily report of the <strong>%1</strong> base station.</p>
                           <p>Measurements between <strong>%2</strong> and&nbsp;<strong>%3</strong></p>)X")
-                            .arg(m_db.getSensorSettings().descriptor.name.c_str())
+                            .arg(m_db.getLastSensorsConfig().descriptor.name.c_str())
                             .arg(startDt.toString("dd-MM-yyyy HH:mm"))
                             .arg(endDt.toString("dd-MM-yyyy HH:mm"))
                             .toUtf8().data();

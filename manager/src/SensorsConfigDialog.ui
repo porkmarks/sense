@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>SensorSettingsDialog</class>
- <widget class="QDialog" name="SensorSettingsDialog">
+ <class>SensorsConfigDialog</class>
+ <widget class="QDialog" name="SensorsConfigDialog">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>485</width>
+    <width>558</width>
     <height>719</height>
    </rect>
   </property>
@@ -238,7 +238,7 @@
   <connection>
    <sender>buttonBox</sender>
    <signal>accepted()</signal>
-   <receiver>SensorSettingsDialog</receiver>
+   <receiver>SensorsConfigDialog</receiver>
    <slot>accept()</slot>
    <hints>
     <hint type="sourcelabel">
@@ -254,7 +254,7 @@
   <connection>
    <sender>buttonBox</sender>
    <signal>rejected()</signal>
-   <receiver>SensorSettingsDialog</receiver>
+   <receiver>SensorsConfigDialog</receiver>
    <slot>reject()</slot>
    <hints>
     <hint type="sourcelabel">

@@ -97,7 +97,7 @@ bool Comms::connectToBaseStation(DB& db, Mac const& mac)
         disconnectedFromBaseStation(cbsPtr);
     }));
 
-    cbsPtr->connections.push_back(connect(&db, &DB::sensorSettingsChanged, [this, cbsPtr]() { sendSensorSettings(*cbsPtr); }));
+    cbsPtr->connections.push_back(connect(&db, &DB::sensorsConfigAdded, [this, cbsPtr]() { sendLastSensorsConfig(*cbsPtr); }));
     cbsPtr->connections.push_back(connect(&db, &DB::sensorAdded, [this, cbsPtr](DB::SensorId id) { requestBindSensor(*cbsPtr, id); }));
     cbsPtr->connections.push_back(connect(&db, &DB::sensorChanged, [this, cbsPtr](DB::SensorId) { sendSensors(*cbsPtr); }));
     cbsPtr->connections.push_back(connect(&db, &DB::sensorRemoved, [this, cbsPtr](DB::SensorId) { sendSensors(*cbsPtr); }));
@@ -136,7 +136,7 @@ void Comms::connectedToBaseStation(InitializedBaseStation* cbs)
         emit baseStationConnected(cbs->descriptor);
         cbs->socketAdapter.start();
 
-        sendSensorSettings(*cbs);
+        sendSensorsConfigs(*cbs);
         sendSensors(*cbs);
     }
 }
@@ -313,22 +313,139 @@ void Comms::processSensorDetails(InitializedBaseStation& cbs, std::vector<uint8_
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::sendSensorSettings(InitializedBaseStation& cbs)
+void Comms::processConfigs(InitializedBaseStation& cbs, std::vector<uint8_t> const& data)
 {
-    DB::SensorSettings const& sensorSettings = cbs.db.getSensorSettings();
+    rapidjson::Document document;
+    document.Parse(reinterpret_cast<const char*>(data.data()), data.size());
+    if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
+    {
+        s_logger.logCritical(QString("Cannot deserialize configs: %1").arg(rapidjson::GetParseError_En(document.GetParseError())));
+        return;
+    }
+    if (!document.IsObject())
+    {
+        s_logger.logCritical(QString("Cannot deserialize configs: Bad document."));
+        return;
+    }
+
+    {
+        auto it = document.FindMember("configs");
+        if (it == document.MemberEnd() || !it->value.IsArray())
+        {
+            s_logger.logCritical(QString("Cannot deserialize configs: Missing configs array."));
+            return;
+        }
+
+        std::vector<DB::SensorsConfig> configs;
+
+        rapidjson::Value const& configArrayj = it->value;
+        for (size_t i = 0; i < configArrayj.Size(); i++)
+        {
+            rapidjson::Value const& configj = configArrayj[i];
+            DB::SensorsConfig config;
+
+            auto it = configj.FindMember("name");
+            if (it == configj.MemberEnd() || !it->value.IsString())
+            {
+                s_logger.logCritical(QString("Cannot deserialize configs: Missing name."));
+                continue;
+            }
+            config.descriptor.name = it->value.GetString();
+
+            it = configj.FindMember("sensors_sleeping");
+            if (it == configj.MemberEnd() || !it->value.IsBool())
+            {
+                s_logger.logCritical(QString("Cannot deserialize config '%1': Missing sensors_sleeping.").arg(config.descriptor.name.c_str()));
+                continue;
+            }
+            config.descriptor.sensorsSleeping = it->value.GetBool();
+
+            it = configj.FindMember("measurement_period");
+            if (it == configj.MemberEnd() || !it->value.IsInt64())
+            {
+                s_logger.logCritical(QString("Cannot deserialize config '%1': Missing measurement_period.").arg(config.descriptor.name.c_str()));
+                continue;
+            }
+            config.descriptor.measurementPeriod = std::chrono::seconds(it->value.GetInt64());
+
+            it = configj.FindMember("comms_period");
+            if (it == configj.MemberEnd() || !it->value.IsInt64())
+            {
+                s_logger.logCritical(QString("Cannot deserialize config '%1': Missing comms_period.").arg(config.descriptor.name.c_str()));
+                continue;
+            }
+            config.descriptor.commsPeriod = std::chrono::seconds(it->value.GetInt64());
+
+            it = configj.FindMember("baseline_measurement_tp");
+            if (it == configj.MemberEnd() || !it->value.IsUint64())
+            {
+                s_logger.logCritical(QString("Cannot deserialize config '%1': Missing baseline_measurement_tp.").arg(config.descriptor.name.c_str()));
+                continue;
+            }
+            config.baselineMeasurementTimePoint = DB::Clock::from_time_t(time_t(it->value.GetUint64()));
+
+            it = configj.FindMember("baseline_measurement_index");
+            if (it == configj.MemberEnd() || !it->value.IsUint())
+            {
+                s_logger.logCritical(QString("Cannot deserialize config '%1': Missing baseline_measurement_index.").arg(config.descriptor.name.c_str()));
+                continue;
+            }
+            config.baselineMeasurementIndex = it->value.GetUint();
+            configs.push_back(config);
+        }
+
+        if (!cbs.db.setSensorsConfigs(configs))
+        {
+            s_logger.logCritical(QString("Cannot deserialize configs: failed to set configs."));
+        }
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Comms::sendLastSensorsConfig(InitializedBaseStation& cbs)
+{
+    DB::SensorsConfig const& config = cbs.db.getLastSensorsConfig();
 
     rapidjson::Document document;
     document.SetObject();
-    document.AddMember("name", rapidjson::Value(sensorSettings.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
-    document.AddMember("sensors_sleeping", sensorSettings.descriptor.sensorsSleeping, document.GetAllocator());
-    document.AddMember("measurement_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(sensorSettings.descriptor.measurementPeriod).count()), document.GetAllocator());
-    document.AddMember("comms_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(sensorSettings.descriptor.commsPeriod).count()), document.GetAllocator());
-    document.AddMember("baseline", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(sensorSettings.baselineTimePoint.time_since_epoch()).count()), document.GetAllocator());
+    document.AddMember("name", rapidjson::Value(config.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
+    document.AddMember("sensors_sleeping", config.descriptor.sensorsSleeping, document.GetAllocator());
+    document.AddMember("measurement_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.measurementPeriod).count()), document.GetAllocator());
+    document.AddMember("comms_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.commsPeriod).count()), document.GetAllocator());
 
     rapidjson::StringBuffer buffer;
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
     document.Accept(writer);
-    cbs.channel.send(data::Server_Message::SET_CONFIG_REQ, buffer.GetString(), buffer.GetSize());
+    cbs.channel.send(data::Server_Message::ADD_CONFIG_REQ, buffer.GetString(), buffer.GetSize());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Comms::sendSensorsConfigs(InitializedBaseStation& cbs)
+{
+    DB& db = cbs.db;
+
+    rapidjson::Document document;
+    document.SetArray();
+    for (size_t i = 0; i < db.getSensorsConfigCount(); i++)
+    {
+        DB::SensorsConfig const& config = db.getSensorsConfig(i);
+        rapidjson::Value configj;
+        configj.SetObject();
+        configj.AddMember("name", rapidjson::Value(config.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
+        configj.AddMember("sensors_sleeping", config.descriptor.sensorsSleeping, document.GetAllocator());
+        configj.AddMember("measurement_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.measurementPeriod).count()), document.GetAllocator());
+        configj.AddMember("comms_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.commsPeriod).count()), document.GetAllocator());
+        configj.AddMember("baseline_measurement_tp", static_cast<uint64_t>(Clock::to_time_t(config.baselineMeasurementTimePoint)), document.GetAllocator());
+        configj.AddMember("baseline_measurement_index", config.baselineMeasurementIndex, document.GetAllocator());
+        document.PushBack(configj, document.GetAllocator());
+    }
+
+    rapidjson::StringBuffer buffer;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    document.Accept(writer);
+    cbs.channel.send(data::Server_Message::SET_CONFIGS_REQ, buffer.GetString(), buffer.GetSize());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -373,7 +490,7 @@ void Comms::requestBindSensor(InitializedBaseStation& cbs, DB::SensorId sensorId
         return;
     }
 
-    DB::Sensor const& sensor = db.getSensor(sensorIndex);
+    DB::Sensor const& sensor = db.getSensor(static_cast<uint32_t>(sensorIndex));
     if (sensor.state != DB::Sensor::State::Unbound)
     {
         s_logger.logCritical(QString("Cannot send bind request: Sensor in bad state: %1.").arg(static_cast<int>(sensor.state)));
@@ -412,7 +529,7 @@ void Comms::processSetSensorsRes(InitializedBaseStation& cbs)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processSetConfigRes(InitializedBaseStation& cbs)
+void Comms::processAddConfigRes(InitializedBaseStation& cbs)
 {
     std::vector<uint8_t> buffer;
     cbs.channel.unpack(buffer);
@@ -424,7 +541,24 @@ void Comms::processSetConfigRes(InitializedBaseStation& cbs)
     }
 
     s_logger.logInfo(QString("Setting the config succeded."));
-    processSensorDetails(cbs, buffer);
+    processConfigs(cbs, buffer);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Comms::processSetConfigsRes(InitializedBaseStation& cbs)
+{
+    std::vector<uint8_t> buffer;
+    cbs.channel.unpack(buffer);
+
+    if (buffer.size() == 0)
+    {
+        s_logger.logCritical(QString("Setting the config FAILED."));
+        return;
+    }
+
+    s_logger.logInfo(QString("Setting the config succeded."));
+    processConfigs(cbs, buffer);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -682,8 +816,11 @@ void Comms::process()
         {
             switch (message)
             {
-            case data::Server_Message::SET_CONFIG_RES:
-                processSetConfigRes(*cbs);
+            case data::Server_Message::ADD_CONFIG_RES:
+                processAddConfigRes(*cbs);
+                break;
+            case data::Server_Message::SET_CONFIGS_RES:
+                processSetConfigsRes(*cbs);
                 break;
             case data::Server_Message::SET_SENSORS_RES:
                 processSetSensorsRes(*cbs);
@@ -701,7 +838,7 @@ void Comms::process()
                 processReportSensorDetails(*cbs);
                 break;
             default:
-                s_logger.logCritical(QString("Invalid message received: %1").arg((int)message));
+                s_logger.logCritical(QString("Invalid message received: %1").arg(int(message)));
             }
         }
     }

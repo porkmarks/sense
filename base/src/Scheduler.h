@@ -6,7 +6,7 @@
 class Scheduler
 {
 public:
-    typedef std::chrono::high_resolution_clock Clock;
+    typedef std::chrono::system_clock Clock;
     typedef uint32_t Slot_Id;
 
     void set_measurement_period(Clock::duration period);

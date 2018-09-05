@@ -97,7 +97,6 @@ HEADERS += \
     ../../src/Utils.h \
     ../../../common/src/Crypt.h \
     ../../src/Emailer.h \
-    ../../src/SensorSettingsDialog.h \
     ../../src/Smtp/emailaddress.h \
     ../../src/Smtp/mimeattachment.h \
     ../../src/Smtp/mimecontentformatter.h \
@@ -127,7 +126,8 @@ HEADERS += \
     ../../src/StackWalker.h \
     ../../src/SensorsFilterWidget.h \
     ../../../sensor/firmware/CRC.h \
-    ../../../sensor/firmware/Data_Defs.h
+    ../../../sensor/firmware/Data_Defs.h \
+    ../../src/SensorsConfigDialog.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -153,7 +153,6 @@ SOURCES += \
     ../../src/Utils.cpp \
     ../../../common/src/Crypt.cpp \
     ../../src/Emailer.cpp \
-    ../../src/SensorSettingsDialog.cpp \
     ../../src/Smtp/emailaddress.cpp \
     ../../src/Smtp/mimeattachment.cpp \
     ../../src/Smtp/mimecontentformatter.cpp \
@@ -181,7 +180,8 @@ SOURCES += \
     ../../src/DateTimeFilterWidget.cpp \
     ../../src/StackWalker.cpp \
     ../../src/SensorsFilterWidget.cpp \
-    ../../../sensor/firmware/CRC.cpp
+    ../../../sensor/firmware/CRC.cpp \
+    ../../src/SensorsConfigDialog.cpp
 
 FORMS += \
     ../../src/Manager.ui \
@@ -196,7 +196,6 @@ FORMS += \
     ../../src/ExportPicDialog.ui \
     ../../src/ReportsWidget.ui \
     ../../src/ConfigureReportDialog.ui \
-    ../../src/SensorSettingsDialog.ui \
     ../../src/SettingsWidget.ui \
     ../../src/ConfigureUserDialog.ui \
     ../../src/UsersWidget.ui \
@@ -204,7 +203,8 @@ FORMS += \
     ../../src/LogsWidget.ui \
     ../../src/ExportLogsDialog.ui \
     ../../src/DateTimeFilterWidget.ui \
-    ../../src/SensorsFilterWidget.ui
+    ../../src/SensorsFilterWidget.ui \
+    ../../src/SensorsConfigDialog.ui
 
 DISTFILES += \
 

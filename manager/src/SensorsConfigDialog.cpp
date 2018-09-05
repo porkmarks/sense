@@ -1,8 +1,8 @@
-#include "SensorSettingsDialog.h"
+#include "SensorsConfigDialog.h"
 
 //////////////////////////////////////////////////////////////////////////
 
-SensorSettingsDialog::SensorSettingsDialog(QWidget *parent)
+SensorsConfigDialog::SensorsConfigDialog(QWidget *parent)
     : QDialog(parent)
 {
     m_ui.setupUi(this);
@@ -10,35 +10,35 @@ SensorSettingsDialog::SensorSettingsDialog(QWidget *parent)
 
 //////////////////////////////////////////////////////////////////////////
 
-SensorSettingsDialog::~SensorSettingsDialog()
+SensorsConfigDialog::~SensorsConfigDialog()
 {
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void SensorSettingsDialog::setSensorSettings(DB::SensorSettings const& settings)
+void SensorsConfigDialog::setSensorsConfig(DB::SensorsConfig const& config)
 {
-    m_settings = settings;
+    m_config = config;
 
-    m_ui.name->setText(settings.descriptor.name.c_str());
-    m_ui.measurementPeriod->setValue(std::chrono::duration<float>(settings.descriptor.measurementPeriod).count() / 60.f);
-    m_ui.commsPeriod->setValue(std::chrono::duration<float>(settings.descriptor.commsPeriod).count() / 60.f);
-    m_ui.computedCommsPeriod->setValue(std::chrono::duration<float>(settings.computedCommsPeriod).count() / 60.f);
-    m_ui.sensorsSleeping->setChecked(settings.descriptor.sensorsSleeping);
+    m_ui.name->setText(config.descriptor.name.c_str());
+    m_ui.measurementPeriod->setValue(std::chrono::duration<float>(config.descriptor.measurementPeriod).count() / 60.f);
+    m_ui.commsPeriod->setValue(std::chrono::duration<float>(config.descriptor.commsPeriod).count() / 60.f);
+    m_ui.computedCommsPeriod->setValue(std::chrono::duration<float>(config.computedCommsPeriod).count() / 60.f);
+    m_ui.sensorsSleeping->setChecked(config.descriptor.sensorsSleeping);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::SensorSettings const& SensorSettingsDialog::getSensorSettings() const
+DB::SensorsConfig const& SensorsConfigDialog::getSensorsConfig() const
 {
-    return m_settings;
+    return m_config;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void SensorSettingsDialog::accept()
+void SensorsConfigDialog::accept()
 {
-    DB::SensorSettingsDescriptor descriptor;
+    DB::SensorsConfigDescriptor descriptor;
 
     descriptor.name = m_ui.name->text().toUtf8().data();
     descriptor.measurementPeriod = std::chrono::seconds(static_cast<size_t>(m_ui.measurementPeriod->value() * 60.0));
@@ -61,6 +61,6 @@ void SensorSettingsDialog::accept()
         return;
     }
 
-    m_settings.descriptor = descriptor;
+    m_config.descriptor = descriptor;
     QDialog::accept();
 }

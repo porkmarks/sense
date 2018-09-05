@@ -18,21 +18,17 @@
 #include "Sensor_Comms.h"
 #include "Sensors.h"
 #include "Server.h"
-
-#define LOG(x) std::cout << x
-#define LOG_LN(x) std::cout << x << std::endl
+#include "Log.h"
 
 static Sensor_Comms s_sensor_comms;
 static Sensors s_sensors;
 static Server s_server(s_sensors);
 
-std::stringstream s_cerr_buffer;
-
-typedef std::chrono::high_resolution_clock Clock;
+typedef std::chrono::system_clock Clock;
 
 extern void run_tests();
-extern std::chrono::high_resolution_clock::time_point string_to_time_point(const std::string& str);
-extern std::string time_point_to_string(std::chrono::high_resolution_clock::time_point tp);
+extern std::chrono::system_clock::time_point string_to_time_point(const std::string& str);
+extern std::string time_point_to_string(std::chrono::system_clock::time_point tp);
 
 ////////////////////////////////////////////////////////////////////////
 
@@ -47,7 +43,7 @@ void fill_config_packet(data::sensor::Config& packet, Sensors::Calibration const
     packet.calibration_change.temperature_bias = static_cast<int16_t>((sensor.calibration.temperature_bias - reported_calibration.temperature_bias) * 100.f);
     packet.calibration_change.humidity_bias = static_cast<int16_t>((sensor.calibration.humidity_bias - reported_calibration.humidity_bias) * 100.f);
 
-    std::cout << "\tnext measurement delay: " << packet.next_measurement_delay.count
+    LOGI << "\tnext measurement delay: " << packet.next_measurement_delay.count
               << "\n\tmeasurement period: " << packet.measurement_period.count
               << "\n\tnext comms delay: " << packet.next_comms_delay.count
               << "\n\tcomms period: " << packet.comms_period.count
@@ -59,16 +55,17 @@ void fill_config_packet(data::sensor::Config& packet, Sensors::Calibration const
 
 ////////////////////////////////////////////////////////////////////////
 
-static void process_sensor_requests(std::chrono::high_resolution_clock::duration dt)
+static void process_sensor_requests(std::chrono::system_clock::duration dt)
 {
     std::vector<uint8_t> raw_packet_data(s_sensor_comms.get_payload_raw_buffer_size(Sensor_Comms::MAX_USER_DATA_SIZE));
 
+    uint32_t millis = static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(dt).count());
+
     uint8_t size = Sensor_Comms::MAX_USER_DATA_SIZE;
-    uint8_t* packet_data = s_sensor_comms.receive_packet(raw_packet_data.data(), size, std::chrono::duration_cast<std::chrono::milliseconds>(dt).count());
+    uint8_t* packet_data = s_sensor_comms.receive_packet(raw_packet_data.data(), size, millis);
     if (packet_data)
     {
         data::sensor::Type type = s_sensor_comms.get_rx_packet_type(packet_data);
-        //LOG_LN("Received packed of " << (int)size << " bytes. Type: "<< (int)type);
         if (type == data::sensor::Type::PAIR_REQUEST && size == sizeof(data::sensor::Pair_Request))
         {
             data::sensor::Pair_Request const& pair_request = *reinterpret_cast<data::sensor::Pair_Request const*>(s_sensor_comms.get_rx_packet_payload(packet_data));
@@ -81,7 +78,7 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
             Sensors::Sensor const* sensor = s_sensors.bind_sensor(serial_number, reported_calibration);
             if (sensor)
             {
-                std::cout << "Adding sensor " << sensor->name << ", id " << sensor->id << ", address " << sensor->address << ", S/N " << sensor->serial_number << "\n";
+                LOGI << "Adding sensor " << sensor->name << ", id " << sensor->id << ", address " << sensor->address << ", S/N " << sensor->serial_number << "\n";
 
                 data::sensor::Pair_Response packet;
                 packet.address = sensor->address;
@@ -91,17 +88,17 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
                 s_sensor_comms.pack(raw_packet_data.data(), packet);
                 if (s_sensor_comms.send_packet(raw_packet_data.data(), 10))
                 {
-                    std::cout << "Pair successful\n";
+                    LOGI << "Pair successful\n";
                 }
                 else
                 {
                     s_sensors.remove_sensor(sensor->id);
-                    std::cerr << "Pair failed (comms)\n";
+                    LOGE << "Pair failed (comms)\n";
                 }
             }
             else
             {
-                std::cerr << "Pairing failed (db)\n";
+                LOGE << "Pairing failed (db)\n";
             }
         }
         else if (type == data::sensor::Type::MEASUREMENT_BATCH && size == sizeof(data::sensor::Measurement_Batch))
@@ -112,18 +109,18 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
             {
                 data::sensor::Measurement_Batch const& batch = *reinterpret_cast<data::sensor::Measurement_Batch const*>(s_sensor_comms.get_rx_packet_payload(packet_data));
 
-                std::cout << "Measurement batch from " << sensor->id << "\n";
+                LOGI << "Measurement batch from " << sensor->id << "\n";
                 if (batch.count == 0)
                 {
-                    std::cout << "\tRange: [empty]\n";
+                    LOGI << "\tRange: [empty]\n";
                 }
                 else if (batch.count == 1)
                 {
-                    std::cout << "\tRange: [" << batch.start_index << "] : 1 measurement\n";
+                    LOGI << "\tRange: [" << batch.start_index << "] : 1 measurement\n";
                 }
                 else
                 {
-                    std::cout << "\tRange: [" << batch.start_index << " - " << batch.start_index + batch.count - 1 << "] : " << static_cast<size_t>(batch.count) << " measurements \n";
+                    LOGI << "\tRange: [" << batch.start_index << " - " << batch.start_index + batch.count - 1 << "] : " << static_cast<size_t>(batch.count) << " measurements \n";
                 }
 
                 std::vector<Sensors::Measurement> measurements;
@@ -147,7 +144,7 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
             }
             else
             {
-                std::cerr << "\tSensor not found!\n";
+                LOGE << "\tSensor not found!\n";
             }
         }
         else if (type == data::sensor::Type::FIRST_CONFIG_REQUEST && size == sizeof(data::sensor::First_Config_Request))
@@ -156,7 +153,7 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
             const Sensors::Sensor* sensor = s_sensors.find_sensor_by_address(address);
             if (sensor)
             {
-                std::cout << "First config for " << sensor->id << "\n";
+                LOGI << "First config for " << sensor->id << "\n";
 
                 data::sensor::First_Config packet;
                 packet.first_measurement_index = s_sensors.compute_next_measurement_index();
@@ -168,16 +165,16 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
                 s_sensor_comms.pack(raw_packet_data.data(), packet);
                 if (s_sensor_comms.send_packet(raw_packet_data.data(), 3))
                 {
-                    std::cout << "\tFirst Config successful\n";
+                    LOGI << "\tFirst Config successful\n";
                 }
                 else
                 {
-                    std::cerr << "\tFirst Config failed\n";
+                    LOGE << "\tFirst Config failed\n";
                 }
             }
             else
             {
-                std::cerr << "\tSensor not found!\n";
+                LOGE << "\tSensor not found!\n";
             }
         }
         else if (type == data::sensor::Type::CONFIG_REQUEST && size == sizeof(data::sensor::Config_Request))
@@ -192,18 +189,18 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
                 reported_calibration.temperature_bias = static_cast<float>(config_request.calibration.temperature_bias) / 100.f;
                 reported_calibration.humidity_bias = static_cast<float>(config_request.calibration.humidity_bias) / 100.f;
 
-                std::cout << "Config for " << sensor->id << "\n";
+                LOGI << "Config for " << sensor->id << "\n";
                 if (config_request.measurement_count == 0)
                 {
-                    std::cout << "\tStored range: [empty]\n";
+                    LOGI << "\tStored range: [empty]\n";
                 }
                 else if (config_request.measurement_count == 1)
                 {
-                    std::cout << "\tStored range: [" << config_request.first_measurement_index << "] : 1 measurement\n";
+                    LOGI << "\tStored range: [" << config_request.first_measurement_index << "] : 1 measurement\n";
                 }
                 else
                 {
-                    std::cout << "\tStored range: [" << config_request.first_measurement_index << " - " << config_request.first_measurement_index + config_request.measurement_count - 1 << "] : " << config_request.measurement_count << " measurements \n";
+                    LOGI << "\tStored range: [" << config_request.first_measurement_index << " - " << config_request.first_measurement_index + config_request.measurement_count - 1 << "] : " << config_request.measurement_count << " measurements \n";
                 }
 
                 s_sensors.set_sensor_measurement_range(sensor->id, config_request.first_measurement_index, config_request.measurement_count);
@@ -217,27 +214,28 @@ static void process_sensor_requests(std::chrono::high_resolution_clock::duration
                 s_sensor_comms.pack(raw_packet_data.data(), packet);
                 if (s_sensor_comms.send_packet(raw_packet_data.data(), 3))
                 {
-                    std::cout << "\tSchedule successful\n";
+                    LOGI << "\tSchedule successful\n";
                 }
                 else
                 {
-                    std::cerr << "\tSchedule failed\n";
+                    LOGE << "\tSchedule failed\n";
                 }
             }
             else
             {
-                std::cerr << "\tSensor not found!\n";
+                LOGE << "\tSensor not found!\n";
             }
         }
     }
     std::cout << std::flush;
+    std::cerr << std::flush;
 }
 
 ////////////////////////////////////////////////////////////////////////
 
 int main(int, const char**)
 {
-    std::cout << "Starting...\n";
+    LOGI << "Starting...\n";
 
     srand(time(nullptr));
 
@@ -256,7 +254,7 @@ int main(int, const char**)
     while (!s_sensor_comms.init(1, 20))
     {
         tries++;
-        std::cerr << "comms init failed. Trying again: " << tries << "\n";
+        LOGE << "comms init failed. Trying again: " << tries << "\n";
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
@@ -265,7 +263,7 @@ int main(int, const char**)
 
     if (!s_server.init(4444, 5555))
     {
-        std::cerr << "Server init failed\n";
+        LOGE << "Server init failed\n";
         return -1;
     }
 

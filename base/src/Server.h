@@ -31,7 +31,8 @@ private:
     void accept_func(asio::error_code ec);
 
     void process_get_config_req();
-    void process_set_config_req();
+    void process_add_config_req();
+    void process_set_configs_req();
     void process_set_sensors_req();
     void process_add_sensor_req();
     void process_remove_sensor_req();
@@ -40,6 +41,7 @@ private:
     void process_power_off_req();
 
     std::string compute_sensor_details_response() const;
+    std::string compute_configs_response() const;
 
     void report_measurement(Sensors::Sensor_Id sensor_id, Clock::time_point time_point, Sensors::Measurement const& measurement);
     void sensor_bound(Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address sensor_address, uint32_t serial_number, Sensors::Calibration const& calibration);

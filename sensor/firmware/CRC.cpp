@@ -17,9 +17,9 @@ static const PROGMEM uint32_t crc_table[16] =
 
 inline uint32_t crc_update(uint32_t crc, uint8_t data)
 {
-    uint8_t tbl_idx = crc ^ (data >> (0 * 4));
+    uint8_t tbl_idx = uint8_t(crc ^ (data >> (0 * 4)));
     crc = pgm_read_dword_near(crc_table + (tbl_idx & 0x0f)) ^ (crc >> 4);
-    tbl_idx = crc ^ (data >> (1 * 4));
+    tbl_idx = uint8_t(crc ^ (data >> (1 * 4)));
     crc = pgm_read_dword_near(crc_table + (tbl_idx & 0x0f)) ^ (crc >> 4);
     return crc;
 }
@@ -27,7 +27,7 @@ inline uint32_t crc_update(uint32_t crc, uint8_t data)
 uint32_t crc32(const void* _data, size_t size)
 {
     const uint8_t* data = reinterpret_cast<const uint8_t*>(_data);
-    uint32_t crc = ~0L;
+    uint32_t crc = uint32_t(~0L);
     while (size-- > 0)
     {
         crc = crc_update(crc, *data++);

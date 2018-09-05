@@ -308,7 +308,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         {
             if (sensor.lastCommsTimePoint.time_since_epoch().count() != 0)
             {
-                auto p = computeNextTimePointString(sensor.lastCommsTimePoint + m_db.getSensorSettings().computedCommsPeriod);
+                auto p = computeNextTimePointString(sensor.lastCommsTimePoint + m_db.getLastSensorsConfig().computedCommsPeriod);
                 if (p.second < k_imminentMaxSecond && p.second > k_imminentMinSecond)
                 {
                     return QVariant(QColor(255, 255, 150));
@@ -409,7 +409,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         {
             if (sensor.lastCommsTimePoint.time_since_epoch().count() != 0)
             {
-                auto p = computeNextTimePointString(sensor.lastCommsTimePoint + m_db.getSensorSettings().computedCommsPeriod);
+                auto p = computeNextTimePointString(sensor.lastCommsTimePoint + m_db.getLastSensorsConfig().computedCommsPeriod);
                 if (p.second < k_imminentMaxSecond && p.second > k_imminentMinSecond)
                 {
                     return "Imminent";

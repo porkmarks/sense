@@ -48,14 +48,13 @@ bool RFM22B::init()
 
     // Get the device type and check it
     // This also tests whether we are really connected to a device
-    uint8_t deviceType = get_register(Register::DEVICE_TYPE_00);
-    if (deviceType != (uint8_t)Device_Type::RX_TRX
-            && deviceType != (uint8_t)Device_Type::TX)
+    Device_Type deviceType = static_cast<Device_Type>(get_register(Register::DEVICE_TYPE_00));
+    if (deviceType != Device_Type::RX_TRX && deviceType != Device_Type::TX)
     {
 #ifdef ARDUINO
         printf_P(PSTR("Wrong device: %d"), (int)deviceType);
 #else
-        std::cout << "Wrong device type " << (int)deviceType << "\n";
+        std::cout << "Wrong device type " << int(deviceType) << "\n";
 #endif
         return false;
     }
@@ -148,44 +147,44 @@ void RFM22B::set_sync_words(uint8_t const* ptr, uint8_t size)
 //	Frequency should be passed in integer Hertz
 bool RFM22B::set_carrier_frequency(float centre, float afcPullInRange)
 {
-    uint8_t fbsel = (uint8_t)Frequency_Band_Select::SBSEL;
+    uint8_t fbsel = static_cast<uint8_t>(Frequency_Band_Select::SBSEL);
     uint8_t afclimiter;
-    if (centre < 240.0 || centre > 960.0) // 930.0 for early silicon
+    if (centre < 240.f || centre > 960.f) // 930.0 for early silicon
     {
         return false;
     }
-    if (centre >= 480.0)
+    if (centre >= 480.f)
     {
-        if (afcPullInRange < 0.0 || afcPullInRange > 0.318750)
+        if (afcPullInRange < 0.f || afcPullInRange > 0.318750f)
         {
             return false;
         }
         centre /= 2;
-        fbsel |= (uint8_t)Frequency_Band_Select::HBSEL;
-        afclimiter = afcPullInRange * 1000000.0 / 1250.0;
+        fbsel |= static_cast<uint8_t>(Frequency_Band_Select::HBSEL);
+        afclimiter = static_cast<uint8_t>(afcPullInRange * 1000000.0f / 1250.0f);
     }
     else
     {
-        if (afcPullInRange < 0.0 || afcPullInRange > 0.159375)
+        if (afcPullInRange < 0.0f || afcPullInRange > 0.159375f)
         {
             return false;
         }
-        afclimiter = afcPullInRange * 1000000.0 / 625.0;
+        afclimiter = static_cast<uint8_t>(afcPullInRange * 1000000.0f / 625.0f);
     }
-    centre /= 10.0;
-    float integerPart = floor(centre);
+    centre /= 10.0f;
+    float integerPart = floorf(centre);
     float fractionalPart = centre - integerPart;
 
-    uint8_t fb = (uint8_t)integerPart - 24; // Range 0 to 23
+    uint8_t fb = static_cast<uint8_t>(integerPart) - 24; // Range 0 to 23
     fbsel |= fb;
-    uint16_t fc = fractionalPart * 64000;
+    uint16_t fc = static_cast<uint16_t>(fractionalPart * 64000.f);
     set_register(Register::FREQUENCY_OFFSET_1_73, 0);  // REVISIT
     set_register(Register::FREQUENCY_OFFSET_2_74, 0);
     set_register(Register::FREQUENCY_BAND_SELECT_75, fbsel);
     set_register(Register::NOMINAL_CARRIER_FREQUENCY_1_76, fc >> 8);
     set_register(Register::NOMINAL_CARRIER_FREQUENCY_0_77, fc & 0xff);
     set_register(Register::AFC_LIMITER_2A, afclimiter);
-    return !(get_register(Register::DEVICE_STATUS_02) & (uint8_t)Device_Status::FREQERR);
+    return !(get_register(Register::DEVICE_STATUS_02) & uint8_t(Device_Status::FREQERR));
 }
 
 // Get the frequency of the carrier wave in integer Hertz
@@ -206,7 +205,7 @@ float RFM22B::get_carrier_frequency()
     uint8_t hbsel = (fbs >> 5) & 1;
 
     // Determine the fractional part
-    uint16_t fc = (ncf1 << 8) | ncf0;
+    uint16_t fc = static_cast<uint8_t>((static_cast<uint16_t>(ncf1) << 8) | static_cast<uint16_t>(ncf0));
 
     // Return the frequency
     return 10.f*(hbsel+1)*(fb+24+fc/64000.f);
@@ -220,7 +219,7 @@ void RFM22B::set_frequency_hopping_step_size(uint32_t step)
     {
         step = uint32_t(2550000);
     }
-    set_register(Register::FREQUENCY_HOPPING_STEP_SIZE_7A, step/10000);
+    set_register(Register::FREQUENCY_HOPPING_STEP_SIZE_7A, static_cast<uint8_t>(step / 10000u));
 }
 uint32_t RFM22B::get_frequency_hopping_step_size()
 {
@@ -244,7 +243,7 @@ void RFM22B::set_frequency_deviation(uint32_t deviation)
     {
         deviation = uint32_t(320000);
     }
-    set_register(Register::FREQUENCY_DEVIATION_72, deviation/625);
+    set_register(Register::FREQUENCY_DEVIATION_72, static_cast<uint8_t>(deviation / 625));
 }
 uint32_t RFM22B::get_frequency_deviation()
 {
@@ -265,14 +264,14 @@ void RFM22B::set_data_rate(uint32_t rate)
         mmc1 |= (1<<5);
         uint64_t scale = 1LL << (16 + 5);
         uint64_t xrate = rate * scale;
-        txdr = xrate / 1000000LL;
+        txdr = static_cast<uint16_t>(xrate / 1000000LL);
     }
     else
     {
         mmc1 &= ~(1<<5);
         uint64_t scale = 1LL << (16);
         uint64_t xrate = rate * scale;
-        txdr = xrate / 1000000LL;
+        txdr = static_cast<uint16_t>(xrate / 1000000LL);
     }
 
     // Set the data rate bytes
@@ -292,7 +291,7 @@ uint32_t RFM22B::get_data_rate()
     // Return the data rate (in bps, hence extra 1E3)
     uint64_t rate = txdr * 1000000LL;
     uint64_t scale = 1LL << (16 + 5 * txdtrtscale);
-    return rate / scale;
+    return static_cast<uint32_t>(rate / scale);
 }
 
 // Set or get the modulation type
@@ -305,7 +304,7 @@ void RFM22B::set_modulation_type(Modulation_Type modulation)
     mmc2 &= ~0x03;
 
     // Set the desired modulation
-    mmc2 |= (uint8_t)modulation;
+    mmc2 |= uint8_t(modulation);
 
     // Set the register
     set_register(Register::MODULATION_MODE_CONTROL_2_71, mmc2);
@@ -342,7 +341,7 @@ void RFM22B::set_modulation_data_source(Modulation_Data_Source source)
     mmc2 &= ~(0x03<<4);
 
     // Set the desired data source
-    mmc2 |= (uint8_t)source << 4;
+    mmc2 |= uint8_t(source) << 4;
 
     // Set the register
     set_register(Register::MODULATION_MODE_CONTROL_2_71, mmc2);
@@ -379,7 +378,7 @@ void RFM22B::set_data_clock_configuration(Data_Clock_Configuration clock)
     mmc2 &= ~(0x03<<6);
 
     // Set the desired data source
-    mmc2 |= (uint8_t)clock << 6;
+    mmc2 |= uint8_t(clock) << 6;
 
     // Set the register
     set_register(Register::MODULATION_MODE_CONTROL_2_71, mmc2);

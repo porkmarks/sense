@@ -13,7 +13,7 @@
 class Sensors
 {
 public:
-    typedef std::chrono::high_resolution_clock Clock;
+    typedef std::chrono::system_clock Clock;
     typedef uint32_t Sensor_Id;
     typedef uint32_t Sensor_Address;
 
@@ -80,19 +80,15 @@ public:
         Clock::duration measurement_period = std::chrono::seconds(5 * 60);
         Clock::duration comms_period = std::chrono::seconds(5 * 60);
 
-        //This is computed when creating the config so that this equation holds for any config:
-        // measurement_time_point = config.baseline_time_point + measurement_index * config.measurement_period
-        //
-        //So when creating a new config, this is how to calculate the baseline:
-        // m = some measurement (any)
-        // config.baseline_time_point = m.time_point - m.index * config.measurement_period
-        //
-        //The reason for this is to keep the indices valid in all configs
-        Clock::time_point baseline_time_point = Clock::time_point(Clock::duration::zero());
+        //when did this config become active?
+        Clock::time_point baseline_measurement_time_point = Clock::time_point(Clock::duration::zero());
+        uint32_t baseline_measurement_index = 0;
     };
 
+    std::vector<Config> get_configs() const;
+    void remove_all_configs();
     Config get_config() const;
-    void set_config(Config const& config);
+    void set_config(Config config);
 
     Clock::duration compute_comms_period() const;
     uint32_t compute_next_measurement_index() const; //the next real-time index
@@ -141,13 +137,7 @@ private:
     Sensor* _find_sensor_by_id(Sensor_Id id);
     Config find_config_for_measurement_index(uint32_t measurement_index) const;
 
-    struct ConfigHolder
-    {
-        Config config;
-        uint32_t first_measurement_index = 0; //when does it become active?
-    };
-
-    std::deque<ConfigHolder> m_configHolders;
+    std::deque<Config> m_configs;
 
     bool m_is_initialized = false;
 
