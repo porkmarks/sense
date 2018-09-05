@@ -16,7 +16,7 @@ class Comms : public QObject
     Q_OBJECT
 public:
 
-    typedef std::chrono::high_resolution_clock Clock;
+    typedef std::chrono::system_clock Clock;
 
     Comms();
     ~Comms();
