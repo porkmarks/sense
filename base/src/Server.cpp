@@ -449,7 +449,7 @@ void Server::process_add_config_req()
         }
 
         boost::optional<Sensors::Config> opt_config = parse_config(document, false);
-        if (opt_config == boost::none)
+        if (opt_config.is_initialized())
         {
             LOGE << "Cannot deserialize request: Bad document.\n";
             goto end;
@@ -503,7 +503,7 @@ void Server::process_set_configs_req()
             rapidjson::Value const& configj = document[i];
 
             boost::optional<Sensors::Config> opt_config = parse_config(configj, true);
-            if (opt_config == boost::none)
+            if (opt_config.is_initialized())
             {
                 LOGE << "Cannot deserialize request: Bad document.\n";
                 ok = false;
