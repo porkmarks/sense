@@ -26,9 +26,7 @@ void ExportPicDialog::accept()
         return;
     }
 
-    QPixmap pic = m_plotWidget.grabPic(m_ui.legend->isChecked());
-
-    pic.save(fileName);
+    m_plotWidget.saveToPng(fileName, m_ui.legend->isChecked());
 
 //    std::ofstream file(fileName.toUtf8().data());
 //    if (!file.is_open())

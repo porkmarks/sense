@@ -6365,6 +6365,7 @@ protected:
   QBrush mBrush, mSelectedBrush;
   QFont mFont, mSelectedFont;
   QString mText;
+  QTextDocument mTextDocument;
   Qt::Alignment mPositionAlignment;
   Qt::Alignment mTextAlignment;
   double mRotation;

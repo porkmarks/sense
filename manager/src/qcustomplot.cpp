@@ -24,6 +24,7 @@
 ****************************************************************************/
 
 #include "qcustomplot.h"
+#include <QTextDocument>
 
 
 /* including file 'src/vector2d.cpp', size 7340                              */
@@ -28942,6 +28943,7 @@ void QCPItemText::setSelectedFont(const QFont &font)
 void QCPItemText::setText(const QString &text)
 {
   mText = text;
+  mTextDocument.setHtml(mText);
 }
 
 /*!
@@ -29002,8 +29004,8 @@ double QCPItemText::selectTest(const QPointF &pos, bool onlySelectable, QVariant
   inputTransform.rotate(-mRotation);
   inputTransform.translate(-positionPixels.x(), -positionPixels.y());
   QPointF rotatedPos = inputTransform.map(pos);
-  QFontMetrics fontMetrics(mFont);
-  QRect textRect = fontMetrics.boundingRect(0, 0, 0, 0, Qt::TextDontClip|mTextAlignment, mText);
+  //QFontMetrics fontMetrics(mFont);
+  QRect textRect = QRect(QPoint(), mTextDocument.size().toSize());//fontMetrics.boundingRect(0, 0, 0, 0, Qt::TextDontClip|mTextAlignment, mText);
   QRect textBoxRect = textRect.adjusted(-mPadding.left(), -mPadding.top(), mPadding.right(), mPadding.bottom());
   QPointF textPos = getTextDrawPoint(positionPixels, textBoxRect, mPositionAlignment);
   textBoxRect.moveTopLeft(textPos.toPoint());
@@ -29020,7 +29022,8 @@ void QCPItemText::draw(QCPPainter *painter)
   if (!qFuzzyIsNull(mRotation))
     transform.rotate(mRotation);
   painter->setFont(mainFont());
-  QRect textRect = painter->fontMetrics().boundingRect(0, 0, 0, 0, Qt::TextDontClip|mTextAlignment, mText);
+
+  QRect textRect = QRect(QPoint(), mTextDocument.size().toSize());// painter->fontMetrics().boundingRect(0, 0, 0, 0, Qt::TextDontClip|mTextAlignment, mText);
   QRect textBoxRect = textRect.adjusted(-mPadding.left(), -mPadding.top(), mPadding.right(), mPadding.bottom());
   QPointF textPos = getTextDrawPoint(QPointF(0, 0), textBoxRect, mPositionAlignment); // 0, 0 because the transform does the translation
   textRect.moveTopLeft(textPos.toPoint()+QPoint(mPadding.left(), mPadding.top()));
@@ -29039,7 +29042,15 @@ void QCPItemText::draw(QCPPainter *painter)
     }
     painter->setBrush(Qt::NoBrush);
     painter->setPen(QPen(mainColor()));
-    painter->drawText(textRect, Qt::TextDontClip|mTextAlignment, mText);
+
+    painter->save();
+    if (textRect.x() != 0 || textRect.y() != 0)
+    {
+        painter->translate(textRect.topLeft());
+    }
+    mTextDocument.drawContents(painter);
+    painter->restore();
+    //painter->drawText(textRect, Qt::TextDontClip|mTextAlignment, mText);
   }
 }
 
@@ -29052,8 +29063,8 @@ QPointF QCPItemText::anchorPixelPosition(int anchorId) const
   transform.translate(pos.x(), pos.y());
   if (!qFuzzyIsNull(mRotation))
     transform.rotate(mRotation);
-  QFontMetrics fontMetrics(mainFont());
-  QRect textRect = fontMetrics.boundingRect(0, 0, 0, 0, Qt::TextDontClip|mTextAlignment, mText);
+  //QFontMetrics fontMetrics(mainFont());
+  QRect textRect = QRect(QPoint(), mTextDocument.size().toSize());//fontMetrics.boundingRect(0, 0, 0, 0, Qt::TextDontClip|mTextAlignment, mText);
   QRectF textBoxRect = textRect.adjusted(-mPadding.left(), -mPadding.top(), mPadding.right(), mPadding.bottom());
   QPointF textPos = getTextDrawPoint(QPointF(0, 0), textBoxRect, mPositionAlignment); // 0, 0 because the transform does the translation
   textBoxRect.moveTopLeft(textPos.toPoint());

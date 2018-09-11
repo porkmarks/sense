@@ -7,6 +7,10 @@
 #include "ui_LoginDialog.h"
 #include "Crypt.h"
 
+#ifdef NDEBUG
+#   define CHECK_PASSWORD
+#endif
+
 static const std::string s_version = "1.0.6";
 
 Logger s_logger;
@@ -183,6 +187,7 @@ void Manager::login()
                 size_t userIndex = static_cast<size_t>(_userIndex);
                 Settings::User const& user = m_settings.getUser(userIndex);
 
+#ifdef CHECK_PASSWORD
                 Crypt crypt;
                 crypt.setAddRandomSalt(false);
                 crypt.setIntegrityProtectionMode(Crypt::ProtectionHash);
@@ -196,6 +201,7 @@ void Manager::login()
                     QMessageBox::critical(this, "Error", "Invalid username/password.");
                     continue;
                 }
+#endif
 
                 m_settings.setLoggedInUserId(user.id);
                 break;

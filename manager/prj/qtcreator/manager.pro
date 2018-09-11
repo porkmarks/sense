@@ -4,7 +4,7 @@
 #
 #-------------------------------------------------
 
-QT       += core gui opengl network widgets charts
+QT       += core gui opengl network widgets printsupport
 
 TARGET = manager
 TEMPLATE = app
@@ -119,7 +119,6 @@ HEADERS += \
     ../../src/LogsModel.h \
     ../../src/Logger.h \
     ../../src/ExportLogsDialog.h \
-    ../../src/PlotToolTip.h \
     ../../src/qftp/qftp.h \
     ../../src/qftp/qurlinfo.h \
     ../../src/DateTimeFilterWidget.h \
@@ -128,7 +127,8 @@ HEADERS += \
     ../../../sensor/firmware/CRC.h \
     ../../../sensor/firmware/Data_Defs.h \
     ../../src/SensorsConfigDialog.h \
-    ../../src/qcustomplot.h
+    ../../src/qcustomplot.h \
+    ../../src/PlotToolTip.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -175,7 +175,6 @@ SOURCES += \
     ../../src/LogsModel.cpp \
     ../../src/Logger.cpp \
     ../../src/ExportLogsDialog.cpp \
-    ../../src/PlotToolTip.cpp \
     ../../src/qftp/qftp.cpp \
     ../../src/qftp/qurlinfo.cpp \
     ../../src/DateTimeFilterWidget.cpp \
@@ -183,7 +182,8 @@ SOURCES += \
     ../../src/SensorsFilterWidget.cpp \
     ../../../sensor/firmware/CRC.cpp \
     ../../src/SensorsConfigDialog.cpp \
-    ../../src/qcustomplot.cpp
+    ../../src/qcustomplot.cpp \
+    ../../src/PlotToolTip.cpp
 
 FORMS += \
     ../../src/Manager.ui \

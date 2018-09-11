@@ -7,6 +7,27 @@
 #include "SensorsDelegate.h"
 #include "ui_SensorsFilterDialog.h"
 
+
+static uint32_t k_colors[256] =
+{
+    0xFF000000, 0xFFFFFF00, 0xFF1CE6FF, 0xFFFF34FF, 0xFFFF4A46, 0xFF008941, 0xFF006FA6, 0xFFA30059,
+    0xFFFFDBE5, 0xFF7A4900, 0xFF0000A6, 0xFF63FFAC, 0xFFB79762, 0xFF004D43, 0xFF8FB0FF, 0xFF997D87,
+    0xFF5A0007, 0xFF809693, 0xFFFEFFE6, 0xFF1B4400, 0xFF4FC601, 0xFF3B5DFF, 0xFF4A3B53, 0xFFFF2F80,
+    0xFF61615A, 0xFFBA0900, 0xFF6B7900, 0xFF00C2A0, 0xFFFFAA92, 0xFFFF90C9, 0xFFB903AA, 0xFFD16100,
+    0xFFDDEFFF, 0xFF000035, 0xFF7B4F4B, 0xFFA1C299, 0xFF300018, 0xFF0AA6D8, 0xFF013349, 0xFF00846F,
+    0xFF372101, 0xFFFFB500, 0xFFC2FFED, 0xFFA079BF, 0xFFCC0744, 0xFFC0B9B2, 0xFFC2FF99, 0xFF001E09,
+    0xFF00489C, 0xFF6F0062, 0xFF0CBD66, 0xFFEEC3FF, 0xFF456D75, 0xFFB77B68, 0xFF7A87A1, 0xFF788D66,
+    0xFF885578, 0xFFFAD09F, 0xFFFF8A9A, 0xFFD157A0, 0xFFBEC459, 0xFF456648, 0xFF0086ED, 0xFF886F4C,
+    0xFF34362D, 0xFFB4A8BD, 0xFF00A6AA, 0xFF452C2C, 0xFF636375, 0xFFA3C8C9, 0xFFFF913F, 0xFF938A81,
+    0xFF575329, 0xFF00FECF, 0xFFB05B6F, 0xFF8CD0FF, 0xFF3B9700, 0xFF04F757, 0xFFC8A1A1, 0xFF1E6E00,
+    0xFF7900D7, 0xFFA77500, 0xFF6367A9, 0xFFA05837, 0xFF6B002C, 0xFF772600, 0xFFD790FF, 0xFF9B9700,
+    0xFF549E79, 0xFFFFF69F, 0xFF201625, 0xFF72418F, 0xFFBC23FF, 0xFF99ADC0, 0xFF3A2465, 0xFF922329,
+    0xFF5B4534, 0xFFFDE8DC, 0xFF404E55, 0xFF0089A3, 0xFFCB7E98, 0xFFA4E804, 0xFF324E72, 0xFF6A3A4C,
+    0xFF83AB58, 0xFF001C1E, 0xFFD1F7CE, 0xFF004B28, 0xFFC8D0F6, 0xFFA3A489, 0xFF806C66, 0xFF222800,
+    0xFFBF5650, 0xFFE83000, 0xFF66796D, 0xFFDA007C, 0xFFFF1A59, 0xFF8ADBB4, 0xFF1E0200, 0xFF5B4E51,
+    0xFFC895C5, 0xFF320033, 0xFFFF6832, 0xFF66E1D3, 0xFFCFCDAC, 0xFFD0AC94, 0xFF7ED379, 0xFF012C58
+};
+
 //////////////////////////////////////////////////////////////////////////
 
 PlotWidget::PlotWidget(QWidget* parent)
@@ -62,7 +83,7 @@ void PlotWidget::shutdown()
     saveSettings();
 
     setEnabled(false);
-    m_series.clear();
+    m_graphs.clear();
     m_db = nullptr;
 }
 
@@ -261,19 +282,27 @@ void PlotWidget::selectSensors()
 
 void PlotWidget::clearAnnotations()
 {
+    m_draggedAnnotation = nullptr;
+    m_annotation.reset();
     m_annotations.clear();
     m_ui.clearAnnotations->setEnabled(false);
+    if (m_plot)
+    {
+        m_plot->replot();
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void PlotWidget::createPlotWidgets()
 {
-    m_annotation.reset();
     clearAnnotations();
 
-    delete m_chart;
-    delete m_chartView;
+    m_graphs.clear();
+    delete m_plot;
+    m_axisD = nullptr;
+    m_axisT = nullptr;
+    m_axisH = nullptr;
 
     if (m_ui.plot->layout() != nullptr)
     {
@@ -286,61 +315,66 @@ void PlotWidget::createPlotWidgets()
     }
 
 
+    m_plot = new QCustomPlot(m_ui.plot);
+    //m_plot->setInteractions(QCP::Interactions(QCP::Interaction::iSelectItems | QCP::Interaction::iSelectLegend));
+
     QFont font;
     font.setPointSize(8);
 
     {
-        QChart* chart = new QChart();
-        chart->legend()->setAlignment(Qt::AlignRight);
-
-        m_chart = chart;
-
-        QDateTimeAxis* axisX = new QDateTimeAxis(chart);
-        axisX->setLabelsFont(font);
-        axisX->setTitleFont(font);
-        axisX->setTickCount(10);
-        axisX->setFormat("dd-MMM-yy h:mm");
-        axisX->setTitleText("Date");
-        chart->addAxis(axisX, Qt::AlignBottom);
-        //m_series->attachAxis(axisX);
-
-        m_axisTY = nullptr;
-        if (m_ui.showTemperature->isChecked())
-        {
-            QValueAxis* axisTY = new QValueAxis(chart);
-            axisTY->setLabelsFont(font);
-            axisTY->setTitleFont(font);
-            axisTY->setLabelFormat("%.1f");
-            axisTY->setTitleText(u8"°C");
-            axisTY->setTickCount(10);
-            chart->addAxis(axisTY, Qt::AlignLeft);
-            m_axisTY = axisTY;
-        }
-
-        m_axisHY = nullptr;
-        if (m_ui.showHumidity->isChecked())
-        {
-            QValueAxis* axisHY = new QValueAxis(chart);
-            axisHY->setLabelsFont(font);
-            axisHY->setTitleFont(font);
-            axisHY->setLabelFormat("%.1f");
-            axisHY->setTitleText("%RH");
-            axisHY->setTickCount(10);
-            chart->addAxis(axisHY, Qt::AlignRight);
-            m_axisHY = axisHY;
-        }
-
-        m_axisX = axisX;
-
-        QChartView* chartView = new QChartView(chart);
-        chartView->setRenderHint(QPainter::Antialiasing);
-        m_chartView = chartView;
+        m_axisD = m_plot->xAxis;
+        m_axisD->setTickLabelFont(font);
+        m_axisD->setLabel("Date");
+        QSharedPointer<QCPAxisTickerDateTime> dateTicker(new QCPAxisTickerDateTime);
+        dateTicker->setDateTimeFormat("dd-MMM-yy h:mm");
+        dateTicker->setTickStepStrategy(QCPAxisTicker::TickStepStrategy::tssReadability);
+        dateTicker->setTickCount(10);
+        m_axisD->setTicker(dateTicker);
+        m_axisD->setTicks(true);
+        m_axisD->setVisible(true);
+    }
+    if (m_ui.showTemperature->isChecked())
+    {
+        m_axisT = m_plot->yAxis;
+        m_axisT->setTickLabelFont(font);
+        m_axisT->setLabel(u8"°C");
+        m_axisT->setNumberFormat("%.1f");
+        m_axisT->ticker()->setTickStepStrategy(QCPAxisTicker::TickStepStrategy::tssReadability);
+        m_axisT->ticker()->setTickCount(20);
+        m_axisT->setTicks(true);
+        m_axisT->setVisible(true);
+    }
+    else
+    {
+        m_plot->yAxis->setVisible(false);
+    }
+    if (m_ui.showHumidity->isChecked())
+    {
+        m_axisH = m_plot->yAxis2;
+        m_axisH->setTickLabelFont(font);
+        m_axisH->setLabel(u8"%RH");
+        m_axisH->setNumberFormat("%.1f");
+        m_axisH->ticker()->setTickStepStrategy(QCPAxisTicker::TickStepStrategy::tssReadability);
+        m_axisH->ticker()->setTickCount(20);
+        m_axisH->setTicks(true);
+        m_axisH->setVisible(true);
+    }
+    else
+    {
+        m_plot->yAxis2->setVisible(false);
     }
 
-    //m_chartView->setMaximumHeight(m_ui.plot->height() - 100);
-    m_ui.plot->layout()->addWidget(m_chartView);
-    //connect(m_chartView, &QChartView::customContextMenuRequested, this, &PlotWidget::plotContextMenu);
-    //m_chartView->setMaximumHeight(999999);
+    {
+        m_plot->legend->setVisible(true);
+        QFont legendFont;  // start out with MainWindow's font..
+        legendFont.setPointSize(9); // and make a bit smaller for legend
+        m_plot->legend->setFont(legendFont);
+        m_plot->legend->setBrush(QBrush(QColor(255, 255, 255, 230)));
+        // by default, the legend is in the inset layout of the main axis rect. So this is how we access it to change legend placement:
+        m_plot->axisRect()->insetLayout()->setInsetAlignment(0, Qt::AlignTop|Qt::AlignRight);
+    }
+
+    m_ui.plot->layout()->addWidget(m_plot);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -352,21 +386,25 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         return;
     }
     m_filter = filter;
-    foreach (QLegendMarker* marker, m_chart->legend()->markers())
-    {
-        QObject::disconnect(marker, SIGNAL(clicked()), this, SLOT(handleMarkerClicked()));
-    }
+//    foreach (QLegendMarker* marker, m_chart->legend()->markers())
+//    {
+//        QObject::disconnect(marker, SIGNAL(clicked()), this, SLOT(handleMarkerClicked()));
+//    }
 
     //save the visibilities
-    std::vector<bool> markersVisible;
-    foreach (QLegendMarker* marker, m_chart->legend()->markers())
-    {
-        markersVisible.push_back(marker->series()->isVisible());
-    }
+//    std::vector<bool> markersVisible;
+//    foreach (QLegendMarker* marker, m_chart->legend()->markers())
+//    {
+//        markersVisible.push_back(marker->series()->isVisible());
+//    }
 
     createPlotWidgets();
 
-    m_series.clear();
+    m_graphs.clear();
+    while (m_plot->graphCount() > 0)
+    {
+        m_plot->removeGraph(m_plot->graph(0));
+    }
 
     uint64_t minTS = std::numeric_limits<uint64_t>::max();
     uint64_t maxTS = std::numeric_limits<uint64_t>::lowest();
@@ -387,36 +425,42 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         DB::Sensor const& sensor = m_db->getSensor(i);
         if (m_selectedSensorIds.find(sensor.id) != m_selectedSensorIds.end())
         {
-            PlotData& plotData = m_series[sensor.id];
-            plotData.sensor = sensor;
-            plotData.temperatureLpf.setup(1, 1, 0.15f);
-            plotData.humidityLpf.setup(1, 1, 0.15f);
-            plotData.temperaturePoints.reserve(8192);
-            plotData.humidityPoints.reserve(8192);
+            GraphData& graphData = m_graphs[sensor.id];
+            graphData.sensor = sensor;
+            graphData.temperatureLpf.setup(1, 1, 0.15f);
+            graphData.humidityLpf.setup(1, 1, 0.15f);
+            graphData.temperatureKeys.reserve(8192);
+            graphData.temperatureValues.reserve(8192);
+            graphData.humidityKeys.reserve(8192);
+            graphData.humidityValues.reserve(8192);
+            graphData.lastIndex = -1;
         }
     }
 
     for (DB::Measurement const& m : measurements)
     {
-        qreal millis = std::chrono::duration_cast<std::chrono::milliseconds>(m.descriptor.timePoint.time_since_epoch()).count();
-        time_t tt = DB::Clock::to_time_t(m.descriptor.timePoint);
-        minTS = std::min(minTS, static_cast<uint64_t>(tt));
-        maxTS = std::max(maxTS, static_cast<uint64_t>(tt));
+        time_t time = DB::Clock::to_time_t(m.descriptor.timePoint);
+        minTS = std::min(minTS, static_cast<uint64_t>(time));
+        maxTS = std::max(maxTS, static_cast<uint64_t>(time));
 
-        auto it = m_series.find(m.descriptor.sensorId);
-        if (it == m_series.end())
+        auto it = m_graphs.find(m.descriptor.sensorId);
+        if (it == m_graphs.end())
         {
             continue;
         }
-        PlotData& plotData = it->second;
+        GraphData& graphData = it->second;
+
+        bool gap = graphData.lastIndex >= 0 && graphData.lastIndex + 1 != m.descriptor.index;
+        graphData.lastIndex = m.descriptor.index;
 
         {
             qreal value = m.descriptor.temperature;
             if (m_useSmoothing)
             {
-                plotData.temperatureLpf.process(value);
+                graphData.temperatureLpf.process(value);
             }
-            plotData.temperaturePoints.append(QPointF(millis, value));
+            graphData.temperatureKeys.push_back(time);
+            graphData.temperatureValues.push_back(gap ? qQNaN() : value);
             minT = std::min(minT, value);
             maxT = std::max(maxT, value);
         }
@@ -425,18 +469,16 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
             qreal value = m.descriptor.humidity;
             if (m_useSmoothing)
             {
-                plotData.humidityLpf.process(value);
+                graphData.humidityLpf.process(value);
             }
-            plotData.humidityPoints.append(QPointF(millis, value));
+            graphData.humidityKeys.push_back(time);
+            graphData.humidityValues.push_back(gap ? qQNaN() : value);
             minH = std::min(minH, value);
             maxH = std::max(maxH, value);
         }
     }
 
-    QDateTime minDT, maxDT;
-    minDT.setTime_t(minTS);
-    maxDT.setTime_t(maxTS);
-    m_axisX->setRange(minDT, maxDT);
+    m_axisD->setRange(minTS, maxTS);
 
     if (m_fitMeasurements)
     {
@@ -463,85 +505,131 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         minH = std::min(m_ui.minHumidity->value(), m_ui.maxHumidity->value());
     }
 
-    if (m_axisTY)
+    if (m_axisT)
     {
-        m_axisTY->setRange(minT, maxT);
+        m_axisT->setRange(minT, maxT);
     }
-    if (m_axisHY)
+    if (m_axisH)
     {
-        m_axisHY->setRange(minH, maxH);
+        m_axisH->setRange(minH, maxH);
     }
 
-
-    for (auto& pair : m_series)
+    uint8_t temperatureColorIndex = 0;
+    uint8_t humidityColorIndex = 255;
+    for (auto& pair : m_graphs)
     {
-        PlotData& plotData = pair.second;
-        if (m_axisTY)
+        GraphData& graphData = pair.second;
+        if (m_axisT)
         {
-            QLineSeries* series = new QLineSeries(m_chart);
-            m_chart->addSeries(series);
-            QPen pen = series->pen();
-            //pen.setWidth(4);
-            //series->setUseOpenGL(true);
-            series->setPen(pen);
-            series->setName(QString("%1°C").arg(plotData.sensor.descriptor.name.c_str()));
-            series->attachAxis(m_axisX);
-            series->attachAxis(m_axisTY);
+            QCPGraph* graph = m_plot->addGraph(m_axisD, m_axisT);
+            QPen pen = graph->pen();
+            pen.setWidth(2);
+            pen.setColor(QColor(k_colors[temperatureColorIndex++]));
+            graph->setPen(pen);
+            graph->setName(QString("%1°C").arg(graphData.sensor.descriptor.name.c_str()));
 
-            connect(series, SIGNAL(clicked(QPointF)), this, SLOT(keepAnnotation()));
-            connect(series, &QLineSeries::hovered, [this, series, &plotData](QPointF const& point, bool state)
+            QVector<double> const& keys = graphData.temperatureKeys;
+            QVector<double> const& values = graphData.temperatureValues;
+            graph->setData(keys, values);
+            graphData.temperatureGraph = graph;
+        }
+        if (m_axisH)
+        {
+            QCPGraph* graph = m_plot->addGraph(m_axisD, m_axisH);
+            QPen pen = graph->pen();
+            pen.setWidth(2);
+            pen.setColor(QColor(k_colors[humidityColorIndex--]));
+            pen.setStyle(Qt::DotLine);
+            graph->setPen(pen);
+            graph->setName(QString("%1 %RH").arg(graphData.sensor.descriptor.name.c_str()));
+
+            QVector<double> const& keys = graphData.humidityKeys;
+            QVector<double> const& values = graphData.humidityValues;
+            graph->setData(keys, values);
+            graphData.humidityGraph = graph;
+        }
+    }
+
+    m_plot->replot();
+
+    connect(m_plot, &QCustomPlot::mousePress, this, &PlotWidget::mousePressEvent);
+    connect(m_plot, &QCustomPlot::mouseRelease, this, &PlotWidget::mouseReleaseEvent);
+    connect(m_plot, &QCustomPlot::mouseMove, this, &PlotWidget::mouseMoveEvent);
+//    size_t index = 0;
+//    foreach (QLegendMarker* marker, m_chart->legend()->markers())
+//    {
+//        // Disconnect possible existing connection to avoid multiple connections
+//        QObject::disconnect(marker, SIGNAL(clicked()), this, SLOT(handleMarkerClicked()));
+//        QObject::connect(marker, SIGNAL(clicked()), this, SLOT(handleMarkerClicked()));
+//        if (index < markersVisible.size())
+//        {
+//            setMarkerVisible(marker, markersVisible[index]);
+//        }
+//        index++;
+//    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::mousePressEvent(QMouseEvent* event)
+{
+    QCPAbstractItem* item = qobject_cast<QCPAbstractItem*>(m_plot->itemAt(event->pos()));
+    for (std::unique_ptr<PlotToolTip>& annotation: m_annotations)
+    {
+        if (annotation->mousePressed(item, event->localPos()))
+        {
+            m_draggedAnnotation = annotation.get();
+            break;
+        }
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::mouseReleaseEvent(QMouseEvent* event)
+{
+    if (m_draggedAnnotation)
+    {
+        m_draggedAnnotation->mouseReleased(event->localPos());
+        m_draggedAnnotation = nullptr;
+    }
+    else
+    {
+        keepAnnotation();
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::mouseMoveEvent(QMouseEvent* event)
+{
+    if (m_draggedAnnotation)
+    {
+        m_draggedAnnotation->mouseMoved(event->localPos());
+    }
+    else
+    {
+        bool overlaps = false;
+        QCPAbstractItem* item = qobject_cast<QCPAbstractItem*>(m_plot->itemAt(event->pos()));
+        for (std::unique_ptr<PlotToolTip>& annotation: m_annotations)
+        {
+            if (annotation->mousePressed(item, event->localPos()))
             {
-                createAnnotation(series, point, state, plotData.sensor, true);
-            });
-
-            QList<QPointF> const& points = plotData.temperaturePoints;
-//            if (points.size() < 400)
-//            {
-//                series->setPointsVisible();
-//            }
-            series->append(points);
-            plotData.temperatureSeries.reset(series);
+                overlaps = true;
+                break;
+            }
         }
-        if (m_axisHY)
+
+        if (!overlaps)
         {
-            QLineSeries* series = new QLineSeries(m_chart);
-            m_chart->addSeries(series);
-            QPen pen = series->pen();
-            //pen.setWidth(2);
-            //series->setUseOpenGL(true);
-            series->setPen(pen);
-            series->setName(QString("%1 %RH").arg(plotData.sensor.descriptor.name.c_str()));
-            series->attachAxis(m_axisX);
-            series->attachAxis(m_axisHY);
-
-            connect(series, SIGNAL(clicked(QPointF)), this, SLOT(keepAnnotation()));
-            connect(series, &QLineSeries::hovered, [this, series, &plotData](QPointF const& point, bool state)
-            {
-                createAnnotation(series, point, state, plotData.sensor, false);
-            });
-
-            QList<QPointF> const& points = plotData.humidityPoints;
-//            if (points.size() < 400)
-//            {
-//                series->setPointsVisible();
-//            }
-            series->append(points);
-            plotData.humiditySeries.reset(series);
+            showAnnotation(event->localPos());
+        }
+        else
+        {
+            m_annotation.reset();
         }
     }
-
-    size_t index = 0;
-    foreach (QLegendMarker* marker, m_chart->legend()->markers())
-    {
-        // Disconnect possible existing connection to avoid multiple connections
-        QObject::disconnect(marker, SIGNAL(clicked()), this, SLOT(handleMarkerClicked()));
-        QObject::connect(marker, SIGNAL(clicked()), this, SLOT(handleMarkerClicked()));
-        if (index < markersVisible.size())
-        {
-            setMarkerVisible(marker, markersVisible[index]);
-        }
-        index++;
-    }
+    m_plot->replot();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -550,9 +638,72 @@ void PlotWidget::resizeEvent(QResizeEvent *event)
 {
     for (std::unique_ptr<PlotToolTip>& p: m_annotations)
     {
-        p->updateGeometry();
+        p->refresh();
     }
     QWidget::resizeEvent(event);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::showAnnotation(const QPointF& pos)
+{
+    double key = 0;
+    double value = 0;
+    double bestDistance = std::numeric_limits<double>::max();
+    auto computeClosestPoint = [&key, &value, &bestDistance](QCPGraph* graph, const QPointF& pos) -> bool
+    {
+        bool found = false;
+        QCPDataRange dataRange = graph->data()->dataRange();
+        QCPGraphDataContainer::const_iterator begin = graph->data()->at(dataRange.begin());
+        QCPGraphDataContainer::const_iterator end = graph->data()->at(dataRange.end());
+        for (QCPGraphDataContainer::const_iterator it = begin; it < end; it++)
+        {
+            double x, y;
+            graph->coordsToPixels(it->key, it->value, x, y);
+            double dx = pos.x() - x;
+            double dy = pos.y() - y;
+            double distance = std::sqrt(dx*dx + dy*dy);
+            if (distance < bestDistance)
+            {
+                key = it->key;
+                value = it->value;
+                bestDistance = distance;
+                found = true;
+            }
+        }
+        return found;
+    };
+
+    QCPGraph* bestGraph = nullptr;
+    const GraphData* bestGraphData = nullptr;
+    bool isTemperature = false;
+    for (const auto& pair: m_graphs)
+    {
+        const GraphData& graphData = pair.second;
+        QCPGraph* graph = graphData.temperatureGraph;
+        if (graph && computeClosestPoint(graph, pos))
+        {
+            bestGraph = graph;
+            bestGraphData = &graphData;
+            isTemperature = true;
+        }
+        graph = graphData.humidityGraph;
+        if (graph && computeClosestPoint(graph, pos))
+        {
+            bestGraph = graph;
+            bestGraphData = &graphData;
+            isTemperature = false;
+        }
+    }
+
+    if (bestGraphData)
+    {
+        createAnnotation(bestGraph, QPointF(), key, value, true, bestGraphData->sensor, isTemperature);
+    }
+    else
+    {
+        m_annotation.reset();
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -570,36 +721,38 @@ void PlotWidget::keepAnnotation()
             if (it != m_annotations.end())
             {
                 m_annotations.erase(it);
+                m_plot->replot();
             }
         });
 
         m_annotations.push_back(std::move(m_annotation));
         m_ui.clearAnnotations->setEnabled(true);
 
-        m_annotation.reset(new PlotToolTip(m_chart));
+        //m_annotation.reset(new PlotToolTip(m_chart));
     }
+    m_plot->replot();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void PlotWidget::createAnnotation(QLineSeries* series, QPointF point, bool state, DB::Sensor const& sensor, bool temperature)
+void PlotWidget::createAnnotation(QCPGraph* graph, QPointF point, double key, double value, bool state, DB::Sensor const& sensor, bool temperature)
 {
     if (m_annotation == nullptr)
     {
-        m_annotation.reset(new PlotToolTip(m_chart));
+        m_annotation.reset(new PlotToolTip(m_plot));
     }
 
     if (state)
     {
-        QColor color = series->color();
+        QColor color = graph->pen().color();
         QDateTime dt;
-        dt.setMSecsSinceEpoch(static_cast<int64_t>(point.x()));
+        dt.setSecsSinceEpoch(static_cast<int64_t>(key));
         if (temperature)
         {
             m_annotation->setText(QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Temperature: <b>%3°C</b>")
                                .arg(sensor.descriptor.name.c_str())
                                .arg(dt.toString("dd-MM-yyyy h:mm"))
-                               .arg(point.y(), 0, 'f', 1)
+                               .arg(value, 0, 'f', 1)
                                .arg(color.name()));
         }
         else
@@ -607,17 +760,14 @@ void PlotWidget::createAnnotation(QLineSeries* series, QPointF point, bool state
             m_annotation->setText(QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Humidity: <b>%3 %RH</b>")
                                .arg(sensor.descriptor.name.c_str())
                                .arg(dt.toString("dd-MM-yyyy h:mm"))
-                               .arg(point.y(), 0, 'f', 1)
+                               .arg(value, 0, 'f', 1)
                                .arg(color.name()));
         }
-        m_annotation->setAnchor(point, series);
-        m_annotation->setZValue(11);
-        m_annotation->updateGeometry();
-        m_annotation->show();
+        m_annotation->setAnchor(graph, point, key, value);
     }
     else
     {
-        m_annotation->hide();
+        m_annotation.reset();
     }
 }
 
@@ -633,91 +783,86 @@ void PlotWidget::plotContextMenu(QPoint const& /*position*/)
 
 void PlotWidget::handleMarkerClicked()
 {
-    QLegendMarker* marker = qobject_cast<QLegendMarker*>(sender());
-    Q_ASSERT(marker);
+//    QLegendMarker* marker = qobject_cast<QLegendMarker*>(sender());
+//    Q_ASSERT(marker);
 
-    setMarkerVisible(marker, !marker->series()->isVisible());
+//    setMarkerVisible(marker, !marker->series()->isVisible());
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void PlotWidget::setMarkerVisible(QLegendMarker* marker, bool visible)
-{
-    switch (marker->type())
-    {
-    case QLegendMarker::LegendMarkerTypeXY:
-    {
-        // Toggle visibility of series
-        marker->series()->setVisible(visible);
+//void PlotWidget::setMarkerVisible(QLegendMarker* marker, bool visible)
+//{
+//    switch (marker->type())
+//    {
+//    case QLegendMarker::LegendMarkerTypeXY:
+//    {
+//        // Toggle visibility of series
+//        marker->series()->setVisible(visible);
 
-        // Turn legend marker back to visible, since hiding series also hides the marker
-        // and we don't want it to happen now.
-        marker->setVisible(true);
+//        // Turn legend marker back to visible, since hiding series also hides the marker
+//        // and we don't want it to happen now.
+//        marker->setVisible(true);
 
-        // Dim the marker, if series is not visible
-        qreal alpha = 1.0;
+//        // Dim the marker, if series is not visible
+//        qreal alpha = 1.0;
 
-        if (!marker->series()->isVisible())
-        {
-            alpha = 0.5;
-        }
+//        if (!marker->series()->isVisible())
+//        {
+//            alpha = 0.5;
+//        }
 
-        QColor color;
-        QBrush brush = marker->labelBrush();
-        color = brush.color();
-        color.setAlphaF(alpha);
-        brush.setColor(color);
-        marker->setLabelBrush(brush);
+//        QColor color;
+//        QBrush brush = marker->labelBrush();
+//        color = brush.color();
+//        color.setAlphaF(alpha);
+//        brush.setColor(color);
+//        marker->setLabelBrush(brush);
 
-        brush = marker->brush();
-        color = brush.color();
-        color.setAlphaF(alpha);
-        brush.setColor(color);
-        marker->setBrush(brush);
+//        brush = marker->brush();
+//        color = brush.color();
+//        color.setAlphaF(alpha);
+//        brush.setColor(color);
+//        marker->setBrush(brush);
 
-        QPen pen = marker->pen();
-        color = pen.color();
-        color.setAlphaF(alpha);
-        pen.setColor(color);
-        marker->setPen(pen);
+//        QPen pen = marker->pen();
+//        color = pen.color();
+//        color.setAlphaF(alpha);
+//        pen.setColor(color);
+//        marker->setPen(pen);
 
-        break;
-    }
-    default:
-    {
-        qDebug() << "Unknown marker type";
-        break;
-    }
-    }
-}
+//        break;
+//    }
+//    default:
+//    {
+//        qDebug() << "Unknown marker type";
+//        break;
+//    }
+//    }
+//}
 
 //////////////////////////////////////////////////////////////////////////
 
 QSize PlotWidget::getPlotSize() const
 {
-    return m_chartView->size();
+    return m_plot->size();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-QPixmap PlotWidget::grabPic(bool showLegend)
+void PlotWidget::saveToPng(const QString& fileName, bool showLegend)
 {
-    QPixmap pixmap(m_chartView->size());
-    pixmap.fill();
-
-    QPainter painter(&pixmap);
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setRenderHint(QPainter::TextAntialiasing, true);
-    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-    painter.setRenderHint(QPainter::HighQualityAntialiasing, true);
-
-    m_chart->legend()->setVisible(showLegend);
-
-    m_chartView->render(&painter, QRectF(), QRect(), Qt::IgnoreAspectRatio);
-
-    m_chart->legend()->setVisible(true);
-
-    return pixmap;
+    if (m_annotation)
+    {
+        m_annotation->setVisible(false);
+    }
+    m_plot->legend->setVisible(showLegend);
+    m_plot->savePng(fileName);
+    m_plot->legend->setVisible(true);
+    if (m_annotation)
+    {
+        m_annotation->setVisible(true);
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////

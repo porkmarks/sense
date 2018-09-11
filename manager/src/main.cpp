@@ -5,6 +5,9 @@
 #include <QLockFile>
 #include "StackWalker.h"
 #include <signal.h>
+#include <QStyleFactory>
+#include <QDir>
+#include <QMessageBox>
 
 std::string s_programFolder;
 std::string s_dataFolder;
