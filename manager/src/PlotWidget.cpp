@@ -389,8 +389,8 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         {
             PlotData& plotData = m_series[sensor.id];
             plotData.sensor = sensor;
-            plotData.temperatureLpf.setup(1, 1, 0.15);
-            plotData.humidityLpf.setup(1, 1, 0.15);
+            plotData.temperatureLpf.setup(1, 1, 0.15f);
+            plotData.humidityLpf.setup(1, 1, 0.15f);
             plotData.temperaturePoints.reserve(8192);
             plotData.humidityPoints.reserve(8192);
         }
@@ -400,8 +400,8 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
     {
         qreal millis = std::chrono::duration_cast<std::chrono::milliseconds>(m.descriptor.timePoint.time_since_epoch()).count();
         time_t tt = DB::Clock::to_time_t(m.descriptor.timePoint);
-        minTS = std::min<uint64_t>(minTS, tt);
-        maxTS = std::max<uint64_t>(maxTS, tt);
+        minTS = std::min(minTS, static_cast<uint64_t>(tt));
+        maxTS = std::max(maxTS, static_cast<uint64_t>(tt));
 
         auto it = m_series.find(m.descriptor.sensorId);
         if (it == m_series.end())
@@ -593,7 +593,7 @@ void PlotWidget::createAnnotation(QLineSeries* series, QPointF point, bool state
     {
         QColor color = series->color();
         QDateTime dt;
-        dt.setMSecsSinceEpoch(point.x());
+        dt.setMSecsSinceEpoch(static_cast<int64_t>(point.x()));
         if (temperature)
         {
             m_annotation->setText(QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Temperature: <b>%3°C</b>")
@@ -623,7 +623,7 @@ void PlotWidget::createAnnotation(QLineSeries* series, QPointF point, bool state
 
 //////////////////////////////////////////////////////////////////////////
 
-void PlotWidget::plotContextMenu(QPoint const& position)
+void PlotWidget::plotContextMenu(QPoint const& /*position*/)
 {
 //    QMenu menu;
 //    menu.exec(mapToGlobal(position));

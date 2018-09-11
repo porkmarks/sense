@@ -120,25 +120,25 @@ void BaseStationsWidget::setRW()
 
 //////////////////////////////////////////////////////////////////////////
 
-void BaseStationsWidget::setStatus(int row, std::string const& status)
+void BaseStationsWidget::setStatus(size_t row, std::string const& status)
 {
-    QStandardItem* item = m_model.item(row, 3);
+    QStandardItem* item = m_model.item(static_cast<int>(row), 3);
     item->setText(status.c_str());
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void BaseStationsWidget::setName(int row, std::string const& name)
+void BaseStationsWidget::setName(size_t row, std::string const& name)
 {
-    QStandardItem* item = m_model.item(row, 0);
+    QStandardItem* item = m_model.item(static_cast<int>(row), 0);
     item->setText(name.c_str());
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void BaseStationsWidget::setAddress(int row, QHostAddress const& address)
+void BaseStationsWidget::setAddress(size_t row, QHostAddress const& address)
 {
-    QStandardItem* item = m_model.item(row, 2);
+    QStandardItem* item = m_model.item(static_cast<int>(row), 2);
     char buf[128];
     sprintf(buf, "  %s  ", address.isNull() ? "N/A" : address.toString().toLatin1().data());
     item->setText(buf);
@@ -155,19 +155,23 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
         return;
     }
 
-    if (index.row() >= m_baseStationDescriptors.size())
+    size_t indexRow = static_cast<size_t>(index.row());
+    if (indexRow >= m_baseStationDescriptors.size())
     {
         assert(false);
         return;
     }
 
-    int32_t bsIndex = m_settings->findBaseStationIndexByMac(m_baseStationDescriptors[index.row()].mac);
-    if (bsIndex >= 0)
+    Settings::BaseStationDescriptor descriptor = m_baseStationDescriptors[indexRow];
+
+    int32_t _bsIndex = m_settings->findBaseStationIndexByMac(descriptor.mac);
+    if (_bsIndex >= 0)
     {
+        size_t bsIndex = static_cast<size_t>(_bsIndex);
         Settings::BaseStation const& bs = m_settings->getBaseStation(bsIndex);
         m_settings->setActiveBaseStationId(bs.id);
         bool connected = m_comms->isBaseStationConnected(bs.descriptor.mac);
-        setStatus(bsIndex, connected ? "Active / Connected" : "Active / Disconnected");
+        setStatus(static_cast<size_t>(bsIndex), connected ? "Active / Connected" : "Active / Disconnected");
         return;
     }
 
@@ -178,14 +182,14 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
         return;
     }
 
-    Settings::BaseStationDescriptor descriptor = m_baseStationDescriptors[bsIndex];
     descriptor.name = qname.toUtf8().data();
     if (m_settings->addBaseStation(descriptor))
     {
-        int32_t index = m_settings->findBaseStationIndexByMac(descriptor.mac);
-        if (index >= 0)
+        _bsIndex = m_settings->findBaseStationIndexByMac(descriptor.mac);
+        if (_bsIndex >= 0)
         {
-            bool connected = m_comms->connectToBaseStation(m_settings->getBaseStationDB(index), descriptor.mac);
+            size_t bsIndex = static_cast<size_t>(_bsIndex);
+            bool connected = m_comms->connectToBaseStation(m_settings->getBaseStationDB(bsIndex), descriptor.mac);
             setStatus(bsIndex, connected ? "Added / Connected" : "Added / Disconnected");
             setName(bsIndex, descriptor.name);
         }
@@ -204,9 +208,10 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
 
 void BaseStationsWidget::baseStationConnected(Comms::BaseStationDescriptor const& commsBS)
 {
-    int32_t bsIndex = m_settings->findBaseStationIndexByMac(commsBS.mac);
-    if (bsIndex >= 0)
+    int32_t _bsIndex = m_settings->findBaseStationIndexByMac(commsBS.mac);
+    if (_bsIndex >= 0)
     {
+        size_t bsIndex = static_cast<size_t>(_bsIndex);
         Settings::BaseStation const& bs = m_settings->getBaseStation(bsIndex);
 
         if (m_settings->getActiveBaseStationId() == bs.id)
@@ -227,9 +232,10 @@ void BaseStationsWidget::baseStationConnected(Comms::BaseStationDescriptor const
 
 void BaseStationsWidget::baseStationDisconnected(Comms::BaseStationDescriptor const& commsBS)
 {
-    int32_t bsIndex = m_settings->findBaseStationIndexByMac(commsBS.mac);
-    if (bsIndex >= 0)
+    int32_t _bsIndex = m_settings->findBaseStationIndexByMac(commsBS.mac);
+    if (_bsIndex >= 0)
     {
+        size_t bsIndex = static_cast<size_t>(_bsIndex);
         Settings::BaseStation const& bs = m_settings->getBaseStation(bsIndex);
 
         if (m_settings->getActiveBaseStationId() == bs.id)
@@ -251,12 +257,13 @@ void BaseStationsWidget::baseStationDisconnected(Comms::BaseStationDescriptor co
 
 void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor const& commsBS)
 {
-    int32_t bsIndex = m_settings->findBaseStationIndexByMac(commsBS.mac);
-    if (bsIndex >= 0)
+    int32_t _bsIndex = m_settings->findBaseStationIndexByMac(commsBS.mac);
+    if (_bsIndex >= 0)
     {
-        Settings::BaseStation const& bs = m_settings->getBaseStation(bsIndex);
+        size_t bsIndex = static_cast<size_t>(_bsIndex);
+        Settings::BaseStation const& bs = m_settings->getBaseStation(static_cast<size_t>(bsIndex));
 
-        bool connected = m_comms->connectToBaseStation(m_settings->getBaseStationDB(bsIndex), bs.descriptor.mac);
+        bool connected = m_comms->connectToBaseStation(m_settings->getBaseStationDB(static_cast<size_t>(bsIndex)), bs.descriptor.mac);
         if (m_settings->getActiveBaseStationId() == bs.id)
         {
             setStatus(bsIndex, connected ? "Active / Connected" : "Active / Disconnected");

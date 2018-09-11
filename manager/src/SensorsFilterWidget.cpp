@@ -1,5 +1,6 @@
 #include "SensorsFilterWidget.h"
 #include <QSettings>
+#include <QAbstractItemModel>
 
 SensorsFilterWidget::SensorsFilterWidget(QWidget *parent) : QWidget(parent)
 {

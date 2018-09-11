@@ -92,8 +92,8 @@ void Emailer::alarmTriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::Mea
         return;
     }
 
-    DB::Alarm const& alarm = m_db.getAlarm(alarmIndex);
-    DB::Sensor const& sensor = m_db.getSensor(sensorIndex);
+    DB::Alarm const& alarm = m_db.getAlarm(static_cast<size_t>(alarmIndex));
+    DB::Sensor const& sensor = m_db.getSensor(static_cast<size_t>(sensorIndex));
 
     if (alarm.descriptor.sendEmailAction)
     {
@@ -113,8 +113,8 @@ void Emailer::alarmUntriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::M
         return;
     }
 
-    DB::Alarm const& alarm = m_db.getAlarm(alarmIndex);
-    DB::Sensor const& sensor = m_db.getSensor(sensorIndex);
+    DB::Alarm const& alarm = m_db.getAlarm(static_cast<size_t>(alarmIndex));
+    DB::Sensor const& sensor = m_db.getSensor(static_cast<size_t>(sensorIndex));
 
     if (alarm.descriptor.sendEmailAction)
     {
@@ -207,6 +207,8 @@ void Emailer::sendReportEmail(DB::Report const& report)
     filter.useTimePointFilter = true;
     filter.timePointFilter.min = report.lastTriggeredTimePoint;
     filter.timePointFilter.max = DB::Clock::now();
+    filter.useSensorFilter = report.descriptor.filterSensors;
+    filter.sensorIds = report.descriptor.sensors;
     std::vector<DB::Measurement> measurements = m_db.getFilteredMeasurements(filter);
     std::sort(measurements.begin(), measurements.end(), [](DB::Measurement const& a, DB::Measurement const& b) { return a.descriptor.timePoint > b.descriptor.timePoint; });
 
@@ -288,12 +290,13 @@ void Emailer::sendReportEmail(DB::Report const& report)
             QDateTime dt;
             dt.setTime_t(DB::Clock::to_time_t(m.descriptor.timePoint));
             std::string sensorName = "N/A";
-            int32_t sensorIndex = m_db.findSensorIndexById(m.descriptor.sensorId);
-            if (sensorIndex < 0)
+            int32_t _sensorIndex = m_db.findSensorIndexById(m.descriptor.sensorId);
+            if (_sensorIndex < 0)
             {
                 continue;
             }
-            if (static_cast<size_t>(sensorIndex) >= sensorDatas.size())
+            size_t sensorIndex = static_cast<size_t>(_sensorIndex);
+            if (sensorIndex >= sensorDatas.size())
             {
                 sensorDatas.resize(sensorIndex + 1);
             }
@@ -352,7 +355,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
             int32_t sensorIndex = m_db.findSensorIndexById(m.descriptor.sensorId);
             if (sensorIndex >= 0)
             {
-                sensorName = m_db.getSensor(sensorIndex).descriptor.name;
+                sensorName = m_db.getSensor(static_cast<size_t>(sensorIndex)).descriptor.name;
             }
             email.body += QString(R"X(
                                   <tr>

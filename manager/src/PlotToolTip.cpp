@@ -79,7 +79,7 @@ void PlotToolTip::paint(QPainter* painter, const QStyleOptionGraphicsItem* optio
     }
 
     QPen pen = painter->pen();
-    pen.setWidthF(1.f);
+    pen.setWidthF(1.0);
     painter->setPen(pen);
 
     painter->setBrush(QColor(255, 255, 255));
@@ -134,8 +134,8 @@ void PlotToolTip::setText(const QString& text)
     m_rect = m_textRect.adjusted(-5, -5, 5, 5);
 
     {
-        float length = 14;
-        float margin = 6;
+        double length = 14.0;
+        double margin = 6.0;
         m_closeRect = QRectF(m_rect.topRight() + QPointF(-(length + margin), margin), QSizeF(length, length));
     }
 }

@@ -1,5 +1,8 @@
 #include "ExportLogsDialog.h"
 
+#include <QFileDialog>
+#include <QMessageBox>
+
 #include <fstream>
 #include <iostream>
 #include <sstream>

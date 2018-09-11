@@ -1,5 +1,7 @@
 #include "ExportDataDialog.h"
 
+#include <QMessageBox>
+#include <QFileDialog>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -187,7 +189,7 @@ void ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount)
             }
             else
             {
-                stream << m_db.getSensor(sensorIndex).descriptor.name;
+                stream << m_db.getSensor(static_cast<size_t>(sensorIndex)).descriptor.name;
             }
             stream << separator;
         }
@@ -200,7 +202,7 @@ void ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount)
             }
             else
             {
-                stream << QString("%1").arg(m_db.getSensor(sensorIndex).serialNumber, 8, 16, QChar('0')).toUtf8().data();
+                stream << QString("%1").arg(m_db.getSensor(static_cast<size_t>(sensorIndex)).serialNumber, 8, 16, QChar('0')).toUtf8().data();
             }
             stream << separator;
         }

@@ -1,4 +1,5 @@
 #include "ConfigureAlarmDialog.h"
+#include <QMessageBox>
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -82,20 +83,20 @@ void ConfigureAlarmDialog::accept()
             DB::Sensor const& sensor = m_db.getSensor(i);
             if (m_ui.sensorFilter->getSensorModel().isSensorChecked(sensor.id))
             {
-                descriptor.sensors.push_back(sensor.id);
+                descriptor.sensors.insert(sensor.id);
             }
         }
     }
 
     descriptor.highTemperatureWatch = m_ui.highTemperatureWatch->isChecked();
-    descriptor.highTemperature = m_ui.highTemperature->value();
+    descriptor.highTemperature = static_cast<float>(m_ui.highTemperature->value());
     descriptor.lowTemperatureWatch = m_ui.lowTemperatureWatch->isChecked();
-    descriptor.lowTemperature = m_ui.lowTemperature->value();
+    descriptor.lowTemperature = static_cast<float>(m_ui.lowTemperature->value());
 
     descriptor.highHumidityWatch = m_ui.highHumidityWatch->isChecked();
-    descriptor.highHumidity = m_ui.highHumidity->value();
+    descriptor.highHumidity = static_cast<float>(m_ui.highHumidity->value());
     descriptor.lowHumidityWatch = m_ui.lowHumidityWatch->isChecked();
-    descriptor.lowHumidity = m_ui.lowHumidity->value();
+    descriptor.lowHumidity = static_cast<float>(m_ui.lowHumidity->value());
 
     descriptor.lowSignalWatch = m_ui.lowSignalWatch->isChecked();
     descriptor.lowVccWatch = m_ui.lowBatteryWatch->isChecked();
@@ -115,7 +116,7 @@ void ConfigureAlarmDialog::accept()
 //    }
 
     int32_t alarmIndex = m_db.findAlarmIndexByName(descriptor.name);
-    if (alarmIndex >= 0 && m_db.getAlarm(alarmIndex).id != m_alarm.id)
+    if (alarmIndex >= 0 && m_db.getAlarm(static_cast<size_t>(alarmIndex)).id != m_alarm.id)
     {
         QMessageBox::critical(this, "Error", QString("Alarm '%1' already exists.").arg(descriptor.name.c_str()));
         return;

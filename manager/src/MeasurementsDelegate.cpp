@@ -3,6 +3,9 @@
 
 #include <QWidget>
 #include <QIcon>
+#include <QApplication>
+#include <QPainter>
+
 #include <bitset>
 
 constexpr QSize k_iconMargin(4, 2);
@@ -32,7 +35,7 @@ void MeasurementsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& 
     MeasurementsModel::Column column = static_cast<MeasurementsModel::Column>(m_model.data(index, MeasurementsModel::RealColumnRole).toULongLong());
     if (column == MeasurementsModel::Column::Alarms)
     {
-        uint8_t triggeredAlarms = m_model.data(index).toUInt();
+        uint8_t triggeredAlarms = static_cast<uint8_t>(m_model.data(index).toUInt());
 
         QApplication::style()->drawControl(QStyle::CE_ItemViewItem, &option, painter);
 
@@ -117,7 +120,7 @@ QSize MeasurementsDelegate::sizeHint(const QStyleOptionViewItem& option, const Q
     MeasurementsModel::Column column = static_cast<MeasurementsModel::Column>(m_model.data(index, MeasurementsModel::RealColumnRole).toULongLong());
     if (column == MeasurementsModel::Column::Alarms)
     {
-        uint8_t triggeredAlarms = m_model.data(index).toUInt();
+        uint8_t triggeredAlarms = static_cast<uint8_t>(m_model.data(index).toUInt());
 
         int32_t width = 0;
         int32_t iconSize = option.rect.height();

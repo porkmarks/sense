@@ -104,7 +104,7 @@ bool Settings::load(std::string const& name)
 
         Crypt crypt;
         crypt.setKey(k_fileEncryptionKey);
-        QByteArray decryptedData = crypt.decryptToByteArray(QByteArray(streamData.data(), streamData.size()));
+        QByteArray decryptedData = crypt.decryptToByteArray(QByteArray(streamData.data(), int32_t(streamData.size())));
 
         rapidjson::Document document;
         document.Parse(decryptedData.data(), decryptedData.size());
@@ -149,7 +149,7 @@ bool Settings::load(std::string const& name)
                 s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings port").arg(dataFilename.c_str()));
                 return false;
             }
-            data.emailSettings.port = it->value.GetUint();
+            data.emailSettings.port = static_cast<uint16_t>(it->value.GetUint());
 
             it = esj.FindMember("connection");
             if (it == esj.MemberEnd() || !it->value.IsUint())
@@ -231,7 +231,7 @@ bool Settings::load(std::string const& name)
                 s_logger.logCritical(QString("Failed to load '%1': Bad or missing ftp settings port").arg(dataFilename.c_str()));
                 return false;
             }
-            data.ftpSettings.port = it->value.GetUint();
+            data.ftpSettings.port = static_cast<uint16_t>(it->value.GetUint());
 
             it = esj.FindMember("username");
             if (it == esj.MemberEnd() || !it->value.IsString())
@@ -597,7 +597,7 @@ bool Settings::addUser(UserDescriptor const& descriptor)
 bool Settings::setUser(UserId id, UserDescriptor const& descriptor)
 {
     int32_t index = findUserIndexByName(descriptor.name);
-    if (index >= 0 && getUser(index).id != id)
+    if (index >= 0 && getUser(static_cast<size_t>(index)).id != id)
     {
         return false;
     }
@@ -608,7 +608,7 @@ bool Settings::setUser(UserId id, UserDescriptor const& descriptor)
         return false;
     }
 
-    m_mainData.users[index].descriptor = descriptor;
+    m_mainData.users[static_cast<size_t>(index)].descriptor = descriptor;
     emit userChanged(id);
 
     s_logger.logInfo(QString("Changed user '%1'").arg(descriptor.name.c_str()));
@@ -647,7 +647,7 @@ int32_t Settings::findUserIndexByName(std::string const& name) const
     {
         return -1;
     }
-    return std::distance(m_mainData.users.begin(), it);
+    return int32_t(std::distance(m_mainData.users.begin(), it));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -659,7 +659,7 @@ int32_t Settings::findUserIndexById(UserId id) const
     {
         return -1;
     }
-    return std::distance(m_mainData.users.begin(), it);
+    return int32_t(std::distance(m_mainData.users.begin(), it));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -671,7 +671,7 @@ int32_t Settings::findUserIndexByPasswordHash(std::string const& passwordHash) c
     {
         return -1;
     }
-    return std::distance(m_mainData.users.begin(), it);
+    return int32_t(std::distance(m_mainData.users.begin(), it));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -690,9 +690,10 @@ bool Settings::needsAdmin() const
 
 void Settings::setLoggedInUserId(UserId id)
 {
-    int32_t index = findUserIndexById(id);
-    if (index >= 0)
+    int32_t _index = findUserIndexById(id);
+    if (_index >= 0)
     {
+        size_t index = static_cast<size_t>(_index);
         s_logger.logInfo(QString("User '%1' logged in").arg(m_mainData.users[index].descriptor.name.c_str()));
 
         m_loggedInUserId = id;
@@ -711,9 +712,10 @@ Settings::UserId Settings::getLoggedInUserId() const
 
 Settings::User const* Settings::getLoggedInUser() const
 {
-    int32_t index = findUserIndexById(m_loggedInUserId);
-    if (index >= 0)
+    int32_t _index = findUserIndexById(m_loggedInUserId);
+    if (_index >= 0)
     {
+        size_t index = static_cast<size_t>(_index);
         return &m_mainData.users[index];
     }
     return nullptr;
@@ -795,22 +797,24 @@ bool Settings::addBaseStation(BaseStationDescriptor const& descriptor)
 
 bool Settings::setBaseStation(BaseStationId id, BaseStationDescriptor const& descriptor)
 {
-    int32_t index = findBaseStationIndexByName(descriptor.name);
-    if (index >= 0 && getBaseStation(index).id != id)
+    int32_t _index = findBaseStationIndexByName(descriptor.name);
+    if (_index >= 0 && getBaseStation(static_cast<size_t>(_index)).id != id)
     {
         return false;
     }
-    index = findBaseStationIndexByMac(descriptor.mac);
-    if (index >= 0 && getBaseStation(index).id != id)
+    _index = findBaseStationIndexByMac(descriptor.mac);
+    if (_index >= 0 && getBaseStation(static_cast<size_t>(_index)).id != id)
     {
         return false;
     }
 
-    index = findBaseStationIndexById(id);
-    if (index < 0)
+    _index = findBaseStationIndexById(id);
+    if (_index < 0)
     {
         return false;
     }
+
+    size_t index = static_cast<size_t>(_index);
 
     s_logger.logInfo(QString("Changing base station '%1' / %2").arg(descriptor.name.c_str()).arg(getMacStr(descriptor.mac).c_str()));
 
@@ -903,7 +907,7 @@ void Settings::setActiveBaseStationId(BaseStationId id)
     int32_t index = findBaseStationIndexById(id);
     if (index >= 0)
     {
-        BaseStationDescriptor const& descriptor = m_mainData.baseStations[index].descriptor;
+        BaseStationDescriptor const& descriptor = m_mainData.baseStations[static_cast<size_t>(index)].descriptor;
         s_logger.logInfo(QString("Activating base station '%1' / %2").arg(descriptor.name.c_str()).arg(getMacStr(descriptor.mac).c_str()));
 
         m_mainData.activeBaseStationId = id;

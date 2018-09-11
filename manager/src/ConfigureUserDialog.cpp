@@ -1,5 +1,6 @@
 #include "ConfigureUserDialog.h"
 #include "Crypt.h"
+#include <QMessageBox>
 
 std::string k_passwordHashReferenceText = "Cannot open file.";
 
@@ -79,7 +80,7 @@ void ConfigureUserDialog::accept()
     }
 
     int32_t userIndex = m_settings.findUserIndexByName(descriptor.name);
-    if (userIndex >= 0 && m_settings.getUser(userIndex).id != m_user.id)
+    if (userIndex >= 0 && m_settings.getUser(static_cast<size_t>(userIndex)).id != m_user.id)
     {
         QMessageBox::critical(this, "Error", QString("User '%1' already exists.").arg(descriptor.name.c_str()));
         return;

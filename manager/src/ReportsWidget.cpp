@@ -2,6 +2,7 @@
 #include "ConfigureReportDialog.h"
 #include "Settings.h"
 #include <QSettings>
+#include <QMessageBox>
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -80,12 +81,13 @@ void ReportsWidget::setRW()
 
 void ReportsWidget::configureReport(QModelIndex const& index)
 {
-    if (!index.isValid() || static_cast<size_t>(index.row()) >= m_db->getReportCount())
+    size_t indexRow = static_cast<size_t>(index.row());
+    if (!index.isValid() || indexRow >= m_db->getReportCount())
     {
         return;
     }
 
-    DB::Report report = m_db->getReport(index.row());
+    DB::Report report = m_db->getReport(indexRow);
 
     ConfigureReportDialog dialog(*m_settings, *m_db);
     dialog.setReport(report);
@@ -132,13 +134,14 @@ void ReportsWidget::removeReports()
 
     QModelIndex mi = m_model->index(selected.at(0).row(), static_cast<int>(ReportsModel::Column::Id));
     DB::ReportId id = m_model->data(mi).toUInt();
-    int32_t index = m_db->findReportIndexById(id);
-    if (index < 0)
+    int32_t _index = m_db->findReportIndexById(id);
+    if (_index < 0)
     {
         QMessageBox::critical(this, "Error", "Invalid report selected.");
         return;
     }
 
+    size_t index = static_cast<size_t>(_index);
     DB::Report const& report = m_db->getReport(index);
 
     int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete report '%1'").arg(report.descriptor.name.c_str()));

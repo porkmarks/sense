@@ -2,6 +2,9 @@
 
 #include <QWidget>
 #include <QIcon>
+#include <QDateTime>
+
+#include <cmath>
 #include <bitset>
 #include <array>
 #include <cassert>
@@ -28,7 +31,7 @@ QIcon getBatteryIcon(float vcc)
     };
 
     float level = getBatteryLevel(vcc);
-    size_t index = std::floor(level * (s_batteryIconNames.size() - 1) + 0.5f);
+    size_t index = static_cast<size_t>(std::floor(level * (s_batteryIconNames.size() - 1) + 0.5f));
     return s_batteryIconNames[index];
 }
 
@@ -57,7 +60,7 @@ QIcon getSignalIcon(int8_t dBm)
     };
 
     float level = getSignalLevel(dBm);
-    size_t index = std::floor(level * (s_signalIconNames.size() - 1) + 0.5f);
+    size_t index = static_cast<size_t>(std::floor(level * (s_signalIconNames.size() - 1) + 0.5f));
     return s_signalIconNames[index];
 }
 
@@ -90,11 +93,11 @@ QModelIndex MeasurementsModel::index(int row, int column, QModelIndex const& par
 {
     if (row < 0 || column < 0)
     {
-        return QModelIndex();
+        return {};
     }
     if (!hasIndex(row, column, parent))
     {
-        return QModelIndex();
+        return {};
     }
     return createIndex(row, column, nullptr);
 }
@@ -114,10 +117,7 @@ int MeasurementsModel::rowCount(QModelIndex const& index) const
     {
         return static_cast<int>(m_measurements.size());
     }
-    else
-    {
-        return 0;
-    }
+    return 0;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -168,12 +168,13 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         return QVariant();
     }
 
-    if (static_cast<size_t>(index.row()) >= m_measurements.size())
+    size_t indexRow = static_cast<size_t>(index.row());
+    if (indexRow >= m_measurements.size())
     {
         return QVariant();
     }
 
-    DB::Measurement const& measurement = m_measurements[index.row()];
+    DB::Measurement const& measurement = m_measurements[indexRow];
 
     //code to skip over disabled columns
     Column column = computeRealColumnFromVisibleColumn(static_cast<size_t>(index.column()));
@@ -256,7 +257,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
             }
             else
             {
-                return m_db.getSensor(sensorIndex).descriptor.name.c_str();
+                return m_db.getSensor(static_cast<size_t>(sensorIndex)).descriptor.name.c_str();
             }
         }
         else if (column == Column::Index)
@@ -343,7 +344,7 @@ void MeasurementsModel::startAutoRefresh(DB::SensorId sensorId)
     //see if the sensor is in the filter
     if (m_filter.useSensorFilter)
     {
-        if (std::find(m_filter.sensorIds.begin(), m_filter.sensorIds.end(), sensorId) == m_filter.sensorIds.end())
+        if (m_filter.sensorIds.find(sensorId) == m_filter.sensorIds.end())
         {
             return;
         }

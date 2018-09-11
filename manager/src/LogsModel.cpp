@@ -2,6 +2,8 @@
 
 #include <QWidget>
 #include <QIcon>
+#include <QDateTime>
+
 #include <bitset>
 
 static std::array<const char*, 3> s_headerNames = {"Timestamp", "Type", "Message"};
@@ -90,12 +92,13 @@ QVariant LogsModel::data(QModelIndex const& index, int role) const
         return QVariant();
     }
 
-    if (static_cast<size_t>(index.row()) >= m_logLines.size())
+    size_t indexRow = static_cast<size_t>(index.row());
+    if (indexRow >= m_logLines.size())
     {
         return QVariant();
     }
 
-    Logger::LogLine const& line = m_logLines[index.row()];
+    Logger::LogLine const& line = m_logLines[indexRow];
 
     Column column = static_cast<Column>(index.column());
 

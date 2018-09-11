@@ -4,6 +4,9 @@
 #include <QIcon>
 #include <QPainter>
 #include <QDateTime>
+#include <QAbstractItemModel>
+#include <QTimer>
+
 #include <cassert>
 
 static std::array<const char*, 10> s_headerNames = {"Name", "Id", "Serial Number", "Temperature", "Humidity", "Battery", "Signal (Current/Avg)", "Comms", "Stored", "Alarms"};
@@ -280,18 +283,20 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         return QVariant();
     }
 
-    if (static_cast<size_t>(index.row()) >= m_sensors.size())
+    size_t indexRow = static_cast<size_t>(index.row());
+    if (indexRow >= m_sensors.size())
     {
         return QVariant();
     }
 
-    SensorData const& sensorData = m_sensors[index.row()];
-    int32_t dbSensorIndex = m_db.findSensorIndexById(sensorData.sensorId);
-    assert(dbSensorIndex >= 0);
-    if (dbSensorIndex < 0)
+    SensorData const& sensorData = m_sensors[indexRow];
+    int32_t _dbSensorIndex = m_db.findSensorIndexById(sensorData.sensorId);
+    assert(_dbSensorIndex >= 0);
+    if (_dbSensorIndex < 0)
     {
         return QVariant();
     }
+    size_t dbSensorIndex = static_cast<size_t>(_dbSensorIndex);
     DB::Sensor const& sensor = m_db.getSensor(dbSensorIndex);
 
     Column column = static_cast<Column>(index.column());

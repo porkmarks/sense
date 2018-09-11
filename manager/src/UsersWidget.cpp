@@ -81,12 +81,13 @@ void UsersWidget::setRW()
 
 void UsersWidget::configureUser(QModelIndex const& index)
 {
-    if (!index.isValid() || static_cast<size_t>(index.row()) >= m_settings->getUserCount())
+    size_t indexRow = static_cast<size_t>(index.row());
+    if (!index.isValid() || indexRow >= m_settings->getUserCount())
     {
         return;
     }
 
-    Settings::User user = m_settings->getUser(index.row());
+    Settings::User user = m_settings->getUser(indexRow);
 
     ConfigureUserDialog dialog(*m_settings);
     dialog.setUser(user);
@@ -149,13 +150,14 @@ void UsersWidget::removeUsers()
 
     QModelIndex mi = m_model->index(selected.at(0).row(), static_cast<int>(UsersModel::Column::Id));
     Settings::UserId id = m_model->data(mi).toUInt();
-    int32_t index = m_settings->findUserIndexById(id);
-    if (index < 0)
+    int32_t _index = m_settings->findUserIndexById(id);
+    if (_index < 0)
     {
         QMessageBox::critical(this, "Error", "Invalid user selected.");
         return;
     }
 
+    size_t index = static_cast<size_t>(_index);
     Settings::User const& user = m_settings->getUser(index);
 
     int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete user '%1'").arg(user.descriptor.name.c_str()));

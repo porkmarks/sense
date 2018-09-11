@@ -1,5 +1,6 @@
 #include "ConfigureReportDialog.h"
 #include "Emailer.h"
+#include <QMessageBox>
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -70,8 +71,8 @@ void ConfigureReportDialog::setReport(DB::Report const& report)
     if (descriptor.period == DB::ReportDescriptor::Period::Custom)
     {
         m_ui.useCustomPeriod->setChecked(true);
-        size_t days = std::chrono::duration_cast<std::chrono::hours>(descriptor.customPeriod).count() / 24;
-        m_ui.customPeriod->setValue(static_cast<int>(days));
+        int days = static_cast<int>(std::chrono::duration_cast<std::chrono::hours>(descriptor.customPeriod).count() / 24);
+        m_ui.customPeriod->setValue(days);
     }
     else
     {
@@ -97,7 +98,7 @@ bool ConfigureReportDialog::getDescriptor(DB::ReportDescriptor& descriptor)
             DB::Sensor const& sensor = m_db.getSensor(i);
             if (m_ui.sensorFilter->getSensorModel().isSensorChecked(sensor.id))
             {
-                descriptor.sensors.push_back(sensor.id);
+                descriptor.sensors.insert(sensor.id);
             }
         }
     }
@@ -106,8 +107,7 @@ bool ConfigureReportDialog::getDescriptor(DB::ReportDescriptor& descriptor)
     {
         descriptor.period = DB::ReportDescriptor::Period::Custom;
         descriptor.customPeriod = std::chrono::hours(m_ui.customPeriod->value());
-        size_t days = std::chrono::duration_cast<std::chrono::hours>(descriptor.customPeriod).count() / 24;
-        if (days == 0)
+        if (std::chrono::duration_cast<std::chrono::hours>(descriptor.customPeriod).count() / 24 == 0)
         {
             descriptor.customPeriod = std::chrono::hours(24);
         }
@@ -124,7 +124,7 @@ bool ConfigureReportDialog::getDescriptor(DB::ReportDescriptor& descriptor)
     }
 
     int32_t reportIndex = m_db.findReportIndexByName(descriptor.name);
-    if (reportIndex >= 0 && m_db.getReport(reportIndex).id != m_report.id)
+    if (reportIndex >= 0 && m_db.getReport(static_cast<size_t>(reportIndex)).id != m_report.id)
     {
         QMessageBox::critical(this, "Error", QString("Report '%1' already exists.").arg(descriptor.name.c_str()));
         return false;

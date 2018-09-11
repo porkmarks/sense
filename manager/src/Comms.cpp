@@ -79,7 +79,7 @@ bool Comms::connectToBaseStation(DB& db, Mac const& mac)
     auto it = std::find_if(m_discoveredBaseStations.begin(), m_discoveredBaseStations.end(), [&mac](Comms::BaseStationDescriptor const& _bs) { return _bs.mac == mac; });
     if (it == m_discoveredBaseStations.end())
     {
-        s_logger.logCritical(QString("Attempting to connect to undiscovered BS %1").arg(getMacStr(mac).c_str()));
+        s_logger.logWarning(QString("Attempting to connect to undiscovered BS %1. Postponed until discovery.").arg(getMacStr(mac).c_str()));
         return false;
     }
 
@@ -236,7 +236,7 @@ void Comms::processSensorDetails(InitializedBaseStation& cbs, std::vector<uint8_
                 s_logger.logCritical(QString("Cannot deserialize sensor details: Missing serial_number."));
                 continue;
             }
-            uint32_t serialNumber = it->value.GetUint();
+            //uint32_t serialNumber = it->value.GetUint();
 
             DB::Sensor::Calibration calibration;
             it = sensorj.FindMember("temperature_bias");
@@ -261,7 +261,7 @@ void Comms::processSensorDetails(InitializedBaseStation& cbs, std::vector<uint8_
                 s_logger.logCritical(QString("Cannot deserialize sensor details: Missing b2s."));
                 continue;
             }
-            int8_t b2s = static_cast<int8_t>(it->value.GetInt());
+            //int8_t b2s = static_cast<int8_t>(it->value.GetInt());
 
             it = sensorj.FindMember("first_recorded_measurement_index");
             if (it == sensorj.MemberEnd() || !it->value.IsUint())
@@ -269,7 +269,7 @@ void Comms::processSensorDetails(InitializedBaseStation& cbs, std::vector<uint8_
                 s_logger.logCritical(QString("Cannot deserialize sensor details: Missing first_recorded_measurement_index."));
                 continue;
             }
-            uint32_t firstRecordedMeasurementIndex = it->value.GetUint();
+            //uint32_t firstRecordedMeasurementIndex = it->value.GetUint();
 
             it = sensorj.FindMember("max_confirmed_measurement_index");
             if (it == sensorj.MemberEnd() || !it->value.IsUint())
@@ -277,7 +277,7 @@ void Comms::processSensorDetails(InitializedBaseStation& cbs, std::vector<uint8_
                 s_logger.logCritical(QString("Cannot deserialize sensor details: Missing max_confirmed_measurement_index."));
                 continue;
             }
-            uint32_t maxConfirmedMeasurementIndex = it->value.GetUint();
+            //uint32_t maxConfirmedMeasurementIndex = it->value.GetUint();
 
             it = sensorj.FindMember("recorded_measurement_count");
             if (it == sensorj.MemberEnd() || !it->value.IsUint())
@@ -301,7 +301,7 @@ void Comms::processSensorDetails(InitializedBaseStation& cbs, std::vector<uint8_
                 s_logger.logCritical(QString("Cannot deserialize sensor details: Missing last_comms_tp."));
                 continue;
             }
-            DB::Clock::time_point lctp = DB::Clock::from_time_t(it->value.GetUint64());
+            DB::Clock::time_point lctp = DB::Clock::from_time_t(time_t(it->value.GetUint64()));
 
             if (!cbs.db.setSensorDetails(id, nmtp, lctp, recordedMeasurementCount))
             {
@@ -483,14 +483,15 @@ void Comms::requestBindSensor(InitializedBaseStation& cbs, DB::SensorId sensorId
 {
     DB& db = cbs.db;
 
-    int32_t sensorIndex = db.findSensorIndexById(sensorId);
-    if (sensorIndex < 0)
+    int32_t _sensorIndex = db.findSensorIndexById(sensorId);
+    if (_sensorIndex < 0)
     {
         s_logger.logCritical(QString("Cannot send bind request: Bad sensor id %1.").arg(sensorId));
         return;
     }
+    size_t sensorIndex = static_cast<size_t>(_sensorIndex);
 
-    DB::Sensor const& sensor = db.getSensor(static_cast<uint32_t>(sensorIndex));
+    DB::Sensor const& sensor = db.getSensor(sensorIndex);
     if (sensor.state != DB::Sensor::State::Unbound)
     {
         s_logger.logCritical(QString("Cannot send bind request: Sensor in bad state: %1.").arg(static_cast<int>(sensor.state)));
@@ -516,7 +517,7 @@ void Comms::processSetSensorsRes(InitializedBaseStation& cbs)
     std::vector<uint8_t> buffer;
     cbs.channel.unpack(buffer);
 
-    if (buffer.size() == 0)
+    if (buffer.empty())
     {
         s_logger.logCritical(QString("Setting the sensors FAILED."));
         return;
@@ -534,7 +535,7 @@ void Comms::processAddConfigRes(InitializedBaseStation& cbs)
     std::vector<uint8_t> buffer;
     cbs.channel.unpack(buffer);
 
-    if (buffer.size() == 0)
+    if (buffer.empty())
     {
         s_logger.logCritical(QString("Setting the config FAILED."));
         return;
@@ -551,7 +552,7 @@ void Comms::processSetConfigsRes(InitializedBaseStation& cbs)
     std::vector<uint8_t> buffer;
     cbs.channel.unpack(buffer);
 
-    if (buffer.size() == 0)
+    if (buffer.empty())
     {
         s_logger.logCritical(QString("Setting the config FAILED."));
         return;
@@ -568,7 +569,7 @@ void Comms::processAddSensorRes(InitializedBaseStation& cbs)
     std::vector<uint8_t> buffer;
     cbs.channel.unpack(buffer);
 
-    if (buffer.size() == 0)
+    if (buffer.empty())
     {
         s_logger.logCritical(QString("Adding the sensor FAILED."));
         return;

@@ -143,7 +143,7 @@ public:
         std::string name;
 
         bool filterSensors = false;
-        std::vector<SensorId> sensors;
+        std::set<SensorId> sensors;
 
         bool lowTemperatureWatch = false;
         float lowTemperature = 0;
@@ -170,7 +170,7 @@ public:
         AlarmDescriptor descriptor;
         AlarmId id;
 
-        std::vector<SensorId> triggeringSensors;
+        std::set<SensorId> triggeringSensors;
     };
 
     size_t getAlarmCount() const;
@@ -221,7 +221,7 @@ public:
         Data data = Data::Summary;
 
         bool filterSensors = false;
-        std::vector<SensorId> sensors;
+        std::set<SensorId> sensors;
     };
 
     typedef uint32_t ReportId;

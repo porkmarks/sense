@@ -95,12 +95,13 @@ QVariant UsersModel::data(QModelIndex const& index, int role) const
         return QVariant();
     }
 
-    if (static_cast<size_t>(index.row()) >= m_settings.getUserCount())
+    size_t indexRow = static_cast<size_t>(index.row());
+    if (indexRow >= m_settings.getUserCount())
     {
         return QVariant();
     }
 
-    Settings::User const& user = m_settings.getUser(index.row());
+    Settings::User const& user = m_settings.getUser(indexRow);
     Settings::UserDescriptor const& descriptor = user.descriptor;
 
     Column column = static_cast<Column>(index.column());

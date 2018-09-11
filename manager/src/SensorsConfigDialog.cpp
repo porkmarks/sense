@@ -1,5 +1,7 @@
 #include "SensorsConfigDialog.h"
 
+#include <QMessageBox>
+
 //////////////////////////////////////////////////////////////////////////
 
 SensorsConfigDialog::SensorsConfigDialog(QWidget *parent)

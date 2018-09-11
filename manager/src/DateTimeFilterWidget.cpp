@@ -2,8 +2,11 @@
 #include <QDateTime>
 #include <QCalendarWidget>
 #include <QSettings>
+#include <QTimer>
 
-DateTimeFilterWidget::DateTimeFilterWidget(QWidget *parent)
+////////////////////////////////////////////////////////////////////////////////
+
+DateTimeFilterWidget::DateTimeFilterWidget(QWidget* parent)
     : QWidget(parent)
 {
     m_ui.setupUi(this);
@@ -17,22 +20,24 @@ DateTimeFilterWidget::DateTimeFilterWidget(QWidget *parent)
 
     setPreset(m_ui.preset->currentIndex());
 
-    m_timer = new QTimer(this);
-    m_timer->setSingleShot(false);
-    m_timer->setInterval(60 * 1000); //every minute
-    m_timer->start();
-    connect(m_timer, &QTimer::timeout, this, &DateTimeFilterWidget::refreshPreset);
+    QTimer::singleShot(60 * 1000, this, &DateTimeFilterWidget::refreshPreset);
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 QDateTime DateTimeFilterWidget::getFromDateTime()
 {
     return m_ui.from->dateTime();
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 QDateTime DateTimeFilterWidget::getToDateTime()
 {
     return m_ui.to->dateTime();
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 void DateTimeFilterWidget::refreshPreset()
 {
@@ -41,7 +46,10 @@ void DateTimeFilterWidget::refreshPreset()
     {
         setPreset(m_ui.preset->currentIndex());
     }
+    QTimer::singleShot(60 * 1000, this, &DateTimeFilterWidget::refreshPreset);
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 void DateTimeFilterWidget::togglePreset(bool toggled)
 {
@@ -50,6 +58,8 @@ void DateTimeFilterWidget::togglePreset(bool toggled)
         setPreset(m_ui.preset->currentIndex());
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 void DateTimeFilterWidget::setPreset(int preset)
 {
@@ -67,6 +77,9 @@ void DateTimeFilterWidget::setPreset(int preset)
     case 9: setPresetLastYear(); break;
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
 void DateTimeFilterWidget::setPresetToday()
 {
     QDateTime fromDT = getFromDateTime();
@@ -89,6 +102,9 @@ void DateTimeFilterWidget::setPresetToday()
         emit filterChanged();
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
 void DateTimeFilterWidget::setPresetYesterday()
 {
     QDateTime fromDT = getFromDateTime();
@@ -113,6 +129,9 @@ void DateTimeFilterWidget::setPresetYesterday()
         emit filterChanged();
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
 void DateTimeFilterWidget::setPresetLastHour()
 {
     QDateTime fromDT = getFromDateTime();
@@ -133,6 +152,9 @@ void DateTimeFilterWidget::setPresetLastHour()
         emit filterChanged();
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
 void DateTimeFilterWidget::setPresetLast24Hours()
 {
     QDateTime fromDT = getFromDateTime();
@@ -153,6 +175,9 @@ void DateTimeFilterWidget::setPresetLast24Hours()
         emit filterChanged();
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
 void DateTimeFilterWidget::setPresetThisWeek()
 {
     QDateTime fromDT = getFromDateTime();
@@ -177,6 +202,9 @@ void DateTimeFilterWidget::setPresetThisWeek()
         emit filterChanged();
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
 void DateTimeFilterWidget::setPresetLastWeek()
 {
     QDateTime fromDT = getFromDateTime();
@@ -201,6 +229,9 @@ void DateTimeFilterWidget::setPresetLastWeek()
         emit filterChanged();
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
 void DateTimeFilterWidget::setPresetThisMonth()
 {
     QDateTime fromDT = getFromDateTime();
@@ -224,6 +255,9 @@ void DateTimeFilterWidget::setPresetThisMonth()
         emit filterChanged();
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
 void DateTimeFilterWidget::setPresetLastMonth()
 {
     QDateTime fromDT = getFromDateTime();
@@ -247,6 +281,9 @@ void DateTimeFilterWidget::setPresetLastMonth()
         emit filterChanged();
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
 void DateTimeFilterWidget::setPresetThisYear()
 {
     QDateTime fromDT = getFromDateTime();
@@ -270,6 +307,9 @@ void DateTimeFilterWidget::setPresetThisYear()
         emit filterChanged();
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
 void DateTimeFilterWidget::setPresetLastYear()
 {
     QDateTime fromDT = getFromDateTime();
@@ -294,10 +334,12 @@ void DateTimeFilterWidget::setPresetLastYear()
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 void DateTimeFilterWidget::fromChanged()
 {
-    QDateTime fromDT = getFromDateTime();
-    QDateTime toDT = getToDateTime();
+    //QDateTime fromDT = getFromDateTime();
+    //QDateTime toDT = getToDateTime();
 
     QDateTime value = m_ui.from->dateTime();
     if (value >= m_ui.to->dateTime())
@@ -314,10 +356,13 @@ void DateTimeFilterWidget::fromChanged()
         emit filterChanged();
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
 void DateTimeFilterWidget::toChanged()
 {
-    QDateTime fromDT = getFromDateTime();
-    QDateTime toDT = getToDateTime();
+    //QDateTime fromDT = getFromDateTime();
+    //QDateTime toDT = getToDateTime();
 
     QDateTime value = m_ui.to->dateTime();
     if (value <= m_ui.from->dateTime())
@@ -347,7 +392,7 @@ void DateTimeFilterWidget::loadSettings()
     m_emitSignal = false;
 
     m_ui.usePreset->setChecked(settings.value("filter/dateTimeFilter/usePreset", true).toBool());
-    m_ui.preset->setCurrentIndex(settings.value("filter/dateTimeFilter/preset", 0).toUInt());
+    m_ui.preset->setCurrentIndex(settings.value("filter/dateTimeFilter/preset", 0).toInt());
     if (!m_ui.usePreset->isChecked())
     {
         m_ui.from->setDateTime(QDateTime::fromTime_t(settings.value("filter/dateTimeFilter/from", QDateTime::currentDateTime().toTime_t()).toUInt()));
@@ -372,3 +417,6 @@ void DateTimeFilterWidget::saveSettings()
     settings.setValue("filter/dateTimeFilter/from", m_ui.from->dateTime().toTime_t());
     settings.setValue("filter/dateTimeFilter/to", m_ui.to->dateTime().toTime_t());
 }
+
+////////////////////////////////////////////////////////////////////////////////
+

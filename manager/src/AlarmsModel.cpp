@@ -8,8 +8,7 @@ static std::array<const char*, 8> s_headerNames = {"Id", "Name", "Temperature", 
 //////////////////////////////////////////////////////////////////////////
 
 AlarmsModel::AlarmsModel(DB& db)
-    : QAbstractItemModel()
-    , m_db(db)
+    : m_db(db)
 {
 }
 
@@ -35,11 +34,11 @@ QModelIndex AlarmsModel::index(int row, int column, QModelIndex const& parent) c
 {
     if (row < 0 || column < 0)
     {
-        return QModelIndex();
+        return {};
     }
     if (!hasIndex(row, column, parent))
     {
-        return QModelIndex();
+        return {};
     }
     return createIndex(row, column, nullptr);
 }
@@ -59,10 +58,7 @@ int AlarmsModel::rowCount(QModelIndex const& index) const
     {
         return static_cast<int>(m_db.getAlarmCount());
     }
-    else
-    {
-        return 0;
-    }
+    return 0;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -80,7 +76,7 @@ QVariant AlarmsModel::headerData(int section, Qt::Orientation orientation, int r
     {
         if (static_cast<size_t>(section) < s_headerNames.size())
         {
-            return s_headerNames[section];
+            return s_headerNames[static_cast<size_t>(section)];
         }
     }
     return QAbstractItemModel::headerData(section, orientation, role);
@@ -100,7 +96,7 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
         return QVariant();
     }
 
-    DB::Alarm const& alarm = m_db.getAlarm(index.row());
+    DB::Alarm const& alarm = m_db.getAlarm(static_cast<size_t>(index.row()));
     DB::AlarmDescriptor const& descriptor = alarm.descriptor;
 
     Column column = static_cast<Column>(index.column());

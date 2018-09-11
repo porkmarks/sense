@@ -124,7 +124,7 @@ void Manager::checkIfAdminExists()
                 int32_t userIndex = m_settings.findUserIndexByName(user.descriptor.name);
                 if (userIndex >= 0)
                 {
-                    m_settings.setLoggedInUserId(m_settings.getUser(userIndex).id);
+                    m_settings.setLoggedInUserId(m_settings.getUser(static_cast<size_t>(userIndex)).id);
                 }
                 else
                 {
@@ -171,8 +171,8 @@ void Manager::login()
             int result = dialog.exec();
             if (result == QDialog::Accepted)
             {
-                int32_t userIndex = m_settings.findUserIndexByName(ui.username->text().toUtf8().data());
-                if (userIndex < 0)
+                int32_t _userIndex = m_settings.findUserIndexByName(ui.username->text().toUtf8().data());
+                if (_userIndex < 0)
                 {
                     attempts++;
                     s_logger.logCritical(QString("Invalid login credentials (user not found), attempt %1").arg(attempts).toUtf8().data());
@@ -180,6 +180,7 @@ void Manager::login()
                     continue;
                 }
 
+                size_t userIndex = static_cast<size_t>(_userIndex);
                 Settings::User const& user = m_settings.getUser(userIndex);
 
                 Crypt crypt;
@@ -213,13 +214,14 @@ void Manager::login()
 
 void Manager::userLoggedIn(Settings::UserId id)
 {
-    int32_t index = m_settings.findUserIndexById(id);
-    if (index < 0)
+    int32_t _index = m_settings.findUserIndexById(id);
+    if (_index < 0)
     {
         setWindowTitle("Manager (Not Logged In");
     }
     else
     {
+        size_t index = static_cast<size_t>(_index);
         Settings::User const& user = m_settings.getUser(index);
         setWindowTitle(QString("Manager (%1)").arg(user.descriptor.name.c_str()));
     }
@@ -247,14 +249,15 @@ void Manager::tabChanged()
 
 void Manager::activateBaseStation(Settings::BaseStationId id)
 {
-    int32_t index = m_settings.findBaseStationIndexById(id);
-    if (index < 0)
+    int32_t _index = m_settings.findBaseStationIndexById(id);
+    if (_index < 0)
     {
         s_logger.logCritical("Tried to activate an inexisting base station");
         assert(false);
         return;
     }
 
+    size_t index = static_cast<size_t>(_index);
     Settings::BaseStation const& bs = m_settings.getBaseStation(index);
     DB& db = m_settings.getBaseStationDB(index);
 
@@ -279,14 +282,15 @@ void Manager::activateBaseStation(Settings::BaseStationId id)
 
 void Manager::deactivateBaseStation(Settings::BaseStationId id)
 {
-    int32_t index = m_settings.findBaseStationIndexById(id);
-    if (index < 0)
+    int32_t _index = m_settings.findBaseStationIndexById(id);
+    if (_index < 0)
     {
         s_logger.logCritical("Tried to deactivate an inexisting base station");
         assert(false);
     }
     else
     {
+        size_t index = static_cast<size_t>(_index);
         Settings::BaseStation const& bs = m_settings.getBaseStation(index);
         s_logger.logInfo(QString("Deactivated base station '%1' / %2").arg(bs.descriptor.name.c_str()).arg(getMacStr(bs.descriptor.mac).c_str()).toUtf8().data());
     }

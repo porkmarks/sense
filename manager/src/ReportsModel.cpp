@@ -96,12 +96,13 @@ QVariant ReportsModel::data(QModelIndex const& index, int role) const
         return QVariant();
     }
 
-    if (static_cast<size_t>(index.row()) >= m_db.getReportCount())
+    size_t indexRow = static_cast<size_t>(index.row());
+    if (indexRow >= m_db.getReportCount())
     {
         return QVariant();
     }
 
-    DB::Report const& report = m_db.getReport(index.row());
+    DB::Report const& report = m_db.getReport(indexRow);
     DB::ReportDescriptor const& descriptor = report.descriptor;
 
     Column column = static_cast<Column>(index.column());

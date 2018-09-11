@@ -76,14 +76,15 @@ void SettingsWidget::shutdown()
 
 void SettingsWidget::initBaseStation(Settings::BaseStationId id)
 {
-    int32_t index = m_settings->findBaseStationIndexById(id);
-    if (index < 0)
+    int32_t _index = m_settings->findBaseStationIndexById(id);
+    if (_index < 0)
     {
         assert(false);
         return;
     }
 
     //Settings::BaseStation const& bs = m_settings->getBaseStation(index);
+    size_t index = static_cast<size_t>(_index);
     DB& db = m_settings->getBaseStationDB(index);
     m_db = &db;
     m_ui.reportsWidget->init(*m_settings, db);
@@ -256,7 +257,7 @@ void SettingsWidget::sendTestEmail()
 
         step = 0;
 
-        connect(&smtp, &SmtpClient::smtpError, [this, &errorMessageMutex, &errorMessage, &step](SmtpClient::SmtpError error)
+        connect(&smtp, &SmtpClient::smtpError, [&errorMessageMutex, &errorMessage, &step](SmtpClient::SmtpError error)
         {
             switch (error)
             {

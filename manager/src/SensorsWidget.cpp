@@ -133,13 +133,14 @@ void SensorsWidget::unbindSensor()
 
     QModelIndex mi = m_sortingModel.index(selected.at(0).row(), static_cast<int>(SensorsModel::Column::Id));
     DB::SensorId id = m_sortingModel.data(mi).toUInt();
-    int32_t index = m_db->findSensorIndexById(id);
-    if (index < 0)
+    int32_t _index = m_db->findSensorIndexById(id);
+    if (_index < 0)
     {
         QMessageBox::critical(this, "Error", "Invalid sensor selected.");
         return;
     }
 
+    size_t index = static_cast<size_t>(_index);
     DB::Sensor const& sensor = m_db->getSensor(index);
 
     int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete sensor '%1'").arg(sensor.descriptor.name.c_str()));
@@ -157,13 +158,14 @@ void SensorsWidget::configureSensor(QModelIndex const& index)
 {
     QModelIndex mi = m_sortingModel.index(index.row(), static_cast<int>(SensorsModel::Column::Id));
     DB::SensorId id = m_sortingModel.data(mi).toUInt();
-    int32_t sensorIndex = m_db->findSensorIndexById(id);
-    if (sensorIndex < 0)
+    int32_t _sensorIndex = m_db->findSensorIndexById(id);
+    if (_sensorIndex < 0)
     {
         QMessageBox::critical(this, "Error", "Invalid sensor selected.");
         return;
     }
 
+    size_t sensorIndex = static_cast<size_t>(_sensorIndex);
     DB::Sensor sensor = m_db->getSensor(sensorIndex);
 
     while (true)

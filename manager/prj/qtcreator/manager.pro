@@ -127,7 +127,8 @@ HEADERS += \
     ../../src/SensorsFilterWidget.h \
     ../../../sensor/firmware/CRC.h \
     ../../../sensor/firmware/Data_Defs.h \
-    ../../src/SensorsConfigDialog.h
+    ../../src/SensorsConfigDialog.h \
+    ../../src/qcustomplot.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -181,7 +182,8 @@ SOURCES += \
     ../../src/StackWalker.cpp \
     ../../src/SensorsFilterWidget.cpp \
     ../../../sensor/firmware/CRC.cpp \
-    ../../src/SensorsConfigDialog.cpp
+    ../../src/SensorsConfigDialog.cpp \
+    ../../src/qcustomplot.cpp
 
 FORMS += \
     ../../src/Manager.ui \

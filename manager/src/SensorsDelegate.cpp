@@ -5,6 +5,8 @@
 #include <QIcon>
 #include <QPainter>
 #include <QDateTime>
+#include <QApplication>
+
 #include <cassert>
 
 extern float getBatteryLevel(float vcc);

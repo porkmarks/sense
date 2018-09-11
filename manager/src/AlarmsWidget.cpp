@@ -83,12 +83,13 @@ void AlarmsWidget::setRW()
 
 void AlarmsWidget::configureAlarm(QModelIndex const& index)
 {
-    if (!index.isValid() || static_cast<size_t>(index.row()) >= m_db->getAlarmCount())
+    size_t indexRow = static_cast<size_t>(index.row());
+    if (!index.isValid() || indexRow >= m_db->getAlarmCount())
     {
         return;
     }
 
-    DB::Alarm alarm = m_db->getAlarm(index.row());
+    DB::Alarm alarm = m_db->getAlarm(indexRow);
 
     ConfigureAlarmDialog dialog(*m_db);
     dialog.setAlarm(alarm);
@@ -135,13 +136,14 @@ void AlarmsWidget::removeAlarms()
 
     QModelIndex mi = m_model->index(selected.at(0).row(), static_cast<int>(AlarmsModel::Column::Id));
     DB::AlarmId id = m_model->data(mi).toUInt();
-    int32_t index = m_db->findAlarmIndexById(id);
-    if (index < 0)
+    int32_t _index = m_db->findAlarmIndexById(id);
+    if (_index < 0)
     {
         QMessageBox::critical(this, "Error", "Invalid alarm selected.");
         return;
     }
 
+    size_t index = static_cast<size_t>(_index);
     DB::Alarm const& alarm = m_db->getAlarm(index);
 
     int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete alarm '%1'").arg(alarm.descriptor.name.c_str()));
