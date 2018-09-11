@@ -1,5 +1,6 @@
 #include "PlotWidget.h"
 #include <QSettings>
+#include <array>
 
 #include "ExportPicDialog.h"
 #include "ExportDataDialog.h"
@@ -8,7 +9,7 @@
 #include "ui_SensorsFilterDialog.h"
 
 
-static uint32_t k_colors[256] =
+static std::array<uint32_t, 128> k_colors =
 {
     0xFF000000, 0xFFFFFF00, 0xFF1CE6FF, 0xFFFF34FF, 0xFFFF4A46, 0xFF008941, 0xFF006FA6, 0xFFA30059,
     0xFFFFDBE5, 0xFF7A4900, 0xFF0000A6, 0xFF63FFAC, 0xFFB79762, 0xFF004D43, 0xFF8FB0FF, 0xFF997D87,
@@ -515,7 +516,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
     }
 
     uint8_t temperatureColorIndex = 0;
-    uint8_t humidityColorIndex = 255;
+    uint8_t humidityColorIndex = k_colors.size() - 1;
     for (auto& pair : m_graphs)
     {
         GraphData& graphData = pair.second;
@@ -524,7 +525,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
             QCPGraph* graph = m_plot->addGraph(m_axisD, m_axisT);
             QPen pen = graph->pen();
             pen.setWidth(2);
-            pen.setColor(QColor(k_colors[temperatureColorIndex++]));
+            pen.setColor(QColor(k_colors[(temperatureColorIndex++) % k_colors.size()]));
             graph->setPen(pen);
             graph->setName(QString("%1°C").arg(graphData.sensor.descriptor.name.c_str()));
 
@@ -538,7 +539,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
             QCPGraph* graph = m_plot->addGraph(m_axisD, m_axisH);
             QPen pen = graph->pen();
             pen.setWidth(2);
-            pen.setColor(QColor(k_colors[humidityColorIndex--]));
+            pen.setColor(QColor(k_colors[(humidityColorIndex--) % k_colors.size()]));
             pen.setStyle(Qt::DotLine);
             graph->setPen(pen);
             graph->setName(QString("%1 %RH").arg(graphData.sensor.descriptor.name.c_str()));
