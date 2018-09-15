@@ -83,7 +83,7 @@ bool Comms::connectToBaseStation(DB& db, Mac const& mac)
         return false;
     }
 
-    s_logger.logVerbose(QString("Attempting to connect to BS %1").arg(getMacStr(mac).c_str()));
+    s_logger.logInfo(QString("Attempting to connect to BS %1").arg(getMacStr(mac).c_str()));
 
     InitializedBaseStation* cbsPtr = new InitializedBaseStation(db, *it);
     std::unique_ptr<InitializedBaseStation> cbs(cbsPtr);
@@ -116,7 +116,7 @@ void Comms::reconnectToBaseStation(InitializedBaseStation* cbs)
     {
         return;
     }
-    s_logger.logVerbose(QString("Attempting to reconnect to BS %1").arg(getMacStr(cbs->descriptor.mac).c_str()));
+    s_logger.logInfo(QString("Attempting to reconnect to BS %1").arg(getMacStr(cbs->descriptor.mac).c_str()));
 
     cbs->isConnecting = true;
     cbs->socketAdapter.getSocket().connectToHost(cbs->descriptor.address, 4444);
@@ -128,7 +128,7 @@ void Comms::connectedToBaseStation(InitializedBaseStation* cbs)
 {
     if (cbs)
     {
-        s_logger.logVerbose(QString("Connected to BS %1").arg(getMacStr(cbs->descriptor.mac).c_str()));
+        s_logger.logInfo(QString("Connected to BS %1").arg(getMacStr(cbs->descriptor.mac).c_str()));
 
         cbs->isConnecting = false;
         cbs->isConnected = true;

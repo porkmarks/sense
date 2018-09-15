@@ -3,6 +3,7 @@
 #include <functional>
 #include <cassert>
 #include <fstream>
+#include <sstream>
 #include <iostream>
 #include <QDateTime>
 
@@ -22,6 +23,43 @@
 extern std::string s_dataFolder;
 
 constexpr uint64_t k_fileEncryptionKey = 3452354435332256ULL;
+
+
+template <typename Stream, typename T>
+void write(Stream& s, T const& t)
+{
+    s.write(reinterpret_cast<const char*>(&t), sizeof(T));
+}
+
+template <typename Stream, typename T>
+bool read(Stream& s, T& t)
+{
+    return s.read(reinterpret_cast<char*>(&t), sizeof(T)).good();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+static uint64_t getTimePointAsMilliseconds(Logger::Clock::time_point tp)
+{
+    time_t tt = Logger::Clock::to_time_t(tp);
+    Logger::Clock::time_point tp2 = Logger::Clock::from_time_t(tt);
+
+    Logger::Clock::duration subSecondRemainder = tp - tp2;
+
+    uint64_t res = uint64_t(tt) * 1000;
+    res += static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(subSecondRemainder).count());
+
+    return res;
+}
+
+static Logger::Clock::time_point getTimePointFromMilliseconds(uint64_t ms)
+{
+    Logger::Clock::time_point tp = Logger::Clock::from_time_t(ms / 1000);
+    Logger::Clock::duration subSecondRemainder = std::chrono::milliseconds(ms % 1000);
+    return tp + subSecondRemainder;
+}
+
+//////////////////////////////////////////////////////////////////////////
 
 Logger::Logger()
 {
@@ -83,7 +121,6 @@ bool Logger::load(std::string const& name)
     std::string dataFilename = (m_dataFolder + "/" + m_dataName);
 
     Data data;
-    data.storedLogLines.reserve(8192);
 
     {
         std::string streamData;
@@ -103,63 +140,70 @@ bool Logger::load(std::string const& name)
         crypt.setKey(k_fileEncryptionKey);
         QByteArray decryptedData = crypt.decryptToByteArray(QByteArray(streamData.data(), streamData.size()));
 
-        rapidjson::Document document;
-        document.Parse(decryptedData.data(), decryptedData.size());
-        if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
+        std::stringstream stream(std::string(decryptedData.data(), decryptedData.size()));
+
+        uint64_t logsSize = 0;
+        if (!read(stream, logsSize))
         {
-            document.Parse(streamData.data(), streamData.size());
-            if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
+            stream = std::stringstream(std::string(streamData.data(), streamData.size())); //try unencrypted
+            if (!read(stream, logsSize))
             {
-                std::cerr << "Failed to open " << dataFilename << " file: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
+                std::cerr << "Failed to open " << dataFilename << " file: corrupted file (canot read log size).\n";
                 return false;
             }
         }
-        if (!document.IsArray())
+        if (logsSize > 1024 * 1024 * 1024)
         {
-            std::cerr << "Bad document.\n";
+            std::cerr << "Failed to open " << dataFilename << " file: corrupted file (logs too big: " << logsSize << " bytes).\n";
             return false;
         }
 
-        for (size_t i = 0; i < document.Size(); i++)
+        data.logs.resize(logsSize);
+        if (stream.read(reinterpret_cast<char*>(&data.logs[0]), logsSize).bad())
         {
-            StoredLogLine storedLine;
-            rapidjson::Value const& linej = document[i];
-            auto it = linej.FindMember("timestamp");
-            if (it == linej.MemberEnd() || !it->value.IsUint64())
-            {
-                std::cerr << "Bad or missing log timestamp\n";
-                return false;
-            }
-            storedLine.timePoint = Clock::time_point(std::chrono::milliseconds(it->value.GetUint64()));
+            std::cerr << "Failed to open " << dataFilename << " file. Failed to read logs: " << std::strerror(errno) << ".\n";
+            return false;
+        }
 
-            it = linej.FindMember("index");
-            if (it == linej.MemberEnd() || !it->value.IsUint64())
-            {
-                std::cerr << "Bad or missing log index\n";
-                return false;
-            }
-            storedLine.index = it->value.GetUint64();
+        uint64_t lineCount = 0;
+        if (!read(stream, lineCount))
+        {
+            std::cerr << "Failed to open " << dataFilename << " file: corrupted file (canot read line count).\n";
+            return false;
+        }
 
-            it = linej.FindMember("type");
-            if (it == linej.MemberEnd() || !it->value.IsInt())
-            {
-                std::cerr << "Bad or missing log type\n";
-                return false;
-            }
-            storedLine.type = static_cast<Type>(it->value.GetInt());
+        if (lineCount > 1024 * 1024 * 1024)
+        {
+            std::cerr << "Failed to open " << dataFilename << " file: corrupted file (too many lines: " << lineCount << ").\n";
+            return false;
+        }
 
-            it = linej.FindMember("message");
-            if (it == linej.MemberEnd() || !it->value.IsString())
-            {
-                std::cerr << "Bad or missing sensor settings name\n";
-                return false;
-            }
-            storedLine.messageOffset = data.logs.size();
-            storedLine.messageSize = it->value.GetStringLength();
-            data.logs.append(it->value.GetString(), storedLine.messageSize);
+        size_t lineSize = sizeof(StoredLogLine);
+        //std::vector<StoredLogLineOld> storedLogLinesOld;
+        //storedLogLinesOld.resize(lineCount);
 
+        data.storedLogLines.resize(lineCount);
+        if (stream.read(reinterpret_cast<char*>(data.storedLogLines.data()), data.storedLogLines.size() * lineSize).bad())
+        {
+            std::cerr << "Failed to open " << dataFilename << " file. Failed to read log lines: " << std::strerror(errno) << ".\n";
+            return false;
+        }
+
+//        for (size_t i = 0; i < lineCount; i++)
+//        {
+//            StoredLogLine& sll = data.storedLogLines[i];
+//            StoredLogLineOld& sllo = storedLogLinesOld[i];
+//            sll.timePoint = sllo.timePoint;
+//            sll.index = sllo.index;
+//            sll.type = sllo.type;
+//            sll.messageOffset = sllo.messageOffset;
+//            sll.messageSize = sllo.messageSize;
+//        }
+
+        //refresh the last log line index
+        for (const StoredLogLine& storedLine: data.storedLogLines)
+        {
             data.lastLineIndex = std::max(data.lastLineIndex, storedLine.index);
-            data.storedLogLines.push_back(storedLine);
         }
     }
 
@@ -187,7 +231,7 @@ bool Logger::load(std::string const& name)
 
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        m_mainData = data;
+        m_mainData = std::move(data);
     }
 
     std::cout << "Time to load logs:" << std::chrono::duration<float>(Clock::now() - start).count() << "s\n";
@@ -204,7 +248,7 @@ void Logger::logVerbose(std::string const& message)
 {
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        StoredLogLine storedLine {Clock::now(), ++m_mainData.lastLineIndex, Type::VERBOSE, 0, 0};
+        StoredLogLine storedLine {getTimePointAsMilliseconds(Clock::now()), ++m_mainData.lastLineIndex, Type::VERBOSE, 0, 0};
         storedLine.messageOffset = m_mainData.logs.size();
         storedLine.messageSize = message.size();
         m_mainData.logs.append(message);
@@ -238,7 +282,7 @@ void Logger::logInfo(std::string const& message)
 {
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        StoredLogLine storedLine {Clock::now(), ++m_mainData.lastLineIndex, Type::INFO, 0, 0};
+        StoredLogLine storedLine {getTimePointAsMilliseconds(Clock::now()), ++m_mainData.lastLineIndex, Type::INFO, 0, 0};
         storedLine.messageOffset = m_mainData.logs.size();
         storedLine.messageSize = message.size();
         m_mainData.logs.append(message);
@@ -272,7 +316,7 @@ void Logger::logWarning(std::string const& message)
 {
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        StoredLogLine storedLine {Clock::now(), ++m_mainData.lastLineIndex, Type::WARNING, 0, 0};
+        StoredLogLine storedLine {getTimePointAsMilliseconds(Clock::now()), ++m_mainData.lastLineIndex, Type::WARNING, 0, 0};
         storedLine.messageOffset = m_mainData.logs.size();
         storedLine.messageSize = message.size();
         m_mainData.logs.append(message);
@@ -306,7 +350,7 @@ void Logger::logCritical(std::string const& message)
 {
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        StoredLogLine storedLine {Clock::now(), ++m_mainData.lastLineIndex, Type::CRITICAL, 0, 0};
+        StoredLogLine storedLine {getTimePointAsMilliseconds(Clock::now()), ++m_mainData.lastLineIndex, Type::CRITICAL, 0, 0};
         storedLine.messageOffset = m_mainData.logs.size();
         storedLine.messageSize = message.size();
         m_mainData.logs.append(message);
@@ -343,9 +387,12 @@ std::vector<Logger::LogLine> Logger::getFilteredLogLines(Filter const& filter) c
 
     std::lock_guard<std::mutex> lg(m_mainDataMutex);
 
+    uint64_t minTimePoint = getTimePointAsMilliseconds(filter.minTimePoint);
+    uint64_t maxTimePoint = getTimePointAsMilliseconds(filter.maxTimePoint);
+
     for (StoredLogLine const& storedLine: m_mainData.storedLogLines)
     {
-        if (storedLine.timePoint < filter.minTimePoint || storedLine.timePoint > filter.maxTimePoint)
+        if (storedLine.timePoint < minTimePoint || storedLine.timePoint > maxTimePoint)
         {
             continue;
         }
@@ -359,7 +406,7 @@ std::vector<Logger::LogLine> Logger::getFilteredLogLines(Filter const& filter) c
 
         LogLine line;
         line.index = storedLine.index;
-        line.timePoint = storedLine.timePoint;
+        line.timePoint = getTimePointFromMilliseconds(storedLine.timePoint);
         line.type = storedLine.type;
         assert(storedLine.messageOffset + storedLine.messageSize <= m_mainData.logs.size());
         line.message = m_mainData.logs.substr(storedLine.messageOffset, storedLine.messageSize);
@@ -419,28 +466,24 @@ void Logger::save(Data const& data) const
     Clock::time_point start = now;
 
     {
-        rapidjson::Document document;
-        document.SetArray();
-        for (StoredLogLine const& storedLine: data.storedLogLines)
+        std::string buffer;
         {
-            rapidjson::Value linej;
-            linej.SetObject();
-            linej.AddMember("timestamp", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(storedLine.timePoint.time_since_epoch()).count()), document.GetAllocator());
-            linej.AddMember("index", storedLine.index, document.GetAllocator());
-            linej.AddMember("type", static_cast<int>(storedLine.type), document.GetAllocator());
+            std::stringstream stream;
+            //write the log text
+            write(stream, static_cast<uint64_t>(data.logs.size()));
+            stream.write(reinterpret_cast<const char*>(data.logs.data()), data.logs.size());
 
-            linej.AddMember("message", rapidjson::Value(data.logs.data() + storedLine.messageOffset, storedLine.messageSize), document.GetAllocator());
-            document.PushBack(linej, document.GetAllocator());
+            //write the log lines
+            write(stream, static_cast<uint64_t>(data.storedLogLines.size()));
+            stream.write(reinterpret_cast<const char*>(data.storedLogLines.data()), data.storedLogLines.size() * sizeof(StoredLogLine));
+
+            buffer = stream.str();
         }
-
-        rapidjson::StringBuffer buffer;
-        rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
-        document.Accept(writer);
 
         Crypt crypt;
         crypt.setKey(k_fileEncryptionKey);
         crypt.setCompressionLevel(1);
-        QByteArray encryptedData = crypt.encryptToByteArray(QByteArray(buffer.GetString(), buffer.GetSize()));
+        QByteArray encryptedData = crypt.encryptToByteArray(QByteArray(buffer.data(), buffer.size()));
 //        QByteArray encryptedData = QByteArray(buffer.GetString(), buffer.GetSize());
 
         std::string tempFilename = (m_dataFolder + "/" + m_dataName + "_temp");

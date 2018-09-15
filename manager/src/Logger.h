@@ -22,7 +22,7 @@ public:
     bool create(std::string const& name);
     bool load(std::string const& name);
 
-    enum class Type
+    enum class Type : uint8_t
     {
         VERBOSE,
         INFO,
@@ -72,20 +72,34 @@ signals:
 
 private:
 
+
+#pragma pack(push, 1) // exact fit - no padding
+
     struct StoredLogLine
     {
-        Clock::time_point timePoint;
+        uint64_t timePoint; //milliseconds
+        uint32_t index;
+        Type type;
+        uint32_t messageOffset;
+        uint32_t messageSize;
+    };
+
+    struct StoredLogLineOld
+    {
+        uint64_t timePoint; //milliseconds
         uint64_t index;
         Type type;
         size_t messageOffset;
         size_t messageSize;
     };
 
+#pragma pack(pop) // exact fit - no padding
+
     struct Data
     {
         std::string logs;
         std::vector<StoredLogLine> storedLogLines;
-        uint64_t lastLineIndex = 0;
+        uint32_t lastLineIndex = 0;
     };
 
     mutable std::mutex m_mainDataMutex;

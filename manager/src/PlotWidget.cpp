@@ -84,7 +84,16 @@ void PlotWidget::shutdown()
     saveSettings();
 
     setEnabled(false);
+
+    clearAnnotations();
+
     m_graphs.clear();
+    delete m_plot;
+    m_plot = nullptr;
+    m_axisD = nullptr;
+    m_axisT = nullptr;
+    m_axisH = nullptr;
+
     m_db = nullptr;
 }
 
@@ -300,82 +309,85 @@ void PlotWidget::createPlotWidgets()
     clearAnnotations();
 
     m_graphs.clear();
-    delete m_plot;
-    m_axisD = nullptr;
-    m_axisT = nullptr;
-    m_axisH = nullptr;
-
-    if (m_ui.plot->layout() != nullptr)
-    {
-        QLayoutItem* item;
-        while ((item = m_ui.plot->layout()->takeAt(0)) != nullptr)
-        {
-            delete item->widget();
-            delete item;
-        }
-    }
-
-
-    m_plot = new QCustomPlot(m_ui.plot);
-    //m_plot->setInteractions(QCP::Interactions(QCP::Interaction::iSelectItems | QCP::Interaction::iSelectLegend));
 
     QFont font;
     font.setPointSize(8);
 
+    if (!m_plot)
     {
-        m_axisD = m_plot->xAxis;
-        m_axisD->setTickLabelFont(font);
-        m_axisD->setLabel("Date");
-        QSharedPointer<QCPAxisTickerDateTime> dateTicker(new QCPAxisTickerDateTime);
-        dateTicker->setDateTimeFormat("dd-MMM-yy h:mm");
-        dateTicker->setTickStepStrategy(QCPAxisTicker::TickStepStrategy::tssReadability);
-        dateTicker->setTickCount(10);
-        m_axisD->setTicker(dateTicker);
-        m_axisD->setTicks(true);
-        m_axisD->setVisible(true);
+        m_plot = new QCustomPlot(m_ui.plot);
+        //m_plot->setInteractions(QCP::Interactions(QCP::Interaction::iSelectItems | QCP::Interaction::iSelectLegend));
+
+        {
+            m_axisD = m_plot->xAxis;
+            m_axisD->setTickLabelFont(font);
+            m_axisD->setLabel("Date");
+            QSharedPointer<QCPAxisTickerDateTime> dateTicker(new QCPAxisTickerDateTime);
+            dateTicker->setDateTimeFormat("dd-MMM-yy h:mm");
+            dateTicker->setTickStepStrategy(QCPAxisTicker::TickStepStrategy::tssReadability);
+            dateTicker->setTickCount(10);
+            m_axisD->setTicker(dateTicker);
+            m_axisD->setTicks(true);
+            m_axisD->setVisible(true);
+        }
+        {
+            m_plot->yAxis->setTickLabelFont(font);
+            m_plot->yAxis->setLabel(u8"°C");
+            m_plot->yAxis->setNumberFormat("gb");
+            m_plot->yAxis->ticker()->setTickStepStrategy(QCPAxisTicker::TickStepStrategy::tssReadability);
+            m_plot->yAxis->ticker()->setTickCount(20);
+            m_plot->yAxis->setTicks(true);
+        }
+        {
+            m_plot->yAxis2->setTickLabelFont(font);
+            m_plot->yAxis2->setLabel(u8"%RH");
+            m_plot->yAxis2->setNumberFormat("gb");
+            m_plot->yAxis2->ticker()->setTickStepStrategy(QCPAxisTicker::TickStepStrategy::tssReadability);
+            m_plot->yAxis2->ticker()->setTickCount(20);
+            m_plot->yAxis2->setTicks(true);
+        }
+
+        {
+            m_plot->legend->setVisible(true);
+            QFont legendFont;  // start out with MainWindow's font..
+            legendFont.setPointSize(9); // and make a bit smaller for legend
+            m_plot->legend->setFont(legendFont);
+            m_plot->legend->setBrush(QBrush(QColor(255, 255, 255, 230)));
+            // by default, the legend is in the inset layout of the main axis rect. So this is how we access it to change legend placement:
+            //m_plot->axisRect()->insetLayout()->setInsetAlignment(0, Qt::AlignTop|Qt::AlignRight);
+
+            QCPLayoutGrid *subLayout = new QCPLayoutGrid;
+            m_plot->plotLayout()->addElement(0, 1, subLayout);
+            subLayout->addElement(0, 0, new QCPLayoutElement);
+            subLayout->addElement(1, 0, m_plot->legend);
+            subLayout->addElement(2, 0, new QCPLayoutElement);
+            m_plot->plotLayout()->setColumnStretchFactor(1, 0.001);
+        }
+
+        m_ui.plot->layout()->addWidget(m_plot);
     }
+
     if (m_ui.showTemperature->isChecked())
     {
         m_axisT = m_plot->yAxis;
-        m_axisT->setTickLabelFont(font);
-        m_axisT->setLabel(u8"°C");
-        m_axisT->setNumberFormat("%.1f");
-        m_axisT->ticker()->setTickStepStrategy(QCPAxisTicker::TickStepStrategy::tssReadability);
-        m_axisT->ticker()->setTickCount(20);
-        m_axisT->setTicks(true);
         m_axisT->setVisible(true);
     }
     else
     {
+        m_axisT = nullptr;
         m_plot->yAxis->setVisible(false);
     }
+
     if (m_ui.showHumidity->isChecked())
     {
         m_axisH = m_plot->yAxis2;
-        m_axisH->setTickLabelFont(font);
-        m_axisH->setLabel(u8"%RH");
-        m_axisH->setNumberFormat("%.1f");
-        m_axisH->ticker()->setTickStepStrategy(QCPAxisTicker::TickStepStrategy::tssReadability);
-        m_axisH->ticker()->setTickCount(20);
-        m_axisH->setTicks(true);
         m_axisH->setVisible(true);
     }
     else
     {
+        m_axisH = nullptr;
         m_plot->yAxis2->setVisible(false);
     }
-
-    {
-        m_plot->legend->setVisible(true);
-        QFont legendFont;  // start out with MainWindow's font..
-        legendFont.setPointSize(9); // and make a bit smaller for legend
-        m_plot->legend->setFont(legendFont);
-        m_plot->legend->setBrush(QBrush(QColor(255, 255, 255, 230)));
-        // by default, the legend is in the inset layout of the main axis rect. So this is how we access it to change legend placement:
-        m_plot->axisRect()->insetLayout()->setInsetAlignment(0, Qt::AlignTop|Qt::AlignRight);
-    }
-
-    m_ui.plot->layout()->addWidget(m_plot);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -479,7 +491,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         }
     }
 
-    m_axisD->setRange(minTS, maxTS);
+    m_axisD->setRange(m_ui.dateTimeFilter->getFromDateTime().toTime_t(), m_ui.dateTimeFilter->getToDateTime().toTime_t());
 
     if (m_fitMeasurements)
     {
@@ -664,7 +676,7 @@ void PlotWidget::showAnnotation(const QPointF& pos)
             double dx = pos.x() - x;
             double dy = pos.y() - y;
             double distance = std::sqrt(dx*dx + dy*dy);
-            if (distance < bestDistance)
+            if (distance < bestDistance && distance < 50.0)
             {
                 key = it->key;
                 value = it->value;

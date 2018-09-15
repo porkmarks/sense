@@ -69,7 +69,7 @@ QIcon getSignalIcon(int8_t dBm)
 MeasurementsModel::MeasurementsModel(DB& db)
     : m_db(db)
 {
-    m_refreshTimer = new QTimer();
+    m_refreshTimer = new QTimer(this);
     m_refreshTimer->setSingleShot(true);
 
     connect(&db, &DB::measurementsAdded, this, &MeasurementsModel::startAutoRefresh);

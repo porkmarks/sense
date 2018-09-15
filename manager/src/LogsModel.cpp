@@ -13,7 +13,7 @@ static std::array<const char*, 3> s_headerNames = {"Timestamp", "Type", "Message
 LogsModel::LogsModel(Logger& logger)
     : m_logger(logger)
 {
-    m_refreshTimer = new QTimer();
+    m_refreshTimer = new QTimer(this);
     m_refreshTimer->setSingleShot(true);
 
     connect(&logger, &Logger::logLinesAdded, this, &LogsModel::startAutoRefreshLogLines);
