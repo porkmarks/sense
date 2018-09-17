@@ -4,6 +4,7 @@
 #include <memory>
 #include <set>
 #include <QWidget>
+
 #include "qcustomplot.h"
 
 #include "PlotToolTip.h"
@@ -79,6 +80,8 @@ private:
 //    QChartView* m_chartView = nullptr;
 
     QCustomPlot* m_plot = nullptr;
+    QCPLayer* m_graphsLayer = nullptr;
+    QCPLayer* m_annotationsLayer = nullptr;
     QCPAxis* m_axisD = nullptr;
     QCPAxis* m_axisT = nullptr;
     QCPAxis* m_axisH = nullptr;

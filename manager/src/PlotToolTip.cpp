@@ -3,8 +3,9 @@
 #include <QtGui/QFontMetrics>
 #include <QtGui/QMouseEvent>
 
-PlotToolTip::PlotToolTip(QCustomPlot* plot)
+PlotToolTip::PlotToolTip(QCustomPlot* plot, QCPLayer* layer)
     : m_plot(plot)
+    , m_layer(layer)
 {
 }
 
@@ -230,6 +231,7 @@ void PlotToolTip::updateGeometry()
     if (!m_textLabel)
     {
         m_textLabel = new QCPItemText(m_plot);
+        m_textLabel->setLayer(m_layer);
         m_textLabel->setPositionAlignment(Qt::AlignTop|Qt::AlignHCenter);
         m_textLabel->position->setType(QCPItemPosition::ptAbsolute);
         m_textLabel->setPen(QPen(Qt::black)); // show black border around text
@@ -243,6 +245,7 @@ void PlotToolTip::updateGeometry()
     if (!m_arrow)
     {
         m_arrow = new QCPItemLine(m_plot);
+        m_arrow->setLayer(m_layer);
         m_arrow->setHead(QCPLineEnding::esSpikeArrow);
         m_arrow->setClipToAxisRect(false);
     }
@@ -306,6 +309,7 @@ void PlotToolTip::refreshCloseBox()
     if (!m_closeBox)
     {
         m_closeBox = new QCPItemText(m_plot);
+        m_closeBox->setLayer(m_layer);
         m_closeBox->setPositionAlignment(Qt::AlignTop|Qt::AlignRight);
         m_closeBox->position->setType(QCPItemPosition::ptAbsolute);
         m_closeBox->setPen(QPen(Qt::black)); // show black border around text

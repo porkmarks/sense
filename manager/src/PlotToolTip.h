@@ -9,7 +9,7 @@ class PlotToolTip : public QObject
 {
     Q_OBJECT
 public:
-    PlotToolTip(QCustomPlot* plot);
+    PlotToolTip(QCustomPlot* plot, QCPLayer* layer);
     ~PlotToolTip();
 
     bool mousePressed(QCPAbstractItem* item, const QPointF& pos);
@@ -37,6 +37,7 @@ private:
     void setTextLabelPosition(const QPointF& pos);
 
     QCustomPlot* m_plot = nullptr;
+    QCPLayer* m_layer = nullptr;
 
     bool m_isFixed = false;
 

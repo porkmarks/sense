@@ -1172,7 +1172,7 @@ void QCPLayer::drawToPaintBuffer()
 */
 void QCPLayer::replot()
 {
-  if (mMode == lmBuffered && !mParentPlot->hasInvalidatedPaintBuffers())
+  if (mMode == lmBuffered/* && !mParentPlot->hasInvalidatedPaintBuffers()*/)
   {
     if (!mPaintBuffer.isNull())
     {

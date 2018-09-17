@@ -298,7 +298,7 @@ void PlotWidget::clearAnnotations()
     m_ui.clearAnnotations->setEnabled(false);
     if (m_plot)
     {
-        m_plot->replot();
+        m_annotationsLayer->replot();
     }
 }
 
@@ -316,6 +316,22 @@ void PlotWidget::createPlotWidgets()
     if (!m_plot)
     {
         m_plot = new QCustomPlot(m_ui.plot);
+        //m_plot->setOpenGl(true);
+
+        bool ok = m_plot->addLayer("graphs");
+        Q_ASSERT(ok);
+        m_graphsLayer = m_plot->layer("graphs");
+        Q_ASSERT(m_graphsLayer);
+        m_graphsLayer->setMode(QCPLayer::lmBuffered);
+
+        ok = m_plot->addLayer("annotations");
+        Q_ASSERT(ok);
+        m_annotationsLayer = m_plot->layer("annotations");
+        Q_ASSERT(m_annotationsLayer);
+        m_annotationsLayer->setMode(QCPLayer::lmBuffered);
+
+        m_plot->setCurrentLayer(m_graphsLayer);
+
         //m_plot->setInteractions(QCP::Interactions(QCP::Interaction::iSelectItems | QCP::Interaction::iSelectLegend));
 
         {
@@ -528,16 +544,24 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
     }
 
     uint8_t temperatureColorIndex = 0;
-    uint8_t humidityColorIndex = k_colors.size() - 1;
+    //uint8_t humidityColorIndex = k_colors.size() - 1;
     for (auto& pair : m_graphs)
     {
+        QColor color(k_colors[(temperatureColorIndex++) % k_colors.size()]);
+        double brightness = (0.2126*color.redF() + 0.7152*color.greenF() + 0.0722*color.blueF());
+        if (brightness > 0.8) //make sure the color is not too bright
+        {
+            color.setHslF(color.hueF(), color.saturationF(), 0.4);
+        }
+
         GraphData& graphData = pair.second;
         if (m_axisT)
         {
             QCPGraph* graph = m_plot->addGraph(m_axisD, m_axisT);
+            graph->setLayer(m_graphsLayer);
             QPen pen = graph->pen();
             pen.setWidth(2);
-            pen.setColor(QColor(k_colors[(temperatureColorIndex++) % k_colors.size()]));
+            pen.setColor(color);
             graph->setPen(pen);
             graph->setName(QString("%1°C").arg(graphData.sensor.descriptor.name.c_str()));
 
@@ -549,9 +573,10 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         if (m_axisH)
         {
             QCPGraph* graph = m_plot->addGraph(m_axisD, m_axisH);
+            graph->setLayer(m_graphsLayer);
             QPen pen = graph->pen();
             pen.setWidth(2);
-            pen.setColor(QColor(k_colors[(humidityColorIndex--) % k_colors.size()]));
+            pen.setColor(color);
             pen.setStyle(Qt::DotLine);
             graph->setPen(pen);
             graph->setName(QString("%1 %RH").arg(graphData.sensor.descriptor.name.c_str()));
@@ -563,6 +588,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         }
     }
 
+    m_graphsLayer->replot();
     m_plot->replot();
 
     connect(m_plot, &QCustomPlot::mousePress, this, &PlotWidget::mousePressEvent);
@@ -642,7 +668,7 @@ void PlotWidget::mouseMoveEvent(QMouseEvent* event)
             m_annotation.reset();
         }
     }
-    m_plot->replot();
+    m_annotationsLayer->replot();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -734,7 +760,7 @@ void PlotWidget::keepAnnotation()
             if (it != m_annotations.end())
             {
                 m_annotations.erase(it);
-                m_plot->replot();
+                m_annotationsLayer->replot();
             }
         });
 
@@ -743,7 +769,7 @@ void PlotWidget::keepAnnotation()
 
         //m_annotation.reset(new PlotToolTip(m_chart));
     }
-    m_plot->replot();
+    m_annotationsLayer->replot();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -752,7 +778,7 @@ void PlotWidget::createAnnotation(QCPGraph* graph, QPointF point, double key, do
 {
     if (m_annotation == nullptr)
     {
-        m_annotation.reset(new PlotToolTip(m_plot));
+        m_annotation.reset(new PlotToolTip(m_plot, m_annotationsLayer));
     }
 
     if (state)

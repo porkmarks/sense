@@ -55,6 +55,8 @@ rpi {
     }
 }
 
+#DEFINES += QCUSTOMPLOT_USE_OPENGL
+
 win32-msvc* {
     QMAKE_LFLAGS_RELEASE += /MAP
     QMAKE_CFLAGS_RELEASE += /Zi
