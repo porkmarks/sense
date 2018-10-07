@@ -7,6 +7,7 @@
 #include <condition_variable>
 #include <QString>
 #include <QObject>
+#include <QTimer>
 
 class Logger : public QObject
 {
@@ -18,6 +19,8 @@ public:
     typedef std::chrono::system_clock Clock;
 
     void shutdown();
+
+    void process();
 
     bool create(std::string const& name);
     bool load(std::string const& name);
@@ -71,7 +74,8 @@ signals:
     void logLinesAdded();
 
 private:
-
+    void triggerSave();
+    void triggerDelayedSave(Clock::duration i_dt);
 
 #pragma pack(push, 1) // exact fit - no padding
 
@@ -107,7 +111,6 @@ private:
 
     std::atomic_bool m_threadsExit = { false };
 
-    void triggerSave();
     void storeThreadProc();
     void save(Data const& data) const;
     std::atomic_bool m_storeThreadTriggered = { false };
@@ -121,5 +124,9 @@ private:
 
     mutable Clock::time_point m_lastDailyBackupTP = Clock::time_point(Clock::duration::zero());
     mutable Clock::time_point m_lastWeeklyBackupTP = Clock::time_point(Clock::duration::zero());
+
+    std::mutex m_delayedTriggerSaveMutex;
+    bool m_delayedTriggerSave = false;
+    Clock::time_point m_delayedTriggerSaveTP;
 };
 

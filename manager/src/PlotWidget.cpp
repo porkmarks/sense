@@ -332,7 +332,8 @@ void PlotWidget::createPlotWidgets()
 
         m_plot->setCurrentLayer(m_graphsLayer);
 
-        //m_plot->setInteractions(QCP::Interactions(QCP::Interaction::iSelectItems | QCP::Interaction::iSelectLegend));
+        //m_plot->setInteractions(QCP::Interactions(QCP::Interaction::iSelectLegend));
+        connect(m_plot, &QCustomPlot::legendClick, this, &PlotWidget::legendSelectionChanged);
 
         {
             m_axisD = m_plot->xAxis;
@@ -372,12 +373,14 @@ void PlotWidget::createPlotWidgets()
             // by default, the legend is in the inset layout of the main axis rect. So this is how we access it to change legend placement:
             //m_plot->axisRect()->insetLayout()->setInsetAlignment(0, Qt::AlignTop|Qt::AlignRight);
 
-            QCPLayoutGrid *subLayout = new QCPLayoutGrid;
-            m_plot->plotLayout()->addElement(0, 1, subLayout);
-            subLayout->addElement(0, 0, new QCPLayoutElement);
-            subLayout->addElement(1, 0, m_plot->legend);
-            subLayout->addElement(2, 0, new QCPLayoutElement);
+            m_legendLayout = new QCPLayoutGrid;
+            m_plot->plotLayout()->addElement(0, 1, m_legendLayout);
+            m_legendLayout->addElement(0, 0, new QCPLayoutElement);
+            m_legendLayout->addElement(1, 0, m_plot->legend);
+            m_legendLayout->addElement(2, 0, new QCPLayoutElement);
             m_plot->plotLayout()->setColumnStretchFactor(1, 0.001);
+
+            m_plot->legend->setSelectableParts(QCPLegend::spItems);
         }
 
         m_ui.plot->layout()->addWidget(m_plot);
@@ -882,6 +885,28 @@ void PlotWidget::handleMarkerClicked()
 
 //////////////////////////////////////////////////////////////////////////
 
+void PlotWidget::legendSelectionChanged(QCPLegend* l, QCPAbstractLegendItem* ai, QMouseEvent* me)
+{
+    Q_UNUSED(me);
+
+    if (QCPPlottableLegendItem* legendItem = dynamic_cast<QCPPlottableLegendItem*>(ai))
+    {
+        QCPAbstractPlottable* plottable = legendItem->plottable();
+        if (plottable)
+        {
+            plottable->setVisible(!plottable->visible());
+
+            QFont font = legendItem->font();
+            font.setItalic(!plottable->visible());
+            legendItem->setFont(font);
+
+            m_plot->replot();
+        }
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 QSize PlotWidget::getPlotSize() const
 {
     return m_plot->size();
@@ -889,18 +914,33 @@ QSize PlotWidget::getPlotSize() const
 
 //////////////////////////////////////////////////////////////////////////
 
-void PlotWidget::saveToPng(const QString& fileName, bool showLegend)
+void PlotWidget::saveToPng(const QString& fileName, bool showLegend, bool showAnnotations)
 {
     if (m_annotation)
     {
         m_annotation->setVisible(false);
     }
+
+    for (std::unique_ptr<PlotToolTip>& annotation: m_annotations)
+    {
+        annotation->setVisible(showAnnotations);
+    }
+
     m_plot->legend->setVisible(showLegend);
+    m_plot->plotLayout()->take(m_legendLayout);
+
     m_plot->savePng(fileName);
+
+    m_plot->plotLayout()->addElement(0, 1, m_legendLayout);
     m_plot->legend->setVisible(true);
+
     if (m_annotation)
     {
         m_annotation->setVisible(true);
+    }
+    for (std::unique_ptr<PlotToolTip>& annotation: m_annotations)
+    {
+        annotation->setVisible(true);
     }
 }
 

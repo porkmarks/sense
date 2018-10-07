@@ -28,6 +28,7 @@ private slots:
     void baseStationConnected(Comms::BaseStationDescriptor const& bs);
     void baseStationDisconnected(Comms::BaseStationDescriptor const& bs);
     void activateBaseStation(QModelIndex const& index);
+    void showDisconnectionMessageBox(Settings::BaseStation const& bs, const QHostAddress& address);
 
 private:
     void setName(size_t row, std::string const& name);

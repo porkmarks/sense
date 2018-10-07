@@ -11,7 +11,7 @@
 #   define CHECK_PASSWORD
 #endif
 
-static const std::string s_version = "1.0.6";
+static const std::string s_version = "1.0.8";
 
 Logger s_logger;
 
@@ -60,7 +60,7 @@ Manager::Manager(QWidget *parent)
 
     auto* timer = new QTimer(this);
     timer->setSingleShot(false);
-    timer->start(1);
+    timer->start(10);
     connect(timer, &QTimer::timeout, this, &Manager::process, Qt::QueuedConnection);
 
     connect(&m_settings, &Settings::baseStationActivated, this, &Manager::activateBaseStation);
@@ -348,6 +348,7 @@ void Manager::process()
 //    }
 
     m_comms.process();
+    s_logger.process();
 }
 
 //////////////////////////////////////////////////////////////////////////

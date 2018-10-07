@@ -818,7 +818,7 @@ bool DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
     m_mainData.sensorsConfigs.push_back(config);
     emit sensorsConfigAdded();
 
-    s_logger.logInfo("Changed sensors config");
+    s_logger.logInfo("Added sensors config");
 
     triggerSave();
 
@@ -1506,7 +1506,7 @@ bool DB::addMeasurement(MeasurementDescriptor const& md)
     sensor.lastMeasurement = measurement;
     sensor.averageSignalStrength = computeAverageSignalStrength(sensor.id, m_mainData);
 
-    s_logger.logInfo(QString("Added measurement index %1, sensor '%2'").arg(md.index).arg(sensor.descriptor.name.c_str()));
+    s_logger.logVerbose(QString("Added measurement index %1, sensor '%2'").arg(md.index).arg(sensor.descriptor.name.c_str()));
 
     emit sensorDataChanged(sensor.id);
 
@@ -1978,7 +1978,7 @@ void DB::save(Data const& data) const
         document.Accept(writer);
 
         Crypt crypt;
-        crypt.setCompressionLevel(1);
+        crypt.setCompressionLevel(-1); //default
         crypt.setKey(k_fileEncryptionKey);
 #ifdef USE_DATA_ENCRYPTION
         QByteArray dataToWrite = crypt.encryptToByteArray(QByteArray(buffer.GetString(), buffer.GetSize()));

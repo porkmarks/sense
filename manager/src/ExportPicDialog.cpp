@@ -26,7 +26,7 @@ void ExportPicDialog::accept()
         return;
     }
 
-    m_plotWidget.saveToPng(fileName, m_ui.legend->isChecked());
+    m_plotWidget.saveToPng(fileName, m_ui.legend->isChecked(), m_ui.annotations->isChecked());
 
 //    std::ofstream file(fileName.toUtf8().data());
 //    if (!file.is_open())

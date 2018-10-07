@@ -147,11 +147,14 @@ void Comms::disconnectedFromBaseStation(InitializedBaseStation* cbs)
 {
     if (cbs)
     {
-        s_logger.logWarning(QString("Disconnected from BS %1").arg(getMacStr(cbs->descriptor.mac).c_str()));
+        if (cbs->isConnected)
+        {
+            s_logger.logWarning(QString("Disconnected from BS %1").arg(getMacStr(cbs->descriptor.mac).c_str()));
+            emit baseStationDisconnected(cbs->descriptor);
+        }
 
         cbs->isConnected = false;
         cbs->isConnecting = false;
-        emit baseStationDisconnected(cbs->descriptor);
     }
 }
 
@@ -537,11 +540,11 @@ void Comms::processAddConfigRes(InitializedBaseStation& cbs)
 
     if (buffer.empty())
     {
-        s_logger.logCritical(QString("Setting the config FAILED."));
+        s_logger.logCritical(QString("Adding the config FAILED."));
         return;
     }
 
-    s_logger.logInfo(QString("Setting the config succeded."));
+    s_logger.logInfo(QString("Adding the config succeded."));
     processConfigs(cbs, buffer);
 }
 
@@ -594,19 +597,19 @@ void Comms::processReportMeasurementReq(InitializedBaseStation& cbs)
         document.Parse(reinterpret_cast<const char*>(buffer.data()), buffer.size());
         if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
         {
-            s_logger.logCritical(QString("Cannot deserialize request: %1").arg(rapidjson::GetParseError_En(document.GetParseError())));
+            s_logger.logCritical(QString("Cannot deserialize measurement request: %1").arg(rapidjson::GetParseError_En(document.GetParseError())));
             goto end;
         }
         if (!document.IsObject())
         {
-            s_logger.logCritical(QString("Cannot deserialize request: Bad document."));
+            s_logger.logCritical(QString("Cannot deserialize measurement request: Bad document."));
             goto end;
         }
 
         auto it = document.FindMember("sensor_id");
         if (it == document.MemberEnd() || !it->value.IsUint())
         {
-            s_logger.logCritical(QString("Cannot deserialize request: Missing sensor_id."));
+            s_logger.logCritical(QString("Cannot deserialize measurement request: Missing sensor_id."));
             goto end;
         }
         descriptor.sensorId = it->value.GetUint();
@@ -614,7 +617,7 @@ void Comms::processReportMeasurementReq(InitializedBaseStation& cbs)
         it = document.FindMember("index");
         if (it == document.MemberEnd() || !it->value.IsUint())
         {
-            s_logger.logCritical(QString("Cannot deserialize request: Missing index."));
+            s_logger.logCritical(QString("Cannot deserialize measurement request: Missing index."));
             goto end;
         }
         descriptor.index = it->value.GetUint();
@@ -622,7 +625,7 @@ void Comms::processReportMeasurementReq(InitializedBaseStation& cbs)
         it = document.FindMember("time_point");
         if (it == document.MemberEnd() || !it->value.IsInt64())
         {
-            s_logger.logCritical(QString("Cannot deserialize request: Missing time_point."));
+            s_logger.logCritical(QString("Cannot deserialize measurement request: Missing time_point."));
             goto end;
         }
         descriptor.timePoint = DB::Clock::time_point(std::chrono::seconds(it->value.GetInt64()));
@@ -630,7 +633,7 @@ void Comms::processReportMeasurementReq(InitializedBaseStation& cbs)
         it = document.FindMember("temperature");
         if (it == document.MemberEnd() || !it->value.IsNumber())
         {
-            s_logger.logCritical(QString("Cannot deserialize request: Missing temperature."));
+            s_logger.logCritical(QString("Cannot deserialize measurement request: Missing temperature."));
             goto end;
         }
         descriptor.temperature = static_cast<float>(it->value.GetDouble());
@@ -638,7 +641,7 @@ void Comms::processReportMeasurementReq(InitializedBaseStation& cbs)
         it = document.FindMember("humidity");
         if (it == document.MemberEnd() || !it->value.IsNumber())
         {
-            s_logger.logCritical(QString("Cannot deserialize request: Missing humidity."));
+            s_logger.logCritical(QString("Cannot deserialize measurement request: Missing humidity."));
             goto end;
         }
         descriptor.humidity = static_cast<float>(it->value.GetDouble());
@@ -646,7 +649,7 @@ void Comms::processReportMeasurementReq(InitializedBaseStation& cbs)
         it = document.FindMember("vcc");
         if (it == document.MemberEnd() || !it->value.IsNumber())
         {
-            s_logger.logCritical(QString("Cannot deserialize request: Missing vcc."));
+            s_logger.logCritical(QString("Cannot deserialize measurement request: Missing vcc."));
             goto end;
         }
         descriptor.vcc = static_cast<float>(it->value.GetDouble());
@@ -654,7 +657,7 @@ void Comms::processReportMeasurementReq(InitializedBaseStation& cbs)
         it = document.FindMember("b2s");
         if (it == document.MemberEnd() || !it->value.IsInt())
         {
-            s_logger.logCritical(QString("Cannot deserialize request: Missing b2s."));
+            s_logger.logCritical(QString("Cannot deserialize measurement request: Missing b2s."));
             goto end;
         }
         descriptor.signalStrength.b2s = static_cast<int8_t>(it->value.GetInt());
@@ -662,7 +665,7 @@ void Comms::processReportMeasurementReq(InitializedBaseStation& cbs)
         it = document.FindMember("s2b");
         if (it == document.MemberEnd() || !it->value.IsInt())
         {
-            s_logger.logCritical(QString("Cannot deserialize request: Missing s2b."));
+            s_logger.logCritical(QString("Cannot deserialize measurement request: Missing s2b."));
             goto end;
         }
         descriptor.signalStrength.s2b = static_cast<int8_t>(it->value.GetInt());
@@ -670,14 +673,14 @@ void Comms::processReportMeasurementReq(InitializedBaseStation& cbs)
         it = document.FindMember("sensor_errors");
         if (it == document.MemberEnd() || !it->value.IsUint())
         {
-            s_logger.logCritical(QString("Cannot deserialize request: Missing sensor_errors."));
+            s_logger.logCritical(QString("Cannot deserialize measurement request: Missing sensor_errors."));
             goto end;
         }
         descriptor.sensorErrors = static_cast<uint8_t>(it->value.GetUint());
 
         if (!cbs.db.addMeasurement(descriptor))
         {
-            s_logger.logCritical(QString("Cannot deserialize request: Adding measurement failed."));
+            s_logger.logCritical(QString("Cannot deserialize measurement request: Adding measurement failed."));
             goto end;
         }
 
@@ -726,19 +729,19 @@ void Comms::processSensorBoundReq(InitializedBaseStation& cbs)
         document.Parse(reinterpret_cast<const char*>(buffer.data()), buffer.size());
         if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
         {
-            s_logger.logCritical(QString("Cannot deserialize request: %1").arg(rapidjson::GetParseError_En(document.GetParseError())));
+            s_logger.logCritical(QString("Cannot deserialize bind request: %1").arg(rapidjson::GetParseError_En(document.GetParseError())));
             goto end;
         }
         if (!document.IsObject())
         {
-            s_logger.logCritical(QString("Cannot deserialize request: Bad document."));
+            s_logger.logCritical(QString("Cannot deserialize bind request: Bad document."));
             goto end;
         }
 
         auto it = document.FindMember("id");
         if (it == document.MemberEnd() || !it->value.IsUint())
         {
-            s_logger.logCritical(QString("Cannot deserialize request: Missing id."));
+            s_logger.logCritical(QString("Cannot deserialize bind request: Missing id."));
             goto end;
         }
         DB::SensorId id = it->value.GetUint();
@@ -746,7 +749,7 @@ void Comms::processSensorBoundReq(InitializedBaseStation& cbs)
         it = document.FindMember("address");
         if (it == document.MemberEnd() || !it->value.IsUint())
         {
-            s_logger.logCritical(QString("Cannot deserialize request: Missing address."));
+            s_logger.logCritical(QString("Cannot deserialize bind request: Missing address."));
             goto end;
         }
         DB::SensorAddress address = it->value.GetUint();
@@ -754,7 +757,7 @@ void Comms::processSensorBoundReq(InitializedBaseStation& cbs)
         it = document.FindMember("serial_number");
         if (it == document.MemberEnd() || !it->value.IsUint())
         {
-            s_logger.logCritical(QString("Cannot deserialize request: Missing serial_number."));
+            s_logger.logCritical(QString("Cannot deserialize bind request: Missing serial_number."));
             goto end;
         }
         uint32_t serialNumber = it->value.GetUint();
@@ -763,7 +766,7 @@ void Comms::processSensorBoundReq(InitializedBaseStation& cbs)
         it = document.FindMember("temperature_bias");
         if (it == document.MemberEnd() || !it->value.IsNumber())
         {
-            s_logger.logCritical(QString("Cannot deserialize request: Missing temperature_bias."));
+            s_logger.logCritical(QString("Cannot deserialize bind request: Missing temperature_bias."));
             goto end;
         }
         calibration.temperatureBias = static_cast<float>(it->value.GetDouble());
@@ -771,18 +774,19 @@ void Comms::processSensorBoundReq(InitializedBaseStation& cbs)
         it = document.FindMember("humidity_bias");
         if (it == document.MemberEnd() || !it->value.IsNumber())
         {
-            s_logger.logCritical(QString("Cannot deserialize request: Missing humidity_bias."));
+            s_logger.logCritical(QString("Cannot deserialize bind request: Missing humidity_bias."));
             goto end;
         }
         calibration.humidityBias = static_cast<float>(it->value.GetDouble());
 
         if (!cbs.db.bindSensor(id, address, serialNumber, calibration))
         {
-            s_logger.logCritical(QString("Cannot deserialize request: Bind failed."));
+            s_logger.logCritical(QString("Cannot deserialize bind request: Bind failed."));
             goto end;
         }
 
         ok = true;
+        s_logger.logInfo(QString("Bind request successed."));
     }
 
 end:

@@ -27,7 +27,7 @@ public:
     void saveSettings();
 
     QSize getPlotSize() const;
-    void saveToPng(const QString& fileName, bool showLegend);
+    void saveToPng(const QString& fileName, bool showLegend, bool showAnnotations);
 
 private slots:
     void resizeEvent(QResizeEvent* event);
@@ -41,6 +41,7 @@ private slots:
     void mousePressEvent(QMouseEvent* event);
     void mouseReleaseEvent(QMouseEvent* event);
     void mouseMoveEvent(QMouseEvent* event);
+    void legendSelectionChanged(QCPLegend* l, QCPAbstractLegendItem* ai, QMouseEvent* me);
 
 private:
     void applyFilter(DB::Filter const& filter);
@@ -78,6 +79,8 @@ private:
 //    QValueAxis* m_axisHY = nullptr;
     std::map<DB::SensorId, GraphData> m_graphs;
 //    QChartView* m_chartView = nullptr;
+
+    QCPLayoutGrid* m_legendLayout = nullptr;
 
     QCustomPlot* m_plot = nullptr;
     QCPLayer* m_graphsLayer = nullptr;

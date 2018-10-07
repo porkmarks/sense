@@ -122,6 +122,16 @@
               </item>
              </widget>
             </item>
+            <item row="4" column="0">
+             <widget class="QCheckBox" name="annotations">
+              <property name="text">
+               <string>Annotations</string>
+              </property>
+              <property name="checked">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
            </layout>
           </widget>
          </item>

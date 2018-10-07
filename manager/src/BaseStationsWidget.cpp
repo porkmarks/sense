@@ -4,6 +4,7 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QInputDialog>
+#include <QDateTime>
 
 extern std::string getMacStr(Settings::BaseStationDescriptor::Mac const& mac);
 
@@ -249,8 +250,20 @@ void BaseStationsWidget::baseStationDisconnected(Comms::BaseStationDescriptor co
 
         setAddress(bsIndex, commsBS.address);
 
+        showDisconnectionMessageBox(bs, commsBS.address);
+
         return;
     }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void BaseStationsWidget::showDisconnectionMessageBox(Settings::BaseStation const& bs, const QHostAddress& address)
+{
+    QMessageBox::critical(this, "Error", QString("Base Station %1, %2 has disconnected at %3")
+                    .arg(bs.descriptor.name.c_str())
+                    .arg(address.toString())
+                    .arg(QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm")));
 }
 
 //////////////////////////////////////////////////////////////////////////

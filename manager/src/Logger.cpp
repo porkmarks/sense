@@ -6,6 +6,7 @@
 #include <sstream>
 #include <iostream>
 #include <QDateTime>
+#include <QTimer>
 
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
@@ -82,12 +83,42 @@ void Logger::shutdown()
         return;
     }
 
+    if (m_delayedTriggerSave)
+    {
+        std::cout << "A logger save was scheduled. Performing it now...\n";
+        triggerSave();
+        while (m_storeThreadTriggered) //wait for the thread to finish saving
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        std::cout << "Finished scheduled save\n";
+    }
+
     m_threadsExit = true;
 
     m_storeCV.notify_all();
     if (m_storeThread.joinable())
     {
         m_storeThread.join();
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Logger::process()
+{
+    bool trigger = false;
+    {
+        std::lock_guard<std::mutex> lg(m_delayedTriggerSaveMutex);
+        if (m_delayedTriggerSave)
+        {
+            trigger = Clock::now() >= m_delayedTriggerSaveTP;
+        }
+    }
+
+    if (trigger)
+    {
+        triggerSave();
     }
 }
 
@@ -201,8 +232,13 @@ bool Logger::load(std::string const& name)
 //        }
 
         //refresh the last log line index
-        for (const StoredLogLine& storedLine: data.storedLogLines)
+        std::string msg = "Added measurement index ";
+        for (StoredLogLine& storedLine: data.storedLogLines)
         {
+            if (storedLine.messageSize >= msg.size() && data.logs.compare(storedLine.messageOffset, msg.size(), msg) == 0)
+            {
+                storedLine.type = Type::VERBOSE;
+            }
             data.lastLineIndex = std::max(data.lastLineIndex, storedLine.index);
         }
     }
@@ -259,7 +295,8 @@ void Logger::logVerbose(std::string const& message)
     std::cout.flush();
 
     emit logLinesAdded();
-    triggerSave();
+
+    triggerDelayedSave(std::chrono::minutes(10));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -293,7 +330,8 @@ void Logger::logInfo(std::string const& message)
     std::cout.flush();
 
     emit logLinesAdded();
-    triggerSave();
+
+    triggerDelayedSave(std::chrono::minutes(1));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -428,6 +466,11 @@ size_t Logger::getAllLogLineCount() const
 
 void Logger::triggerSave()
 {
+    {
+        std::lock_guard<std::mutex> lg(m_delayedTriggerSaveMutex);
+        m_delayedTriggerSave = false;
+    }
+
     Data mainDataCopy;
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
@@ -441,6 +484,28 @@ void Logger::triggerSave()
         m_storeThreadTriggered = true;
     }
     m_storeCV.notify_all();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Logger::triggerDelayedSave(Clock::duration i_dt)
+{
+    if (i_dt < std::chrono::milliseconds(100))
+    {
+        triggerSave();
+        return;
+    }
+
+
+    std::lock_guard<std::mutex> lg(m_delayedTriggerSaveMutex);
+    if (m_delayedTriggerSave && m_delayedTriggerSaveTP < Clock::now() + i_dt)
+    {
+        //if the previous schedule is sooner than the new one, leave the previous intact
+        return;
+    }
+
+    m_delayedTriggerSaveTP = Clock::now() + i_dt;
+    m_delayedTriggerSave = true;
 }
 
 //////////////////////////////////////////////////////////////////////////
