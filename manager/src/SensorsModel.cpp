@@ -9,7 +9,7 @@
 
 #include <cassert>
 
-static std::array<const char*, 10> s_headerNames = {"Name", "Id", "Serial Number", "Temperature", "Humidity", "Battery", "Signal (Current/Avg)", "Comms", "Stored", "Alarms"};
+static std::array<const char*, 10> s_headerNames = {"Name", "Id", "Serial Number", "Temperature", "Humidity", "Battery", "Signal", "Comms", "Stored", "Alarms"};
 
 extern float getBatteryLevel(float vcc);
 extern QIcon getBatteryIcon(float vcc);
@@ -455,9 +455,8 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                 }
                 else if (column == Column::Signal)
                 {
-                    int last = static_cast<int>(getSignalLevel(std::min(sensor.lastMeasurement.descriptor.signalStrength.b2s, sensor.lastMeasurement.descriptor.signalStrength.s2b)) * 100.f);
                     int average = static_cast<int>(getSignalLevel(std::min(sensor.averageSignalStrength.b2s, sensor.averageSignalStrength.s2b)) * 100.f);
-                    return QString("%1% / %2%").arg(last).arg(average);
+                    return QString("%1%").arg(average);
                 }
             }
         }
