@@ -584,13 +584,14 @@ void Comms::processAddSensorRes(InitializedBaseStation& cbs)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processReportMeasurementReq(InitializedBaseStation& cbs)
+void Comms::processReportMeasurementsReq(InitializedBaseStation& cbs)
 {
     std::vector<uint8_t> buffer;
     cbs.channel.unpack(buffer);
 
-    DB::MeasurementDescriptor descriptor;
     bool ok = false;
+
+    std::vector<DB::MeasurementDescriptor> descriptors;
 
     {
         rapidjson::Document document;
@@ -600,87 +601,102 @@ void Comms::processReportMeasurementReq(InitializedBaseStation& cbs)
             s_logger.logCritical(QString("Cannot deserialize measurement request: %1").arg(rapidjson::GetParseError_En(document.GetParseError())));
             goto end;
         }
-        if (!document.IsObject())
+        if (!document.IsArray())
         {
             s_logger.logCritical(QString("Cannot deserialize measurement request: Bad document."));
             goto end;
         }
 
-        auto it = document.FindMember("sensor_id");
-        if (it == document.MemberEnd() || !it->value.IsUint())
-        {
-            s_logger.logCritical(QString("Cannot deserialize measurement request: Missing sensor_id."));
-            goto end;
-        }
-        descriptor.sensorId = it->value.GetUint();
+        descriptors.reserve(document.Size());
 
-        it = document.FindMember("index");
-        if (it == document.MemberEnd() || !it->value.IsUint())
+        for (size_t i = 0; i < document.Size(); i++)
         {
-            s_logger.logCritical(QString("Cannot deserialize measurement request: Missing index."));
-            goto end;
-        }
-        descriptor.index = it->value.GetUint();
+            rapidjson::Value const& valuej = document[i];
+            if (!valuej.IsObject())
+            {
+                s_logger.logCritical(QString("Cannot deserialize report measurements response: Bad value."));
+                goto end;
+            }
 
-        it = document.FindMember("time_point");
-        if (it == document.MemberEnd() || !it->value.IsInt64())
-        {
-            s_logger.logCritical(QString("Cannot deserialize measurement request: Missing time_point."));
-            goto end;
-        }
-        descriptor.timePoint = DB::Clock::time_point(std::chrono::seconds(it->value.GetInt64()));
+            auto it = valuej.FindMember("sensor_id");
+            if (it == valuej.MemberEnd() || !it->value.IsUint())
+            {
+                s_logger.logCritical(QString("Cannot deserialize measurement request: Missing sensor_id."));
+                goto end;
+            }
+            DB::MeasurementDescriptor descriptor;
+            descriptor.sensorId = it->value.GetUint();
 
-        it = document.FindMember("temperature");
-        if (it == document.MemberEnd() || !it->value.IsNumber())
-        {
-            s_logger.logCritical(QString("Cannot deserialize measurement request: Missing temperature."));
-            goto end;
-        }
-        descriptor.temperature = static_cast<float>(it->value.GetDouble());
+            it = valuej.FindMember("index");
+            if (it == valuej.MemberEnd() || !it->value.IsUint())
+            {
+                s_logger.logCritical(QString("Cannot deserialize measurement request: Missing index."));
+                goto end;
+            }
+            descriptor.index = it->value.GetUint();
 
-        it = document.FindMember("humidity");
-        if (it == document.MemberEnd() || !it->value.IsNumber())
-        {
-            s_logger.logCritical(QString("Cannot deserialize measurement request: Missing humidity."));
-            goto end;
-        }
-        descriptor.humidity = static_cast<float>(it->value.GetDouble());
+            it = valuej.FindMember("time_point");
+            if (it == valuej.MemberEnd() || !it->value.IsInt64())
+            {
+                s_logger.logCritical(QString("Cannot deserialize measurement request: Missing time_point."));
+                goto end;
+            }
+            descriptor.timePoint = DB::Clock::time_point(std::chrono::seconds(it->value.GetInt64()));
 
-        it = document.FindMember("vcc");
-        if (it == document.MemberEnd() || !it->value.IsNumber())
-        {
-            s_logger.logCritical(QString("Cannot deserialize measurement request: Missing vcc."));
-            goto end;
-        }
-        descriptor.vcc = static_cast<float>(it->value.GetDouble());
+            it = valuej.FindMember("temperature");
+            if (it == valuej.MemberEnd() || !it->value.IsNumber())
+            {
+                s_logger.logCritical(QString("Cannot deserialize measurement request: Missing temperature."));
+                goto end;
+            }
+            descriptor.temperature = static_cast<float>(it->value.GetDouble());
 
-        it = document.FindMember("b2s");
-        if (it == document.MemberEnd() || !it->value.IsInt())
-        {
-            s_logger.logCritical(QString("Cannot deserialize measurement request: Missing b2s."));
-            goto end;
-        }
-        descriptor.signalStrength.b2s = static_cast<int8_t>(it->value.GetInt());
+            it = valuej.FindMember("humidity");
+            if (it == valuej.MemberEnd() || !it->value.IsNumber())
+            {
+                s_logger.logCritical(QString("Cannot deserialize measurement request: Missing humidity."));
+                goto end;
+            }
+            descriptor.humidity = static_cast<float>(it->value.GetDouble());
 
-        it = document.FindMember("s2b");
-        if (it == document.MemberEnd() || !it->value.IsInt())
-        {
-            s_logger.logCritical(QString("Cannot deserialize measurement request: Missing s2b."));
-            goto end;
-        }
-        descriptor.signalStrength.s2b = static_cast<int8_t>(it->value.GetInt());
+            it = valuej.FindMember("vcc");
+            if (it == valuej.MemberEnd() || !it->value.IsNumber())
+            {
+                s_logger.logCritical(QString("Cannot deserialize measurement request: Missing vcc."));
+                goto end;
+            }
+            descriptor.vcc = static_cast<float>(it->value.GetDouble());
 
-        it = document.FindMember("sensor_errors");
-        if (it == document.MemberEnd() || !it->value.IsUint())
-        {
-            s_logger.logCritical(QString("Cannot deserialize measurement request: Missing sensor_errors."));
-            goto end;
-        }
-        descriptor.sensorErrors = static_cast<uint8_t>(it->value.GetUint());
+            it = valuej.FindMember("b2s");
+            if (it == valuej.MemberEnd() || !it->value.IsInt())
+            {
+                s_logger.logCritical(QString("Cannot deserialize measurement request: Missing b2s."));
+                goto end;
+            }
+            descriptor.signalStrength.b2s = static_cast<int8_t>(it->value.GetInt());
 
-        if (!cbs.db.addMeasurement(descriptor))
+            it = valuej.FindMember("s2b");
+            if (it == valuej.MemberEnd() || !it->value.IsInt())
+            {
+                s_logger.logCritical(QString("Cannot deserialize measurement request: Missing s2b."));
+                goto end;
+            }
+            descriptor.signalStrength.s2b = static_cast<int8_t>(it->value.GetInt());
+
+            it = valuej.FindMember("sensor_errors");
+            if (it == valuej.MemberEnd() || !it->value.IsUint())
+            {
+                s_logger.logCritical(QString("Cannot deserialize measurement request: Missing sensor_errors."));
+                goto end;
+            }
+            descriptor.sensorErrors = static_cast<uint8_t>(it->value.GetUint());
+
+            descriptors.push_back(descriptor);
+        }
+
+        if (!cbs.db.addMeasurements(descriptors))
         {
-            s_logger.logCritical(QString("Cannot deserialize measurement request: Adding measurement failed."));
+            s_logger.logCritical(QString("Cannot deserialize measurement request: Adding measurements failed."));
             goto end;
         }
 
@@ -692,16 +708,24 @@ end:
         //DB& db = cbs.db;
 
         rapidjson::Document document;
-        document.SetObject();
-        document.AddMember("sensor_id", descriptor.sensorId, document.GetAllocator());
-        document.AddMember("index", descriptor.index, document.GetAllocator());
-        document.AddMember("ok", ok, document.GetAllocator());
+        document.SetArray();
+
+        for (DB::MeasurementDescriptor descriptor: descriptors)
+        {
+            rapidjson::Value mj;
+            mj.SetObject();
+            mj.AddMember("sensor_id", descriptor.sensorId, document.GetAllocator());
+            mj.AddMember("index", descriptor.index, document.GetAllocator());
+            mj.AddMember("ok", ok, document.GetAllocator());
+
+            document.PushBack(std::move(mj), document.GetAllocator());
+        }
 
         rapidjson::StringBuffer buffer;
         rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
         document.Accept(writer);
 
-        cbs.channel.send(data::Server_Message::REPORT_MEASUREMENT_RES, buffer.GetString(), buffer.GetSize());
+        cbs.channel.send(data::Server_Message::REPORT_MEASUREMENTS_RES, buffer.GetString(), buffer.GetSize());
     }
 }
 
@@ -833,8 +857,8 @@ void Comms::process()
             case data::Server_Message::ADD_SENSOR_RES:
                 processAddSensorRes(*cbs);
                 break;
-            case data::Server_Message::REPORT_MEASUREMENT_REQ:
-                processReportMeasurementReq(*cbs);
+            case data::Server_Message::REPORT_MEASUREMENTS_REQ:
+                processReportMeasurementsReq(*cbs);
                 break;
             case data::Server_Message::SENSOR_BOUND_REQ:
                 processSensorBoundReq(*cbs);

@@ -159,8 +159,8 @@ enum class Server_Message
     SET_SENSORS_RES,        //base station
     ADD_SENSOR_REQ,         //manager
     ADD_SENSOR_RES,         //base station
-    REPORT_MEASUREMENT_REQ, //base station
-    REPORT_MEASUREMENT_RES, //manager
+    REPORT_MEASUREMENTS_REQ, //base station
+    REPORT_MEASUREMENTS_RES, //manager
     SENSOR_BOUND_REQ,       //base station
     SENSOR_BOUND_RES,       //manager
     POWER_OFF_REQ,          //manager

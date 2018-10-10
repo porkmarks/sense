@@ -245,6 +245,7 @@ public:
     ////////////////////////////////////////////////////////////////////////////
 
     bool addMeasurement(MeasurementDescriptor const& descriptor);
+    bool addMeasurements(std::vector<MeasurementDescriptor> const& descriptors);
 
     template <typename T>
     struct Range
@@ -330,6 +331,7 @@ signals:
     void alarmWasUntriggered(AlarmId alarmId, SensorId sensorId, MeasurementDescriptor const& md);
 
 private:
+    bool _addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> const& mds);
     size_t _getFilteredMeasurements(Filter const& filter, std::vector<Measurement>* result) const;
     bool cull(Measurement const& measurement, Filter const& filter) const;
 

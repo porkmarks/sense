@@ -80,7 +80,7 @@ private:
     void processSetConfigsRes(InitializedBaseStation& cbs);
     void processSetSensorsRes(InitializedBaseStation& cbs);
     void processAddSensorRes(InitializedBaseStation& cbs);
-    void processReportMeasurementReq(InitializedBaseStation& cbs);
+    void processReportMeasurementsReq(InitializedBaseStation& cbs);
     void processSensorBoundReq(InitializedBaseStation& cbs);
     void processReportSensorDetails(InitializedBaseStation& cbs);
 

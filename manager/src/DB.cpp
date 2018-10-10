@@ -1460,54 +1460,81 @@ void DB::setReportExecuted(ReportId id)
 
 bool DB::addMeasurement(MeasurementDescriptor const& md)
 {
-    int32_t _sensorIndex = findSensorIndexById(md.sensorId);
+    return _addMeasurements(md.sensorId, {md});
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool DB::addMeasurements(std::vector<MeasurementDescriptor> const& mds)
+{
+    std::map<SensorId, std::vector<MeasurementDescriptor>> mdPerSensor;
+    for (MeasurementDescriptor const& md: mds)
+    {
+        mdPerSensor[md.sensorId].push_back(md);
+    }
+
+    bool ok = true;
+    for (auto const& pair: mdPerSensor)
+    {
+        ok &= _addMeasurements(pair.first, pair.second);
+    }
+    return ok;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> const& mds)
+{
+    int32_t _sensorIndex = findSensorIndexById(sensorId);
     if (_sensorIndex < 0)
     {
         return false;
     }
     size_t sensorIndex = static_cast<size_t>(_sensorIndex);
-
-    MeasurementId id = computeMeasurementId(md);
-
-    //check for duplicates
-    auto it = std::lower_bound(m_mainData.sortedMeasurementIds.begin(), m_mainData.sortedMeasurementIds.end(), id);
-    if (it != m_mainData.sortedMeasurementIds.end() && *it == id)
-    {
-        return true;
-    }
-
-    Measurement measurement;
-    measurement.id = id;
-    measurement.descriptor = md;
-    measurement.triggeredAlarms = computeTriggeredAlarm(md);
-
-    emit measurementsWillBeAdded(md.sensorId);
-
-    //insert sorted id
-    m_mainData.sortedMeasurementIds.insert(it, id);
-
-    //insert sorted data
-    {
-        StoredMeasurements& storedMeasurements = m_mainData.measurements[md.sensorId];
-
-        uint64_t mdtp = static_cast<uint64_t>(Clock::to_time_t(md.timePoint));
-        auto smit = std::lower_bound(storedMeasurements.begin(), storedMeasurements.end(), mdtp, [](StoredMeasurement const& sm, uint64_t mdtp)
-        {
-            return sm.timePoint < mdtp;
-        });
-
-        storedMeasurements.insert(smit, pack(measurement));
-    }
-
-    emit measurementsAdded(md.sensorId);
-
     Sensor& sensor = m_mainData.sensors[sensorIndex];
     sensor.isLastMeasurementValid = true;
-    sensor.lastMeasurement = measurement;
+
+    emit measurementsWillBeAdded(sensorId);
+
+    for (MeasurementDescriptor const& md: mds)
+    {
+        MeasurementId id = computeMeasurementId(md);
+
+        //check for duplicates
+        auto it = std::lower_bound(m_mainData.sortedMeasurementIds.begin(), m_mainData.sortedMeasurementIds.end(), id);
+        if (it != m_mainData.sortedMeasurementIds.end() && *it == id)
+        {
+            continue;
+        }
+
+        Measurement measurement;
+        measurement.id = id;
+        measurement.descriptor = md;
+        measurement.triggeredAlarms = computeTriggeredAlarm(md);
+
+        //insert sorted id
+        m_mainData.sortedMeasurementIds.insert(it, id);
+
+        //insert sorted data
+        {
+            StoredMeasurements& storedMeasurements = m_mainData.measurements[md.sensorId];
+
+            uint64_t mdtp = static_cast<uint64_t>(Clock::to_time_t(md.timePoint));
+            auto smit = std::lower_bound(storedMeasurements.begin(), storedMeasurements.end(), mdtp, [](StoredMeasurement const& sm, uint64_t mdtp)
+            {
+                    return sm.timePoint < mdtp;
+            });
+
+            storedMeasurements.insert(smit, pack(measurement));
+        }
+        sensor.lastMeasurement = measurement;
+
+        s_logger.logVerbose(QString("Added measurement index %1, sensor '%2'").arg(md.index).arg(sensor.descriptor.name.c_str()));
+    }
+
+    emit measurementsAdded(sensorId);
+
     sensor.averageSignalStrength = computeAverageSignalStrength(sensor.id, m_mainData);
-
-    s_logger.logVerbose(QString("Added measurement index %1, sensor '%2'").arg(md.index).arg(sensor.descriptor.name.c_str()));
-
     emit sensorDataChanged(sensor.id);
 
     triggerSave();
@@ -1797,7 +1824,7 @@ DB::SignalStrength DB::computeAverageSignalStrength(SensorId sensorId, Data cons
             avgs2b += m.descriptor.signalStrength.s2b;
             counts2b++;
         }
-        if (counts2b >= 100 && countb2s >= 100)
+        if (counts2b >= 10 && countb2s >= 10)
         {
             break;
         }
