@@ -546,18 +546,17 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         m_axisH->setRange(minH, maxH);
     }
 
-    uint8_t temperatureColorIndex = 0;
-    //uint8_t humidityColorIndex = k_colors.size() - 1;
     for (auto& pair : m_graphs)
     {
-        QColor color(k_colors[(temperatureColorIndex++) % k_colors.size()]);
+        GraphData& graphData = pair.second;
+
+        QColor color(k_colors[graphData.sensor.id % k_colors.size()]);
         double brightness = (0.2126*color.redF() + 0.7152*color.greenF() + 0.0722*color.blueF());
         if (brightness > 0.8) //make sure the color is not too bright
         {
             color.setHslF(color.hueF(), color.saturationF(), 0.4);
         }
 
-        GraphData& graphData = pair.second;
         if (m_axisT)
         {
             QCPGraph* graph = m_plot->addGraph(m_axisD, m_axisT);
