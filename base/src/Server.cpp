@@ -16,7 +16,7 @@ Server::Server(Sensors& sensors)
     , m_channel(m_socket_adapter)
     , m_broadcast_socket(m_io_service)
 {
-    m_sensors.cb_report_measurement = std::bind(&Server::report_measurement, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    m_sensors.cb_report_measurements = std::bind(&Server::report_measurements, this, std::placeholders::_1);
     m_sensors.cb_sensor_bound = std::bind(&Server::sensor_bound, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4);
     m_sensors.cb_sensor_details_changed = std::bind(&Server::sensor_details_changed, this, std::placeholders::_1);
 }
@@ -25,8 +25,9 @@ Server::Server(Sensors& sensors)
 
 Server::~Server()
 {
-    m_io_service_work.reset();
     m_exit = true;
+    m_io_service.stop();
+    m_io_service_work.reset();
 
     if (m_io_service_thread.joinable())
     {
@@ -310,25 +311,32 @@ std::string Server::compute_configs_response() const
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-void Server::report_measurement(Sensors::Sensor_Id sensor_id, Clock::time_point time_point, Sensors::Measurement const& measurement)
+void Server::report_measurements(std::vector<Sensors::Reported_Measurement> const& measurements)
 {
     rapidjson::Document document;
-    document.SetObject();
-    document.AddMember("sensor_id", sensor_id, document.GetAllocator());
-    document.AddMember("index", measurement.index, document.GetAllocator());
-    document.AddMember("time_point", static_cast<int64_t>(Clock::to_time_t(time_point)), document.GetAllocator());
-    document.AddMember("temperature", measurement.temperature, document.GetAllocator());
-    document.AddMember("humidity", measurement.humidity, document.GetAllocator());
-    document.AddMember("vcc", measurement.vcc, document.GetAllocator());
-    document.AddMember("b2s", static_cast<int>(measurement.b2s_input_dBm), document.GetAllocator());
-    document.AddMember("s2b", static_cast<int>(measurement.s2b_input_dBm), document.GetAllocator());
-    document.AddMember("sensor_errors", static_cast<uint32_t>(measurement.flags), document.GetAllocator());
+    document.SetArray();
+    for (Sensors::Reported_Measurement const& m: measurements)
+    {
+        rapidjson::Value mj;
+        mj.SetObject();
+        mj.AddMember("sensor_id", m.sensor_id, document.GetAllocator());
+        mj.AddMember("index", m.measurement.index, document.GetAllocator());
+        mj.AddMember("time_point", static_cast<int64_t>(Clock::to_time_t(m.time_point)), document.GetAllocator());
+        mj.AddMember("temperature", m.measurement.temperature, document.GetAllocator());
+        mj.AddMember("humidity", m.measurement.humidity, document.GetAllocator());
+        mj.AddMember("vcc", m.measurement.vcc, document.GetAllocator());
+        mj.AddMember("b2s", static_cast<int>(m.measurement.b2s_input_dBm), document.GetAllocator());
+        mj.AddMember("s2b", static_cast<int>(m.measurement.s2b_input_dBm), document.GetAllocator());
+        mj.AddMember("sensor_errors", static_cast<uint32_t>(m.measurement.flags), document.GetAllocator());
+
+        document.PushBack(std::move(mj), document.GetAllocator());
+    }
 
     rapidjson::StringBuffer buffer;
     rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
     document.Accept(writer);
 
-    m_channel.send(data::Server_Message::REPORT_MEASUREMENT_REQ, buffer.GetString(), buffer.GetSize());
+    m_channel.send(data::Server_Message::REPORT_MEASUREMENTS_REQ, buffer.GetString(), buffer.GetSize());
 
     {
         std::string details = compute_sensor_details_response();
@@ -371,14 +379,14 @@ static boost::optional<Sensors::Config> parse_config(rapidjson::Value const& con
 
     if (!configj.IsObject())
     {
-        LOGE << "Cannot deserialize request: Bad json.\n";
+        LOGE << "Cannot deserialize config: Bad json.\n";
         return boost::none;
     }
 
     auto it = configj.FindMember("name");
     if (it == configj.MemberEnd() || !it->value.IsString())
     {
-        LOGE << "Cannot deserialize request: Missing name.\n";
+        LOGE << "Cannot deserialize config: Missing name.\n";
         return boost::none;
     }
     config.name = it->value.GetString();
@@ -386,7 +394,7 @@ static boost::optional<Sensors::Config> parse_config(rapidjson::Value const& con
     it = configj.FindMember("sensors_sleeping");
     if (it == configj.MemberEnd() || !it->value.IsBool())
     {
-        LOGE << "Cannot deserialize request: Missing sensors_sleeping.\n";
+        LOGE << "Cannot deserialize config: Missing sensors_sleeping.\n";
         return boost::none;
     }
     config.sensors_sleeping = it->value.GetBool();
@@ -394,7 +402,7 @@ static boost::optional<Sensors::Config> parse_config(rapidjson::Value const& con
     it = configj.FindMember("measurement_period");
     if (it == configj.MemberEnd() || !it->value.IsInt64())
     {
-        LOGE << "Cannot deserialize request: Missing measurement_period.\n";
+        LOGE << "Cannot deserialize config: Missing measurement_period.\n";
         return boost::none;
     }
     config.measurement_period = std::chrono::seconds(it->value.GetInt64());
@@ -402,7 +410,7 @@ static boost::optional<Sensors::Config> parse_config(rapidjson::Value const& con
     it = configj.FindMember("comms_period");
     if (it == configj.MemberEnd() || !it->value.IsInt64())
     {
-        LOGE << "Cannot deserialize request: Missing comms_period.\n";
+        LOGE << "Cannot deserialize config: Missing comms_period.\n";
         return boost::none;
     }
     config.comms_period = std::chrono::seconds(it->value.GetInt64());
@@ -412,7 +420,7 @@ static boost::optional<Sensors::Config> parse_config(rapidjson::Value const& con
         it = configj.FindMember("baseline_measurement_tp");
         if (it == configj.MemberEnd() || !it->value.IsUint64())
         {
-            LOGE << "Cannot deserialize request: Missing baseline_measurement_tp.\n";
+            LOGE << "Cannot deserialize config: Missing baseline_measurement_tp.\n";
             return boost::none;
         }
         uint64_t x = it->value.GetUint64();
@@ -421,7 +429,7 @@ static boost::optional<Sensors::Config> parse_config(rapidjson::Value const& con
         it = configj.FindMember("baseline_measurement_index");
         if (it == configj.MemberEnd() || !it->value.IsUint())
         {
-            LOGE << "Cannot deserialize request: Missing baseline_measurement_index.\n";
+            LOGE << "Cannot deserialize config: Missing baseline_measurement_index.\n";
             return boost::none;
         }
         config.baseline_measurement_index = it->value.GetUint();
@@ -444,14 +452,14 @@ void Server::process_add_config_req()
         document.Parse(reinterpret_cast<const char*>(buffer.data()), buffer.size());
         if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
         {
-            LOGE << "Cannot deserialize request: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
+            LOGE << "Cannot deserialize add config request: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
             goto end;
         }
 
         boost::optional<Sensors::Config> opt_config = parse_config(document, false);
-        if (opt_config.is_initialized())
+        if (!opt_config.is_initialized())
         {
-            LOGE << "Cannot deserialize request: Bad document.\n";
+            LOGE << "Cannot deserialize add config request: Bad document.\n";
             goto end;
         }
 
@@ -486,12 +494,12 @@ void Server::process_set_configs_req()
         document.Parse(reinterpret_cast<const char*>(buffer.data()), buffer.size());
         if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
         {
-            LOGE << "Cannot deserialize request: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
+            LOGE << "Cannot deserialize set config request: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
             goto end;
         }
         if (!document.IsArray())
         {
-            LOGE << "Cannot deserialize request: Bad json.\n";
+            LOGE << "Cannot deserialize set config request: Bad json.\n";
             goto end;
         }
 
@@ -503,9 +511,9 @@ void Server::process_set_configs_req()
             rapidjson::Value const& configj = document[i];
 
             boost::optional<Sensors::Config> opt_config = parse_config(configj, true);
-            if (opt_config.is_initialized())
+            if (!opt_config.is_initialized())
             {
-                LOGE << "Cannot deserialize request: Bad document.\n";
+                LOGE << "Cannot deserialize set config request: Bad document.\n";
                 ok = false;
                 break;
             }
@@ -514,7 +522,7 @@ void Server::process_set_configs_req()
 
         if (!ok)
         {
-            LOGE << "Cannot initialize sensors\n";
+            LOGE << "Cannot set config.\n";
             goto end;
         }
     }
@@ -546,12 +554,12 @@ void Server::process_set_sensors_req()
         document.Parse(reinterpret_cast<const char*>(buffer.data()), buffer.size());
         if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
         {
-            LOGE << "Cannot deserialize request: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
+            LOGE << "Cannot deserialize set sensors request: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
             goto end;
         }
         if (!document.IsArray())
         {
-            LOGE << "Cannot deserialize request: Bad document.\n";
+            LOGE << "Cannot deserialize set sensors request: Bad document.\n";
             goto end;
         }
 
@@ -564,7 +572,7 @@ void Server::process_set_sensors_req()
             auto it = sensorj.FindMember("name");
             if (it == sensorj.MemberEnd() || !it->value.IsString())
             {
-                LOGE << "Cannot deserialize request: Missing name.\n";
+                LOGE << "Cannot deserialize set sensors request: Missing name.\n";
                 goto end;
             }
             std::string name = it->value.GetString();
@@ -572,7 +580,7 @@ void Server::process_set_sensors_req()
             it = sensorj.FindMember("id");
             if (it == sensorj.MemberEnd() || !it->value.IsUint())
             {
-                LOGE << "Cannot deserialize request: Missing id.\n";
+                LOGE << "Cannot deserialize set sensors request: Missing id.\n";
                 goto end;
             }
             Sensors::Sensor_Id id = it->value.GetUint();
@@ -580,7 +588,7 @@ void Server::process_set_sensors_req()
             it = sensorj.FindMember("address");
             if (it == sensorj.MemberEnd() || !it->value.IsUint())
             {
-                LOGE << "Cannot deserialize request: Missing address.\n";
+                LOGE << "Cannot deserialize set sensors request: Missing address.\n";
                 goto end;
             }
             Sensors::Sensor_Address address = it->value.GetUint();
@@ -588,7 +596,7 @@ void Server::process_set_sensors_req()
             it = sensorj.FindMember("serial_number");
             if (it == sensorj.MemberEnd() || !it->value.IsUint())
             {
-                LOGE << "Cannot deserialize request: Missing serial_number.\n";
+                LOGE << "Cannot deserialize set sensors request: Missing serial_number.\n";
                 goto end;
             }
             uint32_t serial_number = it->value.GetUint();
@@ -597,7 +605,7 @@ void Server::process_set_sensors_req()
             it = sensorj.FindMember("temperature_bias");
             if (it == sensorj.MemberEnd() || !it->value.IsNumber())
             {
-                LOGE << "Cannot deserialize request: Missing temperature_bias.\n";
+                LOGE << "Cannot deserialize set sensors request: Missing temperature_bias.\n";
                 goto end;
             }
             calibration.temperature_bias = static_cast<float>(it->value.GetDouble());
@@ -605,7 +613,7 @@ void Server::process_set_sensors_req()
             it = sensorj.FindMember("humidity_bias");
             if (it == sensorj.MemberEnd() || !it->value.IsNumber())
             {
-                LOGE << "Cannot deserialize request: Missing humidity_bias.\n";
+                LOGE << "Cannot deserialize set sensors request: Missing humidity_bias.\n";
                 goto end;
             }
             calibration.humidity_bias = static_cast<float>(it->value.GetDouble());
@@ -620,7 +628,7 @@ void Server::process_set_sensors_req()
             }
             else if (!m_sensors.add_sensor(id, name, address, serial_number, calibration))
             {
-                LOGE << "Cannot add sensor\n";
+                LOGE << "Cannot add sensor.\n";
                 goto end;
             }
         }
@@ -656,19 +664,19 @@ void Server::process_add_sensor_req()
         document.Parse(reinterpret_cast<const char*>(buffer.data()), buffer.size());
         if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
         {
-            LOGE << "Cannot deserialize request: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
+            LOGE << "Cannot deserialize add sensor request: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
             goto end;
         }
         if (!document.IsObject())
         {
-            LOGE << "Cannot deserialize request: Bad document.\n";
+            LOGE << "Cannot deserialize add sensor request: Bad document.\n";
             goto end;
         }
 
         auto it = document.FindMember("name");
         if (it == document.MemberEnd() || !it->value.IsString())
         {
-            LOGE << "Cannot deserialize request: Missing name.\n";
+            LOGE << "Cannot deserialize add sensor request: Missing name.\n";
             goto end;
         }
         data.name = it->value.GetString();
@@ -676,7 +684,7 @@ void Server::process_add_sensor_req()
         it = document.FindMember("id");
         if (it == document.MemberEnd() || !it->value.IsUint())
         {
-            LOGE << "Cannot deserialize request: Missing id.\n";
+            LOGE << "Cannot deserialize add sensor request: Missing id.\n";
             goto end;
         }
         data.id = it->value.GetUint();
@@ -700,7 +708,7 @@ end:
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-void Server::process_report_measurement_res()
+void Server::process_report_measurements_res()
 {
     std::vector<uint8_t> buffer;
     m_channel.unpack(buffer);
@@ -710,47 +718,56 @@ void Server::process_report_measurement_res()
         document.Parse(reinterpret_cast<const char*>(buffer.data()), buffer.size());
         if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
         {
-            LOGE << "Cannot deserialize request: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
+            LOGE << "Cannot deserialize report measurements response: " << rapidjson::GetParseErrorFunc(document.GetParseError()) << "\n";
             goto end;
         }
-        if (!document.IsObject())
+        if (!document.IsArray())
         {
-            LOGE << "Cannot deserialize request: Bad document.\n";
+            LOGE << "Cannot deserialize report measurements response: Bad document.\n";
             goto end;
         }
 
-        auto it = document.FindMember("sensor_id");
-        if (it == document.MemberEnd() || !it->value.IsUint())
+        for (size_t i = 0; i < document.Size(); i++)
         {
-            LOGE << "Cannot deserialize request: Missing sensor_id.\n";
-            goto end;
-        }
-        Sensors::Sensor_Id sensor_id = it->value.GetUint();
+            rapidjson::Value const& valuej = document[i];
+            if (!valuej.IsObject())
+            {
+                LOGE << "Cannot deserialize report measurements response: Bad value.\n";
+                goto end;
+            }
 
-        it = document.FindMember("index");
-        if (it == document.MemberEnd() || !it->value.IsUint())
-        {
-            LOGE << "Cannot deserialize request: Missing index.\n";
-            goto end;
-        }
-        uint32_t index = it->value.GetUint();
+            auto it = valuej.FindMember("sensor_id");
+            if (it == valuej.MemberEnd() || !it->value.IsUint())
+            {
+                LOGE << "Cannot deserialize report measurements response: Missing sensor_id.\n";
+                goto end;
+            }
+            Sensors::Sensor_Id sensor_id = it->value.GetUint();
 
-        it = document.FindMember("ok");
-        if (it == document.MemberEnd() || !it->value.IsBool())
-        {
-            LOGE << "Cannot deserialize request: Missing ok.\n";
-            goto end;
-        }
-        bool ok = it->value.GetBool();
+            it = valuej.FindMember("index");
+            if (it == valuej.MemberEnd() || !it->value.IsUint())
+            {
+                LOGE << "Cannot deserialize report measurements response: Missing index.\n";
+                goto end;
+            }
+            uint32_t index = it->value.GetUint();
 
-        if (ok)
-        {
-            LOGI << "Measurement " << std::to_string(index) << " from sensor << " << std::to_string(sensor_id) << " confirmed.\n";
-            m_sensors.confirm_measurement(sensor_id, index);
-        }
-        else
-        {
-            LOGE << "Measurement " << std::to_string(index) << " from sensor << " << std::to_string(sensor_id) << " not confirmed.\n";
+            it = valuej.FindMember("ok");
+            if (it == valuej.MemberEnd() || !it->value.IsBool())
+            {
+                LOGE << "Cannot deserialize report measurements response: Missing ok.\n";
+                goto end;
+            }
+            bool ok = it->value.GetBool();
+            if (ok)
+            {
+                LOGI << "Measurement " << std::to_string(index) << " from sensor << " << std::to_string(sensor_id) << " confirmed.\n";
+                m_sensors.confirm_measurement(sensor_id, index);
+            }
+            else
+            {
+                LOGE << "Measurement " << std::to_string(index) << " from sensor << " << std::to_string(sensor_id) << " not confirmed.\n";
+            }
         }
     }
 end:
@@ -767,7 +784,7 @@ void Server::process_sensor_bound_res()
 
     if (buffer.size() != 1)
     {
-        LOGE << "Cannot deserialize request: Bad data.\n";
+        LOGE << "Cannot deserialize sensor bound response: Bad data.\n";
         return;
     }
 
@@ -820,8 +837,8 @@ void Server::process()
         case data::Server_Message::ADD_SENSOR_REQ:
             process_add_sensor_req();
             break;
-        case data::Server_Message::REPORT_MEASUREMENT_RES:
-            process_report_measurement_res();
+        case data::Server_Message::REPORT_MEASUREMENTS_RES:
+            process_report_measurements_res();
             break;
         case data::Server_Message::SENSOR_BOUND_RES:
             process_sensor_bound_res();

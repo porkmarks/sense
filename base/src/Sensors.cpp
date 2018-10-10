@@ -42,8 +42,8 @@ std::string time_point_to_string(std::chrono::system_clock::time_point tp)
     using namespace std::chrono;
 
     auto ttime_t = system_clock::to_time_t(tp);
-    //auto tp_sec = system_clock::from_time_t(ttime_t);
-    //milliseconds ms = duration_cast<milliseconds>(tp - tp_sec);
+    auto tp_sec = system_clock::from_time_t(ttime_t);
+    milliseconds ms = duration_cast<milliseconds>(tp - tp_sec);
 
     std::tm * ttm = localtime(&ttime_t);
 
@@ -54,8 +54,8 @@ std::string time_point_to_string(std::chrono::system_clock::time_point tp)
     strftime(time_str, sizeof(time_str), date_time_format, ttm);
 
     string result(time_str);
-    //result.append(".");
-    //result.append(to_string(ms.count()));
+    result.append(".");
+    result.append(to_string(ms.count()));
 
     return result;
 }
@@ -92,7 +92,7 @@ bool Sensors::init()
 
 bool Sensors::is_initialized() const
 {
-    return m_is_initialized && cb_report_measurement != nullptr && cb_sensor_bound != nullptr;
+    return m_is_initialized && cb_report_measurements != nullptr && cb_sensor_bound != nullptr;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -661,6 +661,8 @@ void Sensors::report_measurements(Sensor_Id id, std::vector<Measurement> const& 
         return;
     }
 
+    std::vector<Reported_Measurement> rms;
+    rms.reserve(measurements.size());
     for (Measurement const& measurement: measurements)
     {
         if (measurement.index > sensor->max_confirmed_measurement_index)
@@ -668,13 +670,15 @@ void Sensors::report_measurements(Sensor_Id id, std::vector<Measurement> const& 
             Config config = find_config_for_measurement_index(measurement.index);
             Clock::time_point tp = config.baseline_measurement_time_point + config.measurement_period * (measurement.index - config.baseline_measurement_index);
             LOGI << "Sensor " << id << " has reported measurement " << measurement.index << " from " << time_point_to_string(tp) << "\n";
-            cb_report_measurement(id, tp, measurement);
+            rms.push_back({id, tp, measurement});
         }
         else
         {
             LOGI << "Sensor " << id << " has reported an already confirmed measurement (" << measurement.index << ")\n";
         }
     }
+
+    cb_report_measurements(rms);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////

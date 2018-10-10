@@ -71,7 +71,14 @@ public:
     bool init();
     bool is_initialized() const;
 
-    std::function<void(Sensor_Id sensor_id, Clock::time_point time_point, Measurement const& measurement)> cb_report_measurement;
+    struct Reported_Measurement
+    {
+        Sensor_Id sensor_id;
+        Clock::time_point time_point;
+        Measurement measurement;
+    };
+
+    std::function<void(std::vector<Reported_Measurement> const&)> cb_report_measurements;
 
     struct Config
     {
