@@ -141,6 +141,11 @@ static void process_sensor_requests(std::chrono::system_clock::duration dt)
 
                 s_sensors.set_sensor_last_comms_time_point(sensor->id, Clock::now());
                 s_sensors.report_measurements(sensor->id, measurements);
+
+                //workaround: sleep so the manager can get the measurements and confirm them
+                //like this - by the time the sensor asks for the config we have them confirmed
+                // proper fix: have the sensor ask for the config 100-200 ms after sending measurements
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
             }
             else
             {
