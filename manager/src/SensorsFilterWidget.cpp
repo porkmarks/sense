@@ -1,6 +1,7 @@
 #include "SensorsFilterWidget.h"
 #include <QSettings>
 #include <QAbstractItemModel>
+#include <QCheckBox>
 
 SensorsFilterWidget::SensorsFilterWidget(QWidget *parent) : QWidget(parent)
 {
@@ -21,17 +22,18 @@ void SensorsFilterWidget::init(DB& db)
 
     size_t sensorCount = m_db->getSensorCount();
 
-    updateSelectionCheckboxes();
-
-    connect(m_model.get(), &SensorsModel::sensorCheckedChanged, this, &SensorsFilterWidget::updateSelectionCheckboxes);
-    connect(m_ui.selectAll, &QCheckBox::stateChanged, [sensorCount, this]()
+    connect(m_ui.selectAll, &QPushButton::released, [sensorCount, this]()
     {
-        if (m_ui.selectAll->checkState() != Qt::PartiallyChecked)
+        for (size_t i = 0; i < sensorCount; i++)
         {
-            for (size_t i = 0; i < sensorCount; i++)
-            {
-                m_model->setSensorChecked(m_db->getSensor(i).id, m_ui.selectAll->isChecked());
-            }
+            m_model->setSensorChecked(m_db->getSensor(i).id, true);
+        }
+    });
+    connect(m_ui.selectNone, &QPushButton::released, [sensorCount, this]()
+    {
+        for (size_t i = 0; i < sensorCount; i++)
+        {
+            m_model->setSensorChecked(m_db->getSensor(i).id, false);
         }
     });
 
@@ -48,23 +50,6 @@ void SensorsFilterWidget::init(DB& db)
         QSettings settings;
         m_ui.list->header()->restoreState(settings.value("sensorFilter/list/state").toByteArray());
     }
-}
-
-void SensorsFilterWidget::updateSelectionCheckboxes()
-{
-    size_t sensorCount = m_db->getSensorCount();
-
-    bool allSensorsChecked = true;
-    bool anySensorsChecked = false;
-    for (size_t i = 0; i < sensorCount; i++)
-    {
-        bool isChecked = m_model->isSensorChecked(m_db->getSensor(i).id);
-        allSensorsChecked &= isChecked;
-        anySensorsChecked |= isChecked;
-    }
-    m_ui.selectAll->blockSignals(true);
-    m_ui.selectAll->setCheckState(allSensorsChecked ? Qt::Checked : (anySensorsChecked ? Qt::PartiallyChecked : Qt::Unchecked));
-    m_ui.selectAll->blockSignals(false);
 }
 
 SensorsModel& SensorsFilterWidget::getSensorModel()

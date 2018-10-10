@@ -19,9 +19,6 @@ public:
 
 signals:
 
-public slots:
-    void updateSelectionCheckboxes();
-
 private:
     DB* m_db = nullptr;
     std::unique_ptr<SensorsModel> m_model;
