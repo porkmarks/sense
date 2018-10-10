@@ -8,6 +8,7 @@
 #include <bitset>
 #include <array>
 #include <cassert>
+#include <iostream>
 
 static std::array<const char*, 10> s_headerNames = {"Id", "Sensor", "Index", "Timestamp", "Temperature", "Humidity", "Battery", "Signal", "Alarms"};
 
@@ -77,8 +78,9 @@ MeasurementsModel::MeasurementsModel(DB& db)
 
     for (size_t i = 0; i < s_headerNames.size(); i++)
     {
-        m_columnsEnabled[i] = true;
+        m_columnsVisible[i] = true;
     }
+    refreshVisibleColumnToRealColumn();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -124,28 +126,22 @@ int MeasurementsModel::rowCount(QModelIndex const& index) const
 
 int MeasurementsModel::columnCount(QModelIndex const& /*index*/) const
 {
-    int cc = static_cast<int>(m_columnsEnabled.count());
+    int cc = static_cast<int>(m_columnsVisible.count());
     return cc;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-MeasurementsModel::Column MeasurementsModel::computeRealColumnFromVisibleColumn(size_t visibleColumn) const
+void MeasurementsModel::refreshVisibleColumnToRealColumn()
 {
-    size_t count = 0;
+    m_visibleColumnToRealColumn.clear();
     for (size_t i = 0; i < s_headerNames.size(); i++)
     {
-        if (m_columnsEnabled[i] == true)
+        if (m_columnsVisible[i] == true)
         {
-            if (count == visibleColumn)
-            {
-                return static_cast<Column>(i);
-            }
-            count++;
+            m_visibleColumnToRealColumn.push_back(static_cast<Column>(i));
         }
     }
-    assert(0);
-    return Column::Id;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -154,7 +150,7 @@ QVariant MeasurementsModel::headerData(int section, Qt::Orientation orientation,
 {
     if (orientation == Qt::Horizontal && role == Qt::DisplayRole)
     {
-        return s_headerNames[static_cast<size_t>(computeRealColumnFromVisibleColumn(static_cast<size_t>(section)))];
+        return s_headerNames[static_cast<size_t>(m_visibleColumnToRealColumn[static_cast<size_t>(section)])];
     }
     return QAbstractItemModel::headerData(section, orientation, role);
 }
@@ -177,7 +173,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
     DB::Measurement const& measurement = m_measurements[indexRow];
 
     //code to skip over disabled columns
-    Column column = computeRealColumnFromVisibleColumn(static_cast<size_t>(index.column()));
+    Column column = m_visibleColumnToRealColumn[static_cast<size_t>(index.column())];
 
     if (role == UserRole::RealColumnRole)
     {
@@ -313,7 +309,9 @@ void MeasurementsModel::setFilter(DB::Filter const& filter)
 {
     beginResetModel();
     m_filter = filter;
+    //auto start = DB::Clock::now();
     m_measurements = m_db.getFilteredMeasurements(m_filter);
+    //std::cout << "XXX: " << std::chrono::duration_cast<std::chrono::microseconds>(DB::Clock::now() - start).count() << "\n";
     endResetModel();
 
     Q_EMIT layoutChanged();
@@ -323,7 +321,8 @@ void MeasurementsModel::setFilter(DB::Filter const& filter)
 
 void MeasurementsModel::setColumnVisibility(Column column, bool visibility)
 {
-    m_columnsEnabled[static_cast<size_t>(column)] = visibility;
+    m_columnsVisible[static_cast<size_t>(column)] = visibility;
+    refreshVisibleColumnToRealColumn();
 }
 
 //////////////////////////////////////////////////////////////////////////

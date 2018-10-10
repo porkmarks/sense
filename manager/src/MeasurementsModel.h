@@ -72,7 +72,7 @@ protected:
     virtual bool insertRows(int position, int rows, QModelIndex const& parent = QModelIndex());
     virtual bool removeRows(int position, int rows, QModelIndex const& parent = QModelIndex());
 
-    Column computeRealColumnFromVisibleColumn(size_t visibleColumn) const;
+    void refreshVisibleColumnToRealColumn();
 
 private:
     DB& m_db;
@@ -80,5 +80,6 @@ private:
     std::vector<DB::Measurement> m_measurements;
     QTimer* m_refreshTimer = nullptr;
 
-    std::bitset<32> m_columnsEnabled;
+    std::bitset<32> m_columnsVisible;
+    std::vector<Column> m_visibleColumnToRealColumn;
 };
