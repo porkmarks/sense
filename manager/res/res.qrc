@@ -1,5 +1,6 @@
 <RCC>
 <qresource prefix="/">
+<file>icons/ui/mqtt.png</file>
 <file>icons/ui/manager.png</file>
 <file>icons/ui/unbound.png</file>
 <file>icons/ui/sleeping.png</file>
