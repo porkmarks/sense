@@ -15,9 +15,11 @@ private slots:
     void accept() override;
 
 private:
+    void loadSettings();
+    void saveSettings();
 
     void refreshPreview();
-    void exportTo(std::ostream& stream, size_t maxCount);
+    bool exportTo(std::ostream& stream, size_t maxCount, bool showProgress);
 
     Ui::ExportDataDialog m_ui;
     DB& m_db;

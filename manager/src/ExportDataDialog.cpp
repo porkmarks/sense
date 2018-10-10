@@ -2,14 +2,18 @@
 
 #include <QMessageBox>
 #include <QFileDialog>
+#include <QSettings>
+#include <QProgressDialog>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <iomanip>
 #include <cstring>
+#include "Logger.h"
 
+extern Logger s_logger;
 extern float getBatteryLevel(float vcc);
-
+extern float getSignalLevel(int8_t dBm);
 
 ExportDataDialog::ExportDataDialog(DB& db, MeasurementsModel& model)
     : m_db(db)
@@ -26,11 +30,13 @@ ExportDataDialog::ExportDataDialog(DB& db, MeasurementsModel& model)
     connect(m_ui.exportTemperature, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
     connect(m_ui.exportHumidity, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
     connect(m_ui.exportBattery, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
+    connect(m_ui.exportSignal, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
     connect(m_ui.units, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &ExportDataDialog::refreshPreview);
-    connect(m_ui.exportBattery, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
     connect(m_ui.decimalPlaces, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, &ExportDataDialog::refreshPreview);
     connect(m_ui.separator, &QLineEdit::textChanged, this, &ExportDataDialog::refreshPreview);
     connect(m_ui.tabSeparator, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
+
+    loadSettings();
 
     refreshPreview();
 }
@@ -40,15 +46,59 @@ ExportDataDialog::ExportDataDialog(DB& db, MeasurementsModel& model)
 void ExportDataDialog::refreshPreview()
 {
     std::stringstream stream;
-    exportTo(stream, 100);
+    exportTo(stream, 100, false);
 
     m_ui.previewText->setText((stream.str() + "\n.....\n").c_str());
 }
 
 //////////////////////////////////////////////////////////////////////////
 
+void ExportDataDialog::loadSettings()
+{
+    QSettings settings;
+    m_ui.dateFormat->setCurrentIndex(settings.value("exportData/dateFormat", 0).toInt());
+    m_ui.exportId->setChecked(settings.value("exportData/exportId", true).toBool());
+    m_ui.exportIndex->setChecked(settings.value("exportData/exportIndex", true).toBool());
+    m_ui.exportSensorName->setChecked(settings.value("exportData/exportSensorName", true).toBool());
+    m_ui.exportSensorSN->setChecked(settings.value("exportData/exportSensorSN", true).toBool());
+    m_ui.exportTimePoint->setChecked(settings.value("exportData/exportTimePoint", true).toBool());
+    m_ui.exportTemperature->setChecked(settings.value("exportData/exportTemperature", true).toBool());
+    m_ui.exportHumidity->setChecked(settings.value("exportData/exportHumidity", true).toBool());
+    m_ui.exportBattery->setChecked(settings.value("exportData/exportBattery", false).toBool());
+    m_ui.exportSignal->setChecked(settings.value("exportData/exportSignal", false).toBool());
+    m_ui.units->setCurrentIndex(settings.value("exportData/units", 1).toInt());
+    m_ui.decimalPlaces->setValue(settings.value("exportData/decimalPlaces", 2).toInt());
+    m_ui.separator->setText(settings.value("exportData/separator", ";").toString());
+    m_ui.tabSeparator->setChecked(settings.value("exportData/tabSeparator", false).toBool());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void ExportDataDialog::saveSettings()
+{
+    QSettings settings;
+    settings.setValue("exportData/dateFormat", m_ui.dateFormat->currentIndex());
+    settings.setValue("exportData/exportId", m_ui.exportId->isChecked());
+    settings.setValue("exportData/exportIndex", m_ui.exportIndex->isChecked());
+    settings.setValue("exportData/exportSensorName", m_ui.exportSensorName->isChecked());
+    settings.setValue("exportData/exportSensorSN", m_ui.exportSensorSN->isChecked());
+    settings.setValue("exportData/exportTimePoint", m_ui.exportTimePoint->isChecked());
+    settings.setValue("exportData/exportTemperature", m_ui.exportTemperature->isChecked());
+    settings.setValue("exportData/exportHumidity", m_ui.exportHumidity->isChecked());
+    settings.setValue("exportData/exportBattery", m_ui.exportBattery->isChecked());
+    settings.setValue("exportData/exportSignal", m_ui.exportSignal->isChecked());
+    settings.setValue("exportData/units", m_ui.units->currentIndex());
+    settings.setValue("exportData/decimalPlaces", m_ui.decimalPlaces->value());
+    settings.setValue("exportData/separator", m_ui.separator->text());
+    settings.setValue("exportData/tabSeparator", m_ui.tabSeparator->isChecked());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void ExportDataDialog::accept()
 {
+    saveSettings();
+
     QString extension = "Export Files (*.csv)";
 
     QString fileName = QFileDialog::getSaveFileName(this, "Select export file", QString(), extension);
@@ -57,27 +107,38 @@ void ExportDataDialog::accept()
         return;
     }
 
+    bool finished = false;
     {
         std::ofstream file(fileName.toUtf8().data());
         if (!file.is_open())
         {
-            QMessageBox::critical(this, "Error", QString("Cannot open file '%1' for writing:\n%2").arg(fileName).arg(std::strerror(errno)));
+            QString msg = QString("Cannot open file '%1' for exporting data:\n%2").arg(fileName).arg(std::strerror(errno));
+            s_logger.logCritical(msg);
+            QMessageBox::critical(this, "Error", msg);
             return;
         }
 
-        exportTo(file, size_t(-1));
-
+        finished = exportTo(file, size_t(-1), true);
         file.close();
+
+        if (!finished)
+        {
+            //cancelled
+            std::remove(fileName.toUtf8().data());
+        }
     }
 
-    QMessageBox::information(this, "Success", QString("Data was exported to file '%1'").arg(fileName));
+    QString msg = finished ? QString("Data was exported to file '%1'").arg(fileName) :
+                             QString("Exporting data to file '%1' was cancelled").arg(fileName);
+    s_logger.logInfo(msg);
+    QMessageBox::information(this, "Success", msg);
 
     QDialog::accept();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount)
+bool ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount, bool showProgress)
 {
     std::string separator = m_ui.separator->text().toUtf8().data();
     if (m_ui.tabSeparator->isChecked())
@@ -109,6 +170,7 @@ void ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount)
     bool exportTemperature = m_ui.exportTemperature->isChecked();
     bool exportHumidity = m_ui.exportHumidity->isChecked();
     bool exportBattery = m_ui.exportBattery->isChecked();
+    bool exportSignal = m_ui.exportSignal->isChecked();
     UnitsFormat unitsFormat = static_cast<UnitsFormat>(m_ui.units->currentIndex());
     int decimalPlaces = m_ui.decimalPlaces->value();
 
@@ -168,12 +230,40 @@ void ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount)
             stream << separator;
         }
     }
+    if (exportSignal)
+    {
+        stream << "Signal";
+        stream << separator;
+        if (unitsFormat == UnitsFormat::SeparateColumn)
+        {
+            stream << "Signal Unit";
+            stream << separator;
+        }
+    }
     stream << std::endl;
 
     //data
-    size_t size = m_model.getMeasurementCount();
-    for (size_t i = 0; i < std::min(size, maxCount); i++)
+    size_t size = std::min(m_model.getMeasurementCount(), maxCount);
+
+    std::unique_ptr<QProgressDialog> progressDialog;
+    if (showProgress)
     {
+        progressDialog.reset(new QProgressDialog("Exporting data...", "Abort", 0, size / 16, this));
+        progressDialog->setWindowModality(Qt::WindowModal);
+        progressDialog->setMinimumDuration(1000);
+    }
+
+    for (size_t i = 0; i < size; i++)
+    {
+        if (progressDialog && (i & 0xF) == 0)
+        {
+            progressDialog->setValue(i / 16);
+            if (progressDialog->wasCanceled())
+            {
+                return false;
+            }
+        }
+
         DB::Measurement const& m = m_model.getMeasurement(i);
         if (exportId)
         {
@@ -277,6 +367,22 @@ void ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount)
                 stream << separator;
             }
         }
+        if (exportSignal)
+        {
+            stream << std::fixed << std::setprecision(decimalPlaces) << getSignalLevel(std::min(m.descriptor.signalStrength.b2s, m.descriptor.signalStrength.s2b)) * 100.f;
+            if (unitsFormat == UnitsFormat::Embedded)
+            {
+                stream << " %";
+            }
+            stream << separator;
+            if (unitsFormat == UnitsFormat::SeparateColumn)
+            {
+                stream << "%";
+                stream << separator;
+            }
+        }
         stream << std::endl;
     }
+
+    return true;
 }

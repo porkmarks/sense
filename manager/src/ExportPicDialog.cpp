@@ -5,19 +5,43 @@
 #include <sstream>
 #include <iomanip>
 #include <cstring>
+#include "Logger.h"
+
+extern Logger s_logger;
+
 
 ExportPicDialog::ExportPicDialog(PlotWidget& plotWidget)
     : m_plotWidget(plotWidget)
 {
     m_ui.setupUi(this);
-    m_ui.width->setValue(plotWidget.getPlotSize().width());
-    m_ui.height->setValue(plotWidget.getPlotSize().height());
+
+    loadSettings();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void ExportPicDialog::loadSettings()
+{
+    QSettings settings;
+    m_ui.legend->setChecked(settings.value("exportPic/legend", true).toBool());
+    m_ui.annotations->setChecked(settings.value("exportPic/annotations", true).toBool());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void ExportPicDialog::saveSettings()
+{
+    QSettings settings;
+    settings.setValue("exportPic/legend", m_ui.legend->isChecked());
+    settings.setValue("exportPic/annotations", m_ui.annotations->isChecked());
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void ExportPicDialog::accept()
 {
+    saveSettings();
+
     QString extension = "Image (*.png)";
 
     QString fileName = QFileDialog::getSaveFileName(this, "Select export file", QString(), extension);
@@ -39,7 +63,9 @@ void ExportPicDialog::accept()
 
 //    file.close();
 
-    QMessageBox::information(this, "Success", QString("Image was exported to file '%1'").arg(fileName));
+    QString msg = QString("Plot was exported to file '%1'").arg(fileName);
+    QMessageBox::information(this, "Success", msg);
+    s_logger.logInfo(msg);
 
     QDialog::accept();
 }

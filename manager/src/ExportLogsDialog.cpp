@@ -2,13 +2,17 @@
 
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QSettings>
+#include <QProgressDialog>
 
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <iomanip>
 #include <cstring>
+#include "Logger.h"
 
+extern Logger s_logger;
 extern float getBatteryLevel(float vcc);
 
 
@@ -25,7 +29,36 @@ ExportLogsDialog::ExportLogsDialog(LogsModel& model)
     connect(m_ui.separator, &QLineEdit::textChanged, this, &ExportLogsDialog::refreshPreview);
     connect(m_ui.tabSeparator, &QCheckBox::stateChanged, this, &ExportLogsDialog::refreshPreview);
 
+    loadSettings();
     refreshPreview();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void ExportLogsDialog::loadSettings()
+{
+    QSettings settings;
+    m_ui.dateFormat->setCurrentIndex(settings.value("exportLogs/dateFormat", 0).toInt());
+    m_ui.exportIndex->setChecked(settings.value("exportLogs/exportIndex", true).toBool());
+    m_ui.exportTimePoint->setChecked(settings.value("exportLogs/exportTimePoint", true).toBool());
+    m_ui.exportType->setChecked(settings.value("exportLogs/exportType", true).toBool());
+    m_ui.exportMessage->setChecked(settings.value("exportLogs/exportMessage", true).toBool());
+    m_ui.separator->setText(settings.value("exportLogs/separator", ";").toString());
+    m_ui.tabSeparator->setChecked(settings.value("exportLogs/tabSeparator", false).toBool());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void ExportLogsDialog::saveSettings()
+{
+    QSettings settings;
+    settings.setValue("exportLogs/dateFormat", m_ui.dateFormat->currentIndex());
+    settings.setValue("exportLogs/exportIndex", m_ui.exportIndex->isChecked());
+    settings.setValue("exportLogs/exportTimePoint", m_ui.exportTimePoint->isChecked());
+    settings.setValue("exportLogs/exportType", m_ui.exportType->isChecked());
+    settings.setValue("exportLogs/exportMessage", m_ui.exportMessage->isChecked());
+    settings.setValue("exportLogs/separator", m_ui.separator->text());
+    settings.setValue("exportLogs/tabSeparator", m_ui.tabSeparator->isChecked());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -33,7 +66,7 @@ ExportLogsDialog::ExportLogsDialog(LogsModel& model)
 void ExportLogsDialog::refreshPreview()
 {
     std::stringstream stream;
-    exportTo(stream, 100);
+    exportTo(stream, 100, false);
 
     m_ui.previewText->setText((stream.str() + "\n.....\n").c_str());
 }
@@ -42,6 +75,8 @@ void ExportLogsDialog::refreshPreview()
 
 void ExportLogsDialog::accept()
 {
+    saveSettings();
+
     QString extension = "Export Files (*.csv)";
 
     QString fileName = QFileDialog::getSaveFileName(this, "Select export file", QString(), extension);
@@ -50,27 +85,38 @@ void ExportLogsDialog::accept()
         return;
     }
 
+    bool finished = false;
     {
         std::ofstream file(fileName.toUtf8().data());
         if (!file.is_open())
         {
-            QMessageBox::critical(this, "Error", QString("Cannot open file '%1' for writing:\n%2").arg(fileName).arg(std::strerror(errno)));
+            QString msg = QString("Cannot open file '%1' for exporting logs:\n%2").arg(fileName).arg(std::strerror(errno));
+            s_logger.logCritical(msg);
+            QMessageBox::critical(this, "Error", msg);
             return;
         }
 
-        exportTo(file, size_t(-1));
-
+        finished = exportTo(file, size_t(-1), true);
         file.close();
+
+        if (!finished)
+        {
+            //cancelled
+            std::remove(fileName.toUtf8().data());
+        }
     }
 
-    QMessageBox::information(this, "Success", QString("Data was exported to file '%1'").arg(fileName));
+    QString msg = finished ? QString("Logs were exported to file '%1'").arg(fileName) :
+                             QString("Exporting logs to file '%1' was cancelled").arg(fileName);
+    s_logger.logInfo(msg);
+    QMessageBox::information(this, "Success", msg);
 
     QDialog::accept();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void ExportLogsDialog::exportTo(std::ostream& stream, size_t maxCount)
+bool ExportLogsDialog::exportTo(std::ostream& stream, size_t maxCount, bool showProgress)
 {
     std::string separator = m_ui.separator->text().toUtf8().data();
     if (m_ui.tabSeparator->isChecked())
@@ -123,9 +169,27 @@ void ExportLogsDialog::exportTo(std::ostream& stream, size_t maxCount)
     stream << std::endl;
 
     //data
-    size_t size = m_model.getLineCount();
-    for (size_t i = 0; i < std::min(size, maxCount); i++)
+    size_t size = std::min(m_model.getLineCount(), maxCount);
+
+    std::unique_ptr<QProgressDialog> progressDialog;
+    if (showProgress)
     {
+        progressDialog.reset(new QProgressDialog("Exporting logs...", "Abort", 0, size / 16, this));
+        progressDialog->setWindowModality(Qt::WindowModal);
+        progressDialog->setMinimumDuration(1000);
+    }
+
+    for (size_t i = 0; i < size; i++)
+    {
+        if (progressDialog && (i & 0xF) == 0)
+        {
+            progressDialog->setValue(i / 16);
+            if (progressDialog->wasCanceled())
+            {
+                return false;
+            }
+        }
+
         Logger::LogLine const& l = m_model.getLine(i);
         if (exportIndex)
         {
@@ -175,4 +239,6 @@ void ExportLogsDialog::exportTo(std::ostream& stream, size_t maxCount)
         }
         stream << std::endl;
     }
+
+    return true;
 }

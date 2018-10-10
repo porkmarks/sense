@@ -15,7 +15,8 @@ private slots:
     void accept() override;
 
 private:
-
+    void loadSettings();
+    void saveSettings();
     void showPreview();
     void exportTo();
 
