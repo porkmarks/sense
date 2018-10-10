@@ -24,6 +24,8 @@ public:
 signals:
 
 private slots:
+    void scheduleSlowRefresh();
+    void scheduleFastRefresh();
     void refresh();
     void selectSensors();
     void exportData();
@@ -39,6 +41,9 @@ private:
     DB::Filter createFilter() const;
 
     Ui::MeasurementsWidget m_ui;
+
+    void scheduleRefresh(DB::Clock::duration dt);
+    std::unique_ptr<QTimer> m_scheduleTimer;
 
     DB* m_db = nullptr;
     std::unique_ptr<MeasurementsModel> m_model;

@@ -60,6 +60,16 @@ Settings::~Settings()
 
 //////////////////////////////////////////////////////////////////////////
 
+void Settings::process()
+{
+    for (std::unique_ptr<DB>& db: m_dbs)
+    {
+        db->process();
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 bool Settings::create(std::string const& name)
 {
     m_dataName = "sense-" + name + ".settings";

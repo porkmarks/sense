@@ -22,6 +22,7 @@ public:
 
     void test();
 
+    void process();
     bool create(std::string const& name);
     bool load(std::string const& name);
 
@@ -131,7 +132,18 @@ public:
     bool setSensor(SensorId id, SensorDescriptor const& descriptor);
     bool bindSensor(SensorId id, SensorAddress address, uint32_t serialNumber, Sensor::Calibration const& calibration);
     bool setSensorState(SensorId id, Sensor::State state);
-    bool setSensorDetails(SensorId id, Clock::time_point nextMeasurementTimePoint, Clock::time_point nextCommsTimePoint, uint32_t storedMeasurementCount);
+
+    struct SensorDetails
+    {
+        SensorId id;
+        Clock::time_point nextMeasurementTimePoint = Clock::time_point(Clock::duration::zero());
+        Clock::time_point lastCommsTimePoint = Clock::time_point(Clock::duration::zero());
+        uint32_t storedMeasurementCount = 0;
+    };
+
+    bool setSensorDetails(SensorDetails const& details);
+    bool setSensorsDetails(std::vector<SensorDetails> const& details);
+
     void removeSensor(size_t index);
     int32_t findSensorIndexByName(std::string const& name) const;
     int32_t findSensorIndexById(SensorId id) const;
@@ -382,6 +394,7 @@ private:
     std::atomic_bool m_threadsExit = { false };
 
     void triggerSave();
+    void triggerDelayedSave(Clock::duration i_dt);
     void storeThreadProc();
     void save(Data const& data) const;
     std::atomic_bool m_storeThreadTriggered = { false };
@@ -392,6 +405,10 @@ private:
 
     std::string m_dbName;
     std::string m_dataName;
+
+    std::mutex m_delayedTriggerSaveMutex;
+    bool m_delayedTriggerSave = false;
+    Clock::time_point m_delayedTriggerSaveTP;
 
     mutable Clock::time_point m_lastDailyBackupTP = Clock::time_point(Clock::duration::zero());
     mutable Clock::time_point m_lastWeeklyBackupTP = Clock::time_point(Clock::duration::zero());

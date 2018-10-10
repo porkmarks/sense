@@ -67,7 +67,7 @@ static void clipBackups(std::string const& filename, std::string const& folder, 
     std::vector<FD> bkFiles = getBackupFiles(filename, folder);
     bool trim = bkFiles.size() > maxBackups;
 
-    s_logger.logVerbose(QString("File '%1' has %2 out of %3 backups. %4").arg(filename.c_str()).arg(bkFiles.size()).arg(maxBackups).arg(trim ? "Trimming" : "No trimming"));
+    //s_logger.logVerbose(QString("File '%1' has %2 out of %3 backups. %4").arg(filename.c_str()).arg(bkFiles.size()).arg(maxBackups).arg(trim ? "Trimming" : "No trimming"));
 
     if (!trim)
     {
@@ -77,7 +77,7 @@ static void clipBackups(std::string const& filename, std::string const& folder, 
     std::sort(bkFiles.begin(), bkFiles.end(), [](FD const& a, FD const& b) { return a.second < b.second; });
     while (bkFiles.size() > maxBackups)
     {
-        s_logger.logVerbose(QString("Deleting backup of file '%1'").arg(filename.c_str()));
+        //s_logger.logVerbose(QString("Deleting backup of file '%1'").arg(filename.c_str()));
         remove((folder + "/" + bkFiles.front().first).c_str());
         bkFiles.erase(bkFiles.begin());
     }

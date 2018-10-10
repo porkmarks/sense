@@ -57,20 +57,22 @@ void PlotWidget::init(DB& db)
     m_db = &db;
 
     m_uiConnections.push_back(connect(m_ui.clearAnnotations, &QPushButton::released, this, &PlotWidget::clearAnnotations));
-    m_uiConnections.push_back(connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &PlotWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.selectSensors, &QPushButton::released, this, &PlotWidget::selectSensors, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.exportData, &QPushButton::released, this, &PlotWidget::exportData));
 
-    m_uiConnections.push_back(connect(m_ui.fitMeasurements, &QCheckBox::stateChanged, this, &PlotWidget::refresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.minTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.maxTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.minHumidity, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.maxHumidity, &QDoubleSpinBox::editingFinished, this, &PlotWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.fitMeasurements, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.minTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.maxTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.minHumidity, &QDoubleSpinBox::editingFinished, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.maxHumidity, &QDoubleSpinBox::editingFinished, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
 
-    m_uiConnections.push_back(connect(m_ui.useSmoothing, &QCheckBox::stateChanged, this, &PlotWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.useSmoothing, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
 
-    m_uiConnections.push_back(connect(m_ui.showTemperature, &QCheckBox::stateChanged, this, &PlotWidget::refresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.showHumidity, &QCheckBox::stateChanged, this, &PlotWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.showTemperature, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.showHumidity, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+
+    m_uiConnections.push_back(connect(m_db, &DB::measurementsAdded, this, &PlotWidget::scheduleSlowRefresh, Qt::QueuedConnection));
 
     loadSettings();
 
@@ -224,8 +226,40 @@ DB::Filter PlotWidget::createFilter() const
 
 //////////////////////////////////////////////////////////////////////////
 
+void PlotWidget::scheduleFastRefresh()
+{
+    scheduleRefresh(std::chrono::milliseconds(500));
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::scheduleSlowRefresh()
+{
+    scheduleRefresh(std::chrono::seconds(30));
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::scheduleRefresh(DB::Clock::duration dt)
+{
+    int duration = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(dt).count());
+    if (m_scheduleTimer && m_scheduleTimer->remainingTime() < duration)
+    {
+        return;
+    }
+    m_scheduleTimer.reset(new QTimer());
+    m_scheduleTimer->setSingleShot(true);
+    m_scheduleTimer->setInterval(duration);
+    connect(m_scheduleTimer.get(), &QTimer::timeout, this, &PlotWidget::refresh);
+    m_scheduleTimer->start();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void PlotWidget::refresh()
 {
+    m_scheduleTimer.reset();
+
     m_useSmoothing = m_ui.useSmoothing->isChecked();
     m_fitMeasurements = m_ui.fitMeasurements->isChecked();
 

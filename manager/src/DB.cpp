@@ -57,6 +57,17 @@ DB::DB()
 
 DB::~DB()
 {
+    if (m_delayedTriggerSave)
+    {
+        std::cout << "A DB save was scheduled. Performing it now...\n";
+        triggerSave();
+        while (m_storeThreadTriggered) //wait for the thread to finish saving
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        std::cout << "Finished scheduled save\n";
+    }
+
     m_threadsExit = true;
 
     m_storeCV.notify_all();
@@ -89,6 +100,25 @@ bool DB::create(std::string const& name)
     s_logger.logVerbose(QString("Creating DB files: '%1' & '%2'").arg(m_dataName.c_str()).arg(m_dbName.c_str()));
 
     return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void DB::process()
+{
+    bool trigger = false;
+    {
+        std::lock_guard<std::mutex> lg(m_delayedTriggerSaveMutex);
+        if (m_delayedTriggerSave)
+        {
+            trigger = Clock::now() >= m_delayedTriggerSaveTP;
+        }
+    }
+
+    if (trigger)
+    {
+        triggerSave();
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -820,7 +850,7 @@ bool DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
 
     s_logger.logInfo("Added sensors config");
 
-    triggerSave();
+    triggerDelayedSave(std::chrono::seconds(1));
 
     return true;
 }
@@ -841,7 +871,7 @@ bool DB::setSensorsConfigs(std::vector<SensorsConfig> const& configs)
 
     s_logger.logInfo("Changed sensors configs");
 
-    triggerSave();
+    triggerDelayedSave(std::chrono::seconds(1));
     return true;
 }
 
@@ -895,7 +925,7 @@ bool DB::addSensor(SensorDescriptor const& descriptor)
         s_logger.logInfo(QString("Added sensor '%1'").arg(descriptor.name.c_str()));
     }
 
-    triggerSave();
+    triggerDelayedSave(std::chrono::seconds(1));
 
     return true;
 }
@@ -922,7 +952,7 @@ bool DB::setSensor(SensorId id, SensorDescriptor const& descriptor)
 
     s_logger.logInfo(QString("Changed sensor '%1'").arg(descriptor.name.c_str()));
 
-    triggerSave();
+    triggerDelayedSave(std::chrono::seconds(1));
 
     return true;
 }
@@ -959,7 +989,7 @@ bool DB::bindSensor(SensorId id, SensorAddress address, uint32_t serialNumber, S
 
     s_logger.logInfo(QString("Sensor '%1' bound").arg(sensor.descriptor.name.c_str()));
 
-    triggerSave();
+    triggerDelayedSave(std::chrono::seconds(1));
 
     return true;
 }
@@ -986,40 +1016,53 @@ bool DB::setSensorState(SensorId id, Sensor::State state)
 
     s_logger.logInfo(QString("Sensor '%1' changed state to %2").arg(sensor.descriptor.name.c_str()).arg(static_cast<int>(state)));
 
-    triggerSave();
+    triggerDelayedSave(std::chrono::seconds(1));
 
     return true;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::setSensorDetails(SensorId id, Clock::time_point nextMeasurementTimePoint, Clock::time_point lastCommsTimePoint, uint32_t storedMeasurementCount)
+bool DB::setSensorDetails(SensorDetails const& details)
 {
-    int32_t _index = findSensorIndexById(id);
-    if (_index < 0)
+    return setSensorsDetails({details});
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool DB::setSensorsDetails(std::vector<SensorDetails> const& details)
+{
+    bool ok = true;
+    for (SensorDetails const& d: details)
     {
-        return false;
+        int32_t _index = findSensorIndexById(d.id);
+        if (_index < 0)
+        {
+            ok = false;
+            continue;
+        }
+
+        size_t index = static_cast<size_t>(_index);
+        Sensor& sensor = m_mainData.sensors[index];
+        if (sensor.state == Sensor::State::Unbound)
+        {
+            ok = false;
+            continue;
+        }
+
+        sensor.nextMeasurementTimePoint = d.nextMeasurementTimePoint;
+        if (d.lastCommsTimePoint > sensor.lastCommsTimePoint)
+        {
+            sensor.lastCommsTimePoint = d.lastCommsTimePoint;
+        }
+        sensor.storedMeasurementCount = static_cast<int32_t>(d.storedMeasurementCount);
+
+        emit sensorDataChanged(sensor.id);
     }
 
-    size_t index = static_cast<size_t>(_index);
-    Sensor& sensor = m_mainData.sensors[index];
-    if (sensor.state == Sensor::State::Unbound)
-    {
-        return false;
-    }
+    triggerDelayedSave(std::chrono::seconds(1));
 
-    sensor.nextMeasurementTimePoint = nextMeasurementTimePoint;
-    if (lastCommsTimePoint > sensor.lastCommsTimePoint)
-    {
-        sensor.lastCommsTimePoint = lastCommsTimePoint;
-    }
-    sensor.storedMeasurementCount = static_cast<int32_t>(storedMeasurementCount);
-
-    emit sensorDataChanged(sensor.id);
-
-    triggerSave();
-
-    return true;
+    return ok;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1057,7 +1100,7 @@ void DB::removeSensor(size_t index)
     m_mainData.sensors.erase(m_mainData.sensors.begin() + index);
     emit sensorRemoved(sensorId);
 
-    triggerSave();
+    triggerDelayedSave(std::chrono::seconds(1));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1123,7 +1166,7 @@ bool DB::addAlarm(AlarmDescriptor const& descriptor)
 
     s_logger.logInfo(QString("Added alarm '%1'").arg(descriptor.name.c_str()));
 
-    triggerSave();
+    triggerDelayedSave(std::chrono::seconds(1));
 
     return true;
 }
@@ -1150,7 +1193,7 @@ bool DB::setAlarm(AlarmId id, AlarmDescriptor const& descriptor)
 
     s_logger.logInfo(QString("Changed alarm '%1'").arg(descriptor.name.c_str()));
 
-    triggerSave();
+    triggerDelayedSave(std::chrono::seconds(1));
 
     return true;
 }
@@ -1168,7 +1211,7 @@ void DB::removeAlarm(size_t index)
     m_mainData.alarms.erase(m_mainData.alarms.begin() + index);
     emit alarmRemoved(id);
 
-    triggerSave();
+    triggerDelayedSave(std::chrono::seconds(1));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1311,7 +1354,7 @@ bool DB::addReport(ReportDescriptor const& descriptor)
 
     s_logger.logInfo(QString("Added report '%1'").arg(descriptor.name.c_str()));
 
-    triggerSave();
+    triggerDelayedSave(std::chrono::seconds(1));
 
     return true;
 }
@@ -1338,7 +1381,7 @@ bool DB::setReport(ReportId id, ReportDescriptor const& descriptor)
 
     s_logger.logInfo(QString("Changed report '%1'").arg(descriptor.name.c_str()));
 
-    triggerSave();
+    triggerDelayedSave(std::chrono::seconds(1));
 
     return true;
 }
@@ -1356,7 +1399,7 @@ void DB::removeReport(size_t index)
     m_mainData.reports.erase(m_mainData.reports.begin() + index);
     emit reportRemoved(id);
 
-    triggerSave();
+    triggerDelayedSave(std::chrono::seconds(1));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1453,7 +1496,7 @@ void DB::setReportExecuted(ReportId id)
     Report& report = m_mainData.reports[index];
     report.lastTriggeredTimePoint = Clock::now();
 
-    triggerSave();
+    triggerDelayedSave(std::chrono::seconds(1));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1537,7 +1580,7 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
     sensor.averageSignalStrength = computeAverageSignalStrength(sensor.id, m_mainData);
     emit sensorDataChanged(sensor.id);
 
-    triggerSave();
+    triggerDelayedSave(std::chrono::seconds(1));
 
     return true;
 }
@@ -1849,6 +1892,11 @@ DB::SignalStrength DB::computeAverageSignalStrength(SensorId sensorId, Data cons
 void DB::triggerSave()
 {
     {
+        std::lock_guard<std::mutex> lg(m_delayedTriggerSaveMutex);
+        m_delayedTriggerSave = false;
+    }
+
+    {
         std::unique_lock<std::mutex> lg(m_storeMutex);
         m_storeData = m_mainData;
         m_storeThreadTriggered = true;
@@ -1856,6 +1904,27 @@ void DB::triggerSave()
     m_storeCV.notify_all();
 
     //s_logger.logVerbose("DB save triggered");
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void DB::triggerDelayedSave(Clock::duration i_dt)
+{
+    if (i_dt < std::chrono::milliseconds(100))
+    {
+        triggerSave();
+        return;
+    }
+
+    std::lock_guard<std::mutex> lg(m_delayedTriggerSaveMutex);
+    if (m_delayedTriggerSave && m_delayedTriggerSaveTP < Clock::now() + i_dt)
+    {
+        //if the previous schedule is sooner than the new one, leave the previous intact
+        return;
+    }
+
+    m_delayedTriggerSaveTP = Clock::now() + i_dt;
+    m_delayedTriggerSave = true;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -2105,7 +2174,7 @@ void DB::storeThreadProc()
 {
     while (!m_threadsExit)
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         Data data;
         {
             //wait for data

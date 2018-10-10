@@ -349,6 +349,7 @@ void Manager::process()
 
     m_comms.process();
     s_logger.process();
+    m_settings.process();
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -205,6 +205,8 @@ void Comms::processSensorDetails(InitializedBaseStation& cbs, std::vector<uint8_
         return;
     }
 
+    std::vector<DB::SensorDetails> sensorsDetails;
+
     {
         auto it = document.FindMember("sensors");
         if (it == document.MemberEnd() || !it->value.IsArray())
@@ -214,8 +216,11 @@ void Comms::processSensorDetails(InitializedBaseStation& cbs, std::vector<uint8_
         }
 
         rapidjson::Value const& sensorArrayj = it->value;
+        sensorsDetails.reserve(sensorArrayj.Size());
+
         for (size_t i = 0; i < sensorArrayj.Size(); i++)
         {
+            DB::SensorDetails details;
             rapidjson::Value const& sensorj = sensorArrayj[i];
 
             auto it = sensorj.FindMember("id");
@@ -224,12 +229,12 @@ void Comms::processSensorDetails(InitializedBaseStation& cbs, std::vector<uint8_
                 s_logger.logCritical(QString("Cannot deserialize sensor details: Missing id."));
                 continue;
             }
-            DB::SensorId id = it->value.GetUint();
+            details.id = it->value.GetUint();
 
-            int32_t sensorIndex = cbs.db.findSensorIndexById(id);
+            int32_t sensorIndex = cbs.db.findSensorIndexById(details.id);
             if (sensorIndex < 0)
             {
-                s_logger.logCritical(QString("Cannot deserialize sensor details: cannot find sensor id %1.").arg(id));
+                s_logger.logCritical(QString("Cannot deserialize sensor details: cannot find sensor id %1.").arg(details.id));
                 continue;
             }
 
@@ -288,7 +293,7 @@ void Comms::processSensorDetails(InitializedBaseStation& cbs, std::vector<uint8_
                 s_logger.logCritical(QString("Cannot deserialize sensor details: Missing recorded_measurement_count."));
                 continue;
             }
-            uint32_t recordedMeasurementCount = it->value.GetUint();
+            details.storedMeasurementCount = it->value.GetUint();
 
             it = sensorj.FindMember("next_measurement_dt");
             if (it == sensorj.MemberEnd() || !it->value.IsInt())
@@ -296,7 +301,7 @@ void Comms::processSensorDetails(InitializedBaseStation& cbs, std::vector<uint8_
                 s_logger.logCritical(QString("Cannot deserialize sensor details: Missing next_measurement_dt."));
                 continue;
             }
-            DB::Clock::time_point nmtp = DB::Clock::now() + std::chrono::seconds(it->value.GetInt());
+            details.nextMeasurementTimePoint = DB::Clock::now() + std::chrono::seconds(it->value.GetInt());
 
             it = sensorj.FindMember("last_comms_tp");
             if (it == sensorj.MemberEnd() || !it->value.IsUint64())
@@ -304,13 +309,14 @@ void Comms::processSensorDetails(InitializedBaseStation& cbs, std::vector<uint8_
                 s_logger.logCritical(QString("Cannot deserialize sensor details: Missing last_comms_tp."));
                 continue;
             }
-            DB::Clock::time_point lctp = DB::Clock::from_time_t(time_t(it->value.GetUint64()));
-
-            if (!cbs.db.setSensorDetails(id, nmtp, lctp, recordedMeasurementCount))
-            {
-                s_logger.logCritical(QString("Cannot deserialize sensor details: failed to set sensor details."));
-            }
+            details.lastCommsTimePoint = DB::Clock::from_time_t(time_t(it->value.GetUint64()));
+            sensorsDetails.push_back(details);
         }
+    }
+
+    if (!cbs.db.setSensorsDetails(sensorsDetails))
+    {
+        s_logger.logCritical(QString("Cannot deserialize sensor details: failed to set sensor details."));
     }
 }
 

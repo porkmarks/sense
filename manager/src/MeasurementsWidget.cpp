@@ -96,7 +96,7 @@ void MeasurementsWidget::init(DB& db)
 
     refresh();
 
-    m_uiConnections.push_back(connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.selectSensors, &QPushButton::released, this, &MeasurementsWidget::selectSensors, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.exportData, &QPushButton::released, this, &MeasurementsWidget::exportData));
 
@@ -107,17 +107,19 @@ void MeasurementsWidget::init(DB& db)
     m_uiConnections.push_back(connect(m_ui.maxHumidity, (&QDoubleSpinBox::editingFinished), this, &MeasurementsWidget::maxHumidityChanged));
 
 
-    m_uiConnections.push_back(connect(m_ui.useTemperature, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.minTemperature, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.maxTemperature, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.useHumidity, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.minHumidity, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.maxHumidity, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.useTemperature, &QCheckBox::stateChanged, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.minTemperature, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.maxTemperature, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.useHumidity, &QCheckBox::stateChanged, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.minHumidity, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.maxHumidity, &QDoubleSpinBox::editingFinished, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
 
-    m_uiConnections.push_back(connect(m_ui.showTemperature, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.showHumidity, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.showBattery, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.showSignal, &QCheckBox::stateChanged, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.showTemperature, &QCheckBox::stateChanged, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.showHumidity, &QCheckBox::stateChanged, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.showBattery, &QCheckBox::stateChanged, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.showSignal, &QCheckBox::stateChanged, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
+
+    m_uiConnections.push_back(connect(m_db, &DB::measurementsAdded, this, &MeasurementsWidget::scheduleSlowRefresh, Qt::QueuedConnection));
 
     loadSettings();
 }
@@ -284,8 +286,40 @@ DB::Filter MeasurementsWidget::createFilter() const
 
 //////////////////////////////////////////////////////////////////////////
 
+void MeasurementsWidget::scheduleFastRefresh()
+{
+    scheduleRefresh(std::chrono::milliseconds(500));
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsWidget::scheduleSlowRefresh()
+{
+    scheduleRefresh(std::chrono::seconds(30));
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsWidget::scheduleRefresh(DB::Clock::duration dt)
+{
+    int duration = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(dt).count());
+    if (m_scheduleTimer && m_scheduleTimer->remainingTime() < duration)
+    {
+        return;
+    }
+    m_scheduleTimer.reset(new QTimer());
+    m_scheduleTimer->setSingleShot(true);
+    m_scheduleTimer->setInterval(duration);
+    connect(m_scheduleTimer.get(), &QTimer::timeout, this, &MeasurementsWidget::refresh);
+    m_scheduleTimer->start();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void MeasurementsWidget::refresh()
 {
+    m_scheduleTimer.reset();
+
     DB::Clock::time_point start = DB::Clock::now();
 
     m_model->setColumnVisibility(MeasurementsModel::Column::Temperature, m_ui.showTemperature->isChecked());
@@ -296,10 +330,10 @@ void MeasurementsWidget::refresh()
     DB::Filter filter = createFilter();
     m_model->setFilter(filter);
 
-    s_logger.logVerbose(QString("Refreshed %1/%2 measurements: %3ms")
+    std::cout << (QString("Refreshed %1/%2 measurements: %3ms\n")
                         .arg(m_model->getMeasurementCount())
                         .arg(m_db->getAllMeasurementCount())
-                        .arg(std::chrono::duration_cast<std::chrono::milliseconds>(DB::Clock::now() - start).count()));
+                        .arg(std::chrono::duration_cast<std::chrono::milliseconds>(DB::Clock::now() - start).count())).toStdString();
 
     m_ui.resultCount->setText(QString("%1 out of %2 results.").arg(m_model->getMeasurementCount()).arg(m_db->getAllMeasurementCount()));
 

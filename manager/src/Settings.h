@@ -24,6 +24,7 @@ public:
 
     typedef std::chrono::system_clock Clock;
 
+    void process();
     bool create(std::string const& name);
     bool load(std::string const& name);
 

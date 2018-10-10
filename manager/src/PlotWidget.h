@@ -36,6 +36,8 @@ private slots:
     void plotContextMenu(QPoint const& position);
     void handleMarkerClicked();
     void refresh();
+    void scheduleSlowRefresh();
+    void scheduleFastRefresh();
     void selectSensors();
     void exportData();
     void mousePressEvent(QMouseEvent* event);
@@ -53,6 +55,9 @@ private:
 
     DB* m_db = nullptr;
     DB::Filter m_filter;
+
+    void scheduleRefresh(DB::Clock::duration dt);
+    std::unique_ptr<QTimer> m_scheduleTimer;
 
     struct GraphData
     {
