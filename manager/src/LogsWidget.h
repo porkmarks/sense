@@ -16,9 +16,11 @@ public:
     void init();
     void shutdown();
 
+    void setAutoRefresh(bool enabled);
+
 signals:
 
-private slots:
+public slots:
     void refresh();
 
 private:

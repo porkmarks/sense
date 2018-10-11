@@ -4,6 +4,7 @@
 #include <vector>
 #include <QAbstractItemModel>
 #include <QStyledItemDelegate>
+#include <QMetaObject>
 #include <QTimer>
 
 #include "Logger.h"
@@ -18,6 +19,7 @@ public:
 
     void setFilter(Logger::Filter const& filter);
     void refresh();
+    void setAutoRefresh(bool enabled);
 
     size_t getLineCount() const;
     Logger::LogLine const& getLine(size_t index) const;
@@ -59,4 +61,6 @@ private:
     Logger::Filter m_filter;
     std::vector<Logger::LogLine> m_logLines;
     QTimer* m_refreshTimer = nullptr;
+    QMetaObject::Connection m_autoRefreshConnection;
+    bool m_autoRefreshEnabled = false;
 };

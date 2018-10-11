@@ -23,6 +23,14 @@
 
 extern std::string s_dataFolder;
 
+struct Header
+{
+    constexpr static uint64_t k_magic = 234112412454325345ULL;
+    uint64_t magic = 0;
+
+    constexpr static uint32_t k_version = 1;
+    uint32_t version = 0;
+};
 constexpr uint64_t k_fileEncryptionKey = 3452354435332256ULL;
 
 
@@ -134,8 +142,8 @@ bool Logger::create(std::string const& name)
     moveToBackup(m_dataName, dataFilename, m_dataFolder + "/backups/deleted", 50);
     remove((dataFilename).c_str());
 
-    m_mainData = Data();
-    save(m_mainData);
+    m_mainDataDelta = Data();
+    save(Data());
 
     return true;
 }
@@ -149,17 +157,86 @@ bool Logger::load(std::string const& name)
     m_dataName = "sense-" + name + ".log";
 
     m_dataFolder = s_dataFolder;
-    std::string dataFilename = (m_dataFolder + "/" + m_dataName);
+    std::string filename = (m_dataFolder + "/" + m_dataName);
 
     Data data;
+    bool res = load(data, filename);
+    if (!res)
+    {
+        return false;
+    }
+
+    //initialize backups
+    std::pair<std::string, time_t> bkf = getMostRecentBackup(filename, m_dataFolder + "/backups/daily");
+    if (bkf.first.empty())
+    {
+        m_lastDailyBackupTP = Clock::now();
+    }
+    else
+    {
+        m_lastDailyBackupTP = Clock::from_time_t(bkf.second);
+    }
+    bkf = getMostRecentBackup(filename, m_dataFolder + "/backups/weekly");
+    if (bkf.first.empty())
+    {
+        m_lastWeeklyBackupTP = Clock::now();
+    }
+    else
+    {
+        m_lastWeeklyBackupTP = Clock::from_time_t(bkf.second);
+    }
+
+    //done!!!
+    //refresh the last log line index
+    uint32_t lastLineIndex = 0;
+    for (StoredLogLine& storedLine: data.storedLogLines)
+    {
+        lastLineIndex = std::max(lastLineIndex, storedLine.index);
+    }
+
+    {
+        std::lock_guard<std::mutex> lg(m_mainDataMutex);
+        m_mainDataLastLineIndex = lastLineIndex;
+    }
+
+    std::cout << "Time to load logs:" << std::chrono::duration<float>(Clock::now() - start).count() << "s\n";
+    std::cout.flush();
+
+    emit logLinesAdded();
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool Logger::load(Data& data, std::string const& filename) const
+{
+    Clock::time_point start = Clock::now();
 
     {
         std::string streamData;
         {
-            std::ifstream file(dataFilename, std::ios_base::binary);
+            std::ifstream file(filename, std::ios_base::binary);
             if (!file.is_open())
             {
-                std::cerr << "Failed to open " << dataFilename << " file: " << std::strerror(errno) << "\n";
+                std::cerr << "Failed to open " << filename << " file: " << std::strerror(errno) << "\n";
+                return false;
+            }
+
+            Header header;
+            if (file.read(reinterpret_cast<char*>(&header), sizeof(header)).bad())
+            {
+                std::cerr << "Failed to open " << filename << " file: corrupted file (cannot read magic).\n";
+                return false;
+            }
+            if (header.magic != Header::k_magic)
+            {
+                std::cerr << "Failed to open " << filename << " file: corrupted file (bad magic).\n";
+                return false;
+            }
+            if (header.version != Header::k_version)
+            {
+                std::cerr << "Failed to open " << filename << " file: corrupted file (bad version).\n";
                 return false;
             }
 
@@ -179,33 +256,33 @@ bool Logger::load(std::string const& name)
             stream = std::stringstream(std::string(streamData.data(), streamData.size())); //try unencrypted
             if (!read(stream, logsSize))
             {
-                std::cerr << "Failed to open " << dataFilename << " file: corrupted file (canot read log size).\n";
+                std::cerr << "Failed to open " << filename << " file: corrupted file (canot read log size).\n";
                 return false;
             }
         }
         if (logsSize > 1024 * 1024 * 1024)
         {
-            std::cerr << "Failed to open " << dataFilename << " file: corrupted file (logs too big: " << logsSize << " bytes).\n";
+            std::cerr << "Failed to open " << filename << " file: corrupted file (logs too big: " << logsSize << " bytes).\n";
             return false;
         }
 
         data.logs.resize(logsSize);
         if (stream.read(reinterpret_cast<char*>(&data.logs[0]), logsSize).bad())
         {
-            std::cerr << "Failed to open " << dataFilename << " file. Failed to read logs: " << std::strerror(errno) << ".\n";
+            std::cerr << "Failed to open " << filename << " file. Failed to read logs: " << std::strerror(errno) << ".\n";
             return false;
         }
 
         uint64_t lineCount = 0;
         if (!read(stream, lineCount))
         {
-            std::cerr << "Failed to open " << dataFilename << " file: corrupted file (canot read line count).\n";
+            std::cerr << "Failed to open " << filename << " file: corrupted file (canot read line count).\n";
             return false;
         }
 
         if (lineCount > 1024 * 1024 * 1024)
         {
-            std::cerr << "Failed to open " << dataFilename << " file: corrupted file (too many lines: " << lineCount << ").\n";
+            std::cerr << "Failed to open " << filename << " file: corrupted file (too many lines: " << lineCount << ").\n";
             return false;
         }
 
@@ -216,7 +293,7 @@ bool Logger::load(std::string const& name)
         data.storedLogLines.resize(lineCount);
         if (stream.read(reinterpret_cast<char*>(data.storedLogLines.data()), data.storedLogLines.size() * lineSize).bad())
         {
-            std::cerr << "Failed to open " << dataFilename << " file. Failed to read log lines: " << std::strerror(errno) << ".\n";
+            std::cerr << "Failed to open " << filename << " file. Failed to read log lines: " << std::strerror(errno) << ".\n";
             return false;
         }
 
@@ -230,51 +307,31 @@ bool Logger::load(std::string const& name)
 //            sll.messageOffset = sllo.messageOffset;
 //            sll.messageSize = sllo.messageSize;
 //        }
-
-        //refresh the last log line index
-        std::string msg = "Added measurement index ";
-        for (StoredLogLine& storedLine: data.storedLogLines)
-        {
-            if (storedLine.messageSize >= msg.size() && data.logs.compare(storedLine.messageOffset, msg.size(), msg) == 0)
-            {
-                storedLine.type = Type::VERBOSE;
-            }
-            data.lastLineIndex = std::max(data.lastLineIndex, storedLine.index);
-        }
-    }
-
-    //initialize backups
-    std::pair<std::string, time_t> bkf = getMostRecentBackup(dataFilename, m_dataFolder + "/backups/daily");
-    if (bkf.first.empty())
-    {
-        m_lastDailyBackupTP = Clock::now();
-    }
-    else
-    {
-        m_lastDailyBackupTP = Clock::from_time_t(bkf.second);
-    }
-    bkf = getMostRecentBackup(dataFilename, m_dataFolder + "/backups/weekly");
-    if (bkf.first.empty())
-    {
-        m_lastWeeklyBackupTP = Clock::now();
-    }
-    else
-    {
-        m_lastWeeklyBackupTP = Clock::from_time_t(bkf.second);
-    }
-
-    //done!!!
-
-    {
-        std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        m_mainData = std::move(data);
     }
 
     std::cout << "Time to load logs:" << std::chrono::duration<float>(Clock::now() - start).count() << "s\n";
     std::cout.flush();
 
-    emit logLinesAdded();
+    return true;
+}
 
+//////////////////////////////////////////////////////////////////////////
+
+bool Logger::loadAndMerge(Data& data, Data const& delta) const
+{
+    std::string filename = (m_dataFolder + "/" + m_dataName);
+    if (!load(data, filename))
+    {
+        return false;
+    }
+
+    uint32_t offset = static_cast<uint32_t>(data.logs.size());
+    data.logs.append(delta.logs);
+    for (StoredLogLine l: delta.storedLogLines)
+    {
+        l.messageOffset += offset;
+        data.storedLogLines.push_back(l);
+    }
     return true;
 }
 
@@ -284,11 +341,11 @@ void Logger::logVerbose(std::string const& message)
 {
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        StoredLogLine storedLine {getTimePointAsMilliseconds(Clock::now()), ++m_mainData.lastLineIndex, Type::VERBOSE, 0, 0};
-        storedLine.messageOffset = m_mainData.logs.size();
-        storedLine.messageSize = message.size();
-        m_mainData.logs.append(message);
-        m_mainData.storedLogLines.emplace_back(storedLine);
+        StoredLogLine storedLine {getTimePointAsMilliseconds(Clock::now()), ++m_mainDataLastLineIndex, Type::VERBOSE, 0, 0};
+        storedLine.messageOffset = static_cast<uint32_t>(m_mainDataDelta.logs.size());
+        storedLine.messageSize = static_cast<uint32_t>(message.size());
+        m_mainDataDelta.logs.append(message);
+        m_mainDataDelta.storedLogLines.emplace_back(storedLine);
     }
 
     std::cout << "VERBOSE: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
@@ -319,11 +376,11 @@ void Logger::logInfo(std::string const& message)
 {
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        StoredLogLine storedLine {getTimePointAsMilliseconds(Clock::now()), ++m_mainData.lastLineIndex, Type::INFO, 0, 0};
-        storedLine.messageOffset = m_mainData.logs.size();
-        storedLine.messageSize = message.size();
-        m_mainData.logs.append(message);
-        m_mainData.storedLogLines.emplace_back(storedLine);
+        StoredLogLine storedLine {getTimePointAsMilliseconds(Clock::now()), ++m_mainDataLastLineIndex, Type::INFO, 0, 0};
+        storedLine.messageOffset = static_cast<uint32_t>(m_mainDataDelta.logs.size());
+        storedLine.messageSize = static_cast<uint32_t>(message.size());
+        m_mainDataDelta.logs.append(message);
+        m_mainDataDelta.storedLogLines.emplace_back(storedLine);
     }
 
     std::cout << "INFO: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
@@ -354,11 +411,11 @@ void Logger::logWarning(std::string const& message)
 {
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        StoredLogLine storedLine {getTimePointAsMilliseconds(Clock::now()), ++m_mainData.lastLineIndex, Type::WARNING, 0, 0};
-        storedLine.messageOffset = m_mainData.logs.size();
-        storedLine.messageSize = message.size();
-        m_mainData.logs.append(message);
-        m_mainData.storedLogLines.emplace_back(storedLine);
+        StoredLogLine storedLine {getTimePointAsMilliseconds(Clock::now()), ++m_mainDataLastLineIndex, Type::WARNING, 0, 0};
+        storedLine.messageOffset = static_cast<uint32_t>(m_mainDataDelta.logs.size());
+        storedLine.messageSize = static_cast<uint32_t>(message.size());
+        m_mainDataDelta.logs.append(message);
+        m_mainDataDelta.storedLogLines.emplace_back(storedLine);
     }
 
     std::cout << "WARNING: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
@@ -388,11 +445,11 @@ void Logger::logCritical(std::string const& message)
 {
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        StoredLogLine storedLine {getTimePointAsMilliseconds(Clock::now()), ++m_mainData.lastLineIndex, Type::CRITICAL, 0, 0};
-        storedLine.messageOffset = m_mainData.logs.size();
-        storedLine.messageSize = message.size();
-        m_mainData.logs.append(message);
-        m_mainData.storedLogLines.emplace_back(storedLine);
+        StoredLogLine storedLine {getTimePointAsMilliseconds(Clock::now()), ++m_mainDataLastLineIndex, Type::CRITICAL, 0, 0};
+        storedLine.messageOffset = static_cast<uint32_t>(m_mainDataDelta.logs.size());
+        storedLine.messageSize = static_cast<uint32_t>(message.size());
+        m_mainDataDelta.logs.append(message);
+        m_mainDataDelta.storedLogLines.emplace_back(storedLine);
     }
 
     std::cout << "ERROR: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
@@ -420,15 +477,22 @@ void Logger::logCritical(char const* message)
 
 std::vector<Logger::LogLine> Logger::getFilteredLogLines(Filter const& filter) const
 {
+    Data data;
+    {
+        std::lock_guard<std::mutex> lg(m_mainDataMutex);
+        if (!loadAndMerge(data, m_mainDataDelta))
+        {
+            return {};
+        }
+    }
+
     std::vector<LogLine> result;
     result.reserve(16384);
-
-    std::lock_guard<std::mutex> lg(m_mainDataMutex);
 
     uint64_t minTimePoint = getTimePointAsMilliseconds(filter.minTimePoint);
     uint64_t maxTimePoint = getTimePointAsMilliseconds(filter.maxTimePoint);
 
-    for (StoredLogLine const& storedLine: m_mainData.storedLogLines)
+    for (StoredLogLine const& storedLine: data.storedLogLines)
     {
         if (storedLine.timePoint < minTimePoint || storedLine.timePoint > maxTimePoint)
         {
@@ -446,20 +510,12 @@ std::vector<Logger::LogLine> Logger::getFilteredLogLines(Filter const& filter) c
         line.index = storedLine.index;
         line.timePoint = getTimePointFromMilliseconds(storedLine.timePoint);
         line.type = storedLine.type;
-        assert(storedLine.messageOffset + storedLine.messageSize <= m_mainData.logs.size());
-        line.message = m_mainData.logs.substr(storedLine.messageOffset, storedLine.messageSize);
-        result.push_back(line);
+        assert(storedLine.messageOffset + storedLine.messageSize <= data.logs.size());
+        line.message = data.logs.substr(storedLine.messageOffset, storedLine.messageSize);
+        result.push_back(std::move(line));
     }
 
     return result;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-size_t Logger::getAllLogLineCount() const
-{
-    std::lock_guard<std::mutex> lg(m_mainDataMutex);
-    return m_mainData.storedLogLines.size();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -471,16 +527,18 @@ void Logger::triggerSave()
         m_delayedTriggerSave = false;
     }
 
-    Data mainDataCopy;
+    Data delta;
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
-        mainDataCopy = m_mainData;
+        //clear, we're storing in mainData just the delta
+        delta = std::move(m_mainDataDelta);
+        m_mainDataDelta = Data();
     }
 
 
     {
         std::unique_lock<std::mutex> lg(m_storeMutex);
-        m_storeData = std::move(mainDataCopy);
+        m_storeDataDelta = std::move(delta);
         m_storeThreadTriggered = true;
     }
     m_storeCV.notify_all();
@@ -549,7 +607,7 @@ void Logger::save(Data const& data) const
         crypt.setKey(k_fileEncryptionKey);
         crypt.setCompressionLevel(1);
         QByteArray encryptedData = crypt.encryptToByteArray(QByteArray(buffer.data(), buffer.size()));
-//        QByteArray encryptedData = QByteArray(buffer.GetString(), buffer.GetSize());
+//        QByteArray encryptedData = QByteArray(buffer.data(), buffer.size());
 
         std::string tempFilename = (m_dataFolder + "/" + m_dataName + "_temp");
         {
@@ -560,6 +618,10 @@ void Logger::save(Data const& data) const
             }
             else
             {
+                Header header;
+                header.magic = Header::k_magic;
+                header.version = Header::k_version;
+                file.write(reinterpret_cast<char const*>(&header), sizeof(header));
                 file.write(encryptedData.data(), encryptedData.size());
             }
             file.flush();
@@ -593,7 +655,11 @@ void Logger::storeThreadProc()
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         Data data;
+
+        while (true)
         {
+            data = Data(); //clear
+
             //wait for data
             std::unique_lock<std::mutex> lg(m_storeMutex);
             if (!m_storeThreadTriggered)
@@ -605,11 +671,17 @@ void Logger::storeThreadProc()
                 break;
             }
 
-            data = std::move(m_storeData);
-            m_storeData = Data();
-            m_storeThreadTriggered = false;
+            if (loadAndMerge(data, m_storeDataDelta))
+            {
+                m_storeDataDelta = Data();
+                m_storeThreadTriggered = false;
+                //break;
+            }
         }
-
+        if (m_threadsExit)
+        {
+            break;
+        }
         save(data);
     }
 }

@@ -59,8 +59,8 @@ public:
 
     struct Filter
     {
-        Clock::time_point minTimePoint;
-        Clock::time_point maxTimePoint;
+        Clock::time_point minTimePoint = Clock::time_point(Clock::duration::zero());
+        Clock::time_point maxTimePoint = Clock::time_point(Clock::duration(std::numeric_limits<Clock::duration::rep>::max()));
         bool allowVerbose = true;
         bool allowInfo = true;
         bool allowWarning = true;
@@ -68,7 +68,6 @@ public:
     };
 
     std::vector<LogLine> getFilteredLogLines(Filter const& filter) const;
-    size_t getAllLogLineCount() const;
 
 signals:
     void logLinesAdded();
@@ -103,11 +102,15 @@ private:
     {
         std::string logs;
         std::vector<StoredLogLine> storedLogLines;
-        uint32_t lastLineIndex = 0;
     };
 
+    bool load(Data& data, std::string const& filename) const;
+
+    bool loadAndMerge(Data& data, Data const& delta) const;
+
     mutable std::mutex m_mainDataMutex;
-    Data m_mainData;
+    Data m_mainDataDelta;
+    uint32_t m_mainDataLastLineIndex = 0;
 
     std::atomic_bool m_threadsExit = { false };
 
@@ -117,7 +120,7 @@ private:
     std::thread m_storeThread;
     std::condition_variable m_storeCV;
     std::mutex m_storeMutex;
-    Data m_storeData;
+    Data m_storeDataDelta;
 
     std::string m_dataFolder;
     std::string m_dataName;

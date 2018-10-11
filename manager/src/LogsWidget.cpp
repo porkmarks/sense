@@ -78,6 +78,13 @@ void LogsWidget::shutdown()
 
 //////////////////////////////////////////////////////////////////////////
 
+void LogsWidget::setAutoRefresh(bool enabled)
+{
+    m_model->setAutoRefresh(enabled);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 Logger::Filter LogsWidget::createFilter() const
 {
     Logger::Filter filter;
@@ -101,9 +108,8 @@ void LogsWidget::refresh()
     Logger::Filter filter = createFilter();
     m_model->setFilter(filter);
 
-    std::cout << (QString("Refreshed %1/%2 logs: %3ms\n")
+    std::cout << (QString("Refreshed %1 logs: %3ms\n")
                         .arg(m_model->getLineCount())
-                        .arg(s_logger.getAllLogLineCount())
                         .arg(std::chrono::duration_cast<std::chrono::milliseconds>(Logger::Clock::now() - start).count())).toStdString();
 
     //m_ui.resultCount->setText(QString("%1 out of %2 results.").arg(m_model->getLinesCount()).arg(s_logger->getAllLinesCount()));

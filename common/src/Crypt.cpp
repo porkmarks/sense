@@ -111,10 +111,14 @@ QByteArray Crypt::encryptToByteArray(QByteArray plaintext)
 
     int cnt = ba.count();
 
-    while (pos < cnt) {
-        ba[pos] = ba.at(pos) ^ m_keyParts.at(pos % 8) ^ lastChar;
-        lastChar = ba.at(pos);
-        ++pos;
+    {
+        char* data = ba.data();
+        while (pos < cnt) {
+            char d = data[pos] ^ m_keyParts.at(pos % 8) ^ lastChar;
+            data[pos] = d;
+            lastChar = d;
+            ++pos;
+        }
     }
 
     QByteArray resultArray;
@@ -194,11 +198,14 @@ QByteArray Crypt::decryptToByteArray(QByteArray cypher)
     int cnt(ba.count());
     char lastChar = 0;
 
-    while (pos < cnt) {
-        char currentChar = ba[pos];
-        ba[pos] = ba.at(pos) ^ lastChar ^ m_keyParts.at(pos % 8);
-        lastChar = currentChar;
-        ++pos;
+    {
+        char* data = ba.data();
+        while (pos < cnt) {
+            char currentChar = data[pos];
+            data[pos] = currentChar ^ lastChar ^ m_keyParts.at(pos % 8);
+            lastChar = currentChar;
+            ++pos;
+        }
     }
 
     ba = ba.mid(1); //chop off the random number at the start

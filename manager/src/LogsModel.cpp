@@ -5,6 +5,7 @@
 #include <QDateTime>
 
 #include <bitset>
+#include <array>
 
 static std::array<const char*, 3> s_headerNames = {"Timestamp", "Type", "Message"};
 
@@ -16,7 +17,6 @@ LogsModel::LogsModel(Logger& logger)
     m_refreshTimer = new QTimer(this);
     m_refreshTimer->setSingleShot(true);
 
-    connect(&logger, &Logger::logLinesAdded, this, &LogsModel::startAutoRefreshLogLines);
     connect(m_refreshTimer, &QTimer::timeout, this, &LogsModel::refreshLogLines);
 }
 
@@ -24,6 +24,24 @@ LogsModel::LogsModel(Logger& logger)
 
 LogsModel::~LogsModel()
 {
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void LogsModel::setAutoRefresh(bool enabled)
+{
+    if (enabled != m_autoRefreshEnabled)
+    {
+        m_autoRefreshEnabled = enabled;
+        if (enabled)
+        {
+            m_autoRefreshConnection = connect(&m_logger, &Logger::logLinesAdded, this, &LogsModel::startAutoRefreshLogLines);
+        }
+        else
+        {
+            QObject::disconnect(m_autoRefreshConnection);
+        }
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////

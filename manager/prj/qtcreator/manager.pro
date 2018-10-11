@@ -36,23 +36,12 @@ win32: RC_ICONS = ../../res/icons/ui/manager.ico
 
 ROOT_LIBS_PATH = ../../../..
 
-rpi {
-    DEFINES+=RASPBERRY_PI
-    CONFIG(debug, debug|release) {
-        DEST_FOLDER = rpi/debug
-    }
-    CONFIG(release, debug|release) {
-        DEST_FOLDER = rpi/release
-        DEFINES += NDEBUG
-    }
-} else {
-    CONFIG(debug, debug|release) {
-        DEST_FOLDER = pc/debug
-    }
-    CONFIG(release, debug|release) {
-        DEST_FOLDER = pc/release
-        DEFINES += NDEBUG
-    }
+CONFIG(debug, debug|release) {
+    DEST_FOLDER = pc/debug
+}
+CONFIG(release, debug|release) {
+    DEST_FOLDER = pc/release
+    DEFINES += NDEBUG
 }
 
 #DEFINES += QCUSTOMPLOT_USE_OPENGL

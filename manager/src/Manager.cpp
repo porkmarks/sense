@@ -248,6 +248,16 @@ void Manager::tabChanged()
         m_ui.measurementsWidget->loadSettings();
     }
 
+    if (m_ui.tabWidget->currentWidget() == m_ui.logsWidget)
+    {
+        m_ui.logsWidget->setAutoRefresh(true);
+        m_ui.logsWidget->refresh();
+    }
+    else
+    {
+        m_ui.logsWidget->setAutoRefresh(false);
+    }
+
     m_currentTabIndex = m_ui.tabWidget->currentIndex();
 }
 
