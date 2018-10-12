@@ -168,6 +168,11 @@ bool Sensor_Comms::init(uint8_t retries, uint8_t power)
     return true;
 }
 
+void Sensor_Comms::set_transmission_power(uint8_t power)
+{
+    m_rf22.set_transmission_power(power);
+}
+
 void Sensor_Comms::idle_mode()
 {
     m_rf22.idle_mode();
