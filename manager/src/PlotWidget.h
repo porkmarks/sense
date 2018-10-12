@@ -34,7 +34,6 @@ private slots:
     void keepAnnotation();
     void createAnnotation(QCPGraph* graph, QPointF point, double key, double value, bool state, DB::Sensor const& sensor, bool temperature);
     void plotContextMenu(QPoint const& position);
-    void handleMarkerClicked();
     void refresh();
     void scheduleSlowRefresh();
     void scheduleFastRefresh();

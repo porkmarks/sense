@@ -418,6 +418,10 @@ void PlotWidget::createPlotWidgets()
         }
 
         m_ui.plot->layout()->addWidget(m_plot);
+
+        connect(m_plot, &QCustomPlot::mousePress, this, &PlotWidget::mousePressEvent);
+        connect(m_plot, &QCustomPlot::mouseRelease, this, &PlotWidget::mouseReleaseEvent);
+        connect(m_plot, &QCustomPlot::mouseMove, this, &PlotWidget::mouseMoveEvent);
     }
 
     if (m_ui.showTemperature->isChecked())
@@ -452,17 +456,6 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         return;
     }
     m_filter = filter;
-//    foreach (QLegendMarker* marker, m_chart->legend()->markers())
-//    {
-//        QObject::disconnect(marker, SIGNAL(clicked()), this, SLOT(handleMarkerClicked()));
-//    }
-
-    //save the visibilities
-//    std::vector<bool> markersVisible;
-//    foreach (QLegendMarker* marker, m_chart->legend()->markers())
-//    {
-//        markersVisible.push_back(marker->series()->isVisible());
-//    }
 
     createPlotWidgets();
 
@@ -626,22 +619,6 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
 
     m_graphsLayer->replot();
     m_plot->replot();
-
-    connect(m_plot, &QCustomPlot::mousePress, this, &PlotWidget::mousePressEvent);
-    connect(m_plot, &QCustomPlot::mouseRelease, this, &PlotWidget::mouseReleaseEvent);
-    connect(m_plot, &QCustomPlot::mouseMove, this, &PlotWidget::mouseMoveEvent);
-//    size_t index = 0;
-//    foreach (QLegendMarker* marker, m_chart->legend()->markers())
-//    {
-//        // Disconnect possible existing connection to avoid multiple connections
-//        QObject::disconnect(marker, SIGNAL(clicked()), this, SLOT(handleMarkerClicked()));
-//        QObject::connect(marker, SIGNAL(clicked()), this, SLOT(handleMarkerClicked()));
-//        if (index < markersVisible.size())
-//        {
-//            setMarkerVisible(marker, markersVisible[index]);
-//        }
-//        index++;
-//    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -853,68 +830,6 @@ void PlotWidget::plotContextMenu(QPoint const& /*position*/)
 //    QMenu menu;
 //    menu.exec(mapToGlobal(position));
 }
-
-//////////////////////////////////////////////////////////////////////////
-
-void PlotWidget::handleMarkerClicked()
-{
-//    QLegendMarker* marker = qobject_cast<QLegendMarker*>(sender());
-//    Q_ASSERT(marker);
-
-//    setMarkerVisible(marker, !marker->series()->isVisible());
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-//void PlotWidget::setMarkerVisible(QLegendMarker* marker, bool visible)
-//{
-//    switch (marker->type())
-//    {
-//    case QLegendMarker::LegendMarkerTypeXY:
-//    {
-//        // Toggle visibility of series
-//        marker->series()->setVisible(visible);
-
-//        // Turn legend marker back to visible, since hiding series also hides the marker
-//        // and we don't want it to happen now.
-//        marker->setVisible(true);
-
-//        // Dim the marker, if series is not visible
-//        qreal alpha = 1.0;
-
-//        if (!marker->series()->isVisible())
-//        {
-//            alpha = 0.5;
-//        }
-
-//        QColor color;
-//        QBrush brush = marker->labelBrush();
-//        color = brush.color();
-//        color.setAlphaF(alpha);
-//        brush.setColor(color);
-//        marker->setLabelBrush(brush);
-
-//        brush = marker->brush();
-//        color = brush.color();
-//        color.setAlphaF(alpha);
-//        brush.setColor(color);
-//        marker->setBrush(brush);
-
-//        QPen pen = marker->pen();
-//        color = pen.color();
-//        color.setAlphaF(alpha);
-//        pen.setColor(color);
-//        marker->setPen(pen);
-
-//        break;
-//    }
-//    default:
-//    {
-//        qDebug() << "Unknown marker type";
-//        break;
-//    }
-//    }
-//}
 
 //////////////////////////////////////////////////////////////////////////
 
