@@ -33,6 +33,7 @@ public:
     bool pop_front();
 
     void clear();
+    bool empty() const;
 
 private:
 

@@ -345,6 +345,11 @@ void Storage::clear()
     memset(m_groups, 0, sizeof(Group) * MAX_GROUP_COUNT);
 }
 
+bool Storage::empty() const
+{
+    return m_group_count == 0;
+}
+
 bool Storage::pop_front()
 {
     if (get_group_count() == 0)
