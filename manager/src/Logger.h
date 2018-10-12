@@ -105,6 +105,7 @@ private:
     };
 
     bool load(Data& data, std::string const& filename) const;
+    bool loadV1(Data& data, std::string const& filename, std::ifstream& file) const;
 
     bool loadAndMerge(Data& data, Data const& delta) const;
 

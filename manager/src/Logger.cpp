@@ -25,12 +25,13 @@ extern std::string s_dataFolder;
 
 struct Header
 {
-    constexpr static uint64_t k_magic = 234112412454325345ULL;
-    uint64_t magic = 0;
+    constexpr static uint64_t k_magic = 2112412454;
+    uint32_t magic = 0;
 
     constexpr static uint32_t k_version = 1;
     uint32_t version = 0;
 };
+
 constexpr uint64_t k_fileEncryptionKey = 3452354435332256ULL;
 
 
@@ -213,100 +214,34 @@ bool Logger::load(Data& data, std::string const& filename) const
 {
     Clock::time_point start = Clock::now();
 
+    std::ifstream file(filename, std::ios_base::binary);
+    if (!file.is_open())
     {
-        std::string streamData;
-        {
-            std::ifstream file(filename, std::ios_base::binary);
-            if (!file.is_open())
-            {
-                std::cerr << "Failed to open " << filename << " file: " << std::strerror(errno) << "\n";
-                return false;
-            }
+        std::cerr << "Failed to open " << filename << " file: " << std::strerror(errno) << "\n";
+        return false;
+    }
 
-            Header header;
-            if (file.read(reinterpret_cast<char*>(&header), sizeof(header)).bad())
-            {
-                std::cerr << "Failed to open " << filename << " file: corrupted file (cannot read magic).\n";
-                return false;
-            }
-            if (header.magic != Header::k_magic)
-            {
-                std::cerr << "Failed to open " << filename << " file: corrupted file (bad magic).\n";
-                return false;
-            }
-            if (header.version != Header::k_version)
-            {
-                std::cerr << "Failed to open " << filename << " file: corrupted file (bad version).\n";
-                return false;
-            }
+    Header header;
+    if (file.read(reinterpret_cast<char*>(&header), sizeof(header)).bad())
+    {
+        std::cerr << "Failed to open " << filename << " file: corrupted file (cannot read magic).\n";
+        return false;
+    }
+    if (header.magic != Header::k_magic)
+    {
+        std::cerr << "Failed to open " << filename << " file: corrupted file (bad magic).\n";
+        return false;
+    }
+    if (header.version != Header::k_version)
+    {
+        std::cerr << "Failed to open " << filename << " file: corrupted file (bad version).\n";
+        return false;
+    }
 
-            streamData = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-            file.close();
-        }
-
-        Crypt crypt;
-        crypt.setKey(k_fileEncryptionKey);
-        QByteArray decryptedData = crypt.decryptToByteArray(QByteArray(streamData.data(), streamData.size()));
-
-        std::stringstream stream(std::string(decryptedData.data(), decryptedData.size()));
-
-        uint64_t logsSize = 0;
-        if (!read(stream, logsSize))
-        {
-            stream = std::stringstream(std::string(streamData.data(), streamData.size())); //try unencrypted
-            if (!read(stream, logsSize))
-            {
-                std::cerr << "Failed to open " << filename << " file: corrupted file (canot read log size).\n";
-                return false;
-            }
-        }
-        if (logsSize > 1024 * 1024 * 1024)
-        {
-            std::cerr << "Failed to open " << filename << " file: corrupted file (logs too big: " << logsSize << " bytes).\n";
-            return false;
-        }
-
-        data.logs.resize(logsSize);
-        if (stream.read(reinterpret_cast<char*>(&data.logs[0]), logsSize).bad())
-        {
-            std::cerr << "Failed to open " << filename << " file. Failed to read logs: " << std::strerror(errno) << ".\n";
-            return false;
-        }
-
-        uint64_t lineCount = 0;
-        if (!read(stream, lineCount))
-        {
-            std::cerr << "Failed to open " << filename << " file: corrupted file (canot read line count).\n";
-            return false;
-        }
-
-        if (lineCount > 1024 * 1024 * 1024)
-        {
-            std::cerr << "Failed to open " << filename << " file: corrupted file (too many lines: " << lineCount << ").\n";
-            return false;
-        }
-
-        size_t lineSize = sizeof(StoredLogLine);
-        //std::vector<StoredLogLineOld> storedLogLinesOld;
-        //storedLogLinesOld.resize(lineCount);
-
-        data.storedLogLines.resize(lineCount);
-        if (stream.read(reinterpret_cast<char*>(data.storedLogLines.data()), data.storedLogLines.size() * lineSize).bad())
-        {
-            std::cerr << "Failed to open " << filename << " file. Failed to read log lines: " << std::strerror(errno) << ".\n";
-            return false;
-        }
-
-//        for (size_t i = 0; i < lineCount; i++)
-//        {
-//            StoredLogLine& sll = data.storedLogLines[i];
-//            StoredLogLineOld& sllo = storedLogLinesOld[i];
-//            sll.timePoint = sllo.timePoint;
-//            sll.index = sllo.index;
-//            sll.type = sllo.type;
-//            sll.messageOffset = sllo.messageOffset;
-//            sll.messageSize = sllo.messageSize;
-//        }
+    bool res = loadV1(data, filename, file);
+    if (!res)
+    {
+        return false;
     }
 
     std::cout << "Time to load logs:" << std::chrono::duration<float>(Clock::now() - start).count() << "s\n";
@@ -315,6 +250,68 @@ bool Logger::load(Data& data, std::string const& filename) const
     return true;
 }
 
+//////////////////////////////////////////////////////////////////////////
+
+bool Logger::loadV1(Data& data, std::string const& filename, std::ifstream& file) const
+{
+    std::string streamData = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+
+    Crypt crypt;
+    crypt.setKey(k_fileEncryptionKey);
+    QByteArray decryptedData = crypt.decryptToByteArray(QByteArray(streamData.data(), streamData.size()));
+
+    std::stringstream stream(std::string(decryptedData.data(), decryptedData.size()));
+
+    uint64_t logsSize = 0;
+    if (!read(stream, logsSize))
+    {
+        stream = std::stringstream(std::string(streamData.data(), streamData.size())); //try unencrypted
+        if (!read(stream, logsSize))
+        {
+            std::cerr << "Failed to open " << filename << " file: corrupted file (canot read log size).\n";
+            return false;
+        }
+    }
+    if (logsSize > 1024 * 1024 * 1024)
+    {
+        std::cerr << "Failed to open " << filename << " file: corrupted file (logs too big: " << logsSize << " bytes).\n";
+        return false;
+    }
+
+    data.logs.resize(logsSize);
+    if (stream.read(reinterpret_cast<char*>(&data.logs[0]), logsSize).bad())
+    {
+        std::cerr << "Failed to open " << filename << " file. Failed to read logs: " << std::strerror(errno) << ".\n";
+        return false;
+    }
+
+    uint64_t lineCount = 0;
+    if (!read(stream, lineCount))
+    {
+        std::cerr << "Failed to open " << filename << " file: corrupted file (canot read line count).\n";
+        return false;
+    }
+
+    if (lineCount > 1024 * 1024 * 1024)
+    {
+        std::cerr << "Failed to open " << filename << " file: corrupted file (too many lines: " << lineCount << ").\n";
+        return false;
+    }
+
+    size_t lineSize = sizeof(StoredLogLine);
+    //std::vector<StoredLogLineOld> storedLogLinesOld;
+    //storedLogLinesOld.resize(lineCount);
+
+    data.storedLogLines.resize(lineCount);
+    if (stream.read(reinterpret_cast<char*>(data.storedLogLines.data()), data.storedLogLines.size() * lineSize).bad())
+    {
+        std::cerr << "Failed to open " << filename << " file. Failed to read log lines: " << std::strerror(errno) << ".\n";
+        return false;
+    }
+
+    return true;
+}
 //////////////////////////////////////////////////////////////////////////
 
 bool Logger::loadAndMerge(Data& data, Data const& delta) const
@@ -353,7 +350,11 @@ void Logger::logVerbose(std::string const& message)
 
     emit logLinesAdded();
 
+#ifdef NDEBUG
     triggerDelayedSave(std::chrono::minutes(10));
+#else
+    triggerDelayedSave(std::chrono::seconds(10));
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -388,7 +389,11 @@ void Logger::logInfo(std::string const& message)
 
     emit logLinesAdded();
 
+#ifdef NDEBUG
     triggerDelayedSave(std::chrono::minutes(1));
+#else
+    triggerDelayedSave(std::chrono::seconds(10));
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -675,7 +680,7 @@ void Logger::storeThreadProc()
             {
                 m_storeDataDelta = Data();
                 m_storeThreadTriggered = false;
-                //break;
+                break;
             }
         }
         if (m_threadsExit)
