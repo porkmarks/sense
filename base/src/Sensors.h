@@ -58,6 +58,8 @@ public:
 
         Calibration calibration;
         uint32_t serial_number = 0;
+
+        bool sleeping = false;
     };
 
     Sensors();
@@ -84,6 +86,7 @@ public:
     {
         std::string name;
         bool sensors_sleeping = false;
+        uint8_t sensors_power = 15;
         Clock::duration measurement_period = std::chrono::seconds(5 * 60);
         Clock::duration comms_period = std::chrono::seconds(5 * 60);
 
@@ -100,6 +103,7 @@ public:
     Clock::duration compute_comms_period() const;
     uint32_t compute_next_measurement_index() const; //the next real-time index
     uint32_t compute_next_measurement_index(Sensor_Id id) const; //the next index for this sensor. This might be in the future!!!
+    uint32_t compute_baseline_measurement_index() const; //sensors should start counting from this.
     uint32_t compute_last_confirmed_measurement_index(Sensor_Id id) const;
 
     Clock::time_point compute_next_measurement_time_point(Sensor_Id id) const;
@@ -132,7 +136,10 @@ public:
     void set_sensor_measurement_range(Sensor_Id id, uint32_t first_measurement_index, uint32_t last_measurement_index);
     void set_sensor_b2s_input_dBm(Sensor_Id id, int8_t dBm);
     void set_sensor_last_comms_time_point(Sensor_Id id, Clock::time_point tp);
+    void set_sensor_sleeping(Sensor_Id id, bool sleeping);
     Clock::time_point get_sensor_last_comms_time_point(Sensor_Id id) const;
+
+    void notify_sensor_details_changed(Sensor_Id id);
 
     std::function<void(Sensor_Id)> cb_sensor_details_changed;
 

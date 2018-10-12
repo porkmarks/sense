@@ -32,6 +32,7 @@ public:
     {
         std::string name = "Base Station";
         bool sensorsSleeping = false;
+        uint8_t sensorsPower = 10;
         Clock::duration measurementPeriod = std::chrono::minutes(5);
         Clock::duration commsPeriod = std::chrono::minutes(10);
     };
@@ -139,6 +140,7 @@ public:
         Clock::time_point nextMeasurementTimePoint = Clock::time_point(Clock::duration::zero());
         Clock::time_point lastCommsTimePoint = Clock::time_point(Clock::duration::zero());
         uint32_t storedMeasurementCount = 0;
+        bool sleeping = false;
     };
 
     bool setSensorDetails(SensorDetails const& details);

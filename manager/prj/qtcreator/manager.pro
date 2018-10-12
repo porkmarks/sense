@@ -117,7 +117,6 @@ HEADERS += \
     ../../src/SensorsFilterWidget.h \
     ../../../sensor/firmware/CRC.h \
     ../../../sensor/firmware/Data_Defs.h \
-    ../../src/SensorsConfigDialog.h \
     ../../src/qcustomplot.h \
     ../../src/PlotToolTip.h
 
@@ -172,7 +171,6 @@ SOURCES += \
     ../../src/StackWalker.cpp \
     ../../src/SensorsFilterWidget.cpp \
     ../../../sensor/firmware/CRC.cpp \
-    ../../src/SensorsConfigDialog.cpp \
     ../../src/qcustomplot.cpp \
     ../../src/PlotToolTip.cpp
 
@@ -196,8 +194,7 @@ FORMS += \
     ../../src/LogsWidget.ui \
     ../../src/ExportLogsDialog.ui \
     ../../src/DateTimeFilterWidget.ui \
-    ../../src/SensorsFilterWidget.ui \
-    ../../src/SensorsConfigDialog.ui
+    ../../src/SensorsFilterWidget.ui
 
 DISTFILES += \
 

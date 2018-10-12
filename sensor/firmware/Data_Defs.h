@@ -60,7 +60,8 @@ static_assert(sizeof(Measurement) == 4, "");
 struct Measurement_Batch
 {
     uint32_t start_index = 0;
-    uint8_t count = 0;
+    uint8_t last_batch : 1; //indicates if there are more batches after this one
+    uint8_t count : 7;
 
     uint8_t vcc = 0; //(vcc - 2) * 100
     void pack(float vcc)
@@ -93,13 +94,15 @@ struct Config_Request
     uint32_t first_measurement_index = 0;
     uint32_t measurement_count = 0;
     int8_t b2s_input_dBm = 0;
+    bool sleeping = false;
 
     Calibration calibration;
 };
-static_assert(sizeof(Config_Request) == 13, "");
+static_assert(sizeof(Config_Request) == 14, "");
 
 struct Config
 {
+    uint32_t baseline_measurement_index = 0; //sensors should start counting from this one
     //all are in seconds
     chrono::seconds next_comms_delay; //how much to wait for next comms
     chrono::seconds comms_period; //comms every this much seconds
@@ -109,8 +112,11 @@ struct Config
 
     //how much to change calibration. 0 means leave it unchanged
     Calibration calibration_change;
+
+    bool sleeping = false;
+    uint8_t power = 15;
 };
-static_assert(sizeof(Config) == 24, "");
+static_assert(sizeof(Config) == 30, "");
 
 struct First_Config_Request
 {
@@ -119,10 +125,10 @@ static_assert(sizeof(First_Config_Request) == 1, "");
 
 struct First_Config
 {
-    Config config;
     uint32_t first_measurement_index = 0;
+    Config config;
 };
-static_assert(sizeof(First_Config) == 28, "");
+static_assert(sizeof(First_Config) == 34, "");
 
 struct Response
 {

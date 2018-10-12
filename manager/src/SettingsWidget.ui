@@ -47,7 +47,7 @@
        <item>
         <widget class="QTabWidget" name="tabWidget">
          <property name="currentIndex">
-          <number>0</number>
+          <number>5</number>
          </property>
          <widget class="QWidget" name="baseStationsTab">
           <attribute name="icon">
@@ -562,7 +562,7 @@
               <item row="5" column="0" colspan="2">
                <widget class="QCheckBox" name="sensorsSleeping">
                 <property name="enabled">
-                 <bool>false</bool>
+                 <bool>true</bool>
                 </property>
                 <property name="text">
                  <string>Put Sensors To Sleep</string>
@@ -636,6 +636,41 @@
                 </property>
                 <property name="value">
                  <double>15.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="8" column="0">
+               <widget class="QLabel" name="label_15">
+                <property name="text">
+                 <string>Transmission Power</string>
+                </property>
+               </widget>
+              </item>
+              <item row="8" column="1">
+               <widget class="QSpinBox" name="sensorsPower">
+                <property name="suffix">
+                 <string> dBm</string>
+                </property>
+                <property name="maximum">
+                 <number>20</number>
+                </property>
+                <property name="value">
+                 <number>10</number>
+                </property>
+               </widget>
+              </item>
+              <item row="9" column="0" colspan="2">
+               <widget class="QLabel" name="label_18">
+                <property name="font">
+                 <font>
+                  <pointsize>8</pointsize>
+                 </font>
+                </property>
+                <property name="text">
+                 <string>Transmission Power severy affects the sensor battery life and range. Max power results in approximately half the battery life, while giving twice the range.</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
                 </property>
                </widget>
               </item>

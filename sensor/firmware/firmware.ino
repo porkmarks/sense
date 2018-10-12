@@ -63,7 +63,8 @@ enum class State : uint8_t
 {
     PAIR,
     FIRST_CONFIG,
-    MEASUREMENT_LOOP
+    MEASUREMENT_LOOP,
+    SLEEPING_LOOP
 };
 State s_state = State::PAIR;
 
@@ -83,7 +84,8 @@ Sensor_Comms s_comms;
 
 FILE s_uart_output;
 
-uint32_t s_first_measurement_index = 0; //the index of the first measurement in storage
+uint32_t s_baseline_measurement_index = 0; //measurements should start from this index
+uint32_t s_first_stored_measurement_index = 0; //the index of the first measurement in storage
 
 namespace chrono
 {
@@ -99,6 +101,7 @@ chrono::millis s_comms_period;
 Storage s_storage;
 data::sensor::Calibration s_calibration;
 uint32_t s_serial_number = 0;
+bool s_sensor_sleeping = false;
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -371,6 +374,8 @@ static bool apply_config(const data::sensor::Config& config)
         return false;
     }
 
+    s_baseline_measurement_index = config.baseline_measurement_index;
+
     data::sensor::Calibration calibration = s_calibration;
     calibration.temperature_bias += config.calibration_change.temperature_bias;
     calibration.humidity_bias += config.calibration_change.humidity_bias;
@@ -403,18 +408,21 @@ static bool apply_config(const data::sensor::Config& config)
     }
 
     //remove confirmed measurements
-    while (s_first_measurement_index <= config.last_confirmed_measurement_index)
+    while (s_first_stored_measurement_index <= config.last_confirmed_measurement_index)
     {
         if (!s_storage.pop_front())
         {
-            LOG(PSTR("Failed to pop storage data. Left: %ld\n"), config.last_confirmed_measurement_index - s_first_measurement_index);
-            s_first_measurement_index = config.last_confirmed_measurement_index + 1;
+            LOG(PSTR("Failed to pop storage data. Left: %ld\n"), config.last_confirmed_measurement_index - s_first_stored_measurement_index);
+            s_first_stored_measurement_index = config.last_confirmed_measurement_index + 1;
             break;
         }
-        s_first_measurement_index++;
+        s_first_stored_measurement_index++;
     };
 
     uint32_t measurement_count = s_storage.get_data_count();
+    s_sensor_sleeping = config.sleeping;
+
+    s_comms.set_transmission_power(config.power);
 
     LOG(PSTR("temp bias: %d.%d\n"), (int)(s_calibration.temperature_bias / 100.f), (int)(s_calibration.temperature_bias) % 100);
     LOG(PSTR("humidity bias: %d.%d\n"), (int)(s_calibration.humidity_bias / 100.f), (int)(s_calibration.humidity_bias) % 100);
@@ -422,9 +430,12 @@ static bool apply_config(const data::sensor::Config& config)
     LOG(PSTR("comms period: %ld\n"), config.comms_period.count);
     LOG(PSTR("next measurement delay: %ld\n"), config.next_measurement_delay.count);
     LOG(PSTR("measurement period: %ld\n"), config.measurement_period.count);
+    LOG(PSTR("baseline index: %lu\n"), config.baseline_measurement_index);
     LOG(PSTR("last confirmed index: %lu\n"), config.last_confirmed_measurement_index);
-    LOG(PSTR("first index: %lu\n"), s_first_measurement_index);
+    LOG(PSTR("first stored index: %lu\n"), s_first_stored_measurement_index);
     LOG(PSTR("count: %lu\n"), measurement_count);
+    LOG(PSTR("sleeping: %d\n"), s_sensor_sleeping ? 1 : 0);
+    LOG(PSTR("power: %d\n"), (int)config.power);
 
     return true;
 }
@@ -438,10 +449,11 @@ static bool request_config()
         uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::sensor::Config_Request))];
         s_comms.begin_packet(raw_buffer, data::sensor::Type::CONFIG_REQUEST);
         data::sensor::Config_Request req;
-        req.first_measurement_index = s_first_measurement_index;
+        req.first_measurement_index = s_first_stored_measurement_index;
         req.measurement_count = s_storage.get_data_count();
         req.b2s_input_dBm = s_comms.get_input_dBm();
         req.calibration = s_calibration;
+        req.sleeping = s_sensor_sleeping;
         s_comms.pack(raw_buffer, req);
         send_successful = s_comms.send_packet(raw_buffer, 2);
     }
@@ -468,13 +480,13 @@ static bool request_config()
 
 static bool apply_first_config(const data::sensor::First_Config& first_config)
 {
-    s_first_measurement_index = first_config.first_measurement_index;
     s_storage.clear();
 
     if (!apply_config(first_config.config))
     {
         return false;
     }
+    s_first_stored_measurement_index = first_config.first_measurement_index;
 
     return true;
 }
@@ -681,7 +693,7 @@ static void do_measurement()
     {
         LOG(PSTR("*"));
         s_storage.pop_front();
-        s_first_measurement_index++;
+        s_first_stored_measurement_index++;
     }
     LOG(PSTR("done\n"));
 }
@@ -690,27 +702,28 @@ static void do_measurement()
 
 static void do_comms()
 {
+    size_t count = s_storage.get_data_count();
+    if (count == 0)
     {
-        size_t count = s_storage.get_data_count();
-        if (count == 0)
-        {
-            LOG(PSTR("No data to send!!!!\n"));
-            return;
-        }
+        LOG(PSTR("No data to send!!!!\n"));
+    }
+    else
+    {
         LOG(PSTR("%d items to send\n"), count);
     }
 
     s_comms.idle_mode();
 
     //send measurements
+    if (count > 0)
     {
-        const chrono::millis COMMS_SLOT_DURATION = chrono::millis(5000);
+        const chrono::millis COMMS_SLOT_DURATION = chrono::millis(7000);
         chrono::time_ms start_tp = chrono::now();
 
         uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::sensor::Measurement_Batch))];
         data::sensor::Measurement_Batch& batch = *(data::sensor::Measurement_Batch*)s_comms.get_tx_packet_payload(raw_buffer);
 
-        batch.start_index = s_first_measurement_index;
+        batch.start_index = s_first_stored_measurement_index;
         batch.count = 0;
 
         bool done = false;
@@ -720,6 +733,7 @@ static void do_comms()
             bool send = false;
             if (s_storage.unpack_next(it) == false)
             {
+                LOG(PSTR("Finished the data.\n"));
                 done = true;
                 send = true;
             }
@@ -745,8 +759,16 @@ static void do_comms()
                 send = true;
             }
 
+            chrono::time_ms now = chrono::now();
+            if (now < start_tp || now - start_tp >= COMMS_SLOT_DURATION)
+            {
+                LOG(PSTR("Comms time slot expired\n"));
+                done = true;
+            }
+
             if (send && batch.count > 0)
             {
+                batch.last_batch = done ? 1 : 0;
                 LOG(PSTR("Sending measurement batch of %d..."), (int)batch.count);
                 s_comms.begin_packet(raw_buffer, data::sensor::Type::MEASUREMENT_BATCH);
                 if (s_comms.send_packet(raw_buffer, sizeof(data::sensor::Measurement_Batch), 1) == true)
@@ -763,17 +785,13 @@ static void do_comms()
 
                 batch.start_index += batch.count;
                 batch.count = 0;
-            }
 
-            chrono::time_ms now = chrono::now();
-            if (now < start_tp || now - start_tp >= COMMS_SLOT_DURATION)
-            {
-                done = true;
+                Low_Power::power_down_int(chrono::millis(200ULL));
             }
-
         } while (!done);
     }
 
+    LOG(PSTR("done with batches\n"));
     request_config();
 
     s_comms.stand_by_mode();
@@ -812,7 +830,7 @@ static void first_config()
 static void measurement_loop()
 {
     while (true)
-    {
+    { 
         bool force_comms = false;
         if (is_pressed(Button::BUTTON1))
         {
@@ -832,11 +850,32 @@ static void measurement_loop()
 
         if (now >= s_next_measurement_time_point)
         {
+            //check if we have to skip indices
+            //we can do this only with an empty storage
+            //so in case the storage is not empty, skip measurements.
+            bool measure = true;
+            if (s_first_stored_measurement_index < s_baseline_measurement_index)
+            {
+                if (s_storage.empty())
+                {
+                    LOG(PSTR("Skipping indices\n"));
+                    s_first_stored_measurement_index = s_baseline_measurement_index;
+                }
+                else
+                {
+                    measure = false;
+                    LOG(PSTR("Skipping measurement until storage empty due to index skipping!\n"));
+                }
+            }
+
             s_next_measurement_time_point += s_measurement_period;
 
-            set_leds(GREEN_LED);
-            do_measurement();
-            set_leds(0);
+            if (measure)
+            {
+                set_leds(GREEN_LED);
+                do_measurement();
+                set_leds(0);
+            }
         }
 
         if (force_comms || now >= s_next_comms_time_point)
@@ -849,6 +888,14 @@ static void measurement_loop()
             set_leds(YELLOW_LED);
             do_comms();
             set_leds(0);
+        }
+
+        if (s_sensor_sleeping == true)
+        {
+            LOG(PSTR("Going to sleep!\n"));
+            s_state = State::SLEEPING_LOOP;
+            blink_leds(GREEN_LED, 8, chrono::millis(50));
+            break;
         }
 
         chrono::time_ms next_time_point = min(s_next_measurement_time_point, s_next_comms_time_point);
@@ -874,6 +921,56 @@ static void measurement_loop()
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
+static void sleep_loop()
+{
+    //request the config again - this also informs the BS that we're sleeping
+    request_config();
+  
+    while (true)
+    {
+        bool force_comms = false;
+        if (is_pressed(Button::BUTTON1))
+        {
+            chrono::time_ms start_tp = chrono::now();
+            while (is_pressed(Button::BUTTON1))
+            {
+                if (chrono::now() - start_tp > chrono::millis(10000))
+                {
+                    reset_settings();
+                    soft_reset();
+                }
+            }
+            force_comms = true;
+        }
+
+        chrono::time_ms now = chrono::now();
+
+        if (force_comms)
+        {
+            set_leds(YELLOW_LED);
+            request_config();
+            set_leds(0);
+        }
+
+        if (s_sensor_sleeping == false)
+        {
+            LOG(PSTR("Going to measurement!\n"));
+            s_state = State::MEASUREMENT_LOOP;
+            blink_leds(YELLOW_LED, 8, chrono::millis(50));
+            request_config(); //report back the sleeping status
+            break;
+        }
+
+        chrono::millis sleep_duration(1000ULL * 3600 * 24);
+        LOG(PSTR("Sleeping for %lu ms\n"), sleep_duration.count);
+
+        chrono::millis remaining = Low_Power::power_down_int(sleep_duration);
+        LOG(PSTR("Woken up, remaining %lu ms\n"), remaining.count);
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
 void loop()
 {
     if (s_state == State::PAIR)
@@ -887,6 +984,10 @@ void loop()
     else if (s_state == State::MEASUREMENT_LOOP)
     {
         measurement_loop();
+    }
+    else if (s_state == State::SLEEPING_LOOP)
+    {
+        sleep_loop();
     }
     else
     {

@@ -310,6 +310,15 @@ void Comms::processSensorDetails(InitializedBaseStation& cbs, std::vector<uint8_
                 continue;
             }
             details.lastCommsTimePoint = DB::Clock::from_time_t(time_t(it->value.GetUint64()));
+
+            it = sensorj.FindMember("sleeping");
+            if (it == sensorj.MemberEnd() || !it->value.IsBool())
+            {
+                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing sleeping."));
+                continue;
+            }
+            details.sleeping = it->value.GetBool();
+
             sensorsDetails.push_back(details);
         }
     }
@@ -369,6 +378,14 @@ void Comms::processConfigs(InitializedBaseStation& cbs, std::vector<uint8_t> con
             }
             config.descriptor.sensorsSleeping = it->value.GetBool();
 
+            it = configj.FindMember("sensors_power");
+            if (it == configj.MemberEnd() || !it->value.IsUint())
+            {
+                s_logger.logCritical(QString("Cannot deserialize config '%1': Missing sensors_power.").arg(config.descriptor.name.c_str()));
+                continue;
+            }
+            config.descriptor.sensorsPower = static_cast<uint8_t>(it->value.GetUint());
+
             it = configj.FindMember("measurement_period");
             if (it == configj.MemberEnd() || !it->value.IsInt64())
             {
@@ -420,6 +437,7 @@ void Comms::sendLastSensorsConfig(InitializedBaseStation& cbs)
     document.SetObject();
     document.AddMember("name", rapidjson::Value(config.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
     document.AddMember("sensors_sleeping", config.descriptor.sensorsSleeping, document.GetAllocator());
+    document.AddMember("sensors_power", static_cast<uint32_t>(config.descriptor.sensorsPower), document.GetAllocator());
     document.AddMember("measurement_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.measurementPeriod).count()), document.GetAllocator());
     document.AddMember("comms_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.commsPeriod).count()), document.GetAllocator());
 
@@ -444,6 +462,7 @@ void Comms::sendSensorsConfigs(InitializedBaseStation& cbs)
         configj.SetObject();
         configj.AddMember("name", rapidjson::Value(config.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
         configj.AddMember("sensors_sleeping", config.descriptor.sensorsSleeping, document.GetAllocator());
+        configj.AddMember("sensors_power", static_cast<uint32_t>(config.descriptor.sensorsPower), document.GetAllocator());
         configj.AddMember("measurement_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.measurementPeriod).count()), document.GetAllocator());
         configj.AddMember("comms_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.commsPeriod).count()), document.GetAllocator());
         configj.AddMember("baseline_measurement_tp", static_cast<uint64_t>(Clock::to_time_t(config.baselineMeasurementTimePoint)), document.GetAllocator());
@@ -476,6 +495,7 @@ void Comms::sendSensors(InitializedBaseStation& cbs)
         sensorj.AddMember("temperature_bias", sensor.calibration.temperatureBias, document.GetAllocator());
         sensorj.AddMember("humidity_bias", sensor.calibration.humidityBias, document.GetAllocator());
         sensorj.AddMember("serial_number", sensor.serialNumber, document.GetAllocator());
+        sensorj.AddMember("sleeping", sensor.state == DB::Sensor::State::Sleeping, document.GetAllocator());
         document.PushBack(sensorj, document.GetAllocator());
     }
 

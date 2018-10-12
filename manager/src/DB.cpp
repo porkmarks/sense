@@ -236,7 +236,7 @@ bool DB::load(std::string const& name)
 //            s_logger.logCritical(QString("Failed to load '%1': Bad or missing base_sensor_configs array").arg(dataFilename.c_str()));
 //            return false;
         }
-        else
+        else //NEW
         {
             rapidjson::Value const& configsj = it->value;
             for (size_t i = 0; i < configsj.Size(); i++)
@@ -258,6 +258,14 @@ bool DB::load(std::string const& name)
                     return false;
                 }
                 config.descriptor.sensorsSleeping = it->value.GetBool();
+
+                it = configj.FindMember("sensors_power");
+                if (it == configj.MemberEnd() || !it->value.IsUint())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing config sensors_power").arg(dataFilename.c_str()));
+                    return false;
+                }
+                config.descriptor.sensorsPower = static_cast<uint8_t>(it->value.GetUint());
 
                 it = configj.FindMember("measurement_period");
                 if (it == configj.MemberEnd() || !it->value.IsUint64())
@@ -1056,6 +1064,10 @@ bool DB::setSensorsDetails(std::vector<SensorDetails> const& details)
             sensor.lastCommsTimePoint = d.lastCommsTimePoint;
         }
         sensor.storedMeasurementCount = static_cast<int32_t>(d.storedMeasurementCount);
+        if (sensor.state != Sensor::State::Unbound)
+        {
+            sensor.state = d.sleeping ? Sensor::State::Sleeping : Sensor::State::Active;
+        }
 
         emit sensorDataChanged(sensor.id);
     }
@@ -1973,6 +1985,7 @@ void DB::save(Data const& data) const
                 configj.SetObject();
                 configj.AddMember("name", rapidjson::Value(config.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
                 configj.AddMember("sensors_sleeping", config.descriptor.sensorsSleeping, document.GetAllocator());
+                configj.AddMember("sensors_power", static_cast<uint32_t>(config.descriptor.sensorsPower), document.GetAllocator());
                 configj.AddMember("measurement_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.measurementPeriod).count()), document.GetAllocator());
                 configj.AddMember("comms_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.commsPeriod).count()), document.GetAllocator());
                 configj.AddMember("baseline_measurement_tp", static_cast<uint64_t>(Clock::to_time_t(config.baselineMeasurementTimePoint)), document.GetAllocator());

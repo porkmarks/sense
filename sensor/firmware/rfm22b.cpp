@@ -54,7 +54,7 @@ bool RFM22B::init()
 #ifdef ARDUINO
         printf_P(PSTR("Wrong device: %d"), (int)deviceType);
 #else
-        std::cout << "Wrong device type " << int(deviceType) << "\n";
+        std::cout << "Wrong device type " << int(deviceType) << std::endl;
 #endif
         return false;
     }
@@ -769,7 +769,7 @@ bool RFM22B::send_raw(uint8_t* data, uint8_t length, uint32_t timeout)
     if (elapsed >= timeout)
     {
 #ifdef RASPBERRY_PI
-        //std::cerr << "Timeout while sending (" << count << ")\n";
+        //std::cerr << "Timeout while sending (" << count << ")" << std::endl;
 #else
         //Serial.print("Timeout while sending - ");
         //Serial.print(count);
@@ -780,7 +780,7 @@ bool RFM22B::send_raw(uint8_t* data, uint8_t length, uint32_t timeout)
     }
 
 #ifdef RASPBERRY_PI
-    //std::cout << "Done sending (" << count << ")\n";
+    //std::cout << "Done sending (" << count << ")" << std::endl;
 #else
     //Serial.print("Done sending - ");
     //Serial.print(count);
@@ -827,7 +827,7 @@ uint8_t* RFM22B::receive_raw(uint8_t* dst, uint8_t& length, uint32_t timeout)
     if (elapsed >= timeout)
     {
 #ifdef RASPBERRY_PI
-        //std::cerr << "Timeout while receiving (" << count << ")\n";
+        //std::cerr << "Timeout while receiving (" << count << ")" << std::endl;
 #else
         //Serial.print("Timeout while receiving - ");
         //Serial.print(count);
@@ -836,7 +836,7 @@ uint8_t* RFM22B::receive_raw(uint8_t* dst, uint8_t& length, uint32_t timeout)
         return nullptr;
     }
 #ifdef RASPBERRY_PI
-    //std::cout << "Done receiving (" << count << ")\n";
+    //std::cout << "Done receiving (" << count << ")" << std::endl;
 #else
     //Serial.print("Done receiving - ");
     //Serial.print(count);

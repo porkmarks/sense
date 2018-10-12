@@ -82,7 +82,7 @@ Sensors::~Sensors()
 
 bool Sensors::init()
 {
-    LOGI << "Sensors initialized\n";
+    LOGI << "Sensors initialized" << std::endl;
 
     m_is_initialized = true;
     return true;
@@ -101,7 +101,7 @@ void Sensors::set_unbound_sensor_data(Unbound_Sensor_Data const& data)
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return;
     }
 
@@ -114,7 +114,7 @@ boost::optional<Sensors::Unbound_Sensor_Data> Sensors::get_unbound_sensor_data()
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return boost::none;
     }
     return m_unbound_sensor_data_opt;
@@ -136,13 +136,13 @@ Sensors::Sensor const* Sensors::bind_sensor(uint32_t serial_number, Sensors::Cal
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return nullptr;
     }
 
     if (!m_unbound_sensor_data_opt.is_initialized())
     {
-        LOGE << "Not expecting any sensor!\n";
+        LOGE << "Not expecting any sensor!" << std::endl;
         return nullptr;
     }
 
@@ -162,23 +162,18 @@ void Sensors::set_sensor_calibration(Sensor_Id id, Calibration const& calibratio
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return;
     }
 
     Sensor* sensor = _find_sensor_by_id(id);
     if (!sensor)
     {
-        LOGE << "Cannot find sensor id " << id << "\n";
+        LOGE << "Cannot find sensor id " << id << std::endl;
         return;
     }
 
     sensor->calibration = calibration;
-
-    if (cb_sensor_details_changed)
-    {
-        cb_sensor_details_changed(id);
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -187,14 +182,14 @@ void Sensors::set_sensor_measurement_range(Sensor_Id id, uint32_t first_measurem
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return;
     }
 
     Sensor* sensor = _find_sensor_by_id(id);
     if (!sensor)
     {
-        LOGE << "Cannot find sensor id " << id << "\n";
+        LOGE << "Cannot find sensor id " << id << std::endl;
         return;
     }
 
@@ -207,11 +202,6 @@ void Sensors::set_sensor_measurement_range(Sensor_Id id, uint32_t first_measurem
         //so at worst, max_confirmed_measurement_index = sensor->first_recorded_measurement_index - 1 (the one just before the first recorded index)
         sensor->max_confirmed_measurement_index = std::max(sensor->max_confirmed_measurement_index, sensor->first_recorded_measurement_index - 1);
     }
-
-    if (cb_sensor_details_changed)
-    {
-        cb_sensor_details_changed(id);
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -220,23 +210,38 @@ void Sensors::set_sensor_b2s_input_dBm(Sensor_Id id, int8_t dBm)
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return;
     }
 
     Sensor* sensor = _find_sensor_by_id(id);
     if (!sensor)
     {
-        LOGE << "Cannot find sensor id " << id << "\n";
+        LOGE << "Cannot find sensor id " << id << std::endl;
         return;
     }
 
     sensor->b2s_input_dBm = dBm;
+}
 
-    if (cb_sensor_details_changed)
+///////////////////////////////////////////////////////////////////////////////////////////
+
+void Sensors::set_sensor_sleeping(Sensor_Id id, bool sleeping)
+{
+    if (!is_initialized())
     {
-        cb_sensor_details_changed(id);
+        LOGE << "Sensors not initialized" << std::endl;
+        return;
     }
+
+    Sensor* sensor = _find_sensor_by_id(id);
+    if (!sensor)
+    {
+        LOGE << "Cannot find sensor id " << id << std::endl;
+        return;
+    }
+
+    sensor->sleeping = sleeping;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -245,18 +250,36 @@ void Sensors::set_sensor_last_comms_time_point(Sensor_Id id, Clock::time_point t
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return;
     }
 
     Sensor* sensor = _find_sensor_by_id(id);
     if (!sensor)
     {
-        LOGE << "Cannot find sensor id " << id << "\n";
+        LOGE << "Cannot find sensor id " << id << std::endl;
         return;
     }
 
     sensor->last_comms_tp = tp;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+void Sensors::notify_sensor_details_changed(Sensor_Id id)
+{
+    if (!is_initialized())
+    {
+        LOGE << "Sensors not initialized" << std::endl;
+        return;
+    }
+
+    Sensor* sensor = _find_sensor_by_id(id);
+    if (!sensor)
+    {
+        LOGE << "Cannot find sensor id " << id << std::endl;
+        return;
+    }
 
     if (cb_sensor_details_changed)
     {
@@ -270,14 +293,14 @@ Sensors::Clock::time_point Sensors::get_sensor_last_comms_time_point(Sensor_Id i
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return Clock::time_point(Clock::duration::zero());
     }
 
     const Sensor* sensor = find_sensor_by_id(id);
     if (!sensor)
     {
-        LOGE << "Cannot find sensor id " << id << "\n";
+        LOGE << "Cannot find sensor id " << id << std::endl;
         return Clock::time_point(Clock::duration::zero());
     }
 
@@ -290,13 +313,13 @@ Sensors::Sensor const* Sensors::add_sensor(Sensor_Id id, std::string const& name
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return nullptr;
     }
 
     if (address == 0)
     {
-        LOGE << "Invalid sensor address\n";
+        LOGE << "Invalid sensor address" << std::endl;
         return nullptr;
     }
 
@@ -320,7 +343,7 @@ std::vector<Sensors::Sensor> Sensors::get_sensors() const
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return {};
     }
 
@@ -333,13 +356,13 @@ void Sensors::set_config(Config config)
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return;
     }
 
     if (config.baseline_measurement_index == 0 && config.baseline_measurement_time_point.time_since_epoch() == Clock::duration::zero())
     {
-        LOGI << "Config requires baseline calculations\n";
+        LOGI << "Config requires baseline calculations" << std::endl;
 
         uint32_t next_measurement_index = 0;
         Clock::time_point next_measurement_tp = Clock::now();
@@ -348,19 +371,19 @@ void Sensors::set_config(Config config)
         {
             next_measurement_index = compute_next_measurement_index();
 
-            Config config = find_config_for_measurement_index(next_measurement_index);
-            next_measurement_tp = config.baseline_measurement_time_point + config.measurement_period * (next_measurement_index - config.baseline_measurement_index);
+            Config c = find_config_for_measurement_index(next_measurement_index);
+            next_measurement_tp = c.baseline_measurement_time_point + c.measurement_period * (next_measurement_index - c.baseline_measurement_index);
 
             m_configs.erase(std::remove_if(m_configs.begin(), m_configs.end(), [&next_measurement_index](Config const& c)
             {
-                                return c.baseline_measurement_index == next_measurement_index;
-                            }), m_configs.end());
+                return c.baseline_measurement_index == next_measurement_index;
+            }), m_configs.end());
         }
 
         config.baseline_measurement_index = next_measurement_index;
         config.baseline_measurement_time_point = next_measurement_tp;
     }
-    LOGI << "Config baseline calculations: index = " << config.baseline_measurement_index << "\n";
+    LOGI << "Config baseline calculations: index = " << config.baseline_measurement_index << std::endl;
 
     m_configs.push_back(config);
     while (m_configs.size() > 100)
@@ -418,7 +441,7 @@ Sensors::Clock::duration Sensors::compute_comms_period() const
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return Clock::duration::zero();
     }
 
@@ -431,18 +454,49 @@ Sensors::Clock::duration Sensors::compute_comms_period() const
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
+uint32_t Sensors::compute_baseline_measurement_index() const
+{
+    //check for sleeping configs
+    if (!m_configs.empty())
+    {
+        //find the last non-sleeping config
+        auto sleeping_rit = m_configs.rend();
+        for (auto rit = m_configs.rbegin(); rit != m_configs.rend(); ++rit)
+        {
+            Config const& c = *rit;
+            if (c.sensors_sleeping)
+            {
+                sleeping_rit = rit;
+                break;
+            }
+        }
+
+        //not the last config?
+        if (sleeping_rit != m_configs.rbegin())
+        {
+            Config const& last_non_sleeping_config = *(sleeping_rit - 1);
+            return last_non_sleeping_config.baseline_measurement_index;
+        }
+        return sleeping_rit->baseline_measurement_index;
+    }
+
+    return 0;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
 Sensors::Clock::time_point Sensors::compute_next_measurement_time_point(Sensor_Id id) const
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return Clock::time_point(Clock::duration::zero());
     }
 
     Sensor const* sensor = find_sensor_by_id(id);
     if (!sensor)
     {
-        LOGE << "Cannot find sensor id " << id << "\n";
+        LOGE << "Cannot find sensor id " << id << std::endl;
         return Clock::time_point(Clock::duration::zero());
     }
 
@@ -460,18 +514,22 @@ uint32_t Sensors::compute_next_measurement_index(Sensor_Id id) const
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return 0u;
     }
 
     Sensor const* sensor = find_sensor_by_id(id);
     if (!sensor)
     {
-        LOGE << "Cannot find sensor id " << id << "\n";
+        LOGE << "Cannot find sensor id " << id << std::endl;
         return 0;
     }
 
     uint32_t next_sensor_measurement_index = sensor->first_recorded_measurement_index + sensor->recorded_measurement_count;
+
+    //make sure the next measurement index doesn't fall below the last non-sleeping config
+    next_sensor_measurement_index = std::max(next_sensor_measurement_index, compute_baseline_measurement_index());
+
     return next_sensor_measurement_index;
 }
 
@@ -481,7 +539,7 @@ uint32_t Sensors::compute_next_measurement_index() const
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return 0u;
     }
 
@@ -498,14 +556,14 @@ uint32_t Sensors::compute_last_confirmed_measurement_index(Sensor_Id id) const
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return 0u;
     }
 
     Sensor const* sensor = find_sensor_by_id(id);
     if (!sensor)
     {
-        LOGE << "Cannot find sensor id " << id << "\n";
+        LOGE << "Cannot find sensor id " << id << std::endl;
         return 0;
     }
 
@@ -518,7 +576,7 @@ Sensors::Clock::time_point Sensors::compute_next_comms_time_point(Sensor_Id id) 
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return Clock::time_point(Clock::duration::zero());
     }
 
@@ -528,7 +586,7 @@ Sensors::Clock::time_point Sensors::compute_next_comms_time_point(Sensor_Id id) 
     });
     if (it == m_sensors.end())
     {
-        LOGE << "Cannot find sensor id " << id << "\n";
+        LOGE << "Cannot find sensor id " << id << std::endl;
         return Clock::now() + std::chrono::hours(99999999);
     }
 
@@ -549,7 +607,7 @@ bool Sensors::remove_sensor(Sensor_Id id)
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return false;
     }
 
@@ -559,7 +617,7 @@ bool Sensors::remove_sensor(Sensor_Id id)
     });
     if (it == m_sensors.end())
     {
-        LOGE << "Cannot find sensor id " << id << "\n";
+        LOGE << "Cannot find sensor id " << id << std::endl;
         return false;
     }
 
@@ -574,7 +632,7 @@ void Sensors::remove_all_sensors()
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return;
     }
 
@@ -587,7 +645,7 @@ Sensors::Sensor const* Sensors::find_sensor_by_id(Sensor_Id id) const
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return nullptr;
     }
 
@@ -608,7 +666,7 @@ Sensors::Sensor* Sensors::_find_sensor_by_id(Sensor_Id id)
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return nullptr;
     }
 
@@ -629,7 +687,7 @@ Sensors::Sensor const* Sensors::find_sensor_by_address(Sensor_Address address) c
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return nullptr;
     }
 
@@ -650,14 +708,14 @@ void Sensors::report_measurements(Sensor_Id id, std::vector<Measurement> const& 
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return;
     }
 
     Sensor* sensor = _find_sensor_by_id(id);
     if (!sensor)
     {
-        LOGE << "Cannot find sensor id " << id << "\n";
+        LOGE << "Cannot find sensor id " << id << std::endl;
         return;
     }
 
@@ -668,17 +726,31 @@ void Sensors::report_measurements(Sensor_Id id, std::vector<Measurement> const& 
         if (measurement.index > sensor->max_confirmed_measurement_index)
         {
             Config config = find_config_for_measurement_index(measurement.index);
-            Clock::time_point tp = config.baseline_measurement_time_point + config.measurement_period * (measurement.index - config.baseline_measurement_index);
-            LOGI << "Sensor " << id << " has reported measurement " << measurement.index << " from " << time_point_to_string(tp) << "\n";
-            rms.push_back({id, tp, measurement});
+            if (config.sensors_sleeping)
+            {
+                LOGI << "Sensor " << id << " has reported measurement " << measurement.index << " when it should have been SLEEPING. Discarded." << std::endl;
+                if (measurement.index == sensor->max_confirmed_measurement_index + 1)
+                {
+                    sensor->max_confirmed_measurement_index = measurement.index;
+                }
+            }
+            else
+            {
+                Clock::time_point tp = config.baseline_measurement_time_point + config.measurement_period * (measurement.index - config.baseline_measurement_index);
+                LOGI << "Sensor " << id << " has reported measurement " << measurement.index << " from " << time_point_to_string(tp) << std::endl;
+                rms.push_back({id, tp, measurement});
+            }
         }
         else
         {
-            LOGI << "Sensor " << id << " has reported an already confirmed measurement (" << measurement.index << ")\n";
+            LOGI << "Sensor " << id << " has reported an already confirmed measurement (" << measurement.index << ")" << std::endl;
         }
     }
 
-    cb_report_measurements(rms);
+    if (!rms.empty())
+    {
+        cb_report_measurements(rms);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -687,14 +759,14 @@ void Sensors::confirm_measurement(Sensor_Id id, uint32_t measurement_index)
 {
     if (!is_initialized())
     {
-        LOGE << "Sensors not initialized\n";
+        LOGE << "Sensors not initialized" << std::endl;
         return;
     }
 
     Sensor* sensor = _find_sensor_by_id(id);
     if (!sensor)
     {
-        LOGE << "Cannot find sensor id " << id << "\n";
+        LOGE << "Cannot find sensor id " << id << std::endl;
         return;
     }
 
