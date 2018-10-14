@@ -1,5 +1,6 @@
 #include "AlarmsModel.h"
 
+#include <array>
 #include <QWidget>
 #include <QIcon>
 
