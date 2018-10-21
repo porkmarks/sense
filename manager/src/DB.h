@@ -31,7 +31,6 @@ public:
     struct SensorsConfigDescriptor
     {
         std::string name = "Base Station";
-        bool sensorsSleeping = false;
         uint8_t sensorsPower = 10;
         Clock::duration measurementPeriod = std::chrono::minutes(5);
         Clock::duration commsPeriod = std::chrono::minutes(10);
@@ -77,7 +76,6 @@ public:
     {
         SensorId sensorId = 0;
         uint32_t index = 0;
-        Clock::time_point timePoint;
         float temperature = 0;
         float humidity = 0;
         float vcc = 0;
@@ -88,7 +86,9 @@ public:
     {
         MeasurementId id;
         MeasurementDescriptor descriptor;
+        Clock::time_point timePoint;
         uint8_t triggeredAlarms = 0;
+        int8_t combinedSignalStrength = 0;
     };
 
     struct SensorDescriptor
@@ -117,11 +117,27 @@ public:
         Calibration calibration;
         uint32_t serialNumber = 0;
         State state = State::Active;
+
         Clock::time_point lastCommsTimePoint = Clock::time_point(Clock::duration::zero());
-        Clock::time_point nextMeasurementTimePoint = Clock::time_point(Clock::duration::zero());
-        int32_t storedMeasurementCount = -1;
+
+        //which is the last confirmed measurement for this sensor.
+        uint32_t lastConfirmedMeasurementIndex = 0;
+
+        //the range of stored measurements in this sensor
+        uint32_t firstStoredMeasurementIndex = 0;
+        uint32_t storedMeasurementCount = 0;
+
+        //how much it's estimated the sensor actually stores
+        //The storedMeasurementCount is from the last communication, so it doesn't reflect the current reality
+        //It's delayes by one comms cycle
+        //This value is a more accurate estmation of what the sensor stores now
+        uint32_t estimatedStoredMeasurementCount = 0;
+
+        //the signal strength from the base station to this sensor, in dBm
+        int8_t lastSignalStrengthB2S = 0; //dBm
 
         SignalStrength averageSignalStrength;
+        int8_t averageCombinedSignalStrength = 0; //dBm
 
         bool isLastMeasurementValid = false;
         Measurement lastMeasurement;
@@ -131,24 +147,48 @@ public:
     Sensor const& getSensor(size_t index) const;
     bool addSensor(SensorDescriptor const& descriptor);
     bool setSensor(SensorId id, SensorDescriptor const& descriptor);
-    bool bindSensor(SensorId id, SensorAddress address, uint32_t serialNumber, Sensor::Calibration const& calibration);
+    bool bindSensor(uint32_t serialNumber, Sensor::Calibration const& calibration, SensorId& id);
     bool setSensorState(SensorId id, Sensor::State state);
 
-    struct SensorDetails
+    struct SensorInputDetails
     {
         SensorId id;
-        Clock::time_point nextMeasurementTimePoint = Clock::time_point(Clock::duration::zero());
-        Clock::time_point lastCommsTimePoint = Clock::time_point(Clock::duration::zero());
+
+        bool hasStoredData = false;
+        uint32_t firstStoredMeasurementIndex = 0;
         uint32_t storedMeasurementCount = 0;
+
+        bool hasSignalStrength = false;
+        int8_t signalStrengthB2S = 0; //dBm
+
+        bool hasLastCommsTimePoint = false;
+        Clock::time_point lastCommsTimePoint = Clock::time_point(Clock::duration::zero());
+
+        bool hasSleepingData = false;
         bool sleeping = false;
     };
 
-    bool setSensorDetails(SensorDetails const& details);
-    bool setSensorsDetails(std::vector<SensorDetails> const& details);
+    bool setSensorInputDetails(SensorInputDetails const& details);
+    bool setSensorsInputDetails(std::vector<SensorInputDetails> const& details);
+
+    struct SensorOutputDetails
+    {
+        Clock::duration commsPeriod = Clock::duration::zero();
+        Clock::time_point nextCommsTimePoint = Clock::time_point(Clock::duration::zero());
+        Clock::duration measurementPeriod = Clock::duration::zero();
+        Clock::time_point nextMeasurementTimePoint = Clock::time_point(Clock::duration::zero());
+        uint32_t nextRealTimeMeasurementIndex = 0; //the next measurement index for the crt date/time
+        uint32_t nextMeasurementIndex = 0; //the next measurement index for this sensor
+        uint32_t baselineMeasurementIndex = 0; //this sensor will measure starting from this index only
+    };
+
+    SensorOutputDetails computeSensorOutputDetails(SensorId id) const;
 
     void removeSensor(size_t index);
     int32_t findSensorIndexByName(std::string const& name) const;
     int32_t findSensorIndexById(SensorId id) const;
+    int32_t findSensorIndexByAddress(SensorAddress address) const;
+    int32_t findUnboundSensorIndex() const;
 
     ////////////////////////////////////////////////////////////////////////////
 
@@ -288,11 +328,8 @@ public:
         bool useVccFilter = false;
         Range<float> vccFilter;
 
-        bool useB2SFilter = false;
-        Range<int8_t> b2sFilter;
-
-        bool useS2BFilter = false;
-        Range<int8_t> s2bFilter;
+        bool useSignalStrengthFilter = false;
+        Range<int8_t> signalStrengthFilter;
 
 //        bool useSensorErrorsFilter = false;
 //        bool sensorErrorsFilter = true;
@@ -304,7 +341,7 @@ public:
     std::vector<Measurement> getFilteredMeasurements(Filter const& filter) const;
     size_t getFilteredMeasurementCount(Filter const& filter) const;
 
-    bool getLastMeasurementForSensor(SensorId sensor_id, Measurement& measurement) const;
+    bool getLastMeasurementForSensor(SensorId sensorId, Measurement& measurement) const;
 
     ////////////////////////////////////////////////////////////////////////////
 
@@ -341,11 +378,11 @@ signals:
     void measurementsWillBeRemoved(SensorId id);
     void measurementsRemoved(SensorId id);
 
-    void alarmWasTriggered(AlarmId alarmId, SensorId sensorId, MeasurementDescriptor const& md);
-    void alarmWasUntriggered(AlarmId alarmId, SensorId sensorId, MeasurementDescriptor const& md);
+    void alarmWasTriggered(AlarmId alarmId, Measurement const& m);
+    void alarmWasUntriggered(AlarmId alarmId, Measurement const& m);
 
 private:
-    bool _addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> const& mds);
+    bool _addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> mds);
     size_t _getFilteredMeasurements(Filter const& filter, std::vector<Measurement>* result) const;
     bool cull(Measurement const& measurement, Filter const& filter) const;
 
@@ -373,7 +410,14 @@ private:
     static inline MeasurementId computeMeasurementId(MeasurementDescriptor const& md);
     static inline MeasurementId computeMeasurementId(SensorId sensor_id, StoredMeasurement const& m);
 
-    uint8_t computeTriggeredAlarm(MeasurementDescriptor const& md);
+    Clock::time_point computeNextCommsTimePoint(Sensor const& sensor, size_t sensorIndex) const;
+    Clock::time_point computeNextMeasurementTimePoint(Sensor const& sensor) const;
+    uint32_t computeNextMeasurementIndex(Sensor const& sensor) const;
+    Clock::duration computeCommsPeriod() const;
+    uint32_t computeNextRealTimeMeasurementIndex() const;
+    SensorsConfig const& findSensorsConfigForMeasurementIndex(uint32_t index) const;
+    Clock::time_point computeMeasurementTimepoint(MeasurementDescriptor const& md) const;
+    uint8_t computeTriggeredAlarm(Measurement const& m);
 
     struct Data
     {
@@ -387,6 +431,7 @@ private:
         AlarmId lastAlarmId = 0;
         ReportId lastReportId = 0;
         MeasurementId lastMeasurementId = 0;
+        uint32_t lastSensorAddress = 0;
     };
 
     Data m_mainData;

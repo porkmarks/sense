@@ -42,6 +42,8 @@ signals:
     void baseStationDisconnected(BaseStationDescriptor const& bs);
 
 private:
+    using Channel = util::comms::Channel<data::Server_Message, QTcpSocketAdapter>;
+
     struct InitializedBaseStation
     {
         InitializedBaseStation(DB& db, const BaseStationDescriptor& descriptor)
@@ -61,7 +63,7 @@ private:
         DB& db;
         BaseStationDescriptor descriptor;
         QTcpSocketAdapter socketAdapter;
-        util::comms::Channel<data::Server_Message, QTcpSocketAdapter> channel;
+        Channel channel;
         bool isConnecting = false;
         bool isConnected = false;
 
@@ -76,21 +78,26 @@ private slots:
 private:
     void reconnectToBaseStation(InitializedBaseStation* cbs);
 
-    void processAddConfigRes(InitializedBaseStation& cbs);
-    void processSetConfigsRes(InitializedBaseStation& cbs);
-    void processSetSensorsRes(InitializedBaseStation& cbs);
-    void processAddSensorRes(InitializedBaseStation& cbs);
-    void processReportMeasurementsReq(InitializedBaseStation& cbs);
-    void processSensorBoundReq(InitializedBaseStation& cbs);
-    void processReportSensorDetails(InitializedBaseStation& cbs);
+    struct SensorRequest
+    {
+        uint32_t reqId = 0;
+        int8_t signalS2B = 0;
+        uint8_t type = 0;
+        uint32_t address = 0;
+        std::vector<uint8_t> payload;
+    };
 
-    void processSensorDetails(InitializedBaseStation& cbs, std::vector<uint8_t> const& data);
-    void processConfigs(InitializedBaseStation& cbs, std::vector<uint8_t> const& data);
+    void sendEmptySensorResponse(InitializedBaseStation& cbs, SensorRequest const& request);
+    template <typename T>
+    void sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Type type, uint32_t address, uint8_t retries, T const& payload);
 
-    void sendSensorsConfigs(InitializedBaseStation& cbs);
-    void sendLastSensorsConfig(InitializedBaseStation& cbs);
-    void sendSensors(InitializedBaseStation& cbs);
-    void requestBindSensor(InitializedBaseStation& cbs, DB::SensorId sensorId);
+    void processPong(InitializedBaseStation& cbs);
+    void processSensorReq(InitializedBaseStation& cbs);
+    void processSensorReq(InitializedBaseStation& cbs, SensorRequest const& request);
+    void processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Measurement_Batch const& payload);
+    void processSensorReq_ConfigRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Config_Request const& payload);
+    void processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::First_Config_Request const& payload);
+    void processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Pair_Request const& payload);
 
     QUdpSocket m_broadcastSocket;
 

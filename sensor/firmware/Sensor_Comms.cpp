@@ -49,95 +49,54 @@ bool Sensor_Comms::init(uint8_t retries, uint8_t power)
     m_rf22.set_gpio_function(RFM22B::GPIO::GPIO0, RFM22B::GPIO_Function::TX_STATE);
     m_rf22.set_gpio_function(RFM22B::GPIO::GPIO1, RFM22B::GPIO_Function::RX_STATE);
 
-    uint8_t modem_config[42] =
+    uint8_t modem_config[46] =
     {
-0x04,
-0x40,
-0xDE,
-0x00,
-0x93,
-0x75,
-0x00,
-0x96,
-0x4C,
-0x28,
-0x45,
-0x29,
-0xCD,
-0x00,
-0x02,
-0x08,
-0x22,
-0x2D,
-0xD4,
-0x00,
-0x00,
-0x00,
-0x00,
-0x00,
-0x00,
-0x01,
-0x00,
-0x00,
-0x00,
-0x00,
-0xFF,
-0xFF,
-0xFF,
-0xFF,
-0x93,
-0x75,
-0x2C,
-0x23,
-0x3A,
-0x53,
-0x75,
-0x80,
-
-      /*
-0x03,
-0x40,
-0xA1,
-0x20,
-0x4E,
-0xA5,
-0x00,
-0x51,
-0x45,
-0x28,
-0x82,
-0x29,
-0xCD,
-0x00,
-0x02,
-0x08,
-0x22,
-0x2D,
-0xD4,
-0x00,
-0x00,
-0x00,
-0x00,
-0x00,
-0x00,
-0x01,
-0x00,
-0x00,
-0x00,
-0x00,
-0xFF,
-0xFF,
-0xFF,
-0xFF,
-0x4E,
-0xA5,
-0x2C,
-0x23,
-0x1F,
-0x53,
-0x64,
-0x00
-*/
+        0xAB,
+        0x44,
+        0x0A,
+        0x03,
+        0xF0,
+        0x00,
+        0x88,
+        0x89,
+        0x00,
+        0x46,
+        0x24,
+        0x28,
+        0x64,
+        0x27,
+        0xCD,
+        0x00,
+        0x02,
+        0x10,
+        0x2A,
+        0x2D,
+        0xD4,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x01,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0xFF,
+        0xFF,
+        0xFF,
+        0xFF,
+        0x80,
+        0x60,
+        0x66,
+        0x66,
+        0x2C,
+        0x23,
+        0x50,
+        0x53,
+        0x75,
+        0x80,
     };
 
     m_rf22.set_modem_configuration(modem_config);
@@ -201,7 +160,7 @@ uint8_t Sensor_Comms::get_payload_raw_buffer_size(uint8_t size) const
     return size + sizeof(Header) + 1;
 }
 
-uint8_t Sensor_Comms::begin_packet(uint8_t* raw_buffer, data::sensor::Type type)
+uint8_t Sensor_Comms::begin_packet(uint8_t* raw_buffer, uint8_t type)
 {
     Header* header_ptr = reinterpret_cast<Header*>(raw_buffer + 1);
     header_ptr->type = type;
@@ -320,7 +279,7 @@ void Sensor_Comms::send_response(const Header& header)
     Header* header_ptr = reinterpret_cast<Header*>(ptr);
     header_ptr->source_address = m_address;
     header_ptr->destination_address = header.source_address;
-    header_ptr->type = data::sensor::Type::RESPONSE;
+    header_ptr->type = static_cast<uint8_t>(data::sensor::Type::RESPONSE);
     header_ptr->req_id = ++m_last_req_id;
     header_ptr->crc = 0;
 
@@ -357,7 +316,7 @@ uint8_t* Sensor_Comms::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size,
             Header* header_ptr = reinterpret_cast<Header*>(data);
             if (validate_packet(data, size, 0))
             {
-                if (get_rx_packet_type(data) != data::sensor::Type::RESPONSE) //ignore protocol packets
+                if (get_rx_packet_type(data) != static_cast<uint8_t>(data::sensor::Type::RESPONSE)) //ignore protocol packets
                 {
                     send_response(*header_ptr);
 
@@ -378,7 +337,7 @@ uint8_t* Sensor_Comms::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size,
     return nullptr;
 }
 
-data::sensor::Type Sensor_Comms::get_rx_packet_type(uint8_t* received_buffer) const
+uint8_t Sensor_Comms::get_rx_packet_type(uint8_t* received_buffer) const
 {
     const Header* header_ptr = reinterpret_cast<const Header*>(received_buffer);
     return header_ptr->type;

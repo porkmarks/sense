@@ -14,6 +14,46 @@
 extern std::string getMacStr(Settings::BaseStationDescriptor::Mac const& mac);
 extern Logger s_logger;
 
+
+template<typename C>
+void pack(C& c, void const* data, size_t size, size_t& offset)
+{
+    if (offset + size > c.size())
+    {
+        assert(false);
+        return;
+        //c.resize(offset + size);
+    }
+    memcpy(c.data() + offset, data, size);
+    offset += size;
+}
+
+template<typename C, typename T>
+void pack(C& c, T const& t, size_t& offset)
+{
+    static_assert(std::is_standard_layout<T>::value, "Only PODs pls");
+    pack(c, &t, sizeof(T), offset);
+}
+
+template<typename C>
+bool unpack(C const& c, void* data, size_t size, size_t& offset, size_t max_size)
+{
+    if (offset + size > c.size() || offset + size > max_size)
+    {
+        return false;
+    }
+    memcpy(data, c.data() + offset, size);
+    offset += size;
+    return true;
+}
+
+template<typename C, typename T>
+bool unpack(C const& c, T& t, size_t& offset, size_t max_size)
+{
+    static_assert(std::is_standard_layout<T>::value, "Only PODs pls");
+    return unpack(c, &t, sizeof(T), offset, max_size);
+}
+
 //////////////////////////////////////////////////////////////////////////
 
 Comms::Comms()
@@ -97,11 +137,6 @@ bool Comms::connectToBaseStation(DB& db, Mac const& mac)
         disconnectedFromBaseStation(cbsPtr);
     }));
 
-    cbsPtr->connections.push_back(connect(&db, &DB::sensorsConfigAdded, [this, cbsPtr]() { sendLastSensorsConfig(*cbsPtr); }));
-    cbsPtr->connections.push_back(connect(&db, &DB::sensorAdded, [this, cbsPtr](DB::SensorId id) { requestBindSensor(*cbsPtr, id); }));
-    cbsPtr->connections.push_back(connect(&db, &DB::sensorChanged, [this, cbsPtr](DB::SensorId) { sendSensors(*cbsPtr); }));
-    cbsPtr->connections.push_back(connect(&db, &DB::sensorRemoved, [this, cbsPtr](DB::SensorId) { sendSensors(*cbsPtr); }));
-
     cbsPtr->isConnecting = true;
     cbsPtr->socketAdapter.getSocket().connectToHost(it->address, 4444);
 
@@ -135,9 +170,6 @@ void Comms::connectedToBaseStation(InitializedBaseStation* cbs)
 
         emit baseStationConnected(cbs->descriptor);
         cbs->socketAdapter.start();
-
-        sendSensorsConfigs(*cbs);
-        sendSensors(*cbs);
     }
 }
 
@@ -190,657 +222,294 @@ QHostAddress Comms::getBaseStationAddress(Mac const& mac) const
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processSensorDetails(InitializedBaseStation& cbs, std::vector<uint8_t> const& data)
+void Comms::sendEmptySensorResponse(InitializedBaseStation& cbs, SensorRequest const& request)
 {
-    rapidjson::Document document;
-    document.Parse(reinterpret_cast<const char*>(data.data()), data.size());
-    if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
-    {
-        s_logger.logCritical(QString("Cannot deserialize sensor details: %1").arg(rapidjson::GetParseError_En(document.GetParseError())));
-        return;
-    }
-    if (!document.IsObject())
-    {
-        s_logger.logCritical(QString("Cannot deserialize sensor details: Bad document."));
-        return;
-    }
+    std::array<uint8_t, 1024> buffer;
+    size_t offset = 0;
+    pack(buffer, request.reqId, offset);
+    pack(buffer, false, offset);
 
-    std::vector<DB::SensorDetails> sensorsDetails;
-
-    {
-        auto it = document.FindMember("sensors");
-        if (it == document.MemberEnd() || !it->value.IsArray())
-        {
-            s_logger.logCritical(QString("Cannot deserialize sensor details: Missing sensors array."));
-            return;
-        }
-
-        rapidjson::Value const& sensorArrayj = it->value;
-        sensorsDetails.reserve(sensorArrayj.Size());
-
-        for (size_t i = 0; i < sensorArrayj.Size(); i++)
-        {
-            DB::SensorDetails details;
-            rapidjson::Value const& sensorj = sensorArrayj[i];
-
-            auto it = sensorj.FindMember("id");
-            if (it == sensorj.MemberEnd() || !it->value.IsUint())
-            {
-                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing id."));
-                continue;
-            }
-            details.id = it->value.GetUint();
-
-            int32_t sensorIndex = cbs.db.findSensorIndexById(details.id);
-            if (sensorIndex < 0)
-            {
-                s_logger.logCritical(QString("Cannot deserialize sensor details: cannot find sensor id %1.").arg(details.id));
-                continue;
-            }
-
-            it = sensorj.FindMember("serial_number");
-            if (it == sensorj.MemberEnd() || !it->value.IsUint())
-            {
-                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing serial_number."));
-                continue;
-            }
-            //uint32_t serialNumber = it->value.GetUint();
-
-            DB::Sensor::Calibration calibration;
-            it = sensorj.FindMember("temperature_bias");
-            if (it == sensorj.MemberEnd() || !it->value.IsNumber())
-            {
-                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing temperature_bias."));
-                continue;
-            }
-            calibration.temperatureBias = static_cast<float>(it->value.GetDouble());
-
-            it = sensorj.FindMember("humidity_bias");
-            if (it == sensorj.MemberEnd() || !it->value.IsNumber())
-            {
-                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing humidity_bias."));
-                continue;
-            }
-            calibration.humidityBias = static_cast<float>(it->value.GetDouble());
-
-            it = sensorj.FindMember("b2s");
-            if (it == sensorj.MemberEnd() || !it->value.IsInt())
-            {
-                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing b2s."));
-                continue;
-            }
-            //int8_t b2s = static_cast<int8_t>(it->value.GetInt());
-
-            it = sensorj.FindMember("first_recorded_measurement_index");
-            if (it == sensorj.MemberEnd() || !it->value.IsUint())
-            {
-                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing first_recorded_measurement_index."));
-                continue;
-            }
-            //uint32_t firstRecordedMeasurementIndex = it->value.GetUint();
-
-            it = sensorj.FindMember("max_confirmed_measurement_index");
-            if (it == sensorj.MemberEnd() || !it->value.IsUint())
-            {
-                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing max_confirmed_measurement_index."));
-                continue;
-            }
-            //uint32_t maxConfirmedMeasurementIndex = it->value.GetUint();
-
-            it = sensorj.FindMember("recorded_measurement_count");
-            if (it == sensorj.MemberEnd() || !it->value.IsUint())
-            {
-                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing recorded_measurement_count."));
-                continue;
-            }
-            details.storedMeasurementCount = it->value.GetUint();
-
-            it = sensorj.FindMember("next_measurement_dt");
-            if (it == sensorj.MemberEnd() || !it->value.IsInt())
-            {
-                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing next_measurement_dt."));
-                continue;
-            }
-            details.nextMeasurementTimePoint = DB::Clock::now() + std::chrono::seconds(it->value.GetInt());
-
-            it = sensorj.FindMember("last_comms_tp");
-            if (it == sensorj.MemberEnd() || !it->value.IsUint64())
-            {
-                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing last_comms_tp."));
-                continue;
-            }
-            details.lastCommsTimePoint = DB::Clock::from_time_t(time_t(it->value.GetUint64()));
-
-            it = sensorj.FindMember("sleeping");
-            if (it == sensorj.MemberEnd() || !it->value.IsBool())
-            {
-                s_logger.logCritical(QString("Cannot deserialize sensor details: Missing sleeping."));
-                continue;
-            }
-            details.sleeping = it->value.GetBool();
-
-            sensorsDetails.push_back(details);
-        }
-    }
-
-    if (!cbs.db.setSensorsDetails(sensorsDetails))
-    {
-        s_logger.logCritical(QString("Cannot deserialize sensor details: failed to set sensor details."));
-    }
+    cbs.channel.send(data::Server_Message::SENSOR_RES, buffer.data(), offset);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processConfigs(InitializedBaseStation& cbs, std::vector<uint8_t> const& data)
+template <typename T>
+void Comms::sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Type type, uint32_t address, uint8_t retries, T const& payload)
 {
-    rapidjson::Document document;
-    document.Parse(reinterpret_cast<const char*>(data.data()), data.size());
-    if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
+    std::array<uint8_t, 1024> buffer;
+    size_t offset = 0;
+    pack(buffer, request.reqId, offset);
+    pack(buffer, true, offset);
+    pack(buffer, type, offset);
+    pack(buffer, address, offset);
+    pack(buffer, retries, offset);
+    pack(buffer, static_cast<uint32_t>(sizeof(payload)), offset);
+    pack(buffer, payload, offset);
+
+    cbs.channel.send(data::Server_Message::SENSOR_RES, buffer.data(), offset);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Comms::processPong(InitializedBaseStation& cbs)
+{
+    std::cout << "PONG" << std::endl;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Comms::processSensorReq(InitializedBaseStation& cbs)
+{
+    Clock::time_point start_tp = Clock::now();
+
+    std::array<uint8_t, 1024> buffer;
+    size_t max_size = 0;
+    bool ok = cbs.channel.unpack_fixed(buffer, max_size) == Channel::Unpack_Result::OK;
+
+    size_t offset = 0;
+    SensorRequest request;
+    uint32_t payload_size = 0;
+    ok &= unpack(buffer, request.reqId, offset, max_size);
+    ok &= unpack(buffer, request.signalS2B, offset, max_size);
+    ok &= unpack(buffer, request.type, offset, max_size);
+    ok &= unpack(buffer, request.address, offset, max_size);
+    ok &= unpack(buffer, payload_size, offset, max_size);
+    ok &= payload_size < 1024 * 1024;
+    if (ok)
     {
-        s_logger.logCritical(QString("Cannot deserialize configs: %1").arg(rapidjson::GetParseError_En(document.GetParseError())));
-        return;
+        request.payload.resize(payload_size);
+        ok &= unpack(buffer, request.payload.data(), payload_size, offset, max_size);
     }
-    if (!document.IsObject())
+
+    if (!ok)
     {
-        s_logger.logCritical(QString("Cannot deserialize configs: Bad document."));
+        std::cerr << "Malformed message" << std::endl;
         return;
     }
 
+    processSensorReq(cbs, request);
+
+    std::cout << "Duration: " << std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - start_tp).count() << std::endl;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Comms::processSensorReq(InitializedBaseStation& cbs, SensorRequest const& request)
+{
+    switch (static_cast<data::sensor::Type>(request.type))
     {
-        auto it = document.FindMember("configs");
-        if (it == document.MemberEnd() || !it->value.IsArray())
+    case data::sensor::Type::MEASUREMENT_BATCH:
+        if (request.payload.size() == sizeof(data::sensor::Measurement_Batch))
         {
-            s_logger.logCritical(QString("Cannot deserialize configs: Missing configs array."));
-            return;
+            processSensorReq_MeasurementBatch(cbs, request, *reinterpret_cast<data::sensor::Measurement_Batch const*>(request.payload.data()));
         }
-
-        std::vector<DB::SensorsConfig> configs;
-
-        rapidjson::Value const& configArrayj = it->value;
-        for (size_t i = 0; i < configArrayj.Size(); i++)
+        break;
+    case data::sensor::Type::CONFIG_REQUEST:
+        if (request.payload.size() == sizeof(data::sensor::Config_Request))
         {
-            rapidjson::Value const& configj = configArrayj[i];
-            DB::SensorsConfig config;
-
-            auto it = configj.FindMember("name");
-            if (it == configj.MemberEnd() || !it->value.IsString())
-            {
-                s_logger.logCritical(QString("Cannot deserialize configs: Missing name."));
-                continue;
-            }
-            config.descriptor.name = it->value.GetString();
-
-            it = configj.FindMember("sensors_sleeping");
-            if (it == configj.MemberEnd() || !it->value.IsBool())
-            {
-                s_logger.logCritical(QString("Cannot deserialize config '%1': Missing sensors_sleeping.").arg(config.descriptor.name.c_str()));
-                continue;
-            }
-            config.descriptor.sensorsSleeping = it->value.GetBool();
-
-            it = configj.FindMember("sensors_power");
-            if (it == configj.MemberEnd() || !it->value.IsUint())
-            {
-                s_logger.logCritical(QString("Cannot deserialize config '%1': Missing sensors_power.").arg(config.descriptor.name.c_str()));
-                continue;
-            }
-            config.descriptor.sensorsPower = static_cast<uint8_t>(it->value.GetUint());
-
-            it = configj.FindMember("measurement_period");
-            if (it == configj.MemberEnd() || !it->value.IsInt64())
-            {
-                s_logger.logCritical(QString("Cannot deserialize config '%1': Missing measurement_period.").arg(config.descriptor.name.c_str()));
-                continue;
-            }
-            config.descriptor.measurementPeriod = std::chrono::seconds(it->value.GetInt64());
-
-            it = configj.FindMember("comms_period");
-            if (it == configj.MemberEnd() || !it->value.IsInt64())
-            {
-                s_logger.logCritical(QString("Cannot deserialize config '%1': Missing comms_period.").arg(config.descriptor.name.c_str()));
-                continue;
-            }
-            config.descriptor.commsPeriod = std::chrono::seconds(it->value.GetInt64());
-
-            it = configj.FindMember("baseline_measurement_tp");
-            if (it == configj.MemberEnd() || !it->value.IsUint64())
-            {
-                s_logger.logCritical(QString("Cannot deserialize config '%1': Missing baseline_measurement_tp.").arg(config.descriptor.name.c_str()));
-                continue;
-            }
-            config.baselineMeasurementTimePoint = DB::Clock::from_time_t(time_t(it->value.GetUint64()));
-
-            it = configj.FindMember("baseline_measurement_index");
-            if (it == configj.MemberEnd() || !it->value.IsUint())
-            {
-                s_logger.logCritical(QString("Cannot deserialize config '%1': Missing baseline_measurement_index.").arg(config.descriptor.name.c_str()));
-                continue;
-            }
-            config.baselineMeasurementIndex = it->value.GetUint();
-            configs.push_back(config);
+            processSensorReq_ConfigRequest(cbs, request, *reinterpret_cast<data::sensor::Config_Request const*>(request.payload.data()));
         }
-
-        if (!cbs.db.setSensorsConfigs(configs))
+        break;
+    case data::sensor::Type::FIRST_CONFIG_REQUEST:
+        if (request.payload.size() == sizeof(data::sensor::First_Config_Request))
         {
-            s_logger.logCritical(QString("Cannot deserialize configs: failed to set configs."));
+            processSensorReq_FirstConfigRequest(cbs, request, *reinterpret_cast<data::sensor::First_Config_Request const*>(request.payload.data()));
         }
+        break;
+    case data::sensor::Type::PAIR_REQUEST:
+        if (request.payload.size() == sizeof(data::sensor::Pair_Request))
+        {
+            processSensorReq_PairRequest(cbs, request, *reinterpret_cast<data::sensor::Pair_Request const*>(request.payload.data()));
+        }
+        break;
+    default:
+        std::cerr << "Invalid sensor request: " << int(request.type) << std::endl;
+        s_logger.logCritical(QString("Invalid sensor request: %1").arg(request.type));
+        break;
     }
+}
+
+
+static void fillConfig(data::sensor::Config& config, DB::SensorsConfig const& sensorsConfig, DB::Sensor const& sensor, DB::SensorOutputDetails const& sensorOutputDetails, DB::Sensor::Calibration const& reportedCalibration)
+{
+    DB::Clock::time_point now = DB::Clock::now();
+
+    config.baseline_measurement_index = sensorOutputDetails.baselineMeasurementIndex;
+    config.next_measurement_delay =
+            chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(sensorOutputDetails.nextMeasurementTimePoint - now).count());
+
+    config.measurement_period =
+            chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(sensorOutputDetails.measurementPeriod).count());
+
+    config.next_comms_delay =
+            chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(sensorOutputDetails.nextCommsTimePoint - now).count());
+
+    config.comms_period =
+            chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(sensorOutputDetails.commsPeriod).count());
+
+    config.last_confirmed_measurement_index = sensor.lastConfirmedMeasurementIndex;
+    config.calibration_change.temperature_bias = static_cast<int16_t>((sensor.calibration.temperatureBias - reportedCalibration.temperatureBias) * 100.f);
+    config.calibration_change.humidity_bias = static_cast<int16_t>((sensor.calibration.humidityBias - reportedCalibration.humidityBias) * 100.f);
+    config.power = sensorsConfig.descriptor.sensorsPower;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::sendLastSensorsConfig(InitializedBaseStation& cbs)
+void Comms::processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Measurement_Batch const& measurementBatch)
 {
-    DB::SensorsConfig const& config = cbs.db.getLastSensorsConfig();
-
-    rapidjson::Document document;
-    document.SetObject();
-    document.AddMember("name", rapidjson::Value(config.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
-    document.AddMember("sensors_sleeping", config.descriptor.sensorsSleeping, document.GetAllocator());
-    document.AddMember("sensors_power", static_cast<uint32_t>(config.descriptor.sensorsPower), document.GetAllocator());
-    document.AddMember("measurement_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.measurementPeriod).count()), document.GetAllocator());
-    document.AddMember("comms_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.commsPeriod).count()), document.GetAllocator());
-
-    rapidjson::StringBuffer buffer;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-    document.Accept(writer);
-    cbs.channel.send(data::Server_Message::ADD_CONFIG_REQ, buffer.GetString(), buffer.GetSize());
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Comms::sendSensorsConfigs(InitializedBaseStation& cbs)
-{
-    DB& db = cbs.db;
-
-    rapidjson::Document document;
-    document.SetArray();
-    for (size_t i = 0; i < db.getSensorsConfigCount(); i++)
+    int32_t sensorIndex = cbs.db.findSensorIndexByAddress(request.address);
+    if (sensorIndex < 0)
     {
-        DB::SensorsConfig const& config = db.getSensorsConfig(i);
-        rapidjson::Value configj;
-        configj.SetObject();
-        configj.AddMember("name", rapidjson::Value(config.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
-        configj.AddMember("sensors_sleeping", config.descriptor.sensorsSleeping, document.GetAllocator());
-        configj.AddMember("sensors_power", static_cast<uint32_t>(config.descriptor.sensorsPower), document.GetAllocator());
-        configj.AddMember("measurement_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.measurementPeriod).count()), document.GetAllocator());
-        configj.AddMember("comms_period", static_cast<int64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.commsPeriod).count()), document.GetAllocator());
-        configj.AddMember("baseline_measurement_tp", static_cast<uint64_t>(Clock::to_time_t(config.baselineMeasurementTimePoint)), document.GetAllocator());
-        configj.AddMember("baseline_measurement_index", config.baselineMeasurementIndex, document.GetAllocator());
-        document.PushBack(configj, document.GetAllocator());
-    }
-
-    rapidjson::StringBuffer buffer;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-    document.Accept(writer);
-    cbs.channel.send(data::Server_Message::SET_CONFIGS_REQ, buffer.GetString(), buffer.GetSize());
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Comms::sendSensors(InitializedBaseStation& cbs)
-{
-    DB& db = cbs.db;
-
-    rapidjson::Document document;
-    document.SetArray();
-    for (size_t i = 0; i < db.getSensorCount(); i++)
-    {
-        DB::Sensor const& sensor = db.getSensor(i);
-        rapidjson::Value sensorj;
-        sensorj.SetObject();
-        sensorj.AddMember("name", rapidjson::Value(sensor.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
-        sensorj.AddMember("id", sensor.id, document.GetAllocator());
-        sensorj.AddMember("address", sensor.address, document.GetAllocator());
-        sensorj.AddMember("temperature_bias", sensor.calibration.temperatureBias, document.GetAllocator());
-        sensorj.AddMember("humidity_bias", sensor.calibration.humidityBias, document.GetAllocator());
-        sensorj.AddMember("serial_number", sensor.serialNumber, document.GetAllocator());
-        sensorj.AddMember("sleeping", sensor.state == DB::Sensor::State::Sleeping, document.GetAllocator());
-        document.PushBack(sensorj, document.GetAllocator());
-    }
-
-    rapidjson::StringBuffer buffer;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-    document.Accept(writer);
-
-    cbs.channel.send(data::Server_Message::SET_SENSORS_REQ, buffer.GetString(), buffer.GetSize());
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Comms::requestBindSensor(InitializedBaseStation& cbs, DB::SensorId sensorId)
-{
-    DB& db = cbs.db;
-
-    int32_t _sensorIndex = db.findSensorIndexById(sensorId);
-    if (_sensorIndex < 0)
-    {
-        s_logger.logCritical(QString("Cannot send bind request: Bad sensor id %1.").arg(sensorId));
-        return;
-    }
-    size_t sensorIndex = static_cast<size_t>(_sensorIndex);
-
-    DB::Sensor const& sensor = db.getSensor(sensorIndex);
-    if (sensor.state != DB::Sensor::State::Unbound)
-    {
-        s_logger.logCritical(QString("Cannot send bind request: Sensor in bad state: %1.").arg(static_cast<int>(sensor.state)));
+        std::cerr << "Invalid sensor address: " << request.address << std::endl;
+        sendEmptySensorResponse(cbs, request);
         return;
     }
 
-    rapidjson::Document document;
-    document.SetObject();
-    document.AddMember("name", rapidjson::Value(sensor.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
-    document.AddMember("id", sensor.id, document.GetAllocator());
+    DB::Sensor const& sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
 
-    rapidjson::StringBuffer buffer;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-    document.Accept(writer);
+    std::vector<DB::MeasurementDescriptor> measurements;
+    uint32_t count = std::min<uint32_t>(measurementBatch.count, data::sensor::Measurement_Batch::MAX_COUNT);
+    measurements.reserve(count);
 
-    cbs.channel.send(data::Server_Message::ADD_SENSOR_REQ, buffer.GetString(), buffer.GetSize());
+    for (uint32_t i = 0; i < count; i++)
+    {
+        data::sensor::Measurement const& m = measurementBatch.measurements[i];
+        DB::MeasurementDescriptor d;
+        d.index = measurementBatch.start_index + i;
+        if (m.flags & static_cast<int>(data::sensor::Measurement::Flag::COMMS_ERROR))
+        {
+            d.sensorErrors |= DB::SensorErrors::Comms;
+        }
+        else if (m.flags > 0)// & static_cast<int>(data::sensor::Measurement::Flag::SENSOR_ERROR))
+        {
+            d.sensorErrors |= DB::SensorErrors::Hardware;
+        }
+        d.sensorId = sensor.id;
+        d.signalStrength.b2s = sensor.lastSignalStrengthB2S;
+        d.signalStrength.s2b = request.signalS2B;
+        measurementBatch.unpack(d.vcc);
+        m.unpack(d.humidity, d.temperature);
+        measurements.push_back(d);
+    }
+    sendEmptySensorResponse(cbs, request);
+
+    cbs.db.addMeasurements(measurements);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processSetSensorsRes(InitializedBaseStation& cbs)
+void Comms::processSensorReq_ConfigRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Config_Request const& configRequest)
 {
-    std::vector<uint8_t> buffer;
-    cbs.channel.unpack(buffer);
-
-    if (buffer.empty())
+    int32_t sensorIndex = cbs.db.findSensorIndexByAddress(request.address);
+    if (sensorIndex < 0)
     {
-        s_logger.logCritical(QString("Setting the sensors FAILED."));
+        std::cerr << "Invalid sensor address: " << request.address << std::endl;
+        sendEmptySensorResponse(cbs, request);
         return;
     }
 
-    s_logger.logInfo(QString("Setting the sensors succeded."));
+    DB::Sensor const& sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
 
-    processSensorDetails(cbs, buffer);
+    DB::SensorInputDetails details;
+    details.id = sensor.id;
+    details.hasStoredData = true;
+    details.firstStoredMeasurementIndex = configRequest.first_measurement_index;
+    details.storedMeasurementCount = configRequest.measurement_count;
+    details.hasSignalStrength = true;
+    details.signalStrengthB2S = configRequest.b2s_input_dBm;
+    details.hasSleepingData = true;
+    details.sleeping = configRequest.sleeping;
+    details.hasLastCommsTimePoint = true;
+    details.lastCommsTimePoint = Clock::now();
+
+    cbs.db.setSensorInputDetails(details);
+
+    DB::SensorsConfig const& sensorsConfig = cbs.db.getLastSensorsConfig();
+    DB::SensorOutputDetails outputDetails = cbs.db.computeSensorOutputDetails(sensor.id);
+    DB::Sensor::Calibration reportedCalibration{ static_cast<float>(configRequest.calibration.temperature_bias) / 100.f,
+                static_cast<float>(configRequest.calibration.humidity_bias) / 100.f};
+
+    data::sensor::Config config;
+    fillConfig(config, sensorsConfig, sensor, outputDetails, reportedCalibration);
+
+    sendSensorResponse(cbs, request, data::sensor::Type::CONFIG, request.address, 1, config);
+
+    std::cout << "Received Config Request" << std::endl;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processAddConfigRes(InitializedBaseStation& cbs)
+void Comms::processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::First_Config_Request const& firstConfigRequest)
 {
-    std::vector<uint8_t> buffer;
-    cbs.channel.unpack(buffer);
-
-    if (buffer.empty())
+    int32_t sensorIndex = cbs.db.findSensorIndexByAddress(request.address);
+    if (sensorIndex < 0)
     {
-        s_logger.logCritical(QString("Adding the config FAILED."));
+        std::cerr << "Invalid sensor address: " << request.address << std::endl;
+        sendEmptySensorResponse(cbs, request);
         return;
     }
 
-    s_logger.logInfo(QString("Adding the config succeded."));
-    processConfigs(cbs, buffer);
+    DB::Sensor const& sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
+
+    data::sensor::First_Config firstConfig;
+
+    {
+        DB::SensorOutputDetails outputDetails = cbs.db.computeSensorOutputDetails(sensor.id);
+        firstConfig.first_measurement_index = outputDetails.nextRealTimeMeasurementIndex; //since this sensor just booted, it cannot have measurements older than now
+    }
+
+    DB::SensorInputDetails details;
+    details.id = sensor.id;
+    details.hasStoredData = true;
+    details.firstStoredMeasurementIndex = firstConfig.first_measurement_index;
+    details.storedMeasurementCount = 0;
+
+    cbs.db.setSensorInputDetails(details);
+
+    {
+        DB::SensorsConfig const& sensorsConfig = cbs.db.getLastSensorsConfig();
+        DB::SensorOutputDetails outputDetails = cbs.db.computeSensorOutputDetails(sensor.id);
+        fillConfig(firstConfig.config, sensorsConfig, sensor, outputDetails, sensor.calibration);
+    }
+
+    sendSensorResponse(cbs, request, data::sensor::Type::FIRST_CONFIG, request.address, 2, firstConfig);
+
+    std::cout << "Received First Config Request" << std::endl;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processSetConfigsRes(InitializedBaseStation& cbs)
+void Comms::processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Pair_Request const& pairRequest)
 {
-    std::vector<uint8_t> buffer;
-    cbs.channel.unpack(buffer);
+    DB::Sensor::Calibration calibration;
+    calibration.temperatureBias = static_cast<float>(pairRequest.calibration.temperature_bias) / 100.f;
+    calibration.humidityBias = static_cast<float>(pairRequest.calibration.humidity_bias) / 100.f;
+    uint32_t serialNumber = pairRequest.serial_number;
 
-    if (buffer.empty())
+    DB::SensorId id;
+    if (!cbs.db.bindSensor(serialNumber, calibration, id))
     {
-        s_logger.logCritical(QString("Setting the config FAILED."));
+        s_logger.logWarning(QString("Unexpected bind request received from sensor SN %1").arg(serialNumber, 8, 18, QChar('0')));
+        sendEmptySensorResponse(cbs, request);
         return;
     }
 
-    s_logger.logInfo(QString("Setting the config succeded."));
-    processConfigs(cbs, buffer);
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Comms::processAddSensorRes(InitializedBaseStation& cbs)
-{
-    std::vector<uint8_t> buffer;
-    cbs.channel.unpack(buffer);
-
-    if (buffer.empty())
+    int32_t sensorIndex = cbs.db.findSensorIndexById(id);
+    if (sensorIndex < 0)
     {
-        s_logger.logCritical(QString("Adding the sensor FAILED."));
+        assert(false);
+        sendEmptySensorResponse(cbs, request);
         return;
     }
 
-    s_logger.logInfo(QString("Adding the sensor succeded."));
-    processSensorDetails(cbs, buffer);
-}
+    DB::Sensor const& sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
 
-//////////////////////////////////////////////////////////////////////////
+    data::sensor::Pair_Response response;
+    response.address = sensor.address;
+    sendSensorResponse(cbs, request, data::sensor::Type::PAIR_RESPONSE, request.address, 10, response);
 
-void Comms::processReportMeasurementsReq(InitializedBaseStation& cbs)
-{
-    std::vector<uint8_t> buffer;
-    cbs.channel.unpack(buffer);
-
-    bool ok = false;
-
-    std::vector<DB::MeasurementDescriptor> descriptors;
-
-    {
-        rapidjson::Document document;
-        document.Parse(reinterpret_cast<const char*>(buffer.data()), buffer.size());
-        if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
-        {
-            s_logger.logCritical(QString("Cannot deserialize measurement request: %1").arg(rapidjson::GetParseError_En(document.GetParseError())));
-            goto end;
-        }
-        if (!document.IsArray())
-        {
-            s_logger.logCritical(QString("Cannot deserialize measurement request: Bad document."));
-            goto end;
-        }
-
-        descriptors.reserve(document.Size());
-
-        for (size_t i = 0; i < document.Size(); i++)
-        {
-            rapidjson::Value const& valuej = document[i];
-            if (!valuej.IsObject())
-            {
-                s_logger.logCritical(QString("Cannot deserialize report measurements response: Bad value."));
-                goto end;
-            }
-
-            auto it = valuej.FindMember("sensor_id");
-            if (it == valuej.MemberEnd() || !it->value.IsUint())
-            {
-                s_logger.logCritical(QString("Cannot deserialize measurement request: Missing sensor_id."));
-                goto end;
-            }
-            DB::MeasurementDescriptor descriptor;
-            descriptor.sensorId = it->value.GetUint();
-
-            it = valuej.FindMember("index");
-            if (it == valuej.MemberEnd() || !it->value.IsUint())
-            {
-                s_logger.logCritical(QString("Cannot deserialize measurement request: Missing index."));
-                goto end;
-            }
-            descriptor.index = it->value.GetUint();
-
-            it = valuej.FindMember("time_point");
-            if (it == valuej.MemberEnd() || !it->value.IsInt64())
-            {
-                s_logger.logCritical(QString("Cannot deserialize measurement request: Missing time_point."));
-                goto end;
-            }
-            descriptor.timePoint = DB::Clock::time_point(std::chrono::seconds(it->value.GetInt64()));
-
-            it = valuej.FindMember("temperature");
-            if (it == valuej.MemberEnd() || !it->value.IsNumber())
-            {
-                s_logger.logCritical(QString("Cannot deserialize measurement request: Missing temperature."));
-                goto end;
-            }
-            descriptor.temperature = static_cast<float>(it->value.GetDouble());
-
-            it = valuej.FindMember("humidity");
-            if (it == valuej.MemberEnd() || !it->value.IsNumber())
-            {
-                s_logger.logCritical(QString("Cannot deserialize measurement request: Missing humidity."));
-                goto end;
-            }
-            descriptor.humidity = static_cast<float>(it->value.GetDouble());
-
-            it = valuej.FindMember("vcc");
-            if (it == valuej.MemberEnd() || !it->value.IsNumber())
-            {
-                s_logger.logCritical(QString("Cannot deserialize measurement request: Missing vcc."));
-                goto end;
-            }
-            descriptor.vcc = static_cast<float>(it->value.GetDouble());
-
-            it = valuej.FindMember("b2s");
-            if (it == valuej.MemberEnd() || !it->value.IsInt())
-            {
-                s_logger.logCritical(QString("Cannot deserialize measurement request: Missing b2s."));
-                goto end;
-            }
-            descriptor.signalStrength.b2s = static_cast<int8_t>(it->value.GetInt());
-
-            it = valuej.FindMember("s2b");
-            if (it == valuej.MemberEnd() || !it->value.IsInt())
-            {
-                s_logger.logCritical(QString("Cannot deserialize measurement request: Missing s2b."));
-                goto end;
-            }
-            descriptor.signalStrength.s2b = static_cast<int8_t>(it->value.GetInt());
-
-            it = valuej.FindMember("sensor_errors");
-            if (it == valuej.MemberEnd() || !it->value.IsUint())
-            {
-                s_logger.logCritical(QString("Cannot deserialize measurement request: Missing sensor_errors."));
-                goto end;
-            }
-            descriptor.sensorErrors = static_cast<uint8_t>(it->value.GetUint());
-
-            descriptors.push_back(descriptor);
-        }
-
-        if (!cbs.db.addMeasurements(descriptors))
-        {
-            s_logger.logCritical(QString("Cannot deserialize measurement request: Adding measurements failed."));
-            goto end;
-        }
-
-        ok = true;
-    }
-
-end:
-    {
-        //DB& db = cbs.db;
-
-        rapidjson::Document document;
-        document.SetArray();
-
-        for (DB::MeasurementDescriptor descriptor: descriptors)
-        {
-            rapidjson::Value mj;
-            mj.SetObject();
-            mj.AddMember("sensor_id", descriptor.sensorId, document.GetAllocator());
-            mj.AddMember("index", descriptor.index, document.GetAllocator());
-            mj.AddMember("ok", ok, document.GetAllocator());
-
-            document.PushBack(std::move(mj), document.GetAllocator());
-        }
-
-        rapidjson::StringBuffer buffer;
-        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-        document.Accept(writer);
-
-        cbs.channel.send(data::Server_Message::REPORT_MEASUREMENTS_RES, buffer.GetString(), buffer.GetSize());
-    }
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Comms::processReportSensorDetails(InitializedBaseStation& cbs)
-{
-    std::vector<uint8_t> buffer;
-    cbs.channel.unpack(buffer);
-
-    processSensorDetails(cbs, buffer);
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Comms::processSensorBoundReq(InitializedBaseStation& cbs)
-{
-    std::vector<uint8_t> buffer;
-    cbs.channel.unpack(buffer);
-
-    bool ok = false;
-
-    {
-        rapidjson::Document document;
-        document.Parse(reinterpret_cast<const char*>(buffer.data()), buffer.size());
-        if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
-        {
-            s_logger.logCritical(QString("Cannot deserialize bind request: %1").arg(rapidjson::GetParseError_En(document.GetParseError())));
-            goto end;
-        }
-        if (!document.IsObject())
-        {
-            s_logger.logCritical(QString("Cannot deserialize bind request: Bad document."));
-            goto end;
-        }
-
-        auto it = document.FindMember("id");
-        if (it == document.MemberEnd() || !it->value.IsUint())
-        {
-            s_logger.logCritical(QString("Cannot deserialize bind request: Missing id."));
-            goto end;
-        }
-        DB::SensorId id = it->value.GetUint();
-
-        it = document.FindMember("address");
-        if (it == document.MemberEnd() || !it->value.IsUint())
-        {
-            s_logger.logCritical(QString("Cannot deserialize bind request: Missing address."));
-            goto end;
-        }
-        DB::SensorAddress address = it->value.GetUint();
-
-        it = document.FindMember("serial_number");
-        if (it == document.MemberEnd() || !it->value.IsUint())
-        {
-            s_logger.logCritical(QString("Cannot deserialize bind request: Missing serial_number."));
-            goto end;
-        }
-        uint32_t serialNumber = it->value.GetUint();
-
-        DB::Sensor::Calibration calibration;
-        it = document.FindMember("temperature_bias");
-        if (it == document.MemberEnd() || !it->value.IsNumber())
-        {
-            s_logger.logCritical(QString("Cannot deserialize bind request: Missing temperature_bias."));
-            goto end;
-        }
-        calibration.temperatureBias = static_cast<float>(it->value.GetDouble());
-
-        it = document.FindMember("humidity_bias");
-        if (it == document.MemberEnd() || !it->value.IsNumber())
-        {
-            s_logger.logCritical(QString("Cannot deserialize bind request: Missing humidity_bias."));
-            goto end;
-        }
-        calibration.humidityBias = static_cast<float>(it->value.GetDouble());
-
-        if (!cbs.db.bindSensor(id, address, serialNumber, calibration))
-        {
-            s_logger.logCritical(QString("Cannot deserialize bind request: Bind failed."));
-            goto end;
-        }
-
-        ok = true;
-        s_logger.logInfo(QString("Bind request successed."));
-    }
-
-end:
-    cbs.channel.send(data::Server_Message::SENSOR_BOUND_RES, &ok, 1);
+    std::cout << "Received Pair Request" << std::endl;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -871,26 +540,11 @@ void Comms::process()
         {
             switch (message)
             {
-            case data::Server_Message::ADD_CONFIG_RES:
-                processAddConfigRes(*cbs);
+            case data::Server_Message::PONG:
+                processPong(*cbs);
                 break;
-            case data::Server_Message::SET_CONFIGS_RES:
-                processSetConfigsRes(*cbs);
-                break;
-            case data::Server_Message::SET_SENSORS_RES:
-                processSetSensorsRes(*cbs);
-                break;
-            case data::Server_Message::ADD_SENSOR_RES:
-                processAddSensorRes(*cbs);
-                break;
-            case data::Server_Message::REPORT_MEASUREMENTS_REQ:
-                processReportMeasurementsReq(*cbs);
-                break;
-            case data::Server_Message::SENSOR_BOUND_REQ:
-                processSensorBoundReq(*cbs);
-                break;
-            case data::Server_Message::REPORT_SENSORS_DETAILS:
-                processReportSensorDetails(*cbs);
+            case data::Server_Message::SENSOR_REQ:
+                processSensorReq(*cbs);
                 break;
             default:
                 s_logger.logCritical(QString("Invalid message received: %1").arg(int(message)));

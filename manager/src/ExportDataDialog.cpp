@@ -304,7 +304,7 @@ bool ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount, bool show
         if (exportTimePoint)
         {
             char buf[128];
-            time_t t = DB::Clock::to_time_t(m.descriptor.timePoint);
+            time_t t = DB::Clock::to_time_t(m.timePoint);
             if (dateTimeFormat == DateTimeFormat::YYYY_MM_DD_Slash)
             {
                 strftime(buf, 128, "%Y/%m/%d %H:%M:%S", localtime(&t));
@@ -369,7 +369,7 @@ bool ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount, bool show
         }
         if (exportSignal)
         {
-            stream << std::fixed << std::setprecision(decimalPlaces) << getSignalLevel(std::min(m.descriptor.signalStrength.b2s, m.descriptor.signalStrength.s2b)) * 100.f;
+            stream << std::fixed << std::setprecision(decimalPlaces) << getSignalLevel(m.combinedSignalStrength) * 100.f;
             if (unitsFormat == UnitsFormat::Embedded)
             {
                 stream << " %";

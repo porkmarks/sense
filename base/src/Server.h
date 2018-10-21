@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Sensors.h"
 #include <asio.hpp>
 #include <memory>
 #include <atomic>
@@ -9,18 +8,35 @@
 
 #include "ASIO_Socket_Adapter.h"
 #include "Channel.h"
+#include "Data_Defs.h"
 
 class Server
 {
 public:
-    Server(Sensors& sensors);
+    Server();
     ~Server();
+
+    using Clock = std::chrono::system_clock;
 
     bool init(uint16_t comms_port, uint16_t broadcast_port);
 
-    typedef Sensors::Clock Clock;
-    typedef Sensors::Sensor_Id Sensor_Id;
+    struct Sensor_Request
+    {
+        uint8_t type = 0;
+        int8_t signal_s2b = 0;
+        uint32_t address = 0;
+        std::vector<uint8_t> payload;
+    };
 
+    struct Sensor_Response
+    {
+        uint8_t type = 0;
+        uint32_t address = 0;
+        uint8_t retries = 0;
+        std::vector<uint8_t> payload;
+    };
+
+    bool send_sensor_message(Sensor_Request const& request, Sensor_Response& response);
     void process();
 
 private:
@@ -29,6 +45,9 @@ private:
 
     void start_accept();
     void accept_func(asio::error_code ec);
+
+    bool wait_for_message(data::Server_Message expected_message, Clock::duration timeout);
+    void process_message(data::Server_Message message);
 
     void process_get_config_req();
     void process_add_config_req();
@@ -43,12 +62,6 @@ private:
     std::string compute_sensor_details_response() const;
     std::string compute_configs_response() const;
 
-    void report_measurements(std::vector<Sensors::Reported_Measurement> const& measurements);
-    void sensor_bound(Sensors::Sensor_Id sensor_id, Sensors::Sensor_Address sensor_address, uint32_t serial_number, Sensors::Calibration const& calibration);
-    void sensor_details_changed(Sensors::Sensor_Id sensor_id);
-
-    Sensors& m_sensors;
-
     std::thread m_io_service_thread;
     asio::io_service m_io_service;
     std::shared_ptr<asio::io_service::work> m_io_service_work;
@@ -59,15 +72,18 @@ private:
     bool m_is_connected = false;
     bool m_is_accepting = false;
 
-    typedef util::comms::ASIO_Socket_Adapter<asio::ip::tcp::socket> Socket_Adapter;
+    using Socket_Adapter = util::comms::ASIO_Socket_Adapter<asio::ip::tcp::socket>;
     Socket_Adapter m_socket_adapter;
-    util::comms::Channel<data::Server_Message, Socket_Adapter> m_channel;
+    using Channel = util::comms::Channel<data::Server_Message, Socket_Adapter>;
+    Channel m_channel;
 
     uint16_t m_broadcast_port = 0;
     std::thread m_broadcast_thread;
     asio::ip::udp::socket m_broadcast_socket;
     asio::ip::udp::endpoint m_broadcast_endpoint;
     uint8_t m_mac_address[6];
+
+    uint32_t m_last_request_id = 0;
 
     std::atomic_bool m_exit = { false };
 };

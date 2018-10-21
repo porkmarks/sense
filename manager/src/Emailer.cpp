@@ -82,10 +82,10 @@ void Emailer::checkReports()
 
 //////////////////////////////////////////////////////////////////////////
 
-void Emailer::alarmTriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::MeasurementDescriptor const& md)
+void Emailer::alarmTriggered(DB::AlarmId alarmId, DB::Measurement const& m)
 {
     int32_t alarmIndex = m_db.findAlarmIndexById(alarmId);
-    int32_t sensorIndex = m_db.findSensorIndexById(sensorId);
+    int32_t sensorIndex = m_db.findSensorIndexById(m.descriptor.sensorId);
     if (alarmIndex < 0 || sensorIndex < 0)
     {
         assert(false);
@@ -97,16 +97,16 @@ void Emailer::alarmTriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::Mea
 
     if (alarm.descriptor.sendEmailAction)
     {
-        sendAlarmTriggeredEmail(alarm, sensor, md);
+        sendAlarmTriggeredEmail(alarm, sensor, m);
     }
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Emailer::alarmUntriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::MeasurementDescriptor const& md)
+void Emailer::alarmUntriggered(DB::AlarmId alarmId, DB::Measurement const& m)
 {
     int32_t alarmIndex = m_db.findAlarmIndexById(alarmId);
-    int32_t sensorIndex = m_db.findSensorIndexById(sensorId);
+    int32_t sensorIndex = m_db.findSensorIndexById(m.descriptor.sensorId);
     if (alarmIndex < 0 || sensorIndex < 0)
     {
         assert(false);
@@ -118,42 +118,42 @@ void Emailer::alarmUntriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::M
 
     if (alarm.descriptor.sendEmailAction)
     {
-        sendAlarmUntriggeredEmail(alarm, sensor, md);
+        sendAlarmUntriggeredEmail(alarm, sensor, m);
     }
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Emailer::sendAlarmTriggeredEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::MeasurementDescriptor const& md)
+void Emailer::sendAlarmTriggeredEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m)
 {
     Email email;
     email.subject = "Sensor '" + sensor.descriptor.name + "' triggered alarm '" + alarm.descriptor.name + "'";
     email.body = "<p>Sensor '<strong>" + sensor.descriptor.name + "</strong>' triggered alarm '<strong>" + alarm.descriptor.name + "</strong>'.</p>";
 
-    sendAlarmEmail(email, alarm, sensor, md);
+    sendAlarmEmail(email, alarm, sensor, m);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Emailer::sendAlarmUntriggeredEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::MeasurementDescriptor const& md)
+void Emailer::sendAlarmUntriggeredEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m)
 {
     Email email;
     email.subject = "Sensor '" + sensor.descriptor.name + "' stopped triggering alarm '" + alarm.descriptor.name + "'";
     email.body = "<p>Sensor '<strong>" + sensor.descriptor.name + "</strong>' stopped triggering alarm '<strong>" + alarm.descriptor.name + "</strong>'.</p>";
 
-    sendAlarmEmail(email, alarm, sensor, md);
+    sendAlarmEmail(email, alarm, sensor, m);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Emailer::sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor const& sensor, DB::MeasurementDescriptor const& md)
+void Emailer::sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m)
 {
     email.settings = m_settings.getEmailSettings();
 
     s_logger.logInfo(QString("Sending alarm email'"));
 
     QDateTime dt;
-    dt.setTime_t(DB::Clock::to_time_t(md.timePoint));
+    dt.setTime_t(DB::Clock::to_time_t(m.timePoint));
 
     email.body += QString(R"X(
                           <p>Measurement:</p>
@@ -165,9 +165,9 @@ void Emailer::sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor co
                           <p>Timestamp: <strong>%4</strong> <span style="font-size: 8pt;"><em>(dd-mm-yyyy hh:mm)</em></span></p>
                           <p>&nbsp;</p>
                           <p><span style="font-size: 10pt;"><em>- Sense -</em></span></p>)X")
-            .arg(md.temperature, 0, 'f', 1)
-            .arg(md.humidity, 0, 'f', 1)
-            .arg(static_cast<int>(getBatteryLevel(md.vcc)*100.f))
+            .arg(m.descriptor.temperature, 0, 'f', 1)
+            .arg(m.descriptor.humidity, 0, 'f', 1)
+            .arg(static_cast<int>(getBatteryLevel(m.descriptor.vcc)*100.f))
             .arg(dt.toString("dd-MM-yyyy HH:mm"))
             .toUtf8().data();
 
@@ -210,7 +210,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
     filter.useSensorFilter = report.descriptor.filterSensors;
     filter.sensorIds = report.descriptor.sensors;
     std::vector<DB::Measurement> measurements = m_db.getFilteredMeasurements(filter);
-    std::sort(measurements.begin(), measurements.end(), [](DB::Measurement const& a, DB::Measurement const& b) { return a.descriptor.timePoint > b.descriptor.timePoint; });
+    std::sort(measurements.begin(), measurements.end(), [](DB::Measurement const& a, DB::Measurement const& b) { return a.timePoint > b.timePoint; });
 
     email.body += QString(R"X(
                           <html>
@@ -288,7 +288,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
         for (DB::Measurement const& m: measurements)
         {
             QDateTime dt;
-            dt.setTime_t(DB::Clock::to_time_t(m.descriptor.timePoint));
+            dt.setTime_t(DB::Clock::to_time_t(m.timePoint));
             std::string sensorName = "N/A";
             int32_t _sensorIndex = m_db.findSensorIndexById(m.descriptor.sensorId);
             if (_sensorIndex < 0)
@@ -350,7 +350,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
         for (DB::Measurement const& m: measurements)
         {
             QDateTime dt;
-            dt.setTime_t(DB::Clock::to_time_t(m.descriptor.timePoint));
+            dt.setTime_t(DB::Clock::to_time_t(m.timePoint));
             std::string sensorName = "N/A";
             int32_t sensorIndex = m_db.findSensorIndexById(m.descriptor.sensorId);
             if (sensorIndex >= 0)

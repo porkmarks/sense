@@ -87,7 +87,8 @@ public:
 /*
     1C - IF_FILTER_BANDWIDTH
     1D - AFC_LOOP_GEARSHIFT_OVERRIDE
-
+    1E - AFC_TIMING_CONTROL
+    1F - CLOCK_RECOVERY_GEARSHIFT_OVERRIDE
     20 - CLOCK_RECOVERY_OVERSAMPLING_RATIO
     21 - CLOCK_RECOVERY_OFFSET_2
     22 - CLOCK_RECOVERY_OFFSET_1
@@ -108,7 +109,6 @@ public:
     37 - SYNC_WORD_2
     38 - SYNC_WORD_1
     39 - SYNC_WORD_0
-
     3A - TRANSMIT_HEADER_3_3A
     3B - TRANSMIT_HEADER_2_3B
     3C - TRANSMIT_HEADER_1_3C
@@ -123,6 +123,9 @@ public:
     45 - HEADER_ENABLE_1_45
     46 - HEADER_ENABLE_0_46
 
+    58
+    69 - AGC_OVERRIDE_1
+
     6E - TX_DATA_RATE_1
     6F - TX_DATA_RATE_0
 
@@ -134,7 +137,7 @@ public:
     76 - NOMINAL_CARRIER_FREQUENCY_1
     77 - NOMINAL_CARRIER_FREQUENCY_0
 */
-    void set_modem_configuration(uint8_t data[42]);
+    void set_modem_configuration(uint8_t data[46]);
 
     // Set or get the transmission power
     void set_transmission_power(uint8_t power);

@@ -43,8 +43,8 @@ public:
     };
 
 private slots:
-    void alarmTriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::MeasurementDescriptor const& md);
-    void alarmUntriggered(DB::AlarmId alarmId, DB::SensorId sensorId, DB::MeasurementDescriptor const& md);
+    void alarmTriggered(DB::AlarmId alarmId, DB::Measurement const& m);
+    void alarmUntriggered(DB::AlarmId alarmId, DB::Measurement const& m);
 
 private:
     void checkReports();
@@ -63,9 +63,9 @@ private:
 
     std::atomic_bool m_threadsExit = { false };
 
-    void sendAlarmTriggeredEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::MeasurementDescriptor const& md);
-    void sendAlarmUntriggeredEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::MeasurementDescriptor const& md);
-    void sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor const& sensor, DB::MeasurementDescriptor const& md);
+    void sendAlarmTriggeredEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m);
+    void sendAlarmUntriggeredEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m);
+    void sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m);
     void sendEmail(Email const& email);
     void emailThreadProc();
     static void sendEmails(std::vector<Email> const& emails);

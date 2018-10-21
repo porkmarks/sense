@@ -42,7 +42,7 @@ float getSignalLevel(int8_t dBm)
     {
         return 0.f;
     }
-    constexpr float max = -60.f;
+    constexpr float max = -50.f;
     constexpr float min = -110.f;
     float level = std::max(std::min(static_cast<float>(dBm), max) - min, 0.f) / (max - min);
     return level;
@@ -183,7 +183,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
     {
         if (column == Column::Timestamp)
         {
-            return static_cast<qlonglong>(DB::Clock::to_time_t(measurement.descriptor.timePoint));
+            return static_cast<qlonglong>(DB::Clock::to_time_t(measurement.timePoint));
         }
         else if (column == Column::Temperature)
         {
@@ -199,7 +199,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Signal)
         {
-            return getSignalLevel(std::min(measurement.descriptor.signalStrength.b2s, measurement.descriptor.signalStrength.s2b));
+            return getSignalLevel(measurement.combinedSignalStrength);
         }
 //        else if (column == Column::SensorErrors)
 //        {
@@ -235,7 +235,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Signal)
         {
-            return getSignalIcon(std::min(measurement.descriptor.signalStrength.b2s, measurement.descriptor.signalStrength.s2b));
+            return getSignalIcon(measurement.combinedSignalStrength);
         }
     }
     else if (role == Qt::DisplayRole)
@@ -263,7 +263,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         else if (column == Column::Timestamp)
         {
             QDateTime dt;
-            dt.setTime_t(DB::Clock::to_time_t(measurement.descriptor.timePoint));
+            dt.setTime_t(DB::Clock::to_time_t(measurement.timePoint));
             return dt.toString("dd-MM-yyyy HH:mm");
         }
         else if (column == Column::Temperature)
@@ -277,10 +277,12 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         else if (column == Column::Battery)
         {
             return QString("%1 %").arg(static_cast<int>(getBatteryLevel(measurement.descriptor.vcc) * 100.f));
+            //return QString("%1 %").arg(static_cast<int>(measurement.descriptor.signalStrength.s2b));
         }
         else if (column == Column::Signal)
         {
-            return QString("%1 %").arg(static_cast<int>(getSignalLevel(std::min(measurement.descriptor.signalStrength.b2s, measurement.descriptor.signalStrength.s2b)) * 100.f));
+            return QString("%1 %").arg(static_cast<int>(getSignalLevel(measurement.combinedSignalStrength) * 100.f));
+            //return QString("%1 %").arg(static_cast<int>(measurement.descriptor.signalStrength.b2s));
             //return QString("%1 %").arg(std::min(measurement.descriptor.b2s, measurement.descriptor.s2b));
         }
 //        else if (column == Column::SensorErrors)

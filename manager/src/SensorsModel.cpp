@@ -7,6 +7,7 @@
 #include <QAbstractItemModel>
 #include <QTimer>
 
+#include <algorithm>
 #include <cassert>
 
 static std::array<const char*, 10> s_headerNames = {"Name", "Id", "Serial Number", "Temperature", "Humidity", "Battery", "Signal", "Comms", "Stored", "Alarms"};
@@ -333,7 +334,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Stored)
         {
-            if (sensor.storedMeasurementCount > k_alertStoredMeasurementCount)
+            if (sensor.estimatedStoredMeasurementCount > k_alertStoredMeasurementCount)
             {
                 return QVariant(QColor(255, 150, 150));
             }
@@ -365,10 +366,10 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Stored)
         {
-            if (sensor.storedMeasurementCount < 0)
-            {
-                return QIcon(":/icons/ui/question.png");
-            }
+//            if (sensor.storedMeasurementCount < 0)
+//            {
+//                return QIcon(":/icons/ui/question.png");
+//            }
         }
         else
         {
@@ -380,7 +381,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                 }
                 else if (column == Column::Signal)
                 {
-                    return getSignalIcon(std::min(sensor.averageSignalStrength.b2s, sensor.averageSignalStrength.s2b));
+                    return getSignalIcon(sensor.averageCombinedSignalStrength);
                 }
                 else if (column == Column::Temperature)
                 {
@@ -438,10 +439,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Stored)
         {
-            if (sensor.storedMeasurementCount >= 0)
-            {
-                return sensor.storedMeasurementCount;
-            }
+            return sensor.estimatedStoredMeasurementCount;
         }
         else if (column == Column::Alarms)
         {
@@ -469,7 +467,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                 }
                 else if (column == Column::Signal)
                 {
-                    int average = static_cast<int>(getSignalLevel(std::min(sensor.averageSignalStrength.b2s, sensor.averageSignalStrength.s2b)) * 100.f);
+                    int average = static_cast<int>(getSignalLevel(sensor.averageCombinedSignalStrength) * 100.f);
                     return QString("%1%").arg(average);
                 }
             }

@@ -98,6 +98,8 @@ chrono::millis s_measurement_period;
 chrono::time_ms s_next_comms_time_point;
 chrono::millis s_comms_period;
 
+int8_t s_last_input_dBm = 0;
+
 Storage s_storage;
 data::sensor::Calibration s_calibration;
 uint32_t s_serial_number = 0;
@@ -447,11 +449,11 @@ static bool request_config()
     bool send_successful = false;
     {
         uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::sensor::Config_Request))];
-        s_comms.begin_packet(raw_buffer, data::sensor::Type::CONFIG_REQUEST);
+        s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::CONFIG_REQUEST));
         data::sensor::Config_Request req;
         req.first_measurement_index = s_first_stored_measurement_index;
         req.measurement_count = s_storage.get_data_count();
-        req.b2s_input_dBm = s_comms.get_input_dBm();
+        req.b2s_input_dBm = s_last_input_dBm;
         req.calibration = s_calibration;
         req.sleeping = s_sensor_sleeping;
         s_comms.pack(raw_buffer, req);
@@ -465,9 +467,10 @@ static bool request_config()
         uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, 500);
         if (buffer)
         {
-            data::sensor::Type type = s_comms.get_rx_packet_type(buffer);
+            data::sensor::Type type = static_cast<data::sensor::Type>(s_comms.get_rx_packet_type(buffer));
             if (type == data::sensor::Type::CONFIG && size == sizeof(data::sensor::Config))
             {
+                s_last_input_dBm = s_comms.get_input_dBm();
                 const data::sensor::Config* ptr = reinterpret_cast<const data::sensor::Config*>(s_comms.get_rx_packet_payload(buffer));
                 return apply_config(*ptr);
             }
@@ -498,7 +501,7 @@ static bool request_first_config()
     bool send_successful = false;
     {
         uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::sensor::First_Config_Request))];
-        s_comms.begin_packet(raw_buffer, data::sensor::Type::FIRST_CONFIG_REQUEST);
+        s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::FIRST_CONFIG_REQUEST));
         s_comms.pack(raw_buffer, data::sensor::First_Config_Request());
         send_successful = s_comms.send_packet(raw_buffer, 2);
     }
@@ -510,9 +513,10 @@ static bool request_first_config()
         uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, 500);
         if (buffer)
         {
-            data::sensor::Type type = s_comms.get_rx_packet_type(buffer);
+            data::sensor::Type type = static_cast<data::sensor::Type>(s_comms.get_rx_packet_type(buffer));
             if (type == data::sensor::Type::FIRST_CONFIG && size == sizeof(data::sensor::First_Config))
             {
+                s_last_input_dBm = s_comms.get_input_dBm();
                 const data::sensor::First_Config* ptr = reinterpret_cast<const data::sensor::First_Config*>(s_comms.get_rx_packet_payload(buffer));
                 return apply_first_config(*ptr);
             }
@@ -556,7 +560,7 @@ static void pair()
                 bool send_successful = false;
                 {
                     uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::sensor::Pair_Request))];
-                    s_comms.begin_packet(raw_buffer, data::sensor::Type::PAIR_REQUEST);
+                    s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::PAIR_REQUEST));
                     data::sensor::Pair_Request request;
                     request.calibration = s_calibration;
                     request.serial_number = s_serial_number;
@@ -578,9 +582,11 @@ static void pair()
                         LOG(PSTR("Received packet of %d bytes. Type %s\n"), (int)size, (int)s_comms.get_rx_packet_type(buffer));
                     }
 
-                    if (buffer && size == sizeof(data::sensor::Pair_Response) && s_comms.get_rx_packet_type(buffer) == data::sensor::Type::PAIR_RESPONSE)
+                    if (buffer && size == sizeof(data::sensor::Pair_Response) && 
+                          s_comms.get_rx_packet_type(buffer) == static_cast<uint8_t>(data::sensor::Type::PAIR_RESPONSE))
                     {
                         s_comms.stand_by_mode();
+                        s_last_input_dBm = s_comms.get_input_dBm();
 
                         const data::sensor::Pair_Response* response_ptr = reinterpret_cast<const data::sensor::Pair_Response*>(s_comms.get_rx_packet_payload(buffer));
                         s_comms.set_address(response_ptr->address);
@@ -770,7 +776,7 @@ static void do_comms()
             {
                 batch.last_batch = done ? 1 : 0;
                 LOG(PSTR("Sending measurement batch of %d..."), (int)batch.count);
-                s_comms.begin_packet(raw_buffer, data::sensor::Type::MEASUREMENT_BATCH);
+                s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::MEASUREMENT_BATCH));
                 if (s_comms.send_packet(raw_buffer, sizeof(data::sensor::Measurement_Batch), 1) == true)
                 {
                     s_error_flags = 0;
@@ -801,13 +807,24 @@ static void do_comms()
 
 static void first_config()
 {
-    while (true)
+    while (s_state == State::FIRST_CONFIG)
     {
         if (is_pressed(Button::BUTTON1))
         {
-            s_state = State::PAIR;
-            break;
-        }
+            LOG(PSTR("Hold for 1 second to pair again..."));
+            chrono::time_ms start_tp = chrono::now();
+            while (is_pressed(Button::BUTTON1))
+            {
+                if (chrono::now() - start_tp > chrono::millis(1000))
+                {
+                    LOG(PSTR("...repairing.\n"));
+                    s_state = State::PAIR;
+                    break;
+                }
+            }
+            LOG(PSTR("...cancelled.\n"));
+            continue;
+        }      
 
         s_comms.idle_mode();
 
@@ -819,7 +836,7 @@ static void first_config()
         }
 
         s_comms.stand_by_mode();
-        Low_Power::power_down_int(chrono::millis(2000));
+        Low_Power::power_down_int(chrono::millis(10000));
     }
 
     s_comms.stand_by_mode();
@@ -834,15 +851,18 @@ static void measurement_loop()
         bool force_comms = false;
         if (is_pressed(Button::BUTTON1))
         {
+            LOG(PSTR("Hold for 10 seconds to reset..."));
             chrono::time_ms start_tp = chrono::now();
             while (is_pressed(Button::BUTTON1))
             {
                 if (chrono::now() - start_tp > chrono::millis(10000))
                 {
+                    LOG(PSTR("...resetting.\n"));
                     reset_settings();
                     soft_reset();
                 }
             }
+            LOG(PSTR("...cancelled.\n"));
             force_comms = true;
         }
 

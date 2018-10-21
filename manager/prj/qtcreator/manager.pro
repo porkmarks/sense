@@ -14,7 +14,7 @@ TEMPLATE = app
 #INSTALLS = target
 
 CONFIG += console
-CONFIG += c++11
+CONFIG += c++14
 CONFIG -= console
 
 INCLUDEPATH += ../../src

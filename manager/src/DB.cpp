@@ -21,6 +21,7 @@
 #include "Utils.h"
 #include "Crypt.h"
 #include "Logger.h"
+#include "Sensor_Comms.h"
 
 #define USE_DB_ENCRYPTION
 //#define USE_DATA_ENCRYPTION
@@ -45,6 +46,10 @@ bool read(Stream& s, T& t)
 {
     return s.read(reinterpret_cast<char*>(&t), sizeof(T)).good();
 }
+
+
+const DB::Clock::duration MEASUREMENT_JITTER = std::chrono::seconds(10);
+const DB::Clock::duration COMMS_DURATION = std::chrono::seconds(10);
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -95,6 +100,7 @@ bool DB::create(std::string const& name)
     remove((dataFilename).c_str());
 
     m_mainData = Data();
+    m_mainData.lastSensorAddress = Sensor_Comms::SLAVE_ADDRESS_BEGIN;
     save(m_mainData);
 
     s_logger.logVerbose(QString("Creating DB files: '%1' & '%2'").arg(m_dataName.c_str()).arg(m_dbName.c_str()));
@@ -196,14 +202,6 @@ bool DB::load(std::string const& name)
                 }
                 config.descriptor.name = it->value.GetString();
 
-                it = ssj.FindMember("sensors_sleeping");
-                if (it == ssj.MemberEnd() || !it->value.IsBool())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings sensors_sleeping").arg(dataFilename.c_str()));
-                    return false;
-                }
-                config.descriptor.sensorsSleeping = it->value.GetBool();
-
                 it = ssj.FindMember("measurement_period");
                 if (it == ssj.MemberEnd() || !it->value.IsUint64())
                 {
@@ -219,7 +217,6 @@ bool DB::load(std::string const& name)
                     return false;
                 }
                 config.descriptor.commsPeriod = std::chrono::seconds(it->value.GetUint64());
-                config.computedCommsPeriod = config.descriptor.commsPeriod;
 
                 it = ssj.FindMember("baseline");
                 if (it == ssj.MemberEnd() || !it->value.IsUint64())
@@ -251,14 +248,6 @@ bool DB::load(std::string const& name)
                 }
                 config.descriptor.name = it->value.GetString();
 
-                it = configj.FindMember("sensors_sleeping");
-                if (it == configj.MemberEnd() || !it->value.IsBool())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing config sensors_sleeping").arg(dataFilename.c_str()));
-                    return false;
-                }
-                config.descriptor.sensorsSleeping = it->value.GetBool();
-
                 it = configj.FindMember("sensors_power");
                 if (it == configj.MemberEnd() || !it->value.IsUint())
                 {
@@ -282,7 +271,6 @@ bool DB::load(std::string const& name)
                     return false;
                 }
                 config.descriptor.commsPeriod = std::chrono::seconds(it->value.GetUint64());
-                config.computedCommsPeriod = config.descriptor.commsPeriod;
 
                 it = configj.FindMember("baseline_measurement_tp");
                 if (it == configj.MemberEnd() || !it->value.IsUint64())
@@ -358,13 +346,13 @@ bool DB::load(std::string const& name)
                 }
                 sensor.serialNumber = it->value.GetUint();
 
-                it = sensorj.FindMember("next_measurement");
-                if (it == sensorj.MemberEnd() || !it->value.IsUint64())
+                it = sensorj.FindMember("last_confirmed_measurement_index");
+                if (it == sensorj.MemberEnd() || !it->value.IsUint())
                 {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor next_measurement").arg(dataFilename.c_str()));
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor last_confirmed_measurement_index").arg(dataFilename.c_str()));
                     return false;
                 }
-                sensor.nextMeasurementTimePoint = Clock::from_time_t(static_cast<time_t>(it->value.GetUint64()));
+                sensor.lastConfirmedMeasurementIndex = it->value.GetUint();
 
                 it = sensorj.FindMember("last_comms");
                 if (it != sensorj.MemberEnd() && it->value.IsUint64())
@@ -393,6 +381,7 @@ bool DB::load(std::string const& name)
                 }
                 sensor.calibration.humidityBias = static_cast<float>(it->value.GetDouble());
 
+                data.lastSensorAddress = std::max(data.lastSensorAddress, sensor.address);
                 data.lastSensorId = std::max(data.lastSensorId, sensor.id);
                 data.sensors.push_back(sensor);
             }
@@ -771,12 +760,6 @@ bool DB::load(std::string const& name)
         }
     }
 
-    //refresh signal strengths
-    for (Sensor& sensor: data.sensors)
-    {
-        sensor.averageSignalStrength = computeAverageSignalStrength(sensor.id, data);
-    }
-
     std::flush(std::cout);
 
     std::pair<std::string, time_t> bkf = getMostRecentBackup(dbFilename, s_dataFolder + "/backups/daily");
@@ -799,6 +782,18 @@ bool DB::load(std::string const& name)
     }
 
     m_mainData = data;
+    //refresh signal strengths
+    for (Sensor& sensor: m_mainData.sensors)
+    {
+        sensor.averageSignalStrength = computeAverageSignalStrength(sensor.id, m_mainData);
+        sensor.averageCombinedSignalStrength = std::min(sensor.averageSignalStrength.b2s, sensor.averageSignalStrength.s2b);
+    }
+    //refresh computed comms period
+    if (!m_mainData.sensorsConfigs.empty())
+    {
+        SensorsConfig& config = m_mainData.sensorsConfigs.back();
+        config.computedCommsPeriod = computeCommsPeriod();
+    }
 
     s_logger.logVerbose(QString("Done loading DB from '%1' & '%2'. Time: %3s").arg(m_dataName.c_str()).arg(m_dbName.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()));
 
@@ -814,6 +809,53 @@ bool DB::load(std::string const& name)
 //    }
 //}
 
+///////////////////////////////////////////////////////////////////////////////////////////
+
+DB::Clock::duration DB::computeCommsPeriod() const
+{
+    SensorsConfig const& config = getLastSensorsConfig();
+
+    Clock::duration max_period = m_mainData.sensors.size() * COMMS_DURATION;
+    Clock::duration period = std::max(config.descriptor.commsPeriod, max_period);
+    return std::max(period, config.descriptor.measurementPeriod + MEASUREMENT_JITTER);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+DB::Clock::time_point DB::computeNextMeasurementTimePoint(Sensor const& sensor) const
+{
+    uint32_t nextMeasurementIndex = computeNextMeasurementIndex(sensor);
+    SensorsConfig const& config = findSensorsConfigForMeasurementIndex(nextMeasurementIndex);
+    Clock::time_point tp = config.baselineMeasurementTimePoint + config.descriptor.measurementPeriod * (nextMeasurementIndex - config.baselineMeasurementIndex);
+    return tp;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+DB::Clock::time_point DB::computeNextCommsTimePoint(Sensor const& /*sensor*/, size_t sensorIndex) const
+{
+    SensorsConfig const& config = getLastSensorsConfig();
+    Clock::duration period = computeCommsPeriod();
+
+    Clock::time_point now = Clock::now();
+    uint32_t index = static_cast<uint32_t>(std::ceil(((now - config.baselineMeasurementTimePoint) / period))) + 1;
+
+    Clock::time_point start = config.baselineMeasurementTimePoint + period * index;
+    return start + sensorIndex * COMMS_DURATION;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+uint32_t DB::computeNextMeasurementIndex(Sensor const& sensor) const
+{
+    uint32_t nextSensorMeasurementIndex = sensor.firstStoredMeasurementIndex + sensor.storedMeasurementCount;
+
+    //make sure the next measurement index doesn't fall below the last non-sleeping config
+    //next_sensor_measurement_index = std::max(next_sensor_measurement_index, compute_baseline_measurement_index());
+
+    return nextSensorMeasurementIndex;
+}
+
 //////////////////////////////////////////////////////////////////////////
 
 size_t DB::getSensorCount() const
@@ -826,7 +868,42 @@ size_t DB::getSensorCount() const
 DB::Sensor const& DB::getSensor(size_t index) const
 {
     assert(index < m_mainData.sensors.size());
-    return m_mainData.sensors[index];
+    Sensor const& sensor = m_mainData.sensors[index];
+    return sensor;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+DB::SensorOutputDetails DB::computeSensorOutputDetails(SensorId id) const
+{
+    int32_t _index = findSensorIndexById(id);
+    if (_index < 0)
+    {
+        return {};
+    }
+
+    size_t index = static_cast<size_t>(_index);
+    Sensor const& sensor = m_mainData.sensors[index];
+    SensorsConfig const& config = getLastSensorsConfig();
+
+    SensorOutputDetails details;
+    details.commsPeriod = computeCommsPeriod();
+    details.nextCommsTimePoint = computeNextCommsTimePoint(sensor, index);
+    details.measurementPeriod = config.descriptor.measurementPeriod;
+    details.nextMeasurementTimePoint = computeNextMeasurementTimePoint(sensor);
+    details.nextRealTimeMeasurementIndex = computeNextRealTimeMeasurementIndex();
+    details.nextMeasurementIndex = computeNextMeasurementIndex(sensor);
+    return details;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+uint32_t DB::computeNextRealTimeMeasurementIndex() const
+{
+    SensorsConfig const& config = getLastSensorsConfig();
+    Clock::time_point now = Clock::now();
+    uint32_t index = static_cast<uint32_t>(std::ceil((now - config.baselineMeasurementTimePoint) / config.descriptor.measurementPeriod)) + config.baselineMeasurementIndex;
+    return index;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -850,10 +927,38 @@ bool DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
         return false;
     }
 
-    emit sensorsConfigWillBeAdded();
     SensorsConfig config;
     config.descriptor = descriptor;
+
+    if (!m_mainData.sensorsConfigs.empty())
+    {
+        uint32_t nextRealTimeMeasurementIndex = computeNextRealTimeMeasurementIndex();
+
+        SensorsConfig const& c = findSensorsConfigForMeasurementIndex(nextRealTimeMeasurementIndex);
+        Clock::time_point nextMeasurementTP = c.baselineMeasurementTimePoint + c.descriptor.measurementPeriod * (nextRealTimeMeasurementIndex - c.baselineMeasurementIndex);
+
+        m_mainData.sensorsConfigs.erase(std::remove_if(m_mainData.sensorsConfigs.begin(), m_mainData.sensorsConfigs.end(), [&nextRealTimeMeasurementIndex](SensorsConfig const& c)
+        {
+            return c.baselineMeasurementIndex == nextRealTimeMeasurementIndex;
+        }), m_mainData.sensorsConfigs.end());
+        config.baselineMeasurementIndex = nextRealTimeMeasurementIndex;
+        config.baselineMeasurementTimePoint = nextMeasurementTP;
+    }
+    else
+    {
+        config.baselineMeasurementIndex = 0;
+        config.baselineMeasurementTimePoint = Clock::now();
+    }
+
+    emit sensorsConfigWillBeAdded();
+
     m_mainData.sensorsConfigs.push_back(config);
+    while (m_mainData.sensorsConfigs.size() > 100)
+    {
+        m_mainData.sensorsConfigs.erase(m_mainData.sensorsConfigs.begin());
+    }
+    m_mainData.sensorsConfigs.back().computedCommsPeriod = computeCommsPeriod(); //make sure the computed commd config is up-to-date
+
     emit sensorsConfigAdded();
 
     s_logger.logInfo("Added sensors config");
@@ -873,6 +978,11 @@ bool DB::setSensorsConfigs(std::vector<SensorsConfig> const& configs)
     for (SensorsConfig& config: m_mainData.sensorsConfigs)
     {
         config.computedCommsPeriod = config.descriptor.commsPeriod;
+    }
+    if (!m_mainData.sensorsConfigs.empty())
+    {
+        SensorsConfig& config = m_mainData.sensorsConfigs.back();
+        config.computedCommsPeriod = computeCommsPeriod();
     }
 
     emit sensorsConfigChanged();
@@ -904,6 +1014,21 @@ DB::SensorsConfig const& DB::getSensorsConfig(size_t index) const
 {
     assert(index < m_mainData.sensorsConfigs.size());
     return m_mainData.sensorsConfigs[index];
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+DB::SensorsConfig const& DB::findSensorsConfigForMeasurementIndex(uint32_t index) const
+{
+    for (auto it = m_mainData.sensorsConfigs.rbegin(); it != m_mainData.sensorsConfigs.rend(); ++it)
+    {
+        SensorsConfig const& c = *it;
+        if (index >= c.baselineMeasurementIndex)
+        {
+            return c;
+        }
+    }
+    return getLastSensorsConfig();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -967,15 +1092,10 @@ bool DB::setSensor(SensorId id, SensorDescriptor const& descriptor)
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::bindSensor(SensorId id, SensorAddress address, uint32_t serialNumber, Sensor::Calibration const& calibration)
+bool DB::bindSensor(uint32_t serialNumber, Sensor::Calibration const& calibration, SensorId& id)
 {
-    int32_t _index = findSensorIndexById(id);
+    int32_t _index = findUnboundSensorIndex();
     if (_index < 0)
-    {
-        return false;
-    }
-    auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [&address](Sensor const& sensor) { return sensor.address == address; });
-    if (it != m_mainData.sensors.end())
     {
         return false;
     }
@@ -987,7 +1107,7 @@ bool DB::bindSensor(SensorId id, SensorAddress address, uint32_t serialNumber, S
         return false;
     }
 
-    sensor.address = address;
+    sensor.address = ++m_mainData.lastSensorAddress;
     sensor.state = Sensor::State::Active;
     sensor.calibration = calibration;
     sensor.serialNumber = serialNumber;
@@ -999,6 +1119,7 @@ bool DB::bindSensor(SensorId id, SensorAddress address, uint32_t serialNumber, S
 
     triggerDelayedSave(std::chrono::seconds(1));
 
+    id = sensor.id;
     return true;
 }
 
@@ -1031,17 +1152,17 @@ bool DB::setSensorState(SensorId id, Sensor::State state)
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::setSensorDetails(SensorDetails const& details)
+bool DB::setSensorInputDetails(SensorInputDetails const& details)
 {
-    return setSensorsDetails({details});
+    return setSensorsInputDetails({details});
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::setSensorsDetails(std::vector<SensorDetails> const& details)
+bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
 {
     bool ok = true;
-    for (SensorDetails const& d: details)
+    for (SensorInputDetails const& d: details)
     {
         int32_t _index = findSensorIndexById(d.id);
         if (_index < 0)
@@ -1058,15 +1179,47 @@ bool DB::setSensorsDetails(std::vector<SensorDetails> const& details)
             continue;
         }
 
-        sensor.nextMeasurementTimePoint = d.nextMeasurementTimePoint;
-        if (d.lastCommsTimePoint > sensor.lastCommsTimePoint)
+        //sensor.nextMeasurementTimePoint = d.nextMeasurementTimePoint;
+        if (d.hasLastCommsTimePoint)
         {
-            sensor.lastCommsTimePoint = d.lastCommsTimePoint;
+            if (d.lastCommsTimePoint > sensor.lastCommsTimePoint)
+            {
+                sensor.lastCommsTimePoint = d.lastCommsTimePoint;
+            }
         }
-        sensor.storedMeasurementCount = static_cast<int32_t>(d.storedMeasurementCount);
-        if (sensor.state != Sensor::State::Unbound)
+        if (d.hasStoredData)
         {
-            sensor.state = d.sleeping ? Sensor::State::Sleeping : Sensor::State::Active;
+            sensor.firstStoredMeasurementIndex = d.firstStoredMeasurementIndex;
+            sensor.storedMeasurementCount = d.storedMeasurementCount;
+
+            if (sensor.firstStoredMeasurementIndex > 0)
+            {
+                //we'll never receive measurements lower than sensor->first_recorded_measurement_index
+                //so at worst, max_confirmed_measurement_index = sensor->first_recorded_measurement_index - 1 (the one just before the first recorded index)
+                sensor.lastConfirmedMeasurementIndex = std::max(sensor.lastConfirmedMeasurementIndex, sensor.firstStoredMeasurementIndex - 1);
+            }
+
+            {
+                //if storing 1 measurement starting from index 15, the last stored index is 15 (therefore the -1 at the end)
+                int64_t lastStoredIndex = static_cast<int64_t>(sensor.firstStoredMeasurementIndex) +
+                        static_cast<int64_t>(sensor.storedMeasurementCount) - 1;
+                lastStoredIndex = std::max<int64_t>(lastStoredIndex, 0); //make sure we don't get negatives
+                int64_t count = std::max<int64_t>(lastStoredIndex - static_cast<int64_t>(sensor.lastConfirmedMeasurementIndex), 0);
+                sensor.estimatedStoredMeasurementCount = static_cast<uint32_t>(count);
+            }
+        }
+
+        if (d.hasSleepingData)
+        {
+            if (sensor.state != Sensor::State::Unbound)
+            {
+                sensor.state = d.sleeping ? Sensor::State::Sleeping : Sensor::State::Active;
+            }
+        }
+
+        if (d.hasSignalStrength)
+        {
+            sensor.lastSignalStrengthB2S = d.signalStrengthB2S;
         }
 
         emit sensorDataChanged(sensor.id);
@@ -1132,6 +1285,30 @@ int32_t DB::findSensorIndexByName(std::string const& name) const
 int32_t DB::findSensorIndexById(SensorId id) const
 {
     auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [&id](Sensor const& sensor) { return sensor.id == id; });
+    if (it == m_mainData.sensors.end())
+    {
+        return -1;
+    }
+    return std::distance(m_mainData.sensors.begin(), it);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+int32_t DB::findSensorIndexByAddress(SensorAddress address) const
+{
+    auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [&address](Sensor const& sensor) { return sensor.address == address; });
+    if (it == m_mainData.sensors.end())
+    {
+        return -1;
+    }
+    return std::distance(m_mainData.sensors.begin(), it);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+int32_t DB::findUnboundSensorIndex() const
+{
+    auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [](Sensor const& sensor) { return sensor.state == Sensor::State::Unbound; });
     if (it == m_mainData.sensors.end())
     {
         return -1;
@@ -1252,7 +1429,7 @@ int32_t DB::findAlarmIndexById(AlarmId id) const
 
 //////////////////////////////////////////////////////////////////////////
 
-uint8_t DB::computeTriggeredAlarm(MeasurementDescriptor const& md)
+uint8_t DB::computeTriggeredAlarm(Measurement const& m)
 {
     uint8_t allTriggered = 0;
 
@@ -1261,53 +1438,53 @@ uint8_t DB::computeTriggeredAlarm(MeasurementDescriptor const& md)
         AlarmDescriptor const& ad = alarm.descriptor;
         if (ad.filterSensors)
         {
-            if (ad.sensors.find(md.sensorId) == ad.sensors.end())
+            if (ad.sensors.find(m.descriptor.sensorId) == ad.sensors.end())
             {
                 continue;
             }
         }
 
         uint8_t triggered = 0;
-        if (ad.highTemperatureWatch && md.temperature > ad.highTemperature)
+        if (ad.highTemperatureWatch && m.descriptor.temperature > ad.highTemperature)
         {
             triggered |= TriggeredAlarm::Temperature;
         }
-        if (ad.lowTemperatureWatch && md.temperature < ad.lowTemperature)
+        if (ad.lowTemperatureWatch && m.descriptor.temperature < ad.lowTemperature)
         {
             triggered |= TriggeredAlarm::Temperature;
         }
 
-        if (ad.highHumidityWatch && md.humidity > ad.highHumidity)
+        if (ad.highHumidityWatch && m.descriptor.humidity > ad.highHumidity)
         {
             triggered |= TriggeredAlarm::Humidity;
         }
-        if (ad.lowHumidityWatch && md.humidity < ad.lowHumidity)
+        if (ad.lowHumidityWatch && m.descriptor.humidity < ad.lowHumidity)
         {
             triggered |= TriggeredAlarm::Humidity;
         }
 
-        if (ad.lowVccWatch && md.vcc <= k_alertVcc)
+        if (ad.lowVccWatch && m.descriptor.vcc <= k_alertVcc)
         {
             triggered |= TriggeredAlarm::LowVcc;
         }
-//        if (ad.sensorErrorsWatch && md.sensorErrors != 0)
+//        if (ad.sensorErrorsWatch && m.descriptor.sensorErrors != 0)
 //        {
 //            triggered |= TriggeredAlarm::SensorErrors;
 //        }
-        if (ad.lowSignalWatch && std::min(md.signalStrength.s2b, md.signalStrength.b2s) <= k_alertSignal)
+        if (ad.lowSignalWatch && std::min(m.descriptor.signalStrength.s2b, m.descriptor.signalStrength.b2s) <= k_alertSignal)
         {
             triggered |= TriggeredAlarm::LowSignal;
         }
 
-        auto it = alarm.triggeringSensors.find(md.sensorId);
+        auto it = alarm.triggeringSensors.find(m.descriptor.sensorId);
         if (triggered)
         {
             if (it == alarm.triggeringSensors.end())
             {
-                alarm.triggeringSensors.insert(md.sensorId);
-                s_logger.logInfo(QString("Alarm '%1' was triggered by measurement index %2").arg(ad.name.c_str()).arg(md.index));
+                alarm.triggeringSensors.insert(m.descriptor.sensorId);
+                s_logger.logInfo(QString("Alarm '%1' was triggered by measurement index %2").arg(ad.name.c_str()).arg(m.descriptor.index));
 
-                emit alarmWasTriggered(alarm.id, md.sensorId, md);
+                emit alarmWasTriggered(alarm.id, m);
             }
         }
         else
@@ -1315,9 +1492,9 @@ uint8_t DB::computeTriggeredAlarm(MeasurementDescriptor const& md)
             if (it != alarm.triggeringSensors.end())
             {
                 alarm.triggeringSensors.erase(it);
-                s_logger.logInfo(QString("Alarm '%1' stopped being triggered by measurement index %2").arg(ad.name.c_str()).arg(md.index));
+                s_logger.logInfo(QString("Alarm '%1' stopped being triggered by measurement index %2").arg(ad.name.c_str()).arg(m.descriptor.index));
 
-                emit alarmWasUntriggered(alarm.id, md.sensorId, md);
+                emit alarmWasUntriggered(alarm.id, m);
             }
         }
 
@@ -1529,16 +1706,16 @@ bool DB::addMeasurements(std::vector<MeasurementDescriptor> const& mds)
     }
 
     bool ok = true;
-    for (auto const& pair: mdPerSensor)
+    for (auto& pair: mdPerSensor)
     {
-        ok &= _addMeasurements(pair.first, pair.second);
+        ok &= _addMeasurements(pair.first, std::move(pair.second));
     }
     return ok;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> const& mds)
+bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> mds)
 {
     int32_t _sensorIndex = findSensorIndexById(sensorId);
     if (_sensorIndex < 0)
@@ -1547,6 +1724,19 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
     }
     size_t sensorIndex = static_cast<size_t>(_sensorIndex);
     Sensor& sensor = m_mainData.sensors[sensorIndex];
+
+
+    //first remove past measurements
+    mds.erase(std::remove_if(mds.begin(), mds.end(), [&sensor](MeasurementDescriptor const& d)
+    {
+        return d.index < sensor.lastConfirmedMeasurementIndex;
+    }), mds.end());
+
+    if (mds.empty())
+    {
+        return true;
+    }
+
     sensor.isLastMeasurementValid = true;
 
     emit measurementsWillBeAdded(sensorId);
@@ -1554,6 +1744,12 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
     for (MeasurementDescriptor const& md: mds)
     {
         MeasurementId id = computeMeasurementId(md);
+
+        //advance the last confirmed index
+        if (md.index == sensor.lastConfirmedMeasurementIndex + 1)
+        {
+            sensor.lastConfirmedMeasurementIndex = md.index;
+        }
 
         //check for duplicates
         auto it = std::lower_bound(m_mainData.sortedMeasurementIds.begin(), m_mainData.sortedMeasurementIds.end(), id);
@@ -1565,7 +1761,9 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
         Measurement measurement;
         measurement.id = id;
         measurement.descriptor = md;
-        measurement.triggeredAlarms = computeTriggeredAlarm(md);
+        measurement.timePoint = computeMeasurementTimepoint(md);
+        measurement.triggeredAlarms = computeTriggeredAlarm(measurement);
+        measurement.combinedSignalStrength = std::min(md.signalStrength.b2s, md.signalStrength.s2b);
 
         //insert sorted id
         m_mainData.sortedMeasurementIds.insert(it, id);
@@ -1574,10 +1772,10 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
         {
             StoredMeasurements& storedMeasurements = m_mainData.measurements[md.sensorId];
 
-            uint64_t mdtp = static_cast<uint64_t>(Clock::to_time_t(md.timePoint));
+            uint64_t mdtp = static_cast<uint64_t>(Clock::to_time_t(measurement.timePoint));
             auto smit = std::lower_bound(storedMeasurements.begin(), storedMeasurements.end(), mdtp, [](StoredMeasurement const& sm, uint64_t mdtp)
             {
-                    return sm.timePoint < mdtp;
+                return sm.timePoint < mdtp;
             });
 
             storedMeasurements.insert(smit, pack(measurement));
@@ -1590,11 +1788,22 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
     emit measurementsAdded(sensorId);
 
     sensor.averageSignalStrength = computeAverageSignalStrength(sensor.id, m_mainData);
+    sensor.averageCombinedSignalStrength = std::min(sensor.averageSignalStrength.b2s, sensor.averageSignalStrength.s2b);
+
     emit sensorDataChanged(sensor.id);
 
     triggerDelayedSave(std::chrono::seconds(1));
 
     return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+DB::Clock::time_point DB::computeMeasurementTimepoint(MeasurementDescriptor const& md) const
+{
+    SensorsConfig const& config = findSensorsConfigForMeasurementIndex(md.index);
+    Clock::time_point tp = config.baselineMeasurementTimePoint + config.descriptor.measurementPeriod * (md.index - config.baselineMeasurementIndex);
+    return tp;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1719,10 +1928,10 @@ bool DB::getLastMeasurementForSensor(SensorId sensor_id, Measurement& measuremen
     for (StoredMeasurement const& sm: it->second)
     {
         Measurement m = unpack(sensor_id, sm);
-        if (m.descriptor.timePoint > best_time_point)
+        if (m.timePoint > best_time_point)
         {
             measurement = m;
-            best_time_point = m.descriptor.timePoint;
+            best_time_point = m.timePoint;
         }
     }
 
@@ -1775,16 +1984,9 @@ bool DB::cull(Measurement const& m, Filter const& filter) const
             return false;
         }
     }
-    if (filter.useB2SFilter)
+    if (filter.useSignalStrengthFilter)
     {
-        if (m.descriptor.signalStrength.b2s < filter.b2sFilter.min || m.descriptor.signalStrength.b2s > filter.b2sFilter.max)
-        {
-            return false;
-        }
-    }
-    if (filter.useS2BFilter)
-    {
-        if (m.descriptor.signalStrength.s2b < filter.s2bFilter.min || m.descriptor.signalStrength.s2b > filter.s2bFilter.max)
+        if (m.combinedSignalStrength < filter.signalStrengthFilter.min || m.combinedSignalStrength > filter.signalStrengthFilter.max)
         {
             return false;
         }
@@ -1807,7 +2009,7 @@ inline DB::StoredMeasurement DB::pack(Measurement const& m)
 {
     StoredMeasurement sm;
     sm.index = m.descriptor.index;
-    sm.timePoint = static_cast<uint64_t>(Clock::to_time_t(m.descriptor.timePoint));
+    sm.timePoint = static_cast<uint64_t>(Clock::to_time_t(m.timePoint));
     sm.temperature = static_cast<int16_t>(std::max(std::min(m.descriptor.temperature, 320.f), -320.f) * 100.f);
     sm.humidity = static_cast<int16_t>(std::max(std::min(m.descriptor.humidity, 320.f), -320.f) * 100.f);
     sm.vcc = static_cast<uint8_t>(std::max(std::min((m.descriptor.vcc - 2.f), 2.55f), 0.f) * 100.f);
@@ -1826,12 +2028,13 @@ inline DB::Measurement DB::unpack(SensorId sensorId, StoredMeasurement const& sm
     m.id = computeMeasurementId(sensorId, sm);
     m.descriptor.sensorId = sensorId;
     m.descriptor.index = sm.index;
-    m.descriptor.timePoint = Clock::from_time_t(static_cast<time_t>(sm.timePoint));
+    m.timePoint = Clock::from_time_t(static_cast<time_t>(sm.timePoint));
     m.descriptor.temperature = static_cast<float>(sm.temperature) / 100.f;
     m.descriptor.humidity = static_cast<float>(sm.humidity) / 100.f;
     m.descriptor.vcc = static_cast<float>(sm.vcc) / 100.f + 2.f;
     m.descriptor.signalStrength.b2s = sm.b2s;
     m.descriptor.signalStrength.s2b = sm.s2b;
+    m.combinedSignalStrength = std::min(sm.b2s, sm.s2b);
     m.descriptor.sensorErrors = sm.sensorErrors;
     m.triggeredAlarms = sm.triggeredAlarms;
     return m;
@@ -1984,7 +2187,6 @@ void DB::save(Data const& data) const
                 rapidjson::Value configj;
                 configj.SetObject();
                 configj.AddMember("name", rapidjson::Value(config.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
-                configj.AddMember("sensors_sleeping", config.descriptor.sensorsSleeping, document.GetAllocator());
                 configj.AddMember("sensors_power", static_cast<uint32_t>(config.descriptor.sensorsPower), document.GetAllocator());
                 configj.AddMember("measurement_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.measurementPeriod).count()), document.GetAllocator());
                 configj.AddMember("comms_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.commsPeriod).count()), document.GetAllocator());
@@ -2006,11 +2208,11 @@ void DB::save(Data const& data) const
                 sensorj.AddMember("id", sensor.id, document.GetAllocator());
                 sensorj.AddMember("address", sensor.address, document.GetAllocator());
                 sensorj.AddMember("state", static_cast<int>(sensor.state), document.GetAllocator());
-                sensorj.AddMember("next_measurement", static_cast<uint64_t>(Clock::to_time_t(sensor.nextMeasurementTimePoint)), document.GetAllocator());
                 sensorj.AddMember("last_comms", static_cast<uint64_t>(Clock::to_time_t(sensor.lastCommsTimePoint)), document.GetAllocator());
                 sensorj.AddMember("temperature_bias", sensor.calibration.temperatureBias, document.GetAllocator());
                 sensorj.AddMember("humidity_bias", sensor.calibration.humidityBias, document.GetAllocator());
                 sensorj.AddMember("serial_number", sensor.serialNumber, document.GetAllocator());
+                sensorj.AddMember("last_confirmed_measurement_index", sensor.lastConfirmedMeasurementIndex, document.GetAllocator());
                 sensorsj.PushBack(sensorj, document.GetAllocator());
             }
             document.AddMember("sensors", sensorsj, document.GetAllocator());

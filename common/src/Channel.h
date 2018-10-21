@@ -41,6 +41,10 @@ public:
     template<class Dst>
     Unpack_Result unpack(Dst& dst) { return _unpack(dst); }
 
+    //decodes the next message
+    template<class Dst>
+    Unpack_Result unpack_fixed(Dst& dst, size_t& size) { return _unpack_fixed(dst, size); }
+
     //////////////////////////////////////////////////////////////////////////
 
     size_t get_pending_data_size() const { return m_rx_buffer.size(); }
@@ -138,6 +142,23 @@ private:
         size_t offset = dst.size();
         dst.resize(offset + m_decoded.data_size);
         std::copy(m_rx_buffer.begin(), m_rx_buffer.begin() + m_decoded.data_size, dst.begin() + offset);
+        return Unpack_Result::OK;
+    }
+
+    template<typename Dst>
+    Unpack_Result _unpack_fixed(Dst& dst, size_t& size)
+    {
+        assert(m_decoded.data_size <= m_rx_buffer.size());
+        if (m_decoded.data_size == 0)
+        {
+            return Unpack_Result::FAILED;
+        }
+        if (m_decoded.data_size > dst.size())
+        {
+            return Unpack_Result::FAILED;
+        }
+        size = m_decoded.data_size;
+        std::copy(m_rx_buffer.begin(), m_rx_buffer.begin() + m_decoded.data_size, dst.begin());
         return Unpack_Result::OK;
     }
 

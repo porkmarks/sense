@@ -60,7 +60,7 @@ Manager::Manager(QWidget *parent)
 
     auto* timer = new QTimer(this);
     timer->setSingleShot(false);
-    timer->start(10);
+    timer->start(1);
     connect(timer, &QTimer::timeout, this, &Manager::process, Qt::QueuedConnection);
 
     connect(&m_settings, &Settings::baseStationActivated, this, &Manager::activateBaseStation);

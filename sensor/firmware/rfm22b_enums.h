@@ -90,7 +90,7 @@ enum class Register : uint8_t
 //	RESERVED									= 0x55,
 //	RESERVED									= 0x56,
 //	RESERVED									= 0x57,
-//	RESERVED									= 0x58,
+    _58                                         = 0x58,
 //	RESERVED									= 0x59,
 //	RESERVED									= 0x5A,
 //	RESERVED									= 0x5B,

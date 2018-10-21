@@ -18,6 +18,7 @@ public:
     QTcpSocketAdapter()
         : m_socket(new QTcpSocket(this))
     {
+        m_socket->setSocketOption(QAbstractSocket::LowDelayOption, true);
     }
 
     ~QTcpSocketAdapter()

@@ -11,14 +11,14 @@ namespace sensor
 
 enum class Type : uint8_t
 {
-    RESPONSE,
-    MEASUREMENT_BATCH,
-    PAIR_REQUEST,
-    PAIR_RESPONSE,
-    CONFIG_REQUEST,
-    CONFIG,
-    FIRST_CONFIG_REQUEST,
-    FIRST_CONFIG,
+    /*  0 */ RESPONSE,
+    /*  1 */ MEASUREMENT_BATCH,
+    /*  2 */ PAIR_REQUEST,
+    /*  3 */ PAIR_RESPONSE,
+    /*  4 */ CONFIG_REQUEST,
+    /*  5 */ CONFIG,
+    /*  6 */ FIRST_CONFIG_REQUEST,
+    /*  7 */ FIRST_CONFIG,
 };
 
 
@@ -157,20 +157,10 @@ static_assert(sizeof(Pair_Response) == 4, "");
 
 enum class Server_Message
 {
-    SET_CONFIGS_REQ,         //manager
-    SET_CONFIGS_RES,         //base station
-    ADD_CONFIG_REQ,         //manager
-    ADD_CONFIG_RES,         //base station
-    SET_SENSORS_REQ,        //manager
-    SET_SENSORS_RES,        //base station
-    ADD_SENSOR_REQ,         //manager
-    ADD_SENSOR_RES,         //base station
-    REPORT_MEASUREMENTS_REQ, //base station
-    REPORT_MEASUREMENTS_RES, //manager
-    SENSOR_BOUND_REQ,       //base station
-    SENSOR_BOUND_RES,       //manager
-    POWER_OFF_REQ,          //manager
-    REPORT_SENSORS_DETAILS, //base station
+    SENSOR_REQ,         //manager
+    SENSOR_RES,         //base station
+    PING,               //manager
+    PONG,               //base station
 };
 
 

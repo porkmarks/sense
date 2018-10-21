@@ -59,15 +59,18 @@ bool RFM22B::init()
         return false;
     }
 
+    uint8_t version = get_register(Register::DEVICE_VERSION_01);
+
     return true;
 }
 
-void RFM22B::set_modem_configuration(uint8_t data[42])
+void RFM22B::set_modem_configuration(uint8_t data[46])
 {
     uint8_t const* ptr = data;
     set_register(Register::IF_FILTER_BANDWIDTH_1C, *ptr++);
     set_register(Register::AFC_LOOP_GEARSHIFT_OVERRIDE_1D, *ptr++);
-
+    set_register(Register::AFC_TIMING_CONTROL_1E, *ptr++);
+    set_register(Register::CLOCK_RECOVERY_GEARSHIFT_OVERRIDE_1F, *ptr++);
     set_register(Register::CLOCK_RECOVERY_OVERSAMPLING_RATIO_20, *ptr++);
     set_register(Register::CLOCK_RECOVERY_OFFSET_2_21, *ptr++);
     set_register(Register::CLOCK_RECOVERY_OFFSET_1_22, *ptr++);
@@ -90,7 +93,6 @@ void RFM22B::set_modem_configuration(uint8_t data[42])
     set_register(Register::SYNC_WORD_2_37, *ptr++);
     set_register(Register::SYNC_WORD_1_38, *ptr++);
     set_register(Register::SYNC_WORD_0_39, *ptr++);
-
     set_register(Register::TRANSMIT_HEADER_3_3A, *ptr++);
     set_register(Register::TRANSMIT_HEADER_2_3B, *ptr++);
     set_register(Register::TRANSMIT_HEADER_1_3C, *ptr++);
@@ -104,6 +106,9 @@ void RFM22B::set_modem_configuration(uint8_t data[42])
     set_register(Register::HEADER_ENABLE_2_44, *ptr++);
     set_register(Register::HEADER_ENABLE_1_45, *ptr++);
     set_register(Register::HEADER_ENABLE_0_46, *ptr++);
+
+    set_register(Register::_58, *ptr++);
+    set_register(Register::AGC_OVERRIDE_1_69, *ptr++);
 
     set_register(Register::TX_DATA_RATE_1_6E, *ptr++);
     set_register(Register::TX_DATA_RATE_0_6F, *ptr++);
@@ -205,7 +210,7 @@ float RFM22B::get_carrier_frequency()
     uint8_t hbsel = (fbs >> 5) & 1;
 
     // Determine the fractional part
-    uint16_t fc = static_cast<uint8_t>((static_cast<uint16_t>(ncf1) << 8) | static_cast<uint16_t>(ncf0));
+    uint16_t fc = static_cast<uint16_t>((static_cast<uint16_t>(ncf1) << 8) | static_cast<uint16_t>(ncf0));
 
     // Return the frequency
     return 10.f*(hbsel+1)*(fb+24+fc/64000.f);

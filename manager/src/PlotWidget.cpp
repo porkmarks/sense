@@ -477,7 +477,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
     m_ui.resultCount->setText(QString("%1 out of %2 results.").arg(measurements.size()).arg(m_db->getAllMeasurementCount()));
     m_ui.exportData->setEnabled(!measurements.empty());
 
-    std::sort(measurements.begin(), measurements.end(), [](DB::Measurement const& a, DB::Measurement const& b) { return a.descriptor.timePoint < b.descriptor.timePoint; });
+    std::sort(measurements.begin(), measurements.end(), [](DB::Measurement const& a, DB::Measurement const& b) { return a.timePoint < b.timePoint; });
 
     for (size_t i = 0; i < m_db->getSensorCount(); i++)
     {
@@ -498,7 +498,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
 
     for (DB::Measurement const& m : measurements)
     {
-        time_t time = DB::Clock::to_time_t(m.descriptor.timePoint);
+        time_t time = DB::Clock::to_time_t(m.timePoint);
         minTS = std::min(minTS, static_cast<uint64_t>(time));
         maxTS = std::max(maxTS, static_cast<uint64_t>(time));
 
