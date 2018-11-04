@@ -44,9 +44,15 @@
  *
  * @return float - The relative humidity in %RH
  **********************************************************/
-float SHT2xClass::GetHumidity(void)
+bool SHT2xClass::GetHumidity(float& value)
 {
-    return (-6.0 + 125.0 / 65536.0 * (float)(readSensor(eRHumidityHoldCmd)));
+    uint16_t raw = 0;
+    if (!readSensor(eRHumidityHoldCmd, raw))
+    {
+        return false;
+    }
+    value = (-6.0 + 125.0 / 65536.0 * (float)(raw));
+    return true;
 }
 
 /**********************************************************
@@ -55,35 +61,58 @@ float SHT2xClass::GetHumidity(void)
  *
  * @return float - The temperature in Deg C
  **********************************************************/
-float SHT2xClass::GetTemperature(void)
+bool SHT2xClass::GetTemperature(float& value)
 {
-    return (-46.85 + 175.72 / 65536.0 * (float)(readSensor(eTempHoldCmd)));
+    uint16_t raw = 0;
+    if (!readSensor(eTempHoldCmd, raw))
+    {
+        return false;
+    }
+    value = (-46.85 + 175.72 / 65536.0 * (float)(raw));
+    return true;
 }
 
 
 /******************************************************************************
  * Private Functions
  ******************************************************************************/
+constexpr uint16_t POLYNOMIAL = 0x131;  // P(x)=x^8+x^5+x^4+1 = 100110001
 
-uint16_t SHT2xClass::readSensor(uint8_t command)
+bool SHT2xClass::readSensor(uint8_t command, uint16_t& result)
 {
-    uint16_t result;
-
     Wire.beginTransmission(eSHT2xAddress);	//begin
     Wire.write(command);					//send the pointer location
-    delay(100);
     Wire.endTransmission();               	//end
 
     Wire.requestFrom(eSHT2xAddress, 3);
-    while(Wire.available() < 3) {
+    while (Wire.available() < 3) 
+    {
       ; //wait
     }
 
     //Store the result
-    result = ((Wire.read()) << 8);
-    result += Wire.read();
+    uint8_t data[2];
+    data[0] = Wire.read();
+    data[1] = Wire.read();
+    result = data[0] << 8;
+    result += data[1];
     result &= ~0x0003;   // clear two low bits (status bits)
-    return result;
+    uint8_t checksum = Wire.read();
+
+    //calculates 8-Bit checksum with given polynomial
+    uint8_t crc = 0;
+    for (uint8_t i = 0; i < 2; ++i)
+    { 
+        crc ^= (data[i]);
+        for (uint8_t bit = 8; bit > 0; --bit)
+        { 
+            if (crc & 0x80) 
+                crc = (crc << 1) ^ POLYNOMIAL;
+            else 
+                crc = (crc << 1);
+        }
+    }
+    return crc == checksum;
 }
 
 SHT2xClass SHT2x;

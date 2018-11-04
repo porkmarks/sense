@@ -12,7 +12,6 @@ public:
     {
         float temperature;
         float humidity;
-        float vcc;
     };
 
     struct iterator
@@ -53,7 +52,6 @@ private:
             uint8_t skip_count;
         } m_header;
 
-        uint8_t m_vcc = 0; //(vcc - 2) * 100
         uint8_t m_humidity = 0;
         int16_t m_temperature = 0;
 
@@ -82,7 +80,7 @@ private:
 
     static constexpr uint8_t MAX_GROUP_COUNT = 28;
 
-    static_assert(sizeof(Group) == 38, "Storage::Group is broken");
+    static_assert(sizeof(Group) == 37, "Storage::Group is broken");
 
     Data m_last_data;
 

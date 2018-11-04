@@ -45,12 +45,12 @@ typedef enum {
 
 class SHT2xClass
 {
-  private:
-    uint16_t readSensor(uint8_t command);
+public:
+    bool GetHumidity(float& value);
+    bool GetTemperature(float& value);
 
-  public:
-    float GetHumidity(void);
-    float GetTemperature(void);
+private:
+    bool readSensor(uint8_t command, uint16_t& result);
 };
 
 extern SHT2xClass SHT2x;

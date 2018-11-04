@@ -5,10 +5,10 @@
 #include <avr/io.h>
 #include <avr/pgmspace.h>
 #include <avr/wdt.h>
+#include <avr/power.h>
 
 #include "Wire.h"
 #include "SPI.h"
-#include "Low_Power.h"
 #include "LEDs.h"
 #include "Buttons.h"
 #include "Battery.h"
@@ -16,18 +16,9 @@
 #include "Data_Defs.h"
 #include "avr_stdio.h"
 #include "Storage.h"
+#include "Sleep.h"
 
-#define SENSOR_DHT22 1
-#define SENSOR_SHT21 2
-
-#define SENSOR_TYPE SENSOR_SHT21
-
-#if SENSOR_TYPE == SENSOR_DHT22
-#   include "DHT.h"
-#elif SENSOR_TYPE == SENSOR_SHT21
-#   include "SHT2x.h"
-#endif
-
+#include "SHT2x.h"
 
 __extension__ typedef int __guard __attribute__((mode (__DI__)));
 
@@ -70,15 +61,7 @@ State s_state = State::PAIR;
 
 uint8_t s_error_flags = 0;
 
-#if SENSOR_TYPE == SENSOR_DHT22
-//constexpr uint8_t DHT_DATA_PIN1 = 5;
-//constexpr uint8_t DHT_DATA_PIN2 = 6;
-//constexpr uint8_t DHT_DATA_PIN3 = 7;
-//constexpr uint8_t DHT_DATA_PIN4 = 8;
-//DHT s_dht(DHT_DATA_PIN1, DHT22);
-#else
 SHT2xClass s_sht;
-#endif
 
 Sensor_Comms s_comms;
 
@@ -86,11 +69,6 @@ FILE s_uart_output;
 
 uint32_t s_baseline_measurement_index = 0; //measurements should start from this index
 uint32_t s_first_stored_measurement_index = 0; //the index of the first measurement in storage
-
-namespace chrono
-{
-    time_ms s_time_point;
-}
 
 chrono::time_ms s_next_measurement_time_point;
 chrono::millis s_measurement_period;
@@ -117,16 +95,6 @@ ISR(BADISR_vect)
         digitalWrite(RED_LED_PIN, LOW);
         delay(95);
     }
-}
-
-void soft_reset()
-{
-    LOG(PSTR("********** resetting..."));
-    //cli();
-    //wdt_enable(WDTO_15MS);
-    //while(1);
-    void (*resetptr)( void ) = 0x0000;
-    resetptr();
 }
 
 void wdt_init(void) __attribute__((naked)) __attribute__((section(".init3")));
@@ -221,20 +189,28 @@ bool load_settings(uint32_t& serial_number, uint32_t& address, data::sensor::Cal
 
 void setup()
 {
-    stack_paint();
-    
     int mcusr_value = MCUSR;
     MCUSR = 0;
 
+    //setup serial.
+    Serial.begin(57600);
+
+    stack_paint();
+    setup_clock(921600);
+    delay(1000); //wait for the clock to stablize
+
+    ///////////////////////////////////////////////
     //setup the led pins
     pinMode(RED_LED_PIN, OUTPUT);
     digitalWrite(RED_LED_PIN, LOW);
     pinMode(GREEN_LED_PIN, OUTPUT);
     digitalWrite(GREEN_LED_PIN, LOW);
 
-    //setup serial.
-    Serial.begin(38400);
-    delay(200);
+    ///////////////////////////////////////////////
+    //setup buttons
+    pinMode(static_cast<uint8_t>(Button::BUTTON1), INPUT_PULLUP);
+
+    ////////////////////////////////////////////
 
     fdev_setup_stream(&s_uart_output, uart_putchar, NULL, _FDEV_SETUP_WRITE);
     stdout = &s_uart_output;
@@ -266,40 +242,32 @@ void setup()
     LOG(PSTR("Stack: initial %d, now: %d\n"), initial_stack_size(), stack_size());
 
     ///////////////////////////////////////////////
-    //notify about startup
-    blink_leds(GREEN_LED, 2, chrono::millis(100));
-
-    ///////////////////////////////////////////////
-    //setup buttons
-    pinMode(static_cast<uint8_t>(Button::BUTTON1), INPUT);
-    digitalWrite(static_cast<uint8_t>(Button::BUTTON1), HIGH);
-
-    ///////////////////////////////////////////////
     //initialize the sensor
-#if SENSOR_TYPE == SENSOR_DHT22
-    s_dht.begin();
-#else
     Wire.begin();
-#endif
-    delay(200);
-
+    sleep_exact(50);
+/*
+    for (uint32_t i = 100; i < 100000; i += 100)
+    {
+        LOG(PSTR("Sleeping %ldms: "), i);
+        Serial.flush();
+        chrono::micros us = sleep(chrono::micros(i * 1000), true);
+        LOG(PSTR("done. left: %ldus\n"), (uint32_t)us.count);
+    }
+*/
     ///////////////////////////////////////////////
     //seed the RNG
     uint32_t rnd_seed = 0;
     {
-        for (size_t i = 0; i < 30; i++)
+        for (size_t i = 0; i < 20; i++)
         {
-            float t, h;
-#if SENSOR_TYPE == SENSOR_DHT22
-            s_dht.read(t, h);
-#else
-            t = s_sht.GetTemperature();
-            h = s_sht.GetHumidity();
-#endif
+            float t;
+            float h;
+            s_sht.GetHumidity(t);
+            s_sht.GetTemperature(h);
             hash_combine(rnd_seed, static_cast<uint32_t>(read_vcc() * 10000000.f));
             hash_combine(rnd_seed, static_cast<uint32_t>(t * 10000000.f));
             hash_combine(rnd_seed, static_cast<uint32_t>(h * 10000000.f));
-            delay(10);
+            sleep_exact(10);
         }
         srandom(rnd_seed);
         LOG(PSTR("Random seed: %lu\n"), rnd_seed);
@@ -309,7 +277,7 @@ void setup()
     //setup SPI
     pinMode(SS, OUTPUT);
     digitalWrite(SS, HIGH);
-    delay(100);
+    sleep_exact(100);
     
     SPI.setDataMode(SPI_MODE0);
     SPI.setClockDivider(SPI_CLOCK_DIV2);
@@ -323,7 +291,7 @@ void setup()
     {
         LOG(PSTR("failed\n"));
         blink_leds(RED_LED, 3, chrono::millis(100));
-        Low_Power::power_down(chrono::millis(5000));
+        sleep(chrono::seconds(5), false);
     }
     s_comms.stand_by_mode();
     LOG(PSTR("done\n"));
@@ -331,9 +299,6 @@ void setup()
     ///////////////////////////////////////////////
     //done
     blink_leds(GREEN_LED, 5, chrono::millis(50));
-
-    //sleep a bit
-    Low_Power::power_down(chrono::millis(1000));
 
     ///////////////////////////////////////////////
     //settings
@@ -344,11 +309,11 @@ void setup()
         if (s_serial_number == 0)
         {
             s_serial_number = rnd_seed;
-            if (s_serial_number == 0)
+            while (s_serial_number == 0)
             {
                 LOG(PSTR("Serial number failed\n"));
                 blink_leds(RED_LED, 8, chrono::millis(100));
-                Low_Power::power_down(chrono::millis(500000ULL));
+                sleep(chrono::seconds(60 * 60), false);
             }
             save_settings(s_serial_number, address, s_calibration);
         }
@@ -481,53 +446,7 @@ static bool request_config()
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-static bool apply_first_config(const data::sensor::First_Config& first_config)
-{
-    s_storage.clear();
-
-    if (!apply_config(first_config.config))
-    {
-        return false;
-    }
-    s_first_stored_measurement_index = first_config.first_measurement_index;
-
-    return true;
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////
-
-static bool request_first_config()
-{
-    bool send_successful = false;
-    {
-        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::sensor::First_Config_Request))];
-        s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::FIRST_CONFIG_REQUEST));
-        s_comms.pack(raw_buffer, data::sensor::First_Config_Request());
-        send_successful = s_comms.send_packet(raw_buffer, 2);
-    }
-
-    if (send_successful)
-    {
-        uint8_t size = sizeof(data::sensor::First_Config);
-        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(size)];
-        uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, 500);
-        if (buffer)
-        {
-            data::sensor::Type type = static_cast<data::sensor::Type>(s_comms.get_rx_packet_type(buffer));
-            if (type == data::sensor::Type::FIRST_CONFIG && size == sizeof(data::sensor::First_Config))
-            {
-                s_last_input_dBm = s_comms.get_input_dBm();
-                const data::sensor::First_Config* ptr = reinterpret_cast<const data::sensor::First_Config*>(s_comms.get_rx_packet_payload(buffer));
-                return apply_first_config(*ptr);
-            }
-        }
-    }
-    return false;
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////
-
-static void pair()
+static void pair_state()
 {
     uint32_t addr = Sensor_Comms::PAIR_ADDRESS_BEGIN + random() % (Sensor_Comms::PAIR_ADDRESS_END - Sensor_Comms::PAIR_ADDRESS_BEGIN);
     s_comms.set_address(addr);
@@ -548,7 +467,7 @@ static void pair()
             if (is_pressed(Button::BUTTON1))
             {
                 tries = 0;
-                set_leds(YELLOW_LED);
+                blink_leds(YELLOW_LED, 3, chrono::millis(500));
 
                 //wait for the user to release the button
                 wait_for_release(Button::BUTTON1);
@@ -572,8 +491,6 @@ static void pair()
                 {
                     LOG(PSTR("done.\nWaiting for response..."));
 
-                    set_leds(GREEN_LED);
-
                     uint8_t size = sizeof(data::sensor::Pair_Response);
                     uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(size)];
                     uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, 10000);
@@ -590,9 +507,12 @@ static void pair()
 
                         const data::sensor::Pair_Response* response_ptr = reinterpret_cast<const data::sensor::Pair_Response*>(s_comms.get_rx_packet_payload(buffer));
                         s_comms.set_address(response_ptr->address);
+
                         LOG(PSTR("done. Addr: %lu\n"), response_ptr->address);
 
                         save_settings(s_serial_number, response_ptr->address, s_calibration);
+
+                        blink_leds(GREEN_LED, 3, chrono::millis(500));
 
                         done = true;
                         break;
@@ -613,7 +533,7 @@ static void pair()
             s_comms.stand_by_mode();
 
             blink_leds(YELLOW_LED, 3, chrono::millis(100));
-            Low_Power::power_down_int(chrono::millis(2000));
+            sleep(chrono::millis(2000), true);
         }
 
         if (!done)
@@ -623,7 +543,7 @@ static void pair()
             fade_out_leds(YELLOW_LED, chrono::millis(1000));
 
             //the user didn't press it - sleep for a loooong time
-            Low_Power::power_down_int(chrono::millis(1000ULL * 3600 * 24));
+            sleep(chrono::seconds(3600ULL * 24ULL), true);
 
             LOG(PSTR("woke up.\n"));
 
@@ -644,7 +564,7 @@ static void pair()
     s_state = State::FIRST_CONFIG;
 
     //sleep a bit
-    Low_Power::power_down(chrono::millis(1000 * 1));
+    sleep(chrono::millis(1000 * 1), false);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -662,22 +582,12 @@ static void do_measurement()
     do
     {
         LOG(PSTR("Measuring %d..."), tries);
-#if SENSOR_TYPE == SENSOR_DHT22
-        bool ok = s_dht.read(data.temperature, data.humidity);
-        if (!ok)
+        if (s_sht.GetTemperature(data.temperature) && s_sht.GetHumidity(data.humidity))
         {
-            LOG(PSTR("failed: DHT sensor!\n"));
-        }
-        else
-        {
-            LOG(PSTR("done\n"));
+            data.temperature += static_cast<float>(s_calibration.temperature_bias) / 100.f;
+            data.humidity += static_cast<float>(s_calibration.humidity_bias) / 100.f;
             break;
         }
-#else
-        data.temperature = s_sht.GetTemperature() + static_cast<float>(s_calibration.temperature_bias) / 100.f;
-        data.humidity = s_sht.GetHumidity() + static_cast<float>(s_calibration.humidity_bias) / 100.f;
-        break;
-#endif
     } while (++tries < max_tries);
 
     if (tries >= max_tries)
@@ -690,8 +600,6 @@ static void do_measurement()
     {
         data.humidity = max(data.humidity, MIN_VALID_HUMIDITY);
     }
-
-    data.vcc = read_vcc();
 
     //push back and make room if it fails
     LOG(PSTR("Storing..."));
@@ -745,18 +653,19 @@ static void do_comms()
             }
             else
             {
+                float vcc = read_vcc();
                 data::sensor::Measurement& item = batch.measurements[batch.count++];
                 item.flags = s_error_flags;
                 if (it.data.humidity < MIN_VALID_HUMIDITY)
                 {
                     item.flags |= static_cast<uint8_t>(data::sensor::Measurement::Flag::SENSOR_ERROR);
                     item.pack(0.f, 0.f);
-                    batch.pack(it.data.vcc);
+                    batch.pack(vcc);
                 }
                 else
                 {
                     item.pack(it.data.humidity, it.data.temperature);
-                    batch.pack(it.data.vcc);
+                    batch.pack(vcc);
                 }
             }
 
@@ -792,7 +701,7 @@ static void do_comms()
                 batch.start_index += batch.count;
                 batch.count = 0;
 
-                Low_Power::power_down_int(chrono::millis(200ULL));
+                sleep(chrono::millis(200ULL), true);
             }
         } while (!done);
     }
@@ -805,7 +714,53 @@ static void do_comms()
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-static void first_config()
+static bool apply_first_config(const data::sensor::First_Config& first_config)
+{
+    s_storage.clear();
+
+    if (!apply_config(first_config.config))
+    {
+        return false;
+    }
+    s_first_stored_measurement_index = first_config.first_measurement_index;
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+static bool request_first_config()
+{
+    bool send_successful = false;
+    {
+        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::sensor::First_Config_Request))];
+        s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::FIRST_CONFIG_REQUEST));
+        s_comms.pack(raw_buffer, data::sensor::First_Config_Request());
+        send_successful = s_comms.send_packet(raw_buffer, 2);
+    }
+
+    if (send_successful)
+    {
+        uint8_t size = sizeof(data::sensor::First_Config);
+        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(size)];
+        uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, 500);
+        if (buffer)
+        {
+            data::sensor::Type type = static_cast<data::sensor::Type>(s_comms.get_rx_packet_type(buffer));
+            if (type == data::sensor::Type::FIRST_CONFIG && size == sizeof(data::sensor::First_Config))
+            {
+                s_last_input_dBm = s_comms.get_input_dBm();
+                const data::sensor::First_Config* ptr = reinterpret_cast<const data::sensor::First_Config*>(s_comms.get_rx_packet_payload(buffer));
+                return apply_first_config(*ptr);
+            }
+        }
+    }
+    return false;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+static void first_config_state()
 {
     while (s_state == State::FIRST_CONFIG)
     {
@@ -826,25 +781,35 @@ static void first_config()
             continue;
         }      
 
-        s_comms.idle_mode();
+        set_leds(YELLOW_LED);
+        sleep_exact(chrono::millis(100));
+        set_leds(0);
 
-        if (request_first_config())
+        s_comms.idle_mode();
+        bool got_it = request_first_config();
+        s_comms.stand_by_mode();
+
+        if (got_it)
         {
             LOG(PSTR("Received first config. Starting measuring.\n"));
+            set_leds(GREEN_LED);
+            sleep_exact(chrono::millis(100));
+            set_leds(0);
             s_state = State::MEASUREMENT_LOOP;
-            break;
         }
-
-        s_comms.stand_by_mode();
-        Low_Power::power_down_int(chrono::millis(10000));
+        else
+        {
+            set_leds(RED_LED);
+            sleep_exact(chrono::millis(100));
+            set_leds(0);
+            sleep(chrono::millis(10000), true);
+        }
     }
-
-    s_comms.stand_by_mode();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-static void measurement_loop()
+static void measurement_loop_state()
 {
     while (true)
     { 
@@ -906,8 +871,10 @@ static void measurement_loop()
             }
 
             set_leds(YELLOW_LED);
-            do_comms();
+            sleep_exact(chrono::millis(100));
             set_leds(0);
+            
+            do_comms();
         }
 
         if (s_sensor_sleeping == true)
@@ -934,14 +901,14 @@ static void measurement_loop()
         LOG(PSTR("tp: %lu, nm: %lu, nc: %lu\n"), uint32_t(now.ticks), uint32_t(s_next_measurement_time_point.ticks), uint32_t(s_next_comms_time_point.ticks));
         LOG(PSTR("Sleeping for %lu ms\n"), sleep_duration.count);
 
-        chrono::millis remaining = Low_Power::power_down_int(sleep_duration);
-        LOG(PSTR("Woken up, remaining %lu ms\n"), remaining.count);
+        chrono::micros remaining = sleep(sleep_duration, true);
+        LOG(PSTR("Woken up, remaining %lu ms\n"), remaining.count / 1000);
     }
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-static void sleep_loop()
+static void sleep_loop_state()
 {
     //request the config again - this also informs the BS that we're sleeping
     request_config();
@@ -963,13 +930,15 @@ static void sleep_loop()
             force_comms = true;
         }
 
-        chrono::time_ms now = chrono::now();
+        chrono::time_us now = chrono::now_us();
 
         if (force_comms)
         {
             set_leds(YELLOW_LED);
-            request_config();
+            sleep_exact(chrono::millis(100));
             set_leds(0);
+            
+            request_config();
         }
 
         if (s_sensor_sleeping == false)
@@ -984,7 +953,7 @@ static void sleep_loop()
         chrono::millis sleep_duration(1000ULL * 3600 * 24);
         LOG(PSTR("Sleeping for %lu ms\n"), sleep_duration.count);
 
-        chrono::millis remaining = Low_Power::power_down_int(sleep_duration);
+        chrono::millis remaining = chrono::millis(sleep(sleep_duration, true));
         LOG(PSTR("Woken up, remaining %lu ms\n"), remaining.count);
     }
 }
@@ -995,23 +964,23 @@ void loop()
 {
     if (s_state == State::PAIR)
     {
-        pair();
+        pair_state();
     }
     else if (s_state == State::FIRST_CONFIG)
     {
-        first_config();
+        first_config_state();
     }
     else if (s_state == State::MEASUREMENT_LOOP)
     {
-        measurement_loop();
+        measurement_loop_state();
     }
     else if (s_state == State::SLEEPING_LOOP)
     {
-        sleep_loop();
+        sleep_loop_state();
     }
     else
     {
         blink_leds(RED_LED, 2, chrono::millis(50));
-        Low_Power::power_down_int(chrono::millis(1000));
+        sleep(chrono::millis(1000), true);
     }
 }

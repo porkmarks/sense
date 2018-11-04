@@ -2,8 +2,8 @@
 
 #include <stdint.h>
 #ifdef __AVR__
-
 #   include <Arduino.h>
+#   include "Scope_Sync.h"
 #endif
 
 
@@ -121,10 +121,11 @@ inline void delay(D duration)
     ::delay(ms.count);
 }
 
-extern time_ms s_time_point;
+extern volatile time_us s_time_point;
 
 inline time_ms now()
 {
+  /*
     static uint32_t s_last_millis = ::millis();
     uint32_t ms = ::millis();
     if (ms > s_last_millis)
@@ -132,7 +133,25 @@ inline time_ms now()
         s_time_point += millis(ms - s_last_millis);
     }
     s_last_millis = ms;
-    return s_time_point;
+    return time_ms(s_time_point.ticks);
+    */
+    Scope_Sync ss;
+    return time_ms(s_time_point.ticks / 1000);
+}
+inline time_us now_us()
+{
+  /*
+    static uint32_t s_last_millis = ::millis();
+    uint32_t ms = ::millis();
+    if (ms > s_last_millis)
+    {
+        s_time_point += millis(ms - s_last_millis);
+    }
+    s_last_millis = ms;
+    return time_ms(s_time_point.ticks);
+    */
+    Scope_Sync ss;
+    return time_us(s_time_point.ticks);
 }
 #endif
 }
