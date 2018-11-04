@@ -414,8 +414,9 @@ void writeBootloader ()
       {
       Serial.println (F("Using Lilypad 8 MHz loader."));
       bootloader = ATmegaBOOT_168_atmega328_pro_8MHz_hex;
-      newlFuse = 0xE2;  // internal 8 MHz oscillator
+      newlFuse = 0xA2;  // internal 8 MHz oscillator
       newhFuse = 0xDA;  //  2048 byte bootloader, SPI enabled
+      newextFuse = 0xFF; //no brownout
       addr = 0x7800;
       len = sizeof ATmegaBOOT_168_atmega328_pro_8MHz_hex;
       }  // end of using the 8 MHz clock

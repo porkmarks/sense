@@ -1,18 +1,14 @@
 https://www.arduino.cc/en/Tutorial/ArduinoToBreadboard
 8Mhz, internal oscillator
-FUSES: (E:FE, H:DA, L:E2)
+FUSES: (E:FF, H:DA, L:A2)
 
+Burn with arduino_sketches/Atmega_Board_Programmer/Atmega_Board_Programmer.ino
+The sketch has the fuses hardcoded inside, lines 417 - 419
 
-http://www.atmel.com/webdoc/avrlibcreferencemanual/group__avr__fuse.html
+Fuse Calculator:
+http://www.engbedded.com/fusecalc/
 
-BOD should be 1.8V!!!!!!
-Turn off BOD while sleeping
+No BOD, not needed as we can detect in software
 
-
-Read fuses:
-avrdude -P /dev/ttyACM0 -b 19200 -c avrisp -p m328p -v
-
-Write Extended Fuse:
-avrdude -P /dev/ttyACM0 -b 19200 -c avrisp -p m328p -U efuse:w:0xFE:m
-
+When programming, use the boards file in this folder and choose "Atmega328 on a breadboard (1Mhz internal oscillator)"
 
