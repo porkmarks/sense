@@ -15,7 +15,7 @@ static const PROGMEM uint32_t crc_table[16] =
     0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c
 };
 
-inline uint32_t crc_update(uint32_t crc, uint8_t data)
+uint32_t crc_update(uint32_t crc, uint8_t data)
 {
     uint8_t tbl_idx = uint8_t(crc ^ (data >> (0 * 4)));
     crc = pgm_read_dword_near(crc_table + (tbl_idx & 0x0f)) ^ (crc >> 4);

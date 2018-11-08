@@ -28,10 +28,11 @@
 */
 
 #include <inttypes.h>
-#include <Wire.h>
-#include "Arduino.h"
 #include "SHT2x.h"
+#include "SoftI2CMaster.h"
 
+bool _i2c_init() { return i2c_init(); }
+//#include "Wire.h"
 
 
 /******************************************************************************
@@ -44,7 +45,7 @@
  *
  * @return float - The relative humidity in %RH
  **********************************************************/
-bool SHT2xClass::GetHumidity(float& value)
+bool SHT2x::GetHumidity(float& value)
 {
     uint16_t raw = 0;
     if (!readSensor(eRHumidityHoldCmd, raw))
@@ -61,7 +62,7 @@ bool SHT2xClass::GetHumidity(float& value)
  *
  * @return float - The temperature in Deg C
  **********************************************************/
-bool SHT2xClass::GetTemperature(float& value)
+bool SHT2x::GetTemperature(float& value)
 {
     uint16_t raw = 0;
     if (!readSensor(eTempHoldCmd, raw))
@@ -78,26 +79,33 @@ bool SHT2xClass::GetTemperature(float& value)
  ******************************************************************************/
 constexpr uint16_t POLYNOMIAL = 0x131;  // P(x)=x^8+x^5+x^4+1 = 100110001
 
-bool SHT2xClass::readSensor(uint8_t command, uint16_t& result)
+bool SHT2x::readSensor(uint8_t command, uint16_t& result)
 {
-    Wire.beginTransmission(eSHT2xAddress);	//begin
-    Wire.write(command);					//send the pointer location
-    Wire.endTransmission();               	//end
-
-    Wire.requestFrom(eSHT2xAddress, 3);
-    while (Wire.available() < 3) 
+    if (!i2c_start((eSHT2xAddress << 1) | I2C_WRITE))	//begin
     {
-      ; //wait
+        return false;
+    }
+    if (!i2c_write(command))					//send the pointer location
+    {
+        i2c_stop();                 //end
+        return false;
+    }
+    if (!i2c_rep_start((eSHT2xAddress << 1) | I2C_READ))  //begin
+    {
+        i2c_stop();                 //end
+        return false;
     }
 
     //Store the result
     uint8_t data[2];
-    data[0] = Wire.read();
-    data[1] = Wire.read();
+    data[0] = i2c_read(false);
+    data[1] = i2c_read(false);
     result = data[0] << 8;
     result += data[1];
     result &= ~0x0003;   // clear two low bits (status bits)
-    uint8_t checksum = Wire.read();
+    uint8_t checksum = i2c_read(true);
+
+    i2c_stop();                 //end
 
     //calculates 8-Bit checksum with given polynomial
     uint8_t crc = 0;
@@ -106,13 +114,10 @@ bool SHT2xClass::readSensor(uint8_t command, uint16_t& result)
         crc ^= (data[i]);
         for (uint8_t bit = 8; bit > 0; --bit)
         { 
-            if (crc & 0x80) 
-                crc = (crc << 1) ^ POLYNOMIAL;
-            else 
-                crc = (crc << 1);
+            crc = (crc & 0x80) ? (crc << 1) ^ POLYNOMIAL : (crc << 1);
         }
     }
     return crc == checksum;
 }
 
-SHT2xClass SHT2x;
+

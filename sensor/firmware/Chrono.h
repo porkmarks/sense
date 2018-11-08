@@ -20,56 +20,56 @@ struct duration
     typedef Rep rep_t;
     rep_t count;
 
-    inline duration() : count(0) {}
-    inline explicit duration(rep_t count) : count(count) {}
-    inline duration(duration<Rep, T> const& other) = default;
-    inline duration& operator=(duration<Rep, T> const& other) { count = other.count; return *this; }
-    inline T operator-(T const& other) const { T x(count - other.count); return x; }
-    inline T operator+(T const& other) const { T x(count + other.count); return x; }
-    inline duration<Rep, T>& operator-=(T const& other) { count -= other.count; return *this; }
-    inline duration<Rep, T>& operator+=(T const& other) { count += other.count; return *this; }
-    inline bool operator<(T const& other) const { return count < other.count; }
-    inline bool operator<=(T const& other) const { return count <= other.count; }
-    inline bool operator>(T const& other) const { return count > other.count; }
-    inline bool operator>=(T const& other) const { return count >= other.count; }
-    inline bool operator==(T const& other) const { return count == other.count; }
-    inline bool operator!=(T const& other) const { return !operator==(other); }
+    duration() : count(0) {}
+    explicit duration(rep_t count) : count(count) {}
+    duration(duration<Rep, T> const& other) = default;
+    duration& operator=(duration<Rep, T> const& other) { count = other.count; return *this; }
+    T operator-(T const& other) const { T x(count - other.count); return x; }
+    T operator+(T const& other) const { T x(count + other.count); return x; }
+    duration<Rep, T>& operator-=(T const& other) { count -= other.count; return *this; }
+    duration<Rep, T>& operator+=(T const& other) { count += other.count; return *this; }
+    bool operator<(T const& other) const { return count < other.count; }
+    bool operator<=(T const& other) const { return count <= other.count; }
+    bool operator>(T const& other) const { return count > other.count; }
+    bool operator>=(T const& other) const { return count >= other.count; }
+    bool operator==(T const& other) const { return count == other.count; }
+    bool operator!=(T const& other) const { return !operator==(other); }
 };
 
 struct millis : public duration<int32_t, millis>
 {
-    inline millis() = default;
-    inline explicit millis(micros const& other);
-    inline explicit millis(secondsf const& other);
-    inline explicit millis(seconds const& other);
-    inline explicit millis(rep_t count) : duration<int32_t, millis>(count) {}
+    millis() = default;
+    explicit millis(micros const& other);
+    explicit millis(secondsf const& other);
+    explicit millis(seconds const& other);
+    explicit millis(rep_t count) : duration<int32_t, millis>(count) {}
 };
 
 struct micros : public duration<int32_t, micros>
 {
-    inline micros() = default;
-    inline explicit micros(millis const& other) : duration<int32_t, micros>(other.count * 1000) {}
-    inline explicit micros(secondsf const& other);
-    inline explicit micros(seconds const& other);
-    inline explicit micros(rep_t count) : duration<int32_t, micros>(count) {}
+    micros() = default;
+    explicit micros(millis const& other) : duration<int32_t, micros>(other.count * 1000) {}
+    explicit micros(secondsf const& other);
+    explicit micros(seconds const& other);
+    explicit micros(rep_t count) : duration<int32_t, micros>(count) {}
 };
 
 struct seconds : public duration<int32_t, seconds>
 {
-    inline seconds() = default;
-    inline explicit seconds(millis const& other) : duration<int32_t, seconds>(other.count * 1000) {}
-    inline explicit seconds(micros const& other) : duration<int32_t, seconds>(other.count * 1000000) {}
-    inline explicit seconds(secondsf const& other);
-    inline explicit seconds(rep_t count) : duration<int32_t, seconds>(count) {}
+    seconds() = default;
+    explicit seconds(millis const& other) : duration<int32_t, seconds>(other.count * 1000) {}
+    explicit seconds(micros const& other) : duration<int32_t, seconds>(other.count * 1000000) {}
+    explicit seconds(secondsf const& other);
+    explicit seconds(rep_t count) : duration<int32_t, seconds>(count) {}
 };
 
 struct secondsf : public duration<float, secondsf>
 {
-    inline secondsf() = default;
-    inline explicit secondsf(millis const& other) : duration<float, secondsf>(other.count * 0.001f) {}
-    inline explicit secondsf(micros const& other) : duration<float, secondsf>(other.count * 0.000001f) {}
-    inline explicit secondsf(seconds const& other) : duration<float, secondsf>(other.count) {}
-    inline explicit secondsf(rep_t count) : duration<float, secondsf>(count) {}
+    secondsf() = default;
+    explicit secondsf(millis const& other) : duration<float, secondsf>(other.count * 0.001f) {}
+    explicit secondsf(micros const& other) : duration<float, secondsf>(other.count * 0.000001f) {}
+    explicit secondsf(seconds const& other) : duration<float, secondsf>(other.count) {}
+    explicit secondsf(rep_t count) : duration<float, secondsf>(count) {}
 };
 
 inline millis::millis(micros const& other) : duration<int32_t, millis>(other.count / 1000) {}
@@ -87,25 +87,25 @@ struct time
     typedef time<Rep, Duration> time_t;
     rep_t ticks;
 
-    inline time() : ticks(0) {}
-    inline explicit time(rep_t ticks) : ticks(ticks) {}
-    inline time(time_t const& other) : ticks(other.ticks) {}
-    inline time_t& operator=(time_t const& other) { ticks = other.ticks; return *this; }
-    inline time_t& operator=(volatile time_t const& other) { ticks = other.ticks; return *this; }
-    inline time_t operator-(duration_t const& other) const { time_t x(ticks - other.count); return x; }
-    inline time_t operator+(duration_t const& other) const { time_t x(ticks + other.count); return x; }
-    inline time_t& operator-=(duration_t const& other) { ticks -= other.count; return *this; }
-    inline time_t& operator+=(duration_t const& other) { ticks += other.count; return *this; }
-    inline duration_t operator-(time_t const& other) const { duration_t x(ticks - other.ticks); return x; }
-    inline duration_t operator-(volatile time_t const& other) const { duration_t x(ticks - other.ticks); return x; }
-    inline bool operator<(time_t const& other) const { return ticks < other.ticks; }
-    inline bool operator<=(time_t const& other) const { return ticks <= other.ticks; }
-    inline bool operator>(time_t const& other) const { return ticks > other.ticks; }
-    inline bool operator>=(time_t const& other) const { return ticks >= other.ticks; }
-    inline bool operator==(time_t const& other) const { return ticks == other.ticks; }
-    inline bool operator!=(time_t const& other) const { return !operator==(other); }
+    time() : ticks(0) {}
+    explicit time(rep_t ticks) : ticks(ticks) {}
+    time(time_t const& other) : ticks(other.ticks) {}
+    time_t& operator=(time_t const& other) { ticks = other.ticks; return *this; }
+    time_t& operator=(volatile time_t const& other) { ticks = other.ticks; return *this; }
+    time_t operator-(duration_t const& other) const { time_t x(ticks - other.count); return x; }
+    time_t operator+(duration_t const& other) const { time_t x(ticks + other.count); return x; }
+    time_t& operator-=(duration_t const& other) { ticks -= other.count; return *this; }
+    time_t& operator+=(duration_t const& other) { ticks += other.count; return *this; }
+    duration_t operator-(time_t const& other) const { duration_t x(ticks - other.ticks); return x; }
+    duration_t operator-(volatile time_t const& other) const { duration_t x(ticks - other.ticks); return x; }
+    bool operator<(time_t const& other) const { return ticks < other.ticks; }
+    bool operator<=(time_t const& other) const { return ticks <= other.ticks; }
+    bool operator>(time_t const& other) const { return ticks > other.ticks; }
+    bool operator>=(time_t const& other) const { return ticks >= other.ticks; }
+    bool operator==(time_t const& other) const { return ticks == other.ticks; }
+    bool operator!=(time_t const& other) const { return !operator==(other); }
 
-    inline Duration time_since_epoch() const { return Duration(static_cast<typename Duration::rep_t>(ticks)); }
+    Duration time_since_epoch() const { return Duration(static_cast<typename Duration::rep_t>(ticks)); }
 };
 
 typedef time<uint64_t, millis> time_ms;
@@ -115,7 +115,7 @@ typedef time<uint32_t, seconds> time_s;
 
 #ifdef __AVR__
 template<class D>
-inline void delay(D duration)
+void delay(D duration)
 {
     millis ms(duration);
     ::delay(ms.count);

@@ -1,11 +1,11 @@
 #pragma once
 
 #include "Data_Defs.h"
-
-#include "rfm22b.h"
+#include "LoRaLib.h"
 
 class Sensor_Comms
 {
+public:
 #ifndef __AVR__
 #   pragma pack(push, 1) // exact fit - no padding
 #endif
@@ -22,7 +22,6 @@ class Sensor_Comms
 #   pragma pack(pop)
 #endif
 
-public:
     Sensor_Comms();
 
     static constexpr uint32_t BROADCAST_ADDRESS = 0;
@@ -42,15 +41,12 @@ public:
     void set_address(uint32_t address);
     void set_destination_address(uint32_t address);
 
-    void idle_mode();
-    void stand_by_mode();
+    void sleep_mode();
 
-    uint8_t get_payload_raw_buffer_size(uint8_t size) const;
     void* get_tx_packet_payload(uint8_t* raw_buffer) const;
 
     uint8_t begin_packet(uint8_t* raw_buffer, uint8_t type);
 
-    template<class T> uint8_t pack(uint8_t* raw_buffer, const T& data);
     uint8_t pack(uint8_t* raw_buffer, const void* data, uint8_t size);
 
     bool send_packet(uint8_t* raw_buffer, uint8_t retries);
@@ -63,10 +59,20 @@ public:
     uint8_t get_rx_packet_type(uint8_t* received_buffer) const;
     const void* get_rx_packet_payload(uint8_t* received_buffer) const;
 
-    static const uint8_t MAX_USER_DATA_SIZE = RFM22B::MAX_DATAGRAM_LENGTH - sizeof(Header);
+    static constexpr uint8_t MAX_USER_DATA_SIZE = 128 - sizeof(Sensor_Comms::Header);
+
+    static constexpr uint32_t BROADCAST_ADDRESS = 0;
+    static constexpr uint32_t BASE_ADDRESS = 0xFFFFFFFFULL;
+
+    static constexpr uint32_t PAIR_ADDRESS_BEGIN = BROADCAST_ADDRESS + 1;
+    static constexpr uint32_t PAIR_ADDRESS_END = PAIR_ADDRESS_BEGIN + 1000;
+
+    static constexpr uint32_t SLAVE_ADDRESS_BEGIN = PAIR_ADDRESS_END + 1;
+    static constexpr uint32_t SLAVE_ADDRESS_END = BASE_ADDRESS - 1;
 
 private:
-    RFM22B m_rf22;
+    Module m_module;
+    RFM95  m_lora;
 
     uint32_t m_address = BROADCAST_ADDRESS;
     uint32_t m_destination_address = BROADCAST_ADDRESS;
@@ -78,13 +84,9 @@ private:
 
     void send_response(const Header& header);
 
-
     uint8_t m_offset = 0;
 };
 
+uint8_t packet_raw_size(uint8_t payload_size);
 
-template<class T> uint8_t Sensor_Comms::pack(uint8_t* dst, const T& data)
-{
-    static_assert(sizeof(T) <= MAX_USER_DATA_SIZE, "");
-    return pack(dst, &data, sizeof(T));
-}
+

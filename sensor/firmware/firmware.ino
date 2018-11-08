@@ -1,5 +1,5 @@
 //#include <Arduino.h>
-#include <HardwareSerial.h>
+//#include <HardwareSerial.h>
 #include <avr/eeprom.h>
 #include <avr/interrupt.h>
 #include <avr/io.h>
@@ -7,7 +7,6 @@
 #include <avr/wdt.h>
 #include <avr/power.h>
 
-#include "Wire.h"
 #include "SPI.h"
 #include "LEDs.h"
 #include "Buttons.h"
@@ -17,6 +16,9 @@
 #include "avr_stdio.h"
 #include "Storage.h"
 #include "Sleep.h"
+
+#define BAUD 57600
+#include <util/setbaud.h>
 
 #include "SHT2x.h"
 
@@ -28,13 +30,13 @@ __extension__ typedef int __guard __attribute__((mode (__DI__)));
 //extern "C" void __cxa_pure_virtual() { while (1); }
 
 #include <stdlib.h>
+/*
 inline void* operator new(size_t size) { return malloc(size); }
 inline void* operator new[](size_t size) { return malloc(size); }
 inline void operator delete(void* p) { free(p); }
 inline void operator delete[](void* p) { free(p); }
 inline void* operator new(size_t size_, void *ptr_) { return ptr_; }
-
-
+*/
 //////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -43,7 +45,7 @@ inline void* operator new(size_t size_, void *ptr_) { return ptr_; }
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-inline void hash_combine(uint32_t& seed, uint32_t v)
+static void hash_combine(uint32_t& seed, uint32_t v)
 {
     seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
 }
@@ -57,31 +59,35 @@ enum class State : uint8_t
     MEASUREMENT_LOOP,
     SLEEPING_LOOP
 };
-State s_state = State::PAIR;
+static State s_state = State::PAIR;
 
-uint8_t s_error_flags = 0;
+#define SENSOR_TYPE       1
+#define HARDWARE_REVISION 2
 
-SHT2xClass s_sht;
+static uint8_t s_error_flags = 0;
 
-Sensor_Comms s_comms;
+static SHT2x s_sht;
 
-FILE s_uart_output;
+static Sensor_Comms s_comms;
 
-uint32_t s_baseline_measurement_index = 0; //measurements should start from this index
-uint32_t s_first_stored_measurement_index = 0; //the index of the first measurement in storage
+static FILE s_uart_output;
 
-chrono::time_ms s_next_measurement_time_point;
-chrono::millis s_measurement_period;
+static uint32_t s_baseline_measurement_index = 0; //measurements should start from this index
+static uint32_t s_first_stored_measurement_index = 0; //the index of the first measurement in storage
 
-chrono::time_ms s_next_comms_time_point;
-chrono::millis s_comms_period;
+static chrono::time_ms s_next_measurement_time_point;
+static chrono::millis s_measurement_period;
 
-int8_t s_last_input_dBm = 0;
+static chrono::time_ms s_next_comms_time_point;
+static chrono::millis s_comms_period;
 
-Storage s_storage;
-data::sensor::Calibration s_calibration;
-uint32_t s_serial_number = 0;
-bool s_sensor_sleeping = false;
+static int8_t s_last_input_dBm = 0;
+
+static Storage s_storage;
+static data::sensor::Calibration s_calibration;
+static uint32_t s_serial_number = 0;
+static bool s_sensor_sleeping = false;
+
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -109,7 +115,7 @@ void wdt_init(void)
 extern uint8_t _end;
 extern uint8_t __stack;
 
-void stack_paint(void)
+static void stack_paint(void)
 {
     uint8_t *p = &_end;
 
@@ -120,12 +126,12 @@ void stack_paint(void)
     }  
 }
 
-uint16_t initial_stack_size(void)
+static uint16_t initial_stack_size(void)
 {
     return &__stack - &_end;
 }
 
-uint16_t stack_size(void)
+static uint16_t stack_size(void)
 {
     const uint8_t *p = &_end;
     uint16_t       c = 0;
@@ -141,7 +147,7 @@ uint16_t stack_size(void)
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-static constexpr size_t MAX_NAME_LENGTH = 32;
+static constexpr uint8_t MAX_NAME_LENGTH = 32;
 static constexpr uint8_t SETTINGS_VERSION = 2;
 
 static uint8_t  EEMEM eeprom_version;
@@ -150,12 +156,12 @@ static uint32_t EEMEM eeprom_address;
 static uint16_t EEMEM eeprom_temperature_bias;
 static uint16_t EEMEM eeprom_humidity_bias;
 
-void reset_settings()
+static void reset_settings()
 {
     eeprom_write_byte(&eeprom_version, 0);
 }
 
-void save_settings(uint32_t serial_number, uint32_t address, data::sensor::Calibration const& calibration)
+static void save_settings(uint32_t serial_number, uint32_t address, data::sensor::Calibration const& calibration)
 {
     eeprom_write_byte(&eeprom_version, SETTINGS_VERSION);
     eeprom_write_dword(&eeprom_serial_number, serial_number);
@@ -164,7 +170,7 @@ void save_settings(uint32_t serial_number, uint32_t address, data::sensor::Calib
     eeprom_write_word(&eeprom_humidity_bias, *reinterpret_cast<uint16_t const*>(&calibration.humidity_bias));
 }
 
-bool load_settings(uint32_t& serial_number, uint32_t& address, data::sensor::Calibration& calibration)
+static bool load_settings(uint32_t& serial_number, uint32_t& address, data::sensor::Calibration& calibration)
 {
     if (eeprom_read_byte(&eeprom_version) == SETTINGS_VERSION)
     {
@@ -186,14 +192,24 @@ bool load_settings(uint32_t& serial_number, uint32_t& address, data::sensor::Cal
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
+extern bool _i2c_init();
 
-void setup()
+static void setup()
 {
     int mcusr_value = MCUSR;
     MCUSR = 0;
 
     //setup serial.
-    Serial.begin(57600);
+    //Serial.begin(57600);
+    // Turn on the transmission/reception circuitry
+    UCSR0B |= (1 << RXEN0) | (1 <<TXEN0); 
+    // Load the lower 8 bits of the baud rate
+    UBRR0L = UBRRL_VALUE;
+    UBRR0H = UBRRH_VALUE;
+
+    fdev_setup_stream(&s_uart_output, uart_putchar, NULL, _FDEV_SETUP_WRITE);
+    stdout = &s_uart_output;
+    ///
 
     stack_paint();
     setup_clock(921600);
@@ -212,10 +228,7 @@ void setup()
 
     ////////////////////////////////////////////
 
-    fdev_setup_stream(&s_uart_output, uart_putchar, NULL, _FDEV_SETUP_WRITE);
-    stdout = &s_uart_output;
-
-    LOG(PSTR("******************** >> "));
+    LOG(PSTR("*** >> "));
     s_error_flags = 0;
     if (mcusr_value & (1<<PORF ))
     {
@@ -237,13 +250,16 @@ void setup()
         s_error_flags |= static_cast<uint8_t>(data::sensor::Measurement::Flag::REBOOT_WATCHDOG);
         LOG(PSTR("Watchdog reset!"));
     }
-    LOG(PSTR(" << ********************\n"));
+    LOG(PSTR(" << ***\n"));
 
     LOG(PSTR("Stack: initial %d, now: %d\n"), initial_stack_size(), stack_size());
 
     ///////////////////////////////////////////////
     //initialize the sensor
-    Wire.begin();
+    if (!_i2c_init())
+    {
+        LOG(PSTR("I2C failed\n"));
+    }
     sleep_exact(50);
 /*
     for (uint32_t i = 100; i < 100000; i += 100)
@@ -258,26 +274,27 @@ void setup()
     //seed the RNG
     uint32_t rnd_seed = 0;
     {
-        for (size_t i = 0; i < 20; i++)
+        float t;
+        float h;
+        for (uint8_t i = 0; i < 20; i++)
         {
-            float t;
-            float h;
-            s_sht.GetHumidity(t);
-            s_sht.GetTemperature(h);
-            hash_combine(rnd_seed, static_cast<uint32_t>(read_vcc() * 10000000.f));
-            hash_combine(rnd_seed, static_cast<uint32_t>(t * 10000000.f));
-            hash_combine(rnd_seed, static_cast<uint32_t>(h * 10000000.f));
+            s_sht.GetHumidity(h);
+            s_sht.GetTemperature(t);
+            float vcc = read_vcc();
+            hash_combine(rnd_seed, *reinterpret_cast<uint32_t*>(&vcc));
+            hash_combine(rnd_seed, *reinterpret_cast<uint32_t*>(&t));
+            hash_combine(rnd_seed, *reinterpret_cast<uint32_t*>(&h));
             sleep_exact(10);
         }
         srandom(rnd_seed);
         LOG(PSTR("Random seed: %lu\n"), rnd_seed);
     }
 
-    ///////////////////////////////////////////////
-    //setup SPI
-    pinMode(SS, OUTPUT);
-    digitalWrite(SS, HIGH);
-    sleep_exact(100);
+//    ///////////////////////////////////////////////
+//    //setup SPI
+//    pinMode(SS, OUTPUT);
+//    digitalWrite(SS, HIGH);
+//    sleep_exact(100);
     
     SPI.setDataMode(SPI_MODE0);
     SPI.setClockDivider(SPI_CLOCK_DIV2);
@@ -285,7 +302,7 @@ void setup()
 
     ///////////////////////////////////////////////
 
-    LOG(PSTR("Starting rfm22b setup..."));
+    LOG(PSTR("Starting RF setup..."));
     
     while (!s_comms.init(5, 15))
     {
@@ -293,7 +310,7 @@ void setup()
         blink_leds(RED_LED, 3, chrono::millis(100));
         sleep(chrono::seconds(5), false);
     }
-    s_comms.stand_by_mode();
+    s_comms.sleep_mode();
     LOG(PSTR("done\n"));
 
     ///////////////////////////////////////////////
@@ -321,7 +338,6 @@ void setup()
         if (ok)
         {
             s_comms.set_address(address);
-            LOG(PSTR("Loaded settings. Addr: %lu. S/N: %lx.\n"), address, s_serial_number);
             s_state = State::FIRST_CONFIG;
         }
         else
@@ -329,6 +345,11 @@ void setup()
             s_state = State::PAIR;
         }
     }
+
+    LOG(PSTR("Sensor Type: %d\n"), SENSOR_TYPE);
+    LOG(PSTR("Hardware Revision: %d\n"), HARDWARE_REVISION);
+    LOG(PSTR("Serial Number: %lx\n"), s_serial_number);
+    LOG(PSTR("Address: %lu\n"), s_comms.get_address());
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -391,8 +412,8 @@ static bool apply_config(const data::sensor::Config& config)
 
     s_comms.set_transmission_power(config.power);
 
-    LOG(PSTR("temp bias: %d.%d\n"), (int)(s_calibration.temperature_bias / 100.f), (int)(s_calibration.temperature_bias) % 100);
-    LOG(PSTR("humidity bias: %d.%d\n"), (int)(s_calibration.humidity_bias / 100.f), (int)(s_calibration.humidity_bias) % 100);
+    LOG(PSTR("temp bias: %d\n"), (int)(s_calibration.temperature_bias));
+    LOG(PSTR("humidity bias: %d\n"), (int)(s_calibration.humidity_bias));
     LOG(PSTR("next comms delay: %ld\n"), config.next_comms_delay.count);
     LOG(PSTR("comms period: %ld\n"), config.comms_period.count);
     LOG(PSTR("next measurement delay: %ld\n"), config.next_measurement_delay.count);
@@ -413,7 +434,7 @@ static bool request_config()
 {
     bool send_successful = false;
     {
-        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::sensor::Config_Request))];
+        uint8_t raw_buffer[packet_raw_size(sizeof(data::sensor::Config_Request))];
         s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::CONFIG_REQUEST));
         data::sensor::Config_Request req;
         req.first_measurement_index = s_first_stored_measurement_index;
@@ -421,14 +442,14 @@ static bool request_config()
         req.b2s_input_dBm = s_last_input_dBm;
         req.calibration = s_calibration;
         req.sleeping = s_sensor_sleeping;
-        s_comms.pack(raw_buffer, req);
+        s_comms.pack(raw_buffer, &req, sizeof(req));
         send_successful = s_comms.send_packet(raw_buffer, 2);
     }
 
     if (send_successful)
     {
         uint8_t size = sizeof(data::sensor::Config);
-        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(size)];
+        uint8_t raw_buffer[packet_raw_size(size)];
         uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, 500);
         if (buffer)
         {
@@ -448,13 +469,15 @@ static bool request_config()
 
 static void pair_state()
 {
+    LOG(PSTR(">>> Entering pair state\n"));
+    
     uint32_t addr = Sensor_Comms::PAIR_ADDRESS_BEGIN + random() % (Sensor_Comms::PAIR_ADDRESS_END - Sensor_Comms::PAIR_ADDRESS_BEGIN);
     s_comms.set_address(addr);
     s_comms.set_destination_address(Sensor_Comms::BASE_ADDRESS);
 
     LOG(PSTR("Starting pairing\n"));
 
-    s_comms.stand_by_mode();
+    s_comms.sleep_mode();
 
     wait_for_release(Button::BUTTON1);
     bool done = false;
@@ -474,16 +497,16 @@ static void pair_state()
 
                 LOG(PSTR("Sending request..."));
 
-                s_comms.idle_mode();
-
                 bool send_successful = false;
                 {
-                    uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::sensor::Pair_Request))];
+                    uint8_t raw_buffer[packet_raw_size(sizeof(data::sensor::Pair_Request))];
                     s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::PAIR_REQUEST));
                     data::sensor::Pair_Request request;
+                    request.sensor_type = SENSOR_TYPE;
+                    request.hardware_revision = HARDWARE_REVISION;
                     request.calibration = s_calibration;
                     request.serial_number = s_serial_number;
-                    s_comms.pack(raw_buffer, request);
+                    s_comms.pack(raw_buffer, &request, sizeof(request));
                     send_successful = s_comms.send_packet(raw_buffer, 2);
                 }
 
@@ -492,7 +515,7 @@ static void pair_state()
                     LOG(PSTR("done.\nWaiting for response..."));
 
                     uint8_t size = sizeof(data::sensor::Pair_Response);
-                    uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(size)];
+                    uint8_t raw_buffer[packet_raw_size(size)];
                     uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, 10000);
                     if (buffer)
                     {
@@ -502,7 +525,7 @@ static void pair_state()
                     if (buffer && size == sizeof(data::sensor::Pair_Response) && 
                           s_comms.get_rx_packet_type(buffer) == static_cast<uint8_t>(data::sensor::Type::PAIR_RESPONSE))
                     {
-                        s_comms.stand_by_mode();
+                        s_comms.sleep_mode();
                         s_last_input_dBm = s_comms.get_input_dBm();
 
                         const data::sensor::Pair_Response* response_ptr = reinterpret_cast<const data::sensor::Pair_Response*>(s_comms.get_rx_packet_payload(buffer));
@@ -519,7 +542,7 @@ static void pair_state()
                     }
                     else
                     {
-                        s_comms.stand_by_mode();
+                        s_comms.sleep_mode();
                         LOG(PSTR("timeout\n"));
                     }
                 }
@@ -530,7 +553,7 @@ static void pair_state()
                 blink_leds(RED_LED, 3, chrono::millis(500));
             }
 
-            s_comms.stand_by_mode();
+            s_comms.sleep_mode();
 
             blink_leds(YELLOW_LED, 3, chrono::millis(100));
             sleep(chrono::millis(2000), true);
@@ -554,7 +577,7 @@ static void pair_state()
         }
     }
 
-    s_comms.stand_by_mode();
+    s_comms.sleep_mode();
 
     blink_leds(GREEN_LED, 3, chrono::millis(500));
 
@@ -565,6 +588,8 @@ static void pair_state()
 
     //sleep a bit
     sleep(chrono::millis(1000 * 1), false);
+
+    LOG(PSTR("<<< Exiting pair state\n"));
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -584,8 +609,8 @@ static void do_measurement()
         LOG(PSTR("Measuring %d..."), tries);
         if (s_sht.GetTemperature(data.temperature) && s_sht.GetHumidity(data.humidity))
         {
-            data.temperature += static_cast<float>(s_calibration.temperature_bias) / 100.f;
-            data.humidity += static_cast<float>(s_calibration.humidity_bias) / 100.f;
+            data.temperature += static_cast<float>(s_calibration.temperature_bias) * 0.01f;
+            data.humidity += static_cast<float>(s_calibration.humidity_bias) * 0.01f;
             break;
         }
     } while (++tries < max_tries);
@@ -626,15 +651,13 @@ static void do_comms()
         LOG(PSTR("%d items to send\n"), count);
     }
 
-    s_comms.idle_mode();
-
     //send measurements
     if (count > 0)
     {
         const chrono::millis COMMS_SLOT_DURATION = chrono::millis(7000);
         chrono::time_ms start_tp = chrono::now();
 
-        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::sensor::Measurement_Batch))];
+        uint8_t raw_buffer[packet_raw_size(sizeof(data::sensor::Measurement_Batch))];
         data::sensor::Measurement_Batch& batch = *(data::sensor::Measurement_Batch*)s_comms.get_tx_packet_payload(raw_buffer);
 
         batch.start_index = s_first_stored_measurement_index;
@@ -709,7 +732,7 @@ static void do_comms()
     LOG(PSTR("done with batches\n"));
     request_config();
 
-    s_comms.stand_by_mode();
+    s_comms.sleep_mode();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -733,16 +756,17 @@ static bool request_first_config()
 {
     bool send_successful = false;
     {
-        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(sizeof(data::sensor::First_Config_Request))];
+        uint8_t raw_buffer[packet_raw_size(sizeof(data::sensor::First_Config_Request))];
         s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::FIRST_CONFIG_REQUEST));
-        s_comms.pack(raw_buffer, data::sensor::First_Config_Request());
+        data::sensor::First_Config_Request request;
+        s_comms.pack(raw_buffer, &request, sizeof(request));
         send_successful = s_comms.send_packet(raw_buffer, 2);
     }
 
     if (send_successful)
     {
         uint8_t size = sizeof(data::sensor::First_Config);
-        uint8_t raw_buffer[s_comms.get_payload_raw_buffer_size(size)];
+        uint8_t raw_buffer[packet_raw_size(size)];
         uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, 500);
         if (buffer)
         {
@@ -762,6 +786,8 @@ static bool request_first_config()
 
 static void first_config_state()
 {
+    LOG(PSTR(">>> Entering first config state\n"));
+    
     while (s_state == State::FIRST_CONFIG)
     {
         if (is_pressed(Button::BUTTON1))
@@ -777,7 +803,10 @@ static void first_config_state()
                     break;
                 }
             }
-            LOG(PSTR("...cancelled.\n"));
+            if (s_state == State::PAIR)
+            {
+                LOG(PSTR("...cancelled.\n"));
+            }
             continue;
         }      
 
@@ -785,9 +814,8 @@ static void first_config_state()
         sleep_exact(chrono::millis(100));
         set_leds(0);
 
-        s_comms.idle_mode();
         bool got_it = request_first_config();
-        s_comms.stand_by_mode();
+        s_comms.sleep_mode();
 
         if (got_it)
         {
@@ -805,12 +833,14 @@ static void first_config_state()
             sleep(chrono::millis(10000), true);
         }
     }
+    LOG(PSTR("<<< Exiting first config state\n"));
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
 static void measurement_loop_state()
 {
+    LOG(PSTR(">>> Entering measuring loop state\n"));
     while (true)
     { 
         bool force_comms = false;
@@ -902,14 +932,17 @@ static void measurement_loop_state()
         LOG(PSTR("Sleeping for %lu ms\n"), sleep_duration.count);
 
         chrono::micros remaining = sleep(sleep_duration, true);
-        LOG(PSTR("Woken up, remaining %lu ms\n"), remaining.count / 1000);
+        LOG(PSTR("Woken up, remaining %lu us\n"), remaining.count);
     }
+
+    LOG(PSTR("<<< Exiting measuring loop state\n"));
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
 static void sleep_loop_state()
 {
+    LOG(PSTR(">>> Entering sleep loop state\n"));
     //request the config again - this also informs the BS that we're sleeping
     request_config();
   
@@ -956,11 +989,13 @@ static void sleep_loop_state()
         chrono::millis remaining = chrono::millis(sleep(sleep_duration, true));
         LOG(PSTR("Woken up, remaining %lu ms\n"), remaining.count);
     }
+
+    LOG(PSTR("<<< Exiting sleep loop state\n"));
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-void loop()
+static void loop()
 {
     if (s_state == State::PAIR)
     {

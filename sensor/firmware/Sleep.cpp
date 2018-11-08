@@ -43,16 +43,16 @@ ISR(TIMER2_COMPA_vect)
     if (s_ocr2a == 0) 
     {
         constexpr uint32_t k_crystal_div = 1024; //the normal RTC div
-        static_assert(1900000ULL / (32768ULL / k_crystal_div) < 60000, "Overflow");
-        static_assert(500000ULL / (32768ULL / k_crystal_div) > 30, "Underflow");
+        static_assert(1900000ULL * k_crystal_div / 32768ULL < 60000, "Overflow");
+        static_assert(500000ULL * k_crystal_div / 32768ULL > 30, "Underflow");
         constexpr uint8_t k_min_v = 0;
         constexpr uint8_t k_max_v = 127;
       
         if ((TIFR1 & bit(TOV1)) == 0) //no overflow
         {
-            const uint16_t target = s_main_oscillator_frequency / (32768ULL / k_crystal_div);
-            const uint16_t margin = (target / 100) / 2; //0.5% on both sides
             uint16_t counter = TCNT1;
+            const uint16_t target = (s_main_oscillator_frequency * k_crystal_div) >> 15; //>> 15 is divided by 32768
+            const uint16_t margin = (target / 200); //0.5% on both sides
             if (counter > target + margin && OSCCAL > k_min_v) //too fast, decrease the OSCCAL
             {
                 OSCCAL--;
@@ -76,7 +76,7 @@ ISR(TIMER2_COMPA_vect)
 }
 
 volatile bool s_button_interrupt_fired = false;
-ISR(INT0_vect)
+static void button_interrupt()
 {
 //    for (volatile int i = 0; i < 200; i++)
 //      digitalWrite(RED_LED_PIN, HIGH);
@@ -97,6 +97,8 @@ ISR(INT0_vect)
 
 void setup_clock(uint32_t freq)
 {
+    attachInterrupt(digitalPinToInterrupt(static_cast<uint8_t>(Button::BUTTON1)), &button_interrupt, FALLING);
+  
     //main clock, ~1Mhz
     clock_prescale_set(clock_div_8);
 
@@ -127,9 +129,9 @@ void setup_clock(uint32_t freq)
     ENABLE_INTR();
 
     //button 0 interrupt - falling edge
-    EICRA &= ~(bit(ISC00) | bit(ISC01));
-    EICRA |= bit(ISC01);
-    EIMSK |= bit(INT0);
+    //EICRA &= ~(bit(ISC00) | bit(ISC01));
+    //EICRA |= bit(ISC01);
+    //EIMSK |= bit(INT0);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////

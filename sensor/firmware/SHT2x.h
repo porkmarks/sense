@@ -32,7 +32,8 @@
 
 #include <inttypes.h>
 
-typedef enum {
+typedef enum 
+{
     eSHT2xAddress = 0x40,
 } HUM_SENSOR_T;
 
@@ -43,7 +44,7 @@ typedef enum {
     eRHumidityNoHoldCmd = 0xF5,
 } HUM_MEASUREMENT_CMD_T;
 
-class SHT2xClass
+class SHT2x
 {
 public:
     bool GetHumidity(float& value);
@@ -52,7 +53,5 @@ public:
 private:
     bool readSensor(uint8_t command, uint16_t& result);
 };
-
-extern SHT2xClass SHT2x;
 
 #endif

@@ -22,11 +22,13 @@ struct Item8
     //humidity is very unstable so allocate more bits
     uint8_t m_humidity_delta : 4;
     static constexpr float HUMIDITY_SCALE = 2.f;
+    static constexpr float HUMIDITY_INV_SCALE = 1.f / HUMIDITY_SCALE;
     static constexpr float MAX_HUMIDITY_DELTA = 3.75f; //+-
 
     //temp is pretty stable.
     uint8_t m_temperature_delta : 3;
     static constexpr float TEMPERATURE_SCALE = 5.f;
+    static constexpr float TEMPERATURE_INV_SCALE = 1.f / TEMPERATURE_SCALE;
     static constexpr float MAX_TEMPERATURE_DELTA = 0.7f;//+-
 
     typedef Storage::Data Data;
@@ -39,8 +41,10 @@ struct Item16
     uint16_t m_is_16 : 1;
     uint16_t m_humidity : 8; //absolute value, not a delta
     static constexpr float HUMIDITY_SCALE = 2.55f;
+    static constexpr float HUMIDITY_INV_SCALE = 1.f / HUMIDITY_SCALE;
     uint16_t m_temperature_delta : 7;
     static constexpr float TEMPERATURE_SCALE = 5.f;
+    static constexpr float TEMPERATURE_INV_SCALE = 1.f / TEMPERATURE_SCALE;
     static constexpr float MAX_TEMPERATURE_DELTA = 12.7f;//+-
 
     typedef Storage::Data Data;
@@ -82,9 +86,9 @@ bool Item8::pack(const Data& last_data, const Data& data)
 Item8::Data Item8::unpack(const Data& last_data) const
 {
     Data data;
-    float dt = static_cast<float>(m_temperature_delta) / TEMPERATURE_SCALE - MAX_TEMPERATURE_DELTA;
+    float dt = static_cast<float>(m_temperature_delta) * TEMPERATURE_INV_SCALE - MAX_TEMPERATURE_DELTA;
     data.temperature = last_data.temperature + dt;
-    float dh = static_cast<float>(m_humidity_delta) / HUMIDITY_SCALE - MAX_HUMIDITY_DELTA;
+    float dh = static_cast<float>(m_humidity_delta) * HUMIDITY_INV_SCALE - MAX_HUMIDITY_DELTA;
     data.humidity = last_data.humidity + dh;
     return data;
 }
@@ -107,24 +111,21 @@ bool Item16::pack(const Data& last_data, const Data& data)
 Item16::Data Item16::unpack(const Data& last_data) const
 {
     Data data;
-    float dt = static_cast<float>(m_temperature_delta) / TEMPERATURE_SCALE - MAX_TEMPERATURE_DELTA;
+    float dt = static_cast<float>(m_temperature_delta) * TEMPERATURE_INV_SCALE - MAX_TEMPERATURE_DELTA;
     data.temperature = last_data.temperature + dt;
-    data.humidity = static_cast<float>(m_humidity) / HUMIDITY_SCALE;
+    data.humidity = static_cast<float>(m_humidity) * HUMIDITY_INV_SCALE;
     return data;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static constexpr float GROUP_VCC_BIAS = 2.f;
-static constexpr float GROUP_VCC_SCALE = 100.f;
-static constexpr float GROUP_MIN_VCC = 2.f;
-static constexpr float GROUP_MAX_VCC = 4.5f;
-
 static constexpr float GROUP_HUMIDITY_SCALE = 2.55f;
+static constexpr float GROUP_HUMIDITY_INV_SCALE = 1.f / GROUP_HUMIDITY_SCALE;
 static constexpr float GROUP_MIN_HUMIDITY = 0.f;
 static constexpr float GROUP_MAX_HUMIDITY = 100.f;
 
 static constexpr float GROUP_TEMPERATURE_SCALE = 100.f;
+static constexpr float GROUP_TEMPERATURE_INV_SCALE = 1.f / GROUP_TEMPERATURE_SCALE;
 static constexpr float GROUP_MIN_TEMPERATURE = -60.f;
 static constexpr float GROUP_MAX_TEMPERATURE = 80.f;
 
@@ -144,8 +145,8 @@ void Storage::Group::pack(const Data& data)
 Storage::Data Storage::Group::unpack() const
 {
     Data data;
-    data.humidity = static_cast<float>(m_humidity) / GROUP_HUMIDITY_SCALE;
-    data.temperature = static_cast<float>(m_temperature) / GROUP_TEMPERATURE_SCALE;
+    data.humidity = static_cast<float>(m_humidity) * GROUP_HUMIDITY_INV_SCALE;
+    data.temperature = static_cast<float>(m_temperature) * GROUP_TEMPERATURE_INV_SCALE;
     return data;
 }
 

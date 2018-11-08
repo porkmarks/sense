@@ -139,10 +139,12 @@ static_assert(sizeof(Response) == 2, "");
 
 struct Pair_Request
 {
-    Calibration calibration;
+    uint8_t sensor_type = 0;
+    uint8_t hardware_revision = 0;
     uint32_t serial_number;
+    Calibration calibration;
 };
-static_assert(sizeof(Pair_Request) == 8, "");
+static_assert(sizeof(Pair_Request) == 10, "");
 
 struct Pair_Response
 {

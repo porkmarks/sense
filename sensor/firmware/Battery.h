@@ -1,6 +1,6 @@
 #pragma once
 
-inline float read_vcc()
+float read_vcc()
 {
     // Read 1.1V reference against AVcc
     // set the reference to Vcc and the measurement to the internal 1.1V reference

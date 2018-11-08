@@ -78,7 +78,7 @@ private:
 
     bool _unpack_next(iterator& it) const;
 
-    static constexpr uint8_t MAX_GROUP_COUNT = 28;
+    static constexpr uint8_t MAX_GROUP_COUNT = 30;
 
     static_assert(sizeof(Group) == 37, "Storage::Group is broken");
 
