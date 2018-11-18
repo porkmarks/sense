@@ -182,6 +182,7 @@ void Server::start_accept()
     LOGI << "Started accepting connections." << std::endl;
     try
     {
+        m_is_connected = false;
         m_is_accepting = true;
         m_socket.close();
         m_acceptor->async_accept(m_socket, std::bind(&Server::accept_func, this, std::placeholders::_1));
@@ -271,8 +272,19 @@ void Server::broadcast_thread_func()
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-bool Server::send_sensor_message(Sensor_Request const& request, Sensor_Response& response)
+bool Server::is_connected() const
 {
+    return m_is_connected;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+Server::Result Server::send_sensor_message(Sensor_Request const& request, Sensor_Response& response)
+{
+    if (!is_connected())
+    {
+        return Result::Connection_Error;
+    }
     std::array<uint8_t, 1024> buffer;
     size_t offset = 0;
     uint32_t req_id = m_last_request_id++;
@@ -309,7 +321,7 @@ bool Server::send_sensor_message(Sensor_Request const& request, Sensor_Response&
 
         if (!ok || !has_response)
         {
-            return false;
+            return Result::Ok;
         }
 
         uint32_t payload_size = 0;
@@ -323,14 +335,10 @@ bool Server::send_sensor_message(Sensor_Request const& request, Sensor_Response&
             response.payload.resize(payload_size);
             ok &= unpack(buffer, response.payload.data(), payload_size, offset);
         }
-        return ok;
+        return ok ? Result::Has_Response : Result::Data_Error;
     }
-    else
-    {
-        std::cout << " ...timeout!" << std::endl;
-    }
-
-    return false;
+    std::cout << " ...timeout!" << std::endl;
+    return Result::Timeout_Error;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////

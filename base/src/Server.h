@@ -20,6 +20,8 @@ public:
 
     bool init(uint16_t comms_port, uint16_t broadcast_port);
 
+    bool is_connected() const;
+
     struct Sensor_Request
     {
         uint8_t type = 0;
@@ -36,7 +38,16 @@ public:
         std::vector<uint8_t> payload;
     };
 
-    bool send_sensor_message(Sensor_Request const& request, Sensor_Response& response);
+    enum class Result
+    {
+        Ok,
+        Has_Response,
+        Data_Error,
+        Timeout_Error,
+        Connection_Error
+    };
+
+    Result send_sensor_message(Sensor_Request const& request, Sensor_Response& response);
     void process();
 
 private:
