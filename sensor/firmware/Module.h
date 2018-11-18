@@ -1,9 +1,12 @@
-#ifndef _LORALIB_MODULE_H
-#define _LORALIB_MODULE_H
+#pragma once
 
-#include <SPI.h>
-
+//#include <SPI.h>
+#include <stdint.h>
 #include "TypeDef.h"
+
+#ifdef RASPBERRY_PI
+#   include <spi.h>
+#endif
 
 #define SPI_READ  0b00000000
 #define SPI_WRITE 0b10000000
@@ -38,7 +41,8 @@ class Module {
     int _cs;
     int _int0;
     int _int1;
+#ifdef RASPBERRY_PI
+    SPI _spi;
+#endif
 
 };
-
-#endif

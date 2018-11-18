@@ -6,6 +6,7 @@
 #include <avr/pgmspace.h>
 #include <avr/wdt.h>
 #include <avr/power.h>
+#include <compat/deprecated.h>
 
 #include "SPI.h"
 #include "LEDs.h"
@@ -16,6 +17,7 @@
 #include "avr_stdio.h"
 #include "Storage.h"
 #include "Sleep.h"
+#include "digitalWriteFast.h"
 
 #define BAUD 57600
 #include <util/setbaud.h>
@@ -62,7 +64,8 @@ enum class State : uint8_t
 static State s_state = State::PAIR;
 
 #define SENSOR_TYPE       1
-#define HARDWARE_REVISION 2
+#define HARDWARE_VERSION  2
+#define SOFTWARE_VERSION  2
 
 static uint8_t s_error_flags = 0;
 
@@ -93,13 +96,13 @@ static bool s_sensor_sleeping = false;
 
 ISR(BADISR_vect)
 {
-    digitalWrite(GREEN_LED_PIN, LOW);
+    digitalWriteFast(GREEN_LED_PIN, LOW);
     while (true)
     {
-        digitalWrite(RED_LED_PIN, HIGH);
-        delay(5);
-        digitalWrite(RED_LED_PIN, LOW);
-        delay(95);
+        digitalWriteFast(RED_LED_PIN, HIGH);
+        chrono::delay(chrono::millis(5));
+        digitalWriteFast(RED_LED_PIN, LOW);
+        chrono::delay(chrono::millis(95));
     }
 }
 
@@ -203,7 +206,6 @@ static void setup()
     //Serial.begin(57600);
     // Turn on the transmission/reception circuitry
     UCSR0B |= (1 << RXEN0) | (1 <<TXEN0); 
-    // Load the lower 8 bits of the baud rate
     UBRR0L = UBRRL_VALUE;
     UBRR0H = UBRRH_VALUE;
 
@@ -213,24 +215,26 @@ static void setup()
 
     stack_paint();
     setup_clock(921600);
-    delay(1000); //wait for the clock to stablize
+    
+    chrono::delay(chrono::millis(1000)); //wait for the main clock to get calibrated
 
     ///////////////////////////////////////////////
     //setup the led pins
-    pinMode(RED_LED_PIN, OUTPUT);
-    digitalWrite(RED_LED_PIN, LOW);
-    pinMode(GREEN_LED_PIN, OUTPUT);
-    digitalWrite(GREEN_LED_PIN, LOW);
+    pinModeFast(RED_LED_PIN, OUTPUT);
+    digitalWriteFast(RED_LED_PIN, LOW);
+    pinModeFast(GREEN_LED_PIN, OUTPUT);
+    digitalWriteFast(GREEN_LED_PIN, LOW);
 
     ///////////////////////////////////////////////
     //setup buttons
-    pinMode(static_cast<uint8_t>(Button::BUTTON1), INPUT_PULLUP);
+    pinModeFast(static_cast<uint8_t>(Button::BUTTON1), INPUT);
+    digitalWriteFast(static_cast<uint8_t>(Button::BUTTON1), HIGH);
 
     ////////////////////////////////////////////
 
     LOG(PSTR("*** >> "));
     s_error_flags = 0;
-    if (mcusr_value & (1<<PORF ))
+    if (mcusr_value & (1<<PORF))
     {
         s_error_flags |= static_cast<uint8_t>(data::sensor::Measurement::Flag::REBOOT_POWER_ON);
         LOG(PSTR("Power-on reset."));
@@ -240,12 +244,12 @@ static void setup()
         s_error_flags |= static_cast<uint8_t>(data::sensor::Measurement::Flag::REBOOT_RESET);
         LOG(PSTR("External reset!"));
     }
-    if (mcusr_value & (1<<BORF ))
+    if (mcusr_value & (1<<BORF))
     {
         s_error_flags |= static_cast<uint8_t>(data::sensor::Measurement::Flag::REBOOT_BROWNOUT);
         LOG(PSTR("Brownout reset!"));
     }
-    if (mcusr_value & (1<<WDRF ))
+    if (mcusr_value & (1<<WDRF))
     {
         s_error_flags |= static_cast<uint8_t>(data::sensor::Measurement::Flag::REBOOT_WATCHDOG);
         LOG(PSTR("Watchdog reset!"));
@@ -261,6 +265,8 @@ static void setup()
         LOG(PSTR("I2C failed\n"));
     }
     sleep_exact(50);
+
+    init_adc();
 /*
     for (uint32_t i = 100; i < 100000; i += 100)
     {
@@ -289,17 +295,24 @@ static void setup()
         srandom(rnd_seed);
         LOG(PSTR("Random seed: %lu\n"), rnd_seed);
     }
+    //while (true);
 
+    {
+        float t;
+        float h;
+        s_sht.GetHumidity(h);
+        s_sht.GetTemperature(t);
+        float vcc = read_vcc();      
+        LOG(PSTR("VCC: %d.%dV\n"), (int)vcc, int(vcc * 100.f) % 100);
+        LOG(PSTR("T: %d.%d'C\n"), (int)t, int(t * 100.f) % 100);
+        LOG(PSTR("H: %d.%d%%\n"), (int)h, int(h * 100.f) % 100);
+    }
 //    ///////////////////////////////////////////////
 //    //setup SPI
-//    pinMode(SS, OUTPUT);
-//    digitalWrite(SS, HIGH);
+//    pinModeFast(SS, OUTPUT);
+//    digitalWriteFast(SS, HIGH);
 //    sleep_exact(100);
     
-    SPI.setDataMode(SPI_MODE0);
-    SPI.setClockDivider(SPI_CLOCK_DIV2);
-    SPI.begin();
-
     ///////////////////////////////////////////////
 
     LOG(PSTR("Starting RF setup..."));
@@ -312,6 +325,15 @@ static void setup()
     }
     s_comms.sleep_mode();
     LOG(PSTR("done\n"));
+
+    //send some test garbage for frequency measurements
+    {
+        uint8_t raw_packet_data[packet_raw_size(Sensor_Comms::MAX_USER_DATA_SIZE)];
+        s_comms.set_destination_address(Sensor_Comms::BROADCAST_ADDRESS);
+        s_comms.begin_packet(raw_packet_data, 0);
+        s_comms.send_packet(raw_packet_data, 2);
+    }
+
 
     ///////////////////////////////////////////////
     //done
@@ -347,7 +369,8 @@ static void setup()
     }
 
     LOG(PSTR("Sensor Type: %d\n"), SENSOR_TYPE);
-    LOG(PSTR("Hardware Revision: %d\n"), HARDWARE_REVISION);
+    LOG(PSTR("Hardware Version: %d\n"), HARDWARE_VERSION);
+    LOG(PSTR("Software Version: %d\n"), SOFTWARE_VERSION);
     LOG(PSTR("Serial Number: %lx\n"), s_serial_number);
     LOG(PSTR("Address: %lu\n"), s_comms.get_address());
 }
@@ -502,10 +525,11 @@ static void pair_state()
                     uint8_t raw_buffer[packet_raw_size(sizeof(data::sensor::Pair_Request))];
                     s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::PAIR_REQUEST));
                     data::sensor::Pair_Request request;
-                    request.sensor_type = SENSOR_TYPE;
-                    request.hardware_revision = HARDWARE_REVISION;
+                    request.descriptor.sensor_type = SENSOR_TYPE;
+                    request.descriptor.hardware_version = HARDWARE_VERSION;
+                    request.descriptor.software_version = SOFTWARE_VERSION;
+                    request.descriptor.serial_number = s_serial_number;
                     request.calibration = s_calibration;
-                    request.serial_number = s_serial_number;
                     s_comms.pack(raw_buffer, &request, sizeof(request));
                     send_successful = s_comms.send_packet(raw_buffer, 2);
                 }
@@ -563,14 +587,14 @@ static void pair_state()
         {
             LOG(PSTR("Going to sleep..."));
 
-            fade_out_leds(YELLOW_LED, chrono::millis(1000));
+            //fade_out_leds(YELLOW_LED, chrono::millis(1000));
 
             //the user didn't press it - sleep for a loooong time
             sleep(chrono::seconds(3600ULL * 24ULL), true);
 
             LOG(PSTR("woke up.\n"));
 
-            fade_in_leds(YELLOW_LED, chrono::millis(1000));
+            //fade_in_leds(YELLOW_LED, chrono::millis(1000));
 
             //we probably woken up because the user pressed the button - wait for him to release it
             wait_for_release(Button::BUTTON1);
@@ -759,6 +783,10 @@ static bool request_first_config()
         uint8_t raw_buffer[packet_raw_size(sizeof(data::sensor::First_Config_Request))];
         s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::FIRST_CONFIG_REQUEST));
         data::sensor::First_Config_Request request;
+        request.descriptor.sensor_type = SENSOR_TYPE;
+        request.descriptor.hardware_version = HARDWARE_VERSION;
+        request.descriptor.software_version = SOFTWARE_VERSION;
+        request.descriptor.serial_number = s_serial_number;
         s_comms.pack(raw_buffer, &request, sizeof(request));
         send_successful = s_comms.send_packet(raw_buffer, 2);
     }
@@ -803,7 +831,7 @@ static void first_config_state()
                     break;
                 }
             }
-            if (s_state == State::PAIR)
+            if (s_state == State::FIRST_CONFIG)
             {
                 LOG(PSTR("...cancelled.\n"));
             }
@@ -995,27 +1023,33 @@ static void sleep_loop_state()
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-static void loop()
+int main()
 {
-    if (s_state == State::PAIR)
+    setup();
+    
+    while (true)
     {
-        pair_state();
-    }
-    else if (s_state == State::FIRST_CONFIG)
-    {
-        first_config_state();
-    }
-    else if (s_state == State::MEASUREMENT_LOOP)
-    {
-        measurement_loop_state();
-    }
-    else if (s_state == State::SLEEPING_LOOP)
-    {
-        sleep_loop_state();
-    }
-    else
-    {
-        blink_leds(RED_LED, 2, chrono::millis(50));
-        sleep(chrono::millis(1000), true);
+        if (s_state == State::PAIR)
+        {
+            pair_state();
+        }
+        else if (s_state == State::FIRST_CONFIG)
+        {
+            first_config_state();
+        }
+        else if (s_state == State::MEASUREMENT_LOOP)
+        {
+            measurement_loop_state();
+        }
+        else if (s_state == State::SLEEPING_LOOP)
+        {
+            sleep_loop_state();
+        }
+        else
+        {
+            blink_leds(RED_LED, 2, chrono::millis(50));
+            sleep(chrono::millis(1000), true);
+        }      
     }
 }
+

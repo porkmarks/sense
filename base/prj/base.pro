@@ -1,5 +1,5 @@
 TEMPLATE = app
-CONFIG += console c++11
+CONFIG += console c++14
 CONFIG -= app_bundle
 CONFIG -= qt
 
@@ -58,13 +58,15 @@ HEADERS += \
     ../src/Scheduler.h \
     ../src/Sensors.h \
     ../src/Server.h \
-    ../../common/src/rfm22b_spi.h \
-    ../../sensor/firmware/rfm22b.h \
-    ../../sensor/firmware/rfm22b_enums.h \
     ../../sensor/firmware/Sensor_Comms.h \
     ../../sensor/firmware/CRC.h \
     ../../sensor/firmware/Storage.h \
-    ../src/Log.h
+    ../src/Log.h \
+    ../../common/src/spi.h \
+    ../../sensor/firmware/LoRaLib.h \
+    ../../sensor/firmware/Module.h \
+    ../../sensor/firmware/RFM95.h \
+    ../../sensor/firmware/TypeDef.h
 
 SOURCES += \
     ../src/main.cpp \
@@ -74,8 +76,9 @@ SOURCES += \
     ../src/tests.cpp \
     ../src/command.c \
     ../src/pigpio.c \
-    ../../common/src/rfm22b_spi.cpp \
-    ../../sensor/firmware/rfm22b.cpp \
     ../../sensor/firmware/Sensor_Comms.cpp \
     ../../sensor/firmware/CRC.cpp \
-    ../../sensor/firmware/Storage.cpp
+    ../../sensor/firmware/Storage.cpp \
+    ../../common/src/spi.cpp \
+    ../../sensor/firmware/Module.cpp \
+    ../../sensor/firmware/RFM95.cpp

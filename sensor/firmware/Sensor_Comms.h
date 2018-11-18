@@ -33,6 +33,9 @@ public:
     static constexpr uint32_t SLAVE_ADDRESS_BEGIN = PAIR_ADDRESS_END + 1;
     static constexpr uint32_t SLAVE_ADDRESS_END = BASE_ADDRESS - 1;
 
+    static constexpr uint8_t MAX_USER_DATA_SIZE = 128 - sizeof(Sensor_Comms::Header);
+
+
     bool init(uint8_t retries, uint8_t power);
 
     void set_transmission_power(uint8_t power);
@@ -58,17 +61,6 @@ public:
     int8_t get_input_dBm();
     uint8_t get_rx_packet_type(uint8_t* received_buffer) const;
     const void* get_rx_packet_payload(uint8_t* received_buffer) const;
-
-    static constexpr uint8_t MAX_USER_DATA_SIZE = 128 - sizeof(Sensor_Comms::Header);
-
-    static constexpr uint32_t BROADCAST_ADDRESS = 0;
-    static constexpr uint32_t BASE_ADDRESS = 0xFFFFFFFFULL;
-
-    static constexpr uint32_t PAIR_ADDRESS_BEGIN = BROADCAST_ADDRESS + 1;
-    static constexpr uint32_t PAIR_ADDRESS_END = PAIR_ADDRESS_BEGIN + 1000;
-
-    static constexpr uint32_t SLAVE_ADDRESS_BEGIN = PAIR_ADDRESS_END + 1;
-    static constexpr uint32_t SLAVE_ADDRESS_END = BASE_ADDRESS - 1;
 
 private:
     Module m_module;

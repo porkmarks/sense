@@ -1,28 +1,19 @@
-#ifndef _LORALIB_TYPES_H
-#define _LORALIB_TYPES_H
-
-#if ARDUINO >= 100
-  #include "Arduino.h"
-#else
-  #include "WProgram.h"
-#endif
+#pragma once
 
 //#define KITELIB_DEBUG
 
 #ifdef KITELIB_DEBUG
-  #define DEBUG_BEGIN(x)                Serial.begin (x)
-  #define DEBUG_PRINT(x)                Serial.print (x)
-  #define DEBUG_PRINT_BIN(x)            Serial.print (x, BIN)
-  #define DEBUG_PRINTLN_BIN(x)          Serial.println (x, BIN)
-  #define DEBUG_PRINT_DEC(x)            Serial.print (x, DEC)
-  #define DEBUG_PRINTLN_DEC(x)          Serial.println (x, DEC)
-  #define DEBUG_PRINT_HEX(x)            Serial.print (x, HEX)
-  #define DEBUG_PRINTLN_HEX(x)          Serial.println (x, HEX)
-  #define DEBUG_PRINTLN(x)              Serial.println (x)
-  #define DEBUG_PRINT_STR(x)            Serial.print (F(x))
-  #define DEBUG_PRINTLN_STR(x)          Serial.println (F(x))
+  #define DEBUG_PRINT(x)                printf_P(PSTR("%s"), x)
+  #define DEBUG_PRINT_BIN(x)            printf_P(PSTR("%d"), x)
+  #define DEBUG_PRINTLN_BIN(x)          printf_P(PSTR("%d\n"), int(x))
+  #define DEBUG_PRINT_DEC(x)            printf_P(PSTR("%d"), int(x))
+  #define DEBUG_PRINTLN_DEC(x)          printf_P(PSTR("%d\n"), int(x))
+  #define DEBUG_PRINT_HEX(x)            printf_P(PSTR("%x"), int(x))
+  #define DEBUG_PRINTLN_HEX(x)          printf_P(PSTR("%x\n"), int(x))
+  #define DEBUG_PRINTLN(x)              printf_P(PSTR("%s\n"), (x))
+  #define DEBUG_PRINT_STR(x)            printf_P(PSTR("%s"), (x))
+  #define DEBUG_PRINTLN_STR(x)          printf_P(PSTR("%s\n"), (x))
 #else
-  #define DEBUG_BEGIN(x)
   #define DEBUG_PRINT(x)
   #define DEBUG_PRINT_BIN(x)
   #define DEBUG_PRINTLN_BIN(x)
@@ -70,5 +61,3 @@
 #define ERR_INVALID_RX_BANDWIDTH              -22
 #define ERR_INVALID_FREQUENCY_DEVIATION       -23
 #define ERR_INVALID_SYNC_WORD                 -24
-
-#endif

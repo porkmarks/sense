@@ -118,10 +118,19 @@ struct Config
 };
 static_assert(sizeof(Config) == 30, "");
 
+struct Descriptor
+{
+    uint8_t sensor_type = 0;
+    uint8_t hardware_version = 0;
+    uint8_t software_version = 0;
+    uint32_t serial_number;
+};
+
 struct First_Config_Request
 {
+    Descriptor descriptor;
 };
-static_assert(sizeof(First_Config_Request) == 1, "");
+static_assert(sizeof(First_Config_Request) == 7, "");
 
 struct First_Config
 {
@@ -139,12 +148,10 @@ static_assert(sizeof(Response) == 2, "");
 
 struct Pair_Request
 {
-    uint8_t sensor_type = 0;
-    uint8_t hardware_revision = 0;
-    uint32_t serial_number;
+    Descriptor descriptor;
     Calibration calibration;
 };
-static_assert(sizeof(Pair_Request) == 10, "");
+static_assert(sizeof(Pair_Request) == 11, "");
 
 struct Pair_Response
 {

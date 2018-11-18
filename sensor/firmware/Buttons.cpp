@@ -1,9 +1,10 @@
 #include "Buttons.h"
 #include "Sleep.h"
+#include "Arduino_Compat.h"
 
 bool is_pressed(Button b)
 {
-    return digitalRead(static_cast<uint8_t>(b)) == LOW;
+    return digitalReadFast(static_cast<uint8_t>(b)) == LOW;
 }
 void wait_for_press(Button b)
 {

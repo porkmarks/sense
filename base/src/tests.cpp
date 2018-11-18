@@ -44,12 +44,6 @@ static bool check_equal(const Storage& storage, const std::vector<Storage::Data>
             //std::cout << data_idx << ": Humidity delta too big: " << humidity_delta << ".\n";
             return false;
         }
-        float vcc_delta = std::abs(data.vcc - ref_data.vcc);
-        if (it.offset == 0 && vcc_delta > VCC_ACCURACY)
-        {
-            //std::cout << data_idx << ": VCC delta too big: " << vcc_delta << ".\n";
-            return false;
-        }
 
         data_idx++;
     }
@@ -103,7 +97,6 @@ static void test_storage_operations()
     Storage::Data data;
     data.temperature = 50.f;
     data.humidity = 50.f;
-    data.vcc = 4.2f;
 
     //add one group
     storage.push_back(data);
@@ -156,7 +149,6 @@ static void test_storage_accuracy()
     Data last_data;
     last_data.temperature = randposf() * 80.f;
     last_data.humidity = randposf() * 100.f;
-    last_data.vcc = randposf() * 4.2f;
 
     size_t min_items = std::numeric_limits<size_t>::max();
     size_t max_items = std::numeric_limits<size_t>::lowest();
@@ -175,9 +167,6 @@ static void test_storage_accuracy()
 
             last_data.humidity += randf() * MAX_HUMIDITY_VARIATION;
             last_data.humidity = std::min(std::max(last_data.humidity, 0.f), 100.f);
-
-            last_data.vcc += randf() * MAX_VCC_VARIATION;
-            last_data.vcc = std::min(std::max(last_data.vcc, 2.f), 4.5f);
 
             bool ok = storage.push_back(last_data);
             if (ok)

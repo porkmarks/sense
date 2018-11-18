@@ -87,8 +87,10 @@
 #define _SOFTI2C_H   1
 
 #include <avr/io.h>
-#include <Arduino.h>
+//#include <Arduino.h>
 #include <util/twi.h>
+#include "Arduino_Compat.h"
+#include "Chrono.h"
 
 #pragma GCC diagnostic push
 
@@ -130,7 +132,7 @@ uint8_t __attribute__ ((noinline)) i2c_read(bool last) __attribute__ ((used));
 
 // If you want to use the TWI hardeware, you have to define I2C_HARDWARE to be 1
 #ifndef I2C_HARDWARE
-#define I2C_HARDWARE 1
+#define I2C_HARDWARE 0
 #endif
 
 #if I2C_HARDWARE
@@ -311,11 +313,11 @@ bool i2c_init(void)
 #if I2C_HARDWARE
 {
 #if I2C_PULLUP
-  digitalWrite(SDA, 1);
-  digitalWrite(SCL, 1);
+  digitalWriteFast(SDA, 1);
+  digitalWriteFast(SCL, 1);
 #else
-  digitalWrite(SDA, 0);
-  digitalWrite(SCL, 0);
+  digitalWriteFast(SDA, 0);
+  digitalWriteFast(SCL, 0);
 #endif
 #if ((I2C_CPUFREQ/SCL_CLOCK)-16)/2 < 250
   TWSR = 0;                         /* no prescaler */
@@ -324,7 +326,7 @@ bool i2c_init(void)
   TWSR = (1<<TWPS0); // prescaler is 4
   TWBR = ((I2C_CPUFREQ/SCL_CLOCK)-16)/8;
 #endif
-  return (digitalRead(SDA) != 0 && digitalRead(SCL) != 0);
+  return (digitalReadFast(SDA) != 0 && digitalReadFast(SCL) != 0);
 }
 #else
 {
@@ -363,7 +365,7 @@ bool  i2c_start(uint8_t addr)
 {
   uint8_t   twst;
 #if I2C_TIMEOUT
-  uint32_t start = millis();
+  auto start = chrono::now();
 #endif
 
   // send START condition
@@ -372,7 +374,7 @@ bool  i2c_start(uint8_t addr)
   // wait until transmission completed
   while(!(TWCR & (1<<TWINT))) {
 #if I2C_TIMEOUT
-    if (millis() - start > I2C_TIMEOUT) return false;
+    if ((chrono::now() - start).count > I2C_TIMEOUT) return false;
 #endif
   }
 
@@ -387,7 +389,7 @@ bool  i2c_start(uint8_t addr)
   // wail until transmission completed and ACK/NACK has been received
   while(!(TWCR & (1<<TWINT))) {
 #if I2C_TIMEOUT
-    if (millis() - start > I2C_TIMEOUT) return false;
+    if ((chrono::now() - start).count > I2C_TIMEOUT) return false;
 #endif
   }
 
@@ -470,7 +472,7 @@ bool  i2c_start_wait(uint8_t addr)
   uint8_t   twst;
   uint16_t maxwait = I2C_MAXWAIT;
 #if I2C_TIMEOUT
-  uint32_t start = millis();
+  auto start = chrono::now();
 #endif
 
   while (true) {
@@ -480,7 +482,7 @@ bool  i2c_start_wait(uint8_t addr)
     // wait until transmission completed
     while(!(TWCR & (1<<TWINT))) {
 #if I2C_TIMEOUT
-    if (millis() - start > I2C_TIMEOUT) return false;
+    if ((chrono::now() - start).count > I2C_TIMEOUT) return false;
 #endif
     }
 
@@ -495,7 +497,7 @@ bool  i2c_start_wait(uint8_t addr)
     // wail until transmission completed
     while(!(TWCR & (1<<TWINT))) {
 #if I2C_TIMEOUT
-      if (millis() - start > I2C_TIMEOUT) return false;
+      if ((chrono::now() - start).count > I2C_TIMEOUT) return false;
 #endif
     }
 
@@ -509,7 +511,7 @@ bool  i2c_start_wait(uint8_t addr)
 	// wait until stop condition is executed and bus released
 	while(TWCR & (1<<TWSTO)) {
 #if I2C_TIMEOUT
-	  if (millis() - start > I2C_TIMEOUT) return false;
+	  if ((chrono::now() - start).count > I2C_TIMEOUT) return false;
 #endif
 	}
 
@@ -570,7 +572,7 @@ void  i2c_stop(void)
 #if I2C_HARDWARE
 {
 #if I2C_TIMEOUT
-  uint32_t start = millis();
+  auto start = chrono::now();
 #endif
   /* send stop condition */
   TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO);
@@ -578,7 +580,7 @@ void  i2c_stop(void)
   // wait until stop condition is executed and bus released
   while(TWCR & (1<<TWSTO)) {
 #if I2C_TIMEOUT
-    if (millis() - start > I2C_TIMEOUT) return;
+    if ((chrono::now() - start).count > I2C_TIMEOUT) return;
 #endif
   }
 }
@@ -622,7 +624,7 @@ bool i2c_write(uint8_t value)
 {
   uint8_t   twst;
 #if I2C_TIMEOUT
-  uint32_t start = millis();
+  auto start = chrono::now();
 #endif
 
 
@@ -633,7 +635,7 @@ bool i2c_write(uint8_t value)
   // wait until transmission completed
   while(!(TWCR & (1<<TWINT))) {
 #if I2C_TIMEOUT
-    if (millis() - start > I2C_TIMEOUT) return false;
+    if ((chrono::now() - start).count > I2C_TIMEOUT) return false;
 #endif
   }
 
@@ -749,13 +751,13 @@ uint8_t i2c_read(bool last)
 #if I2C_HARDWARE
 {
 #if I2C_TIMEOUT
-  uint32_t start = millis();
+  auto start = chrono::now();
 #endif
 
   TWCR = (1<<TWINT) | (1<<TWEN) | (last ? 0 : (1<<TWEA));
   while(!(TWCR & (1<<TWINT))) {
 #if I2C_TIMEOUT
-    if (millis() - start > I2C_TIMEOUT) return 0xFF;
+    if ((chrono::now() - start).count > I2C_TIMEOUT) return 0xFF;
 #endif
   }
   return TWDR;

@@ -1,8 +1,12 @@
 #include "Sleep.h"
 #include "Buttons.h"
 #include "LEDs.h"
+#include "Arduino_Compat.h"
+#include "digitalWriteFast.h"
+#include <avr/pgmspace.h>
+#include <stdio.h>
 
-#include <Arduino.h>
+//#include <Arduino.h>
 #include <avr/sleep.h>
 #include <avr/power.h>
 
@@ -19,8 +23,6 @@ void soft_reset()
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-
-static const uint64_t k_period_us = 31250ULL;
 
 namespace chrono
 {
@@ -66,7 +68,7 @@ ISR(TIMER2_COMPA_vect)
     TCNT1 = 0;     // clear timer1 counter
     TIFR1 = 0xFF;
   
-    chrono::s_time_point.ticks += uint64_t(s_ocr2a + 1) * k_period_us;
+    chrono::s_time_point.ticks += uint64_t(s_ocr2a + 1) * k_min_sleep_period.count;
     s_timer2_interrupt_fired = true;
     if (ocr2a_changed)
     {
@@ -76,7 +78,7 @@ ISR(TIMER2_COMPA_vect)
 }
 
 volatile bool s_button_interrupt_fired = false;
-static void button_interrupt()
+ISR(INT0_vect)
 {
 //    for (volatile int i = 0; i < 200; i++)
 //      digitalWrite(RED_LED_PIN, HIGH);
@@ -97,7 +99,7 @@ static void button_interrupt()
 
 void setup_clock(uint32_t freq)
 {
-    attachInterrupt(digitalPinToInterrupt(static_cast<uint8_t>(Button::BUTTON1)), &button_interrupt, FALLING);
+    //attachInterrupt(digitalPinToInterrupt(static_cast<uint8_t>(Button::BUTTON1)), &button_interrupt, FALLING);
   
     //main clock, ~1Mhz
     clock_prescale_set(clock_div_8);
@@ -115,6 +117,8 @@ void setup_clock(uint32_t freq)
         
     ASSR |= bit(AS2);
 
+    //1024 prescaler, resulting in a tick every 31.25 millis (1000 / 32 == 31.25)
+    //if you change this, make sure to change the chrono::k_period as well
     TCCR2A &= ~(bit(WGM21) | bit(WGM20));
     TCCR2A |= bit(WGM21);
     TCCR2B &= ~bit(WGM22);
@@ -129,9 +133,11 @@ void setup_clock(uint32_t freq)
     ENABLE_INTR();
 
     //button 0 interrupt - falling edge
-    //EICRA &= ~(bit(ISC00) | bit(ISC01));
-    //EICRA |= bit(ISC01);
-    //EIMSK |= bit(INT0);
+    EICRA &= ~(bit(ISC00) | bit(ISC01));
+    EICRA |= bit(ISC01);
+    EIMSK |= bit(INT0);
+
+    sei();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -145,7 +151,7 @@ chrono::micros sleep(chrono::micros us, bool allow_button)
         soft_reset();
     }
 
-    uint64_t count = us.count / k_period_us;
+    uint64_t count = us.count / k_min_sleep_period.count;
     if (count == 0)
     {
         return us;
@@ -153,7 +159,7 @@ chrono::micros sleep(chrono::micros us, bool allow_button)
 
     s_button_interrupt_fired = false;
     uint8_t button_pin = static_cast<uint8_t>(Button::BUTTON1);
-    if (allow_button && (digitalRead(button_pin) == LOW || s_button_interrupt_fired == true))
+    if (allow_button && (digitalReadFast(button_pin) == LOW || s_button_interrupt_fired == true))
     {
         return us;
     }
@@ -204,7 +210,7 @@ chrono::micros sleep(chrono::micros us, bool allow_button)
             SYNC_W_ALL();
             ENABLE_INTR();
 
-            uint64_t us_done = uint64_t(cycles_done) * k_period_us;
+            uint64_t us_done = uint64_t(cycles_done) * k_min_sleep_period.count;
             chrono::s_time_point.ticks += us_done;
             us.count -= us_done;
             
@@ -218,7 +224,7 @@ chrono::micros sleep(chrono::micros us, bool allow_button)
         else if (s_timer2_interrupt_fired)
         {
             s_timer2_interrupt_fired = false;
-            us.count -= uint64_t(q) * k_period_us;
+            us.count -= uint64_t(q) * k_min_sleep_period.count;
 
 //            printf_P(PSTR("loop1 %ld, %ld, %ld\n"), (uint32_t)count, (uint32_t)next_q, (uint32_t)q);
 //            Serial.flush();
@@ -263,16 +269,7 @@ void sleep_exact(chrono::micros us)
     //busy loop the rest
     if (left.count > 0)
     {
-        chrono::millis ms(left);
-        if (ms.count > 0)
-        {
-            ::delay(ms.count);
-            left.count -= ms.count * 1000;
-        }
-        if (left.count > 0)
-        {
-            ::delayMicroseconds(left.count);
-        }
+        chrono::delay(left);
     }
 }
 

@@ -2,6 +2,8 @@
 
 #include "Chrono.h"
 
+static const chrono::micros k_min_sleep_period = chrono::k_period;
+
 void setup_clock(uint32_t freq);
 
 chrono::micros sleep(chrono::micros us, bool allow_button);

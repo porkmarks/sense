@@ -29,6 +29,14 @@
 
 #include <inttypes.h>
 #include "SHT2x.h"
+
+//hack for hardware rev 2, as I got the SDA/SCL pins reverted.
+//For this reason I use software i2c instead of hardware
+#define SDA_PIN 5
+#define SDA_PORT PORTC
+#define SCL_PIN 4
+#define SCL_PORT PORTC
+
 #include "SoftI2CMaster.h"
 
 bool _i2c_init() { return i2c_init(); }

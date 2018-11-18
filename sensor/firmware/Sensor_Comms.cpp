@@ -1,34 +1,31 @@
 #include "Sensor_Comms.h"
 #include "CRC.h"
 
+#include "Arduino_Compat.h"
+
 #ifdef __AVR__
-
-//#   include <Arduino.h>
-//#   include <HardwareSerial.h>
-
+#   include <stdio.h>
 #else
-
 #   include <chrono>
 #   include <iostream>
 #   include <thread>
 #   include <cstring>
 #   include <cmath>
-#   define delay(x) std::this_thread::sleep_for(std::chrono::milliseconds(x))
-#   define printf_P printf
-#   define F
-#   define PSTR
-
 #endif
 
 uint8_t packet_raw_size(uint8_t payload_size)
 {
-  return uint8_t(sizeof(Sensor_Comms::Header)) + payload_size;
+    return uint8_t(sizeof(Sensor_Comms::Header)) + payload_size;
 }
 
 
 Sensor_Comms::Sensor_Comms()
-  : m_module(SS, PD3, PD4)
-  , m_lora(&m_module)
+#ifdef __AVR__
+    : m_module(SS, PD3, PD4)
+#else
+    : m_module(0, 22, 23)
+#endif
+    , m_lora(&m_module)
 {
 }
 
@@ -43,29 +40,29 @@ bool Sensor_Comms::init(uint8_t retries, uint8_t power)
     for (i = 0; i < retries; i++)
     {
         //float freq = 434.0, float bw = 125.0, uint8_t sf = 9, uint8_t cr = 7, uint8_t syncWord = SX127X_SYNC_WORD, int8_t power = 17, uint8_t currentLimit = 100, uint16_t preambleLength = 8, uint8_t gain = 0);
-      
+
         int state = m_lora.begin(868.f,  //FREQ
-                                125.f,  //BW
-                                9,      //SF
-                                7,
-                                SX127X_SYNC_WORD,
-                                power);     //Power
+                                 250.f,  //BW
+                                 9,      //SF
+                                 7,
+                                 SX127X_SYNC_WORD,
+                                 power);     //Power
         if (state == ERR_NONE)
         {
             break;
         }
         printf_P(PSTR("Try failed %d: %d\n"), (int)i, state);
-        delay(500);
+        chrono::delay(chrono::millis(500));
     }
-  
+
     if (i >= retries)
     {
         return false;
     }
 
-//    m_rf22.set_transmission_power(power);
+    //    m_rf22.set_transmission_power(power);
 
-/*    printf_P(PSTR("Frequency is %luKhz\n"), (int32_t)(m_rf22.get_carrier_frequency()*1000.f));
+    /*    printf_P(PSTR("Frequency is %luKhz\n"), (int32_t)(m_rf22.get_carrier_frequency()*1000.f));
     printf_P(PSTR("FH Step is %lu\n"), m_rf22.get_frequency_hopping_step_size());
     printf_P(PSTR("Channel is %d\n"), (int)m_rf22.get_channel());
     printf_P(PSTR("Frequency deviation is %lu\n"), m_rf22.get_frequency_deviation());
@@ -82,7 +79,7 @@ bool Sensor_Comms::init(uint8_t retries, uint8_t power)
 
 void Sensor_Comms::set_transmission_power(uint8_t power)
 {
-//    m_rf22.set_transmission_power(power);
+    //    m_rf22.set_transmission_power(power);
 }
 
 void Sensor_Comms::sleep_mode()
@@ -154,7 +151,7 @@ bool Sensor_Comms::send_packet(uint8_t* raw_buffer, uint8_t packet_size, uint8_t
             for (uint8_t rx_r = 0; rx_r < 3; rx_r++)
             {
                 uint8_t response_buffer[RESPONSE_BUFFER_SIZE + 1] = { 0 };
-                uint16_t size = RESPONSE_BUFFER_SIZE;
+                size_t size = RESPONSE_BUFFER_SIZE;
                 if (m_lora.receive(response_buffer, size) == ERR_NONE && size > 0)
                 {
                     if (validate_packet(response_buffer, size, sizeof(data::sensor::Response)))
@@ -168,7 +165,7 @@ bool Sensor_Comms::send_packet(uint8_t* raw_buffer, uint8_t packet_size, uint8_t
                 }
             }
         }
-        delay(10 + (random() % 5) * 10);
+        chrono::delay(chrono::millis(10 + (random() % 5) * 10));
     }
 
     return false;
@@ -238,14 +235,14 @@ void Sensor_Comms::send_response(const Header& header)
     for (uint8_t i = 0; i < 2; i++)
     {
         m_lora.transmit(response_buffer, RESPONSE_BUFFER_SIZE);
-        delay(2);
+        chrono::delay(chrono::millis(2));
     }
 }
 
 uint8_t* Sensor_Comms::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size, uint32_t timeout)
 {
 #ifdef __AVR__
-    uint32_t start = millis();
+    auto start = chrono::now();
     uint32_t elapsed = 0;
 #else
     auto start = std::chrono::high_resolution_clock::now();
@@ -254,7 +251,7 @@ uint8_t* Sensor_Comms::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size,
 
     do
     {
-        uint16_t size = sizeof(Header) + packet_size;
+        size_t size = sizeof(Header) + packet_size;
         if (m_lora.receive(raw_buffer, size) == ERR_NONE && size > sizeof(Header))
         {
             Header* header_ptr = reinterpret_cast<Header*>(raw_buffer);
@@ -271,7 +268,7 @@ uint8_t* Sensor_Comms::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size,
         }
 
 #ifdef __AVR__
-        elapsed = millis() - start;
+        elapsed = (chrono::now() - start).count;
 #else
         elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
 #endif

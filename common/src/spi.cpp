@@ -1,4 +1,4 @@
-#include "rfm22b_spi.h"
+#include "spi.h"
 
 #ifdef RASPBERRY_PI
 
@@ -19,14 +19,14 @@
 //	Default bits per word is 8
 //	Default clock speed is 10kHz
 SPI::SPI() {
-    const char* device = "/dev/spidev1.0";
+    const char* device = "/dev/spidev0.0";
     m_fd = open(device, O_RDWR);
     if (m_fd < 0) {
         perror("Unable to open SPI device");
     }
     set_mode(0);
     set_bits_per_word(8);
-    set_speed(1000000);
+    set_speed(2000000);
     set_delay(0);
 }
 

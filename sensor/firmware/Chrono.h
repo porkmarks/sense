@@ -2,8 +2,13 @@
 
 #include <stdint.h>
 #ifdef __AVR__
-#   include <Arduino.h>
+//#   include <Arduino.h>
 #   include "Scope_Sync.h"
+#   include <util/delay_basic.h>
+#   include <stdio.h>
+#else
+#   include <thread>
+#   include <chrono>
 #endif
 
 
@@ -26,8 +31,10 @@ struct duration
     duration& operator=(duration<Rep, T> const& other) { count = other.count; return *this; }
     T operator-(T const& other) const { T x(count - other.count); return x; }
     T operator+(T const& other) const { T x(count + other.count); return x; }
+    T operator*(rep_t scale) const { T x(count * scale); return x; }
     duration<Rep, T>& operator-=(T const& other) { count -= other.count; return *this; }
     duration<Rep, T>& operator+=(T const& other) { count += other.count; return *this; }
+    duration<Rep, T>& operator*(rep_t scale) { count *= scale; return *this; }
     bool operator<(T const& other) const { return count < other.count; }
     bool operator<=(T const& other) const { return count <= other.count; }
     bool operator>(T const& other) const { return count > other.count; }
@@ -113,45 +120,50 @@ typedef time<uint64_t, micros> time_us;
 typedef time<uint32_t, seconds> time_s;
 
 
-#ifdef __AVR__
 template<class D>
 void delay(D duration)
 {
-    millis ms(duration);
-    ::delay(ms.count);
+    micros us(duration);
+#ifdef __AVR__
+    constexpr uint8_t cycles_per_us = F_CPU / 1000000ULL;
+//    delayMicroseconds(us.count);
+    uint64_t cycles = (us.count * cycles_per_us) >> 2; //the _delay_loop_2 executes 4 cycles per iteration
+    while (cycles > 0)
+    {
+        uint16_t c = cycles > 65535 ? 65535 : (uint16_t)cycles;
+        _delay_loop_2(c);
+        cycles -= c;
+    }
+#else
+    std::this_thread::sleep_for(std::chrono::microseconds(us.count));
+#endif
 }
 
+#ifdef __AVR__
 extern volatile time_us s_time_point;
+static const micros k_period(31250ULL);
+#else
+static const micros k_period(1ULL);
+#endif
+
 
 inline time_ms now()
 {
-  /*
-    static uint32_t s_last_millis = ::millis();
-    uint32_t ms = ::millis();
-    if (ms > s_last_millis)
-    {
-        s_time_point += millis(ms - s_last_millis);
-    }
-    s_last_millis = ms;
-    return time_ms(s_time_point.ticks);
-    */
+#ifdef __AVR__
     Scope_Sync ss;
     return time_ms(s_time_point.ticks / 1000);
+#else
+    return time_ms(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
+#endif
 }
 inline time_us now_us()
 {
-  /*
-    static uint32_t s_last_millis = ::millis();
-    uint32_t ms = ::millis();
-    if (ms > s_last_millis)
-    {
-        s_time_point += millis(ms - s_last_millis);
-    }
-    s_last_millis = ms;
-    return time_ms(s_time_point.ticks);
-    */
+#ifdef __AVR__
     Scope_Sync ss;
     return time_us(s_time_point.ticks);
-}
+#else
+    return time_us(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
 #endif
+}
+
 }
