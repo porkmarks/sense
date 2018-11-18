@@ -485,7 +485,7 @@ void Comms::processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequ
     DB::Sensor::Calibration calibration;
     calibration.temperatureBias = static_cast<float>(pairRequest.calibration.temperature_bias) / 100.f;
     calibration.humidityBias = static_cast<float>(pairRequest.calibration.humidity_bias) / 100.f;
-    uint32_t serialNumber = pairRequest.serial_number;
+    uint32_t serialNumber = pairRequest.descriptor.serial_number;
 
     DB::SensorId id;
     if (!cbs.db.bindSensor(serialNumber, calibration, id))

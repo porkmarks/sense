@@ -540,7 +540,7 @@ static void pair_state()
 
                     uint8_t size = sizeof(data::sensor::Pair_Response);
                     uint8_t raw_buffer[packet_raw_size(size)];
-                    uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, 10000);
+                    uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, 2000);
                     if (buffer)
                     {
                         LOG(PSTR("Received packet of %d bytes. Type %s\n"), (int)size, (int)s_comms.get_rx_packet_type(buffer));

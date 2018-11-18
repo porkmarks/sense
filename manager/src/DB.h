@@ -31,7 +31,7 @@ public:
     struct SensorsConfigDescriptor
     {
         std::string name = "Base Station";
-        uint8_t sensorsPower = 10;
+        int8_t sensorsPower = 10;
         Clock::duration measurementPeriod = std::chrono::minutes(5);
         Clock::duration commsPeriod = std::chrono::minutes(10);
     };

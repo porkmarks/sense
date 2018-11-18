@@ -42,8 +42,8 @@ float getSignalLevel(int8_t dBm)
     {
         return 0.f;
     }
-    constexpr float max = -50.f;
-    constexpr float min = -110.f;
+    constexpr float max = -40.f;
+    constexpr float min = -120.f;
     float level = std::max(std::min(static_cast<float>(dBm), max) - min, 0.f) / (max - min);
     return level;
 }

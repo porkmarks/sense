@@ -249,12 +249,12 @@ bool DB::load(std::string const& name)
                 config.descriptor.name = it->value.GetString();
 
                 it = configj.FindMember("sensors_power");
-                if (it == configj.MemberEnd() || !it->value.IsUint())
+                if (it == configj.MemberEnd() || !it->value.IsInt())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing config sensors_power").arg(dataFilename.c_str()));
                     return false;
                 }
-                config.descriptor.sensorsPower = static_cast<uint8_t>(it->value.GetUint());
+                config.descriptor.sensorsPower = static_cast<int8_t>(it->value.GetInt());
 
                 it = configj.FindMember("measurement_period");
                 if (it == configj.MemberEnd() || !it->value.IsUint64())
@@ -2187,7 +2187,7 @@ void DB::save(Data const& data) const
                 rapidjson::Value configj;
                 configj.SetObject();
                 configj.AddMember("name", rapidjson::Value(config.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
-                configj.AddMember("sensors_power", static_cast<uint32_t>(config.descriptor.sensorsPower), document.GetAllocator());
+                configj.AddMember("sensors_power", static_cast<int32_t>(config.descriptor.sensorsPower), document.GetAllocator());
                 configj.AddMember("measurement_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.measurementPeriod).count()), document.GetAllocator());
                 configj.AddMember("comms_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.commsPeriod).count()), document.GetAllocator());
                 configj.AddMember("baseline_measurement_tp", static_cast<uint64_t>(Clock::to_time_t(config.baselineMeasurementTimePoint)), document.GetAllocator());

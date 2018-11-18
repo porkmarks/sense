@@ -517,7 +517,7 @@ bool SettingsWidget::getSensorsConfig(DB::SensorsConfigDescriptor& descriptor)
     descriptor.measurementPeriod = std::chrono::seconds(static_cast<size_t>(m_ui.sensorsMeasurementPeriod->value() * 60.0));
     descriptor.commsPeriod = std::chrono::seconds(static_cast<size_t>(m_ui.sensorsCommsPeriod->value() * 60.0));
     //descriptor.sensorsSleeping = m_ui.sensorsSleeping->isChecked();
-    descriptor.sensorsPower = static_cast<uint8_t>(m_ui.sensorsPower->value());
+    descriptor.sensorsPower = static_cast<int8_t>(m_ui.sensorsPower->value());
 
     if (descriptor.commsPeriod.count() == 0)
     {

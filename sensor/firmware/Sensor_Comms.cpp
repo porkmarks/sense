@@ -29,7 +29,7 @@ Sensor_Comms::Sensor_Comms()
 {
 }
 
-bool Sensor_Comms::init(uint8_t retries, uint8_t power)
+bool Sensor_Comms::init(uint8_t retries, int8_t power_dBm)
 {
     if (retries == 0)
     {
@@ -46,7 +46,7 @@ bool Sensor_Comms::init(uint8_t retries, uint8_t power)
                                  9,      //SF
                                  7,
                                  SX127X_SYNC_WORD,
-                                 power);     //Power
+                                 power_dBm);     //Power
         if (state == ERR_NONE)
         {
             break;
@@ -77,9 +77,9 @@ bool Sensor_Comms::init(uint8_t retries, uint8_t power)
     return true;
 }
 
-void Sensor_Comms::set_transmission_power(uint8_t power)
+void Sensor_Comms::set_transmission_power(int8_t power_dBm)
 {
-    //    m_rf22.set_transmission_power(power);
+    m_lora.setOutputPower(power_dBm);
 }
 
 void Sensor_Comms::sleep_mode()

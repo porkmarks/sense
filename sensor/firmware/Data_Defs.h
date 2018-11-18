@@ -114,7 +114,7 @@ struct Config
     Calibration calibration_change;
 
     bool sleeping = false;
-    uint8_t power = 15;
+    int8_t power = 15;
 };
 static_assert(sizeof(Config) == 30, "");
 

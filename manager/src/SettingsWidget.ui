@@ -651,8 +651,11 @@
                 <property name="suffix">
                  <string> dBm</string>
                 </property>
+                <property name="minimum">
+                 <number>-3</number>
+                </property>
                 <property name="maximum">
-                 <number>20</number>
+                 <number>17</number>
                 </property>
                 <property name="value">
                  <number>10</number>

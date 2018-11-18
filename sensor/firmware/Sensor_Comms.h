@@ -36,9 +36,9 @@ public:
     static constexpr uint8_t MAX_USER_DATA_SIZE = 128 - sizeof(Sensor_Comms::Header);
 
 
-    bool init(uint8_t retries, uint8_t power);
+    bool init(uint8_t retries, int8_t power_dBm);
 
-    void set_transmission_power(uint8_t power);
+    void set_transmission_power(int8_t power_dBm);
 
     uint32_t get_address() const;
     void set_address(uint32_t address);
