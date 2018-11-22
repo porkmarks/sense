@@ -12,19 +12,26 @@ namespace sensor
 enum class Type : uint8_t
 {
     /*  0 */ RESPONSE,
-    /*  1 */ MEASUREMENT_BATCH,
+    /*  1 */ MEASUREMENT_BATCH_REQUEST,
     /*  2 */ PAIR_REQUEST,
     /*  3 */ PAIR_RESPONSE,
     /*  4 */ CONFIG_REQUEST,
-    /*  5 */ CONFIG,
+    /*  5 */ CONFIG_RESPONSE,
     /*  6 */ FIRST_CONFIG_REQUEST,
-    /*  7 */ FIRST_CONFIG,
+    /*  7 */ FIRST_CONFIG_RESPONSE,
 };
 
 
 #ifndef __AVR__
 #   pragma pack(push, 1) // exact fit - no padding
 #endif
+
+struct Response
+{
+    uint16_t ack : 1;
+    uint16_t req_id : 15;
+};
+static_assert(sizeof(Response) == 2, "");
 
 struct Measurement
 {
@@ -57,7 +64,7 @@ struct Measurement
 };
 static_assert(sizeof(Measurement) == 4, "");
 
-struct Measurement_Batch
+struct Measurement_Batch_Request
 {
     uint32_t start_index = 0;
     uint8_t last_batch : 1; //indicates if there are more batches after this one
@@ -77,7 +84,7 @@ struct Measurement_Batch
     enum { MAX_COUNT = 8 };
     Measurement measurements[MAX_COUNT];
 };
-static_assert(sizeof(Measurement_Batch) == 38, "");
+static_assert(sizeof(Measurement_Batch_Request) == 38, "");
 //template<int s> struct Size_Checker;
 //Size_Checker<sizeof(Measurement_Batch)> size_checker;
 
@@ -100,7 +107,7 @@ struct Config_Request
 };
 static_assert(sizeof(Config_Request) == 14, "");
 
-struct Config
+struct Config_Response
 {
     uint32_t baseline_measurement_index = 0; //sensors should start counting from this one
     //all are in seconds
@@ -116,7 +123,7 @@ struct Config
     bool sleeping = false;
     int8_t power = 15;
 };
-static_assert(sizeof(Config) == 30, "");
+static_assert(sizeof(Config_Response) == 30, "");
 
 struct Descriptor
 {
@@ -132,19 +139,11 @@ struct First_Config_Request
 };
 static_assert(sizeof(First_Config_Request) == 7, "");
 
-struct First_Config
+struct First_Config_Response : Config_Response
 {
     uint32_t first_measurement_index = 0;
-    Config config;
 };
-static_assert(sizeof(First_Config) == 34, "");
-
-struct Response
-{
-    uint16_t ack : 1;
-    uint16_t req_id : 15;
-};
-static_assert(sizeof(Response) == 2, "");
+static_assert(sizeof(First_Config_Response) == 34, "");
 
 struct Pair_Request
 {

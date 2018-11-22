@@ -25,9 +25,9 @@ struct duration
     typedef Rep rep_t;
     rep_t count;
 
-    duration() : count(0) {}
-    explicit duration(rep_t count) : count(count) {}
-    duration(duration<Rep, T> const& other) = default;
+    constexpr duration() : count(0) {}
+    explicit constexpr duration(rep_t count) : count(count) {}
+    constexpr duration(duration<Rep, T> const& other) = default;
     duration& operator=(duration<Rep, T> const& other) { count = other.count; return *this; }
     T operator-(T const& other) const { T x(count - other.count); return x; }
     T operator+(T const& other) const { T x(count + other.count); return x; }
@@ -45,46 +45,46 @@ struct duration
 
 struct millis : public duration<int32_t, millis>
 {
-    millis() = default;
-    explicit millis(micros const& other);
-    explicit millis(secondsf const& other);
-    explicit millis(seconds const& other);
-    explicit millis(rep_t count) : duration<int32_t, millis>(count) {}
+    constexpr millis() = default;
+    explicit constexpr millis(micros const& other);
+    explicit constexpr millis(secondsf const& other);
+    explicit constexpr millis(seconds const& other);
+    explicit constexpr millis(rep_t count) : duration<int32_t, millis>(count) {}
 };
 
 struct micros : public duration<int32_t, micros>
 {
-    micros() = default;
-    explicit micros(millis const& other) : duration<int32_t, micros>(other.count * 1000) {}
-    explicit micros(secondsf const& other);
-    explicit micros(seconds const& other);
-    explicit micros(rep_t count) : duration<int32_t, micros>(count) {}
+    constexpr micros() = default;
+    explicit constexpr micros(millis const& other) : duration<int32_t, micros>(other.count * 1000) {}
+    explicit constexpr micros(secondsf const& other);
+    explicit constexpr micros(seconds const& other);
+    explicit constexpr micros(rep_t count) : duration<int32_t, micros>(count) {}
 };
 
 struct seconds : public duration<int32_t, seconds>
 {
-    seconds() = default;
-    explicit seconds(millis const& other) : duration<int32_t, seconds>(other.count * 1000) {}
-    explicit seconds(micros const& other) : duration<int32_t, seconds>(other.count * 1000000) {}
-    explicit seconds(secondsf const& other);
-    explicit seconds(rep_t count) : duration<int32_t, seconds>(count) {}
+    constexpr seconds() = default;
+    explicit constexpr seconds(millis const& other) : duration<int32_t, seconds>(other.count * 1000) {}
+    explicit constexpr seconds(micros const& other) : duration<int32_t, seconds>(other.count * 1000000) {}
+    explicit constexpr seconds(secondsf const& other);
+    explicit constexpr seconds(rep_t count) : duration<int32_t, seconds>(count) {}
 };
 
 struct secondsf : public duration<float, secondsf>
 {
-    secondsf() = default;
-    explicit secondsf(millis const& other) : duration<float, secondsf>(other.count * 0.001f) {}
-    explicit secondsf(micros const& other) : duration<float, secondsf>(other.count * 0.000001f) {}
-    explicit secondsf(seconds const& other) : duration<float, secondsf>(other.count) {}
-    explicit secondsf(rep_t count) : duration<float, secondsf>(count) {}
+    constexpr secondsf() = default;
+    explicit constexpr secondsf(millis const& other) : duration<float, secondsf>(other.count * 0.001f) {}
+    explicit constexpr secondsf(micros const& other) : duration<float, secondsf>(other.count * 0.000001f) {}
+    explicit constexpr secondsf(seconds const& other) : duration<float, secondsf>(other.count) {}
+    explicit constexpr secondsf(rep_t count) : duration<float, secondsf>(count) {}
 };
 
-inline millis::millis(micros const& other) : duration<int32_t, millis>(other.count / 1000) {}
-inline millis::millis(secondsf const& other) : duration<int32_t, millis>(other.count * 1000.f) {}
-inline millis::millis(seconds const& other) : duration<int32_t, millis>(other.count * 1000) {}
-inline micros::micros(secondsf const& other) : duration<int32_t, micros>(other.count * 1000000.f) {}
-inline micros::micros(seconds const& other) : duration<int32_t, micros>(other.count * 1000000) {}
-inline seconds::seconds(secondsf const& other) : duration<int32_t, seconds>(other.count) {}
+inline constexpr millis::millis(micros const& other) : duration<int32_t, millis>(other.count / 1000) {}
+inline constexpr millis::millis(secondsf const& other) : duration<int32_t, millis>(other.count * 1000.f) {}
+inline constexpr millis::millis(seconds const& other) : duration<int32_t, millis>(other.count * 1000) {}
+inline constexpr micros::micros(secondsf const& other) : duration<int32_t, micros>(other.count * 1000000.f) {}
+inline constexpr micros::micros(seconds const& other) : duration<int32_t, micros>(other.count * 1000000) {}
+inline constexpr seconds::seconds(secondsf const& other) : duration<int32_t, seconds>(other.count) {}
 
 template<class Rep, class Duration>
 struct time
@@ -141,9 +141,9 @@ void delay(D duration)
 
 #ifdef __AVR__
 extern volatile time_us s_time_point;
-static const micros k_period(31250ULL);
+static constexpr micros k_period(31250ULL);
 #else
-static const micros k_period(1ULL);
+static constexpr micros k_period(1ULL);
 #endif
 
 

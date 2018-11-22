@@ -1,6 +1,6 @@
 #pragma once
 
-float init_adc()
+void init_adc()
 {
 #if defined(ADCSRA)
   // set a2d prescaler so we are inside the desired 50-200 KHz range.

@@ -203,13 +203,13 @@ public:
     inTransactionFlag = 1;
     #endif
 
-    SPCR = settings.spcr;
-    SPSR = settings.spsr;
+    SPCR0 = settings.spcr;
+    SPSR0 = settings.spsr;
   }
 
   // Write to the SPI bus (MOSI pin) and also receive (MISO pin)
   inline static uint8_t transfer(uint8_t data) {
-    SPDR = data;
+    SPDR0 = data;
     /*
      * The following NOP introduces a small delay that can prevent the wait
      * loop form iterating when running at the maximum speed. This gives
@@ -217,46 +217,46 @@ public:
      * speeds it is unnoticed.
      */
     asm volatile("nop");
-    while (!(SPSR & _BV(SPIF))) ; // wait
-    return SPDR;
+    while (!(SPSR0 & _BV(SPIF))) ; // wait
+    return SPDR0;
   }
   inline static uint16_t transfer16(uint16_t data) {
     union { uint16_t val; struct { uint8_t lsb; uint8_t msb; }; } in, out;
     in.val = data;
-    if (!(SPCR & _BV(DORD))) {
-      SPDR = in.msb;
+    if (!(SPCR0 & _BV(DORD))) {
+      SPDR0 = in.msb;
       asm volatile("nop"); // See transfer(uint8_t) function
-      while (!(SPSR & _BV(SPIF))) ;
-      out.msb = SPDR;
-      SPDR = in.lsb;
+      while (!(SPSR0 & _BV(SPIF))) ;
+      out.msb = SPDR0;
+      SPDR0 = in.lsb;
       asm volatile("nop");
-      while (!(SPSR & _BV(SPIF))) ;
-      out.lsb = SPDR;
+      while (!(SPSR0 & _BV(SPIF))) ;
+      out.lsb = SPDR0;
     } else {
-      SPDR = in.lsb;
+      SPDR0 = in.lsb;
       asm volatile("nop");
-      while (!(SPSR & _BV(SPIF))) ;
-      out.lsb = SPDR;
-      SPDR = in.msb;
+      while (!(SPSR0 & _BV(SPIF))) ;
+      out.lsb = SPDR0;
+      SPDR0 = in.msb;
       asm volatile("nop");
-      while (!(SPSR & _BV(SPIF))) ;
-      out.msb = SPDR;
+      while (!(SPSR0 & _BV(SPIF))) ;
+      out.msb = SPDR0;
     }
     return out.val;
   }
   inline static void transfer(void *buf, size_t count) {
     if (count == 0) return;
     uint8_t *p = (uint8_t *)buf;
-    SPDR = *p;
+    SPDR0 = *p;
     while (--count > 0) {
       uint8_t out = *(p + 1);
-      while (!(SPSR & _BV(SPIF))) ;
-      uint8_t in = SPDR;
-      SPDR = out;
+      while (!(SPSR0 & _BV(SPIF))) ;
+      uint8_t in = SPDR0;
+      SPDR0 = out;
       *p++ = in;
     }
-    while (!(SPSR & _BV(SPIF))) ;
-    *p = SPDR;
+    while (!(SPSR0 & _BV(SPIF))) ;
+    *p = SPDR0;
   }
   // After performing a group of transfers and releasing the chip select
   // signal, this function allows others to access the SPI bus
@@ -292,25 +292,20 @@ public:
   // This function is deprecated.  New applications should use
   // beginTransaction() to configure SPI settings.
   inline static void setBitOrder(uint8_t bitOrder) {
-    if (bitOrder == LSBFIRST) SPCR |= _BV(DORD);
-    else SPCR &= ~(_BV(DORD));
+    if (bitOrder == LSBFIRST) SPCR0 |= _BV(DORD);
+    else SPCR0 &= ~(_BV(DORD));
   }
   // This function is deprecated.  New applications should use
   // beginTransaction() to configure SPI settings.
   inline static void setDataMode(uint8_t dataMode) {
-    SPCR = (SPCR & ~SPI_MODE_MASK) | dataMode;
+    SPCR0 = (SPCR0 & ~SPI_MODE_MASK) | dataMode;
   }
   // This function is deprecated.  New applications should use
   // beginTransaction() to configure SPI settings.
   inline static void setClockDivider(uint8_t clockDiv) {
-    SPCR = (SPCR & ~SPI_CLOCK_MASK) | (clockDiv & SPI_CLOCK_MASK);
-    SPSR = (SPSR & ~SPI_2XCLOCK_MASK) | ((clockDiv >> 2) & SPI_2XCLOCK_MASK);
+    SPCR0 = (SPCR0 & ~SPI_CLOCK_MASK) | (clockDiv & SPI_CLOCK_MASK);
+    SPSR0 = (SPSR0 & ~SPI_2XCLOCK_MASK) | ((clockDiv >> 2) & SPI_2XCLOCK_MASK);
   }
-  // These undocumented functions should not be used.  SPI.transfer()
-  // polls the hardware flag which is automatically cleared as the
-  // AVR responds to SPI's interrupt
-  inline static void attachInterrupt() { SPCR |= _BV(SPIE); }
-  inline static void detachInterrupt() { SPCR &= ~_BV(SPIE); }
 
 private:
   static uint8_t initialized;

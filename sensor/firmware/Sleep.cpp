@@ -5,6 +5,7 @@
 #include "digitalWriteFast.h"
 #include <avr/pgmspace.h>
 #include <stdio.h>
+#include "avr_stdio.h"
 
 //#include <Arduino.h>
 #include <avr/sleep.h>
@@ -31,50 +32,66 @@ namespace chrono
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
+//extern volatile uint16_t s_xxx;
+
 static uint32_t s_main_oscillator_frequency = F_CPU;
-volatile bool s_timer2_interrupt_fired = false;
-volatile uint8_t s_ocr2a = 0;
-volatile uint8_t s_next_ocr2a = 0;
+static volatile bool s_timer2_interrupt_fired = false;
+static volatile uint8_t s_ocr2a = 0;
+static volatile uint8_t s_next_ocr2a = 0;
+
+constexpr uint8_t k_min_osccal = 0;
+constexpr uint8_t k_max_osccal = 127;
+
+constexpr uint32_t k_crystal_div = 1024; //the normal RTC div
+static_assert(1900000ULL * k_crystal_div / 32768ULL < 60000, "Overflow");
+static_assert(500000ULL * k_crystal_div / 32768ULL > 30, "Underflow");
+
+static uint16_t s_timer_target_min = 0;
+static uint16_t s_timer_target_max = 0;
+static volatile int8_t s_timer_pause_cycles = 3; //pause the calibration for this many cycles because there is a glitch with timer1 after waking up
+
+constexpr uint32_t k_min_sleep_period32 = uint32_t(k_min_sleep_period.count);
+
 
 ISR(TIMER2_COMPA_vect)
 {
-    bool ocr2a_changed = s_ocr2a != s_next_ocr2a;
+    //bool ocr2a_changed = s_ocr2a != s_next_ocr2a;
+    //digitalWriteFast(14, HIGH);
 
     //if the clock period didn't change since the prev interrupt
     //and it matches the hot calibration period then calibrate
-    if (s_ocr2a == 0) 
+    if (s_timer_pause_cycles-- == 0)
     {
-        constexpr uint32_t k_crystal_div = 1024; //the normal RTC div
-        static_assert(1900000ULL * k_crystal_div / 32768ULL < 60000, "Overflow");
-        static_assert(500000ULL * k_crystal_div / 32768ULL > 30, "Underflow");
-        constexpr uint8_t k_min_v = 0;
-        constexpr uint8_t k_max_v = 127;
-      
+        s_timer_pause_cycles = 0;
+        uint16_t counter = TCNT1;
         if ((TIFR1 & bit(TOV1)) == 0) //no overflow
         {
-            uint16_t counter = TCNT1;
-            const uint16_t target = (s_main_oscillator_frequency * k_crystal_div) >> 15; //>> 15 is divided by 32768
-            const uint16_t margin = (target / 200); //0.5% on both sides
-            if (counter > target + margin && OSCCAL > k_min_v) //too fast, decrease the OSCCAL
+            //s_xxx = counter;
+            if (counter > s_timer_target_max) //too fast, decrease the OSCCAL
             {
-                OSCCAL--;
+                if (OSCCAL > k_min_osccal)
+                {
+                  OSCCAL--;
+                }
             }
-            else if (counter < target - margin && OSCCAL < k_max_v) //too slow, increase the OSCCAL
+            else if (counter < s_timer_target_min) //too slow, increase the OSCCAL
             {
-                OSCCAL++;
+                if (OSCCAL < k_max_osccal)
+                {
+                  OSCCAL++;
+                }
             }
         }          
     }
     TCNT1 = 0;     // clear timer1 counter
     TIFR1 = 0xFF;
+    OCR2A = s_next_ocr2a;
   
-    chrono::s_time_point.ticks += uint64_t(s_ocr2a + 1) * k_min_sleep_period.count;
+    chrono::s_time_point.ticks += uint32_t(s_ocr2a + 1) * k_min_sleep_period32;
     s_timer2_interrupt_fired = true;
-    if (ocr2a_changed)
-    {
-        OCR2A = s_next_ocr2a;
-        s_ocr2a = s_next_ocr2a;
-    }
+    s_ocr2a = s_next_ocr2a;
+
+    //digitalWriteFast(14, LOW);
 }
 
 volatile bool s_button_interrupt_fired = false;
@@ -83,8 +100,7 @@ ISR(INT0_vect)
 //    for (volatile int i = 0; i < 200; i++)
 //      digitalWrite(RED_LED_PIN, HIGH);
 //    digitalWrite(RED_LED_PIN, LOW);                
-
-    s_button_interrupt_fired = true;  
+    s_button_interrupt_fired = true;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -99,16 +115,23 @@ ISR(INT0_vect)
 
 void setup_clock(uint32_t freq)
 {
+    s_main_oscillator_frequency = freq;
     //attachInterrupt(digitalPinToInterrupt(static_cast<uint8_t>(Button::BUTTON1)), &button_interrupt, FALLING);
-  
+
+    uint16_t target = (s_main_oscillator_frequency * k_crystal_div) >> 15; //>> 15 is divided by 32768
+    uint16_t margin = target >> 8; // 0.39% on both sides
+    s_timer_target_max = target + margin;
+    s_timer_target_min = target - margin;
+
     //main clock, ~1Mhz
-    clock_prescale_set(clock_div_8);
+    CLKPR = bit(CLKPCE);
+    CLKPR = 0x3;
+    OSCCAL = (k_min_osccal + k_max_osccal) / 2;
 
     //hot calibration setup (timer1)
     TIMSK1 = 0;
     TCCR1A = 0; //normal mode for timer 1
     TCCR1B = bit(CS10);
-    s_main_oscillator_frequency = freq;
     
     //setup timer2 crystal oscillator
     DISABLE_INTR();
@@ -164,11 +187,15 @@ chrono::micros sleep(chrono::micros us, bool allow_button)
         return us;
     }
 
+    //printf_P(PSTR(">osccal %d\n"), (int)OSCCAL);
+
+    uart_flush();
+
     //turn off adc
     uint8_t adcsra = ADCSRA;
     ADCSRA &= ~bit(ADEN);
 
-//    PRR = (uint8_t)(~bit(PRTIM2)); //turn off everything except timer2
+    PRR0 = (uint8_t)(~bit(PRTIM2)); //turn off everything except timer2
 
 
     uint16_t q = 0; //this is zero on purpose, so that the first round we don't substract any time as it's a dummy sleep
@@ -180,17 +207,18 @@ chrono::micros sleep(chrono::micros us, bool allow_button)
     {
         s_timer2_interrupt_fired = false;
 
-        //set the duration of the next next sleep (the one after the next one)
-        {
-            Scope_Sync ss;
-            s_next_ocr2a = uint8_t(next_q - 1);
-        }
-
         if (!allow_button || s_button_interrupt_fired == false)
         {
+            s_timer_pause_cycles = 127; //pause calibration
             //this will sleep q, and prepare the next sleep to be next_q
             set_sleep_mode(SLEEP_MODE_PWR_SAVE); 
-            sleep_mode();
+
+            cli();
+            s_next_ocr2a = uint8_t(next_q - 1); //set the duration of the next next sleep (the one after the next one)
+            sleep_enable();
+            sei();
+            sleep_cpu();
+            sleep_disable();
         }
         
 
@@ -253,9 +281,13 @@ chrono::micros sleep(chrono::micros us, bool allow_button)
         }
     }
     
-    PRR = 0;
+    PRR0 = 0;
     //restore adc
     ADCSRA = adcsra;
+
+    s_timer_pause_cycles = 3;
+
+    //printf_P(PSTR("<osccal %d\n"), (int)OSCCAL);
 
     return us;
 }

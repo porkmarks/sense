@@ -2,13 +2,22 @@
 
 #include "Chrono.h"
 
-constexpr uint8_t RED_LED_PIN  = 14;
-constexpr uint8_t GREEN_LED_PIN = 15;
+enum class Led
+{
+  None    = 0,
+  Green   = 1,
+  Red     = 2,
+  Yellow  = 3
+};
 
-constexpr uint8_t GREEN_LED = 1 << 0;
-constexpr uint8_t RED_LED = 1 << 1;
-constexpr uint8_t YELLOW_LED = GREEN_LED | RED_LED;
+enum class Blink_Led
+{
+  Green   = 1, //to match the Led enum
+  Red     = 2,
+  Yellow  = 3
+};
 
-void set_leds(uint8_t leds);
-void blink_leds(uint8_t leds, uint8_t times, chrono::millis period);
+void init_leds();
+void set_led(Led led);
+void blink_led(Blink_Led led, uint8_t times, chrono::millis period);
 

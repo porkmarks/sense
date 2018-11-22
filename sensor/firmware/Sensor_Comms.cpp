@@ -51,7 +51,7 @@ bool Sensor_Comms::init(uint8_t retries, int8_t power_dBm)
         {
             break;
         }
-        printf_P(PSTR("Try failed %d: %d\n"), (int)i, state);
+        printf_P(PSTR("Try failed %d: %d\n"), int(i), state);
         chrono::delay(chrono::millis(500));
     }
 
@@ -100,13 +100,14 @@ void Sensor_Comms::set_destination_address(uint32_t address)
     m_destination_address = address;
 }
 
-uint8_t Sensor_Comms::begin_packet(uint8_t* raw_buffer, uint8_t type)
+uint8_t Sensor_Comms::begin_packet(uint8_t* raw_buffer, uint8_t type, bool needs_response)
 {
     Header* header_ptr = reinterpret_cast<Header*>(raw_buffer);
     header_ptr->type = type;
     header_ptr->source_address = m_address;
     header_ptr->destination_address = m_destination_address;
     header_ptr->req_id = ++m_last_req_id;
+    header_ptr->needs_response = needs_response ? 1 : 0;
     header_ptr->crc = 0;
 
     m_offset = 0;
@@ -148,7 +149,8 @@ bool Sensor_Comms::send_packet(uint8_t* raw_buffer, uint8_t packet_size, uint8_t
         //m_rf22.send_raw(raw_buffer, sizeof(Header) + packet_size, 100);
         if (m_lora.transmit(raw_buffer, sizeof(Header) + packet_size) == ERR_NONE)
         {
-            for (uint8_t rx_r = 0; rx_r < 3; rx_r++)
+            chrono::time_ms start = chrono::now();
+            while (chrono::now() - start < chrono::millis(50));
             {
                 uint8_t response_buffer[RESPONSE_BUFFER_SIZE + 1] = { 0 };
                 size_t size = RESPONSE_BUFFER_SIZE;
@@ -241,13 +243,8 @@ void Sensor_Comms::send_response(const Header& header)
 
 uint8_t* Sensor_Comms::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size, uint32_t timeout)
 {
-#ifdef __AVR__
     auto start = chrono::now();
     uint32_t elapsed = 0;
-#else
-    auto start = std::chrono::high_resolution_clock::now();
-    uint32_t elapsed = 0;
-#endif
 
     do
     {
@@ -259,6 +256,7 @@ uint8_t* Sensor_Comms::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size,
             {
                 if (get_rx_packet_type(raw_buffer) != static_cast<uint8_t>(data::sensor::Type::RESPONSE)) //ignore protocol packets
                 {
+                    chrono::delay(chrono::micros(5)); //to allow the sender to go in receive mode
                     send_response(*header_ptr);
 
                     packet_size = size - sizeof(Header);
@@ -267,12 +265,7 @@ uint8_t* Sensor_Comms::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size,
             }
         }
 
-#ifdef __AVR__
         elapsed = (chrono::now() - start).count;
-#else
-        elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
-#endif
-
     } while (elapsed < timeout);
 
     return nullptr;
@@ -282,6 +275,11 @@ uint8_t Sensor_Comms::get_rx_packet_type(uint8_t* received_buffer) const
 {
     const Header* header_ptr = reinterpret_cast<const Header*>(received_buffer);
     return header_ptr->type;
+}
+bool Sensor_Comms::get_rx_packet_needs_response(uint8_t* received_buffer) const
+{
+    const Header* header_ptr = reinterpret_cast<const Header*>(received_buffer);
+    return header_ptr->needs_response ? true : false;
 }
 const void* Sensor_Comms::get_rx_packet_payload(uint8_t* received_buffer) const
 {

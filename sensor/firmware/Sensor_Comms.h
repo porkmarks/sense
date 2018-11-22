@@ -15,6 +15,7 @@ public:
         uint32_t source_address = BROADCAST_ADDRESS;
         uint32_t destination_address = BROADCAST_ADDRESS;
         uint16_t req_id : 15;
+        uint16_t needs_response : 1;
         uint8_t type = 0;
     };
 
@@ -48,7 +49,7 @@ public:
 
     void* get_tx_packet_payload(uint8_t* raw_buffer) const;
 
-    uint8_t begin_packet(uint8_t* raw_buffer, uint8_t type);
+    uint8_t begin_packet(uint8_t* raw_buffer, uint8_t type, bool needs_response);
 
     uint8_t pack(uint8_t* raw_buffer, const void* data, uint8_t size);
 
@@ -57,9 +58,10 @@ public:
 
     uint8_t* receive_packet(uint8_t* raw_buffer, uint8_t& packet_size, uint32_t timeout);
 
-    uint32_t get_rx_packet_source_address(uint8_t* received_buffer) const;
     int8_t get_input_dBm();
+    uint32_t get_rx_packet_source_address(uint8_t* received_buffer) const;
     uint8_t get_rx_packet_type(uint8_t* received_buffer) const;
+    bool get_rx_packet_needs_response(uint8_t* received_buffer) const;
     const void* get_rx_packet_payload(uint8_t* received_buffer) const;
 
 private:

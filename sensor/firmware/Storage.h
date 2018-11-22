@@ -34,6 +34,8 @@ public:
     void clear();
     bool empty() const;
 
+    static constexpr uint8_t MAX_GROUP_COUNT = 35;
+
 private:
 
 #ifndef __AVR__
@@ -77,8 +79,6 @@ private:
     bool add_group();
 
     bool _unpack_next(iterator& it) const;
-
-    static constexpr uint8_t MAX_GROUP_COUNT = 30;
 
     static_assert(sizeof(Group) == 37, "Storage::Group is broken");
 

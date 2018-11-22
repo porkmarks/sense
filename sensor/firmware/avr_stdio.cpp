@@ -19,5 +19,10 @@ char uart_getchar(FILE* stream)
     return 0;
 }
 
+void uart_flush()
+{
+    loop_until_bit_is_set(UCSR0A, UDRE0);
+}
+
 
 #endif

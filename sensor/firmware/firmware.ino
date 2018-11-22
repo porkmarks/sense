@@ -70,9 +70,7 @@ static State s_state = State::PAIR;
 static uint8_t s_error_flags = 0;
 
 static SHT2x s_sht;
-
 static Sensor_Comms s_comms;
-
 static FILE s_uart_output;
 
 static uint32_t s_baseline_measurement_index = 0; //measurements should start from this index
@@ -96,13 +94,9 @@ static bool s_sensor_sleeping = false;
 
 ISR(BADISR_vect)
 {
-    digitalWriteFast(GREEN_LED_PIN, LOW);
     while (true)
     {
-        digitalWriteFast(RED_LED_PIN, HIGH);
-        chrono::delay(chrono::millis(5));
-        digitalWriteFast(RED_LED_PIN, LOW);
-        chrono::delay(chrono::millis(95));
+      blink_led(Blink_Led::Red, 255, chrono::millis(50));
     }
 }
 
@@ -150,7 +144,6 @@ static uint16_t stack_size(void)
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-static constexpr uint8_t MAX_NAME_LENGTH = 32;
 static constexpr uint8_t SETTINGS_VERSION = 2;
 
 static uint8_t  EEMEM eeprom_version;
@@ -158,6 +151,7 @@ static uint32_t EEMEM eeprom_serial_number;
 static uint32_t EEMEM eeprom_address;
 static uint16_t EEMEM eeprom_temperature_bias;
 static uint16_t EEMEM eeprom_humidity_bias;
+static uint32_t EEMEM eeprom_crc;
 
 static void reset_settings()
 {
@@ -166,29 +160,62 @@ static void reset_settings()
 
 static void save_settings(uint32_t serial_number, uint32_t address, data::sensor::Calibration const& calibration)
 {
+    LOG(PSTR("Saving settings..."));
+    uint32_t crc = 123456789ULL;
     eeprom_write_byte(&eeprom_version, SETTINGS_VERSION);
+    hash_combine(crc, SETTINGS_VERSION);
+    
     eeprom_write_dword(&eeprom_serial_number, serial_number);
+    hash_combine(crc, serial_number);
+    
     eeprom_write_dword(&eeprom_address, address);
-    eeprom_write_word(&eeprom_temperature_bias, *reinterpret_cast<uint16_t const*>(&calibration.temperature_bias));
-    eeprom_write_word(&eeprom_humidity_bias, *reinterpret_cast<uint16_t const*>(&calibration.humidity_bias));
+    hash_combine(crc, address);
+    
+    eeprom_write_word(&eeprom_temperature_bias, *(uint16_t*)&calibration.temperature_bias);
+    hash_combine(crc, int32_t(calibration.temperature_bias) + 65535ULL);
+    
+    eeprom_write_word(&eeprom_humidity_bias, *(uint16_t*)&calibration.humidity_bias);
+    hash_combine(crc, int32_t(calibration.humidity_bias) + 65535ULL);
+
+    eeprom_write_dword(&eeprom_crc, crc);
+    LOG(PSTR("done\n"));
 }
 
 static bool load_settings(uint32_t& serial_number, uint32_t& address, data::sensor::Calibration& calibration)
 {
+    LOG(PSTR("Loading settings..."));
     if (eeprom_read_byte(&eeprom_version) == SETTINGS_VERSION)
     {
+        uint32_t crc = 123456789ULL;
+        hash_combine(crc, SETTINGS_VERSION);
+        
         serial_number = eeprom_read_dword(&eeprom_serial_number);
+        hash_combine(crc, serial_number);
+        
         address = eeprom_read_dword(&eeprom_address);
+        hash_combine(crc, address);
 
         uint16_t v = eeprom_read_word(&eeprom_temperature_bias);
-        calibration.temperature_bias = *reinterpret_cast<int16_t const*>(&v);
+        calibration.temperature_bias = *(int16_t*)&v;
+        hash_combine(crc, int32_t(calibration.temperature_bias) + 65535ULL);
 
         v = eeprom_read_word(&eeprom_humidity_bias);
-        calibration.humidity_bias = *reinterpret_cast<int16_t const*>(&v);
+        calibration.humidity_bias = *(int16_t*)&v;
+        hash_combine(crc, int32_t(calibration.humidity_bias) + 65535ULL);
+
+        uint32_t stored_crc = eeprom_read_dword(&eeprom_crc);
+        if (stored_crc != crc)
+        {
+            LOG(PSTR("failed: crc mismatch\n"));
+            //reset_settings();
+            return false;
+        }
+        LOG(PSTR("done\n"));
         return true;
     }
     else
     {
+        LOG(PSTR("failed: old version\n"));
         reset_settings();
         return false;
     }
@@ -213,22 +240,95 @@ static void setup()
     stdout = &s_uart_output;
     ///
 
+    ///////////////////////////////////////////////
+    //setup the leds and buttons
+    init_leds();
+    init_buttons();
+
+    ///////////////////////////////////////////////
+    //setup clock
     stack_paint();
     setup_clock(921600);
+
+    chrono::delay(chrono::millis(2000)); //wait for the main clock to get calibrated
+
     
-    chrono::delay(chrono::millis(1000)); //wait for the main clock to get calibrated
 
-    ///////////////////////////////////////////////
-    //setup the led pins
-    pinModeFast(RED_LED_PIN, OUTPUT);
-    digitalWriteFast(RED_LED_PIN, LOW);
-    pinModeFast(GREEN_LED_PIN, OUTPUT);
-    digitalWriteFast(GREEN_LED_PIN, LOW);
-
-    ///////////////////////////////////////////////
-    //setup buttons
-    pinModeFast(static_cast<uint8_t>(Button::BUTTON1), INPUT);
-    digitalWriteFast(static_cast<uint8_t>(Button::BUTTON1), HIGH);
+/*
+    printf_P(PSTR("0 %d\n"), (int)(EECR & bit(EERIE)));
+    printf_P(PSTR("1 %d\n"), (int)(XFDCSR & bit(XFDIE)));
+    printf_P(PSTR("2 %d\n"), (int)(WDTCSR & bit(WDIE)));
+    printf_P(PSTR("3 %d\n"), (int)(PCICR & bit(PCIE2)));
+    printf_P(PSTR("4 %d\n"), (int)(PCICR & bit(PCIE1)));
+    printf_P(PSTR("5 %d\n"), (int)(PCICR & bit(PCIE0)));
+    printf_P(PSTR("6 %d\n"), (int)(TIMSK0 & bit(OCIE0B)));
+    printf_P(PSTR("7 %d\n"), (int)(TIMSK0 & bit(OCIE0A)));
+    printf_P(PSTR("8 %d\n"), (int)(TIMSK0 & bit(TOIE0)));
+    printf_P(PSTR("9 %d\n"), (int)(TIMSK1 & bit(ICIE1)));
+    printf_P(PSTR("a %d\n"), (int)(TIMSK1 & bit(OCIE1B)));
+    printf_P(PSTR("b %d\n"), (int)(TIMSK1 & bit(OCIE1A)));
+    printf_P(PSTR("c %d\n"), (int)(TIMSK1 & bit(TOIE1)));
+    printf_P(PSTR("d %d\n"), (int)(TIMSK2 & bit(OCIE2B)));
+    printf_P(PSTR("e %d\n"), (int)(TIMSK2 & bit(OCIE2A)));
+    printf_P(PSTR("f %d\n"), (int)(TIMSK2 & bit(TOIE2)));
+    printf_P(PSTR("g %d\n"), (int)(TIMSK3 & bit(ICIE3)));
+    printf_P(PSTR("h %d\n"), (int)(TIMSK3 & bit(OCIE3B)));
+    printf_P(PSTR("i %d\n"), (int)(TIMSK3 & bit(OCIE3A)));
+    printf_P(PSTR("j %d\n"), (int)(TIMSK3 & bit(TOIE3)));
+    printf_P(PSTR("k %d\n"), (int)(TIMSK4 & bit(ICIE4)));
+    printf_P(PSTR("l %d\n"), (int)(TIMSK4 & bit(OCIE4B)));
+    printf_P(PSTR("m %d\n"), (int)(TIMSK4 & bit(OCIE4A)));
+    printf_P(PSTR("n %d\n"), (int)(TIMSK4 & bit(TOIE4)));
+    printf_P(PSTR("o %d\n"), (int)(SPCR0 & bit(SPIE)));
+    printf_P(PSTR("p %d\n"), (int)(SPCR1 & bit(SPIE)));
+    printf_P(PSTR("q %d\n"), (int)(UCSR0B & bit(RXCIE0)));
+    printf_P(PSTR("r %d\n"), (int)(UCSR0B & bit(TXCIE0)));
+    printf_P(PSTR("s %d\n"), (int)(UCSR0B & bit(UDRIE0)));
+    printf_P(PSTR("t %d\n"), (int)(UCSR1B & bit(RXCIE1)));
+    printf_P(PSTR("u %d\n"), (int)(UCSR1B & bit(TXCIE1)));
+    printf_P(PSTR("v %d\n"), (int)(UCSR1B & bit(UDRIE1)));
+    printf_P(PSTR("w %d\n"), (int)(TWCR0 & bit(TWIE)));
+    printf_P(PSTR("w %d\n"), (int)(TWCR1 & bit(TWIE)));
+    printf_P(PSTR("x %d\n"), (int)(ACSR & bit(ACIE)));
+    printf_P(PSTR("y %d\n"), (int)(ADCSRA & bit(ADIE)));
+    printf_P(PSTR("z %d\n"), (int)(SPMCSR & bit(SPMIE)));
+    printf_P(PSTR("0 %d\n"), (int)(EIMSK & bit(INT0)));
+    printf_P(PSTR("1 %d\n"), (int)(EIMSK & bit(INT1)));
+*/
+/*
+    int counter = 0;
+    while (true)
+    {
+      if (counter++ < 100)
+      {
+        set_led(Led::Yellow);
+        LOG(PSTR("%d, OSCCAL: %d, %ld, %d\n"), counter, (int)OSCCAL, (int32_t)s_xxx, (int)chrono::now().ticks);
+        chrono::delay(chrono::millis(10));
+        set_led(Led::None);
+      }
+      else
+      {
+        sleep(chrono::millis(1000), true);
+        counter = 0;
+      }
+    }
+    */
+/*
+    chrono::time_ms start = chrono::now();
+    uint32_t count = 0;
+    uint32_t loops = 1;
+    while (true)
+    {
+      //printf_P(PSTR("%d, %d\n"), digitalReadFast(18), digitalReadFast(19));
+      //chrono::delay(chrono::millis(20));
+      int x = rand() % 200;
+      uint32_t rt_count = (uint32_t)(chrono::now() - start).count;
+      printf_P(PSTR("Sleeping for %d. TP: %ld, %ld. OSC: %d, T: %ld, D: %ld\n  "), x, rt_count, count, (int)OSCCAL, (uint32_t)s_xxx, (rt_count - count) / loops);
+      sleep_exact(chrono::millis(x));
+      count += x;
+      loops++;
+      //chrono::delay(chrono::millis(50));
+    }*/
 
     ////////////////////////////////////////////
 
@@ -256,17 +356,47 @@ static void setup()
     }
     LOG(PSTR(" << ***\n"));
 
-    LOG(PSTR("Stack: initial %d, now: %d\n"), initial_stack_size(), stack_size());
+    LOG(PSTR("Stack: initial %d, now %d\n"), initial_stack_size(), stack_size());
 
     ///////////////////////////////////////////////
-    //initialize the sensor
-    if (!_i2c_init())
+    //initialize the bus and sensors
+    while (!_i2c_init())
     {
         LOG(PSTR("I2C failed\n"));
+        blink_led(Blink_Led::Red, 4, chrono::millis(200));
+        while (true)
+        {
+            printf_P(PSTR("%d, %d\n"), digitalReadFast(18), digitalReadFast(19));
+            chrono::delay(chrono::millis(20));
+        }
+        sleep(chrono::seconds(3), false);
     }
     sleep_exact(50);
 
     init_adc();
+
+    //init sensor
+    while (true)
+    {
+        float t;
+        float h;
+        s_sht.GetHumidity(h);
+        s_sht.GetTemperature(t);
+        float vcc = read_vcc();      
+        LOG(PSTR("VCC: %d.%dV\n"), (int)vcc, int(vcc * 100.f) % 100);
+        LOG(PSTR("T: %d.%d'C\n"), (int)t, int(t * 100.f) % 100);
+        LOG(PSTR("H: %d.%d%%\n"), (int)h, int(h * 100.f) % 100);
+        if (t != 0.f && h > 0.1f && vcc > 1.5f)
+        {
+          break;
+        }
+        LOG(PSTR("Sensors failed\n"));
+        blink_led(Blink_Led::Red, 5, chrono::millis(200));
+        sleep(chrono::seconds(3), false);
+    }
+    ///////////////////////////////////////////////
+
+        
 /*
     for (uint32_t i = 100; i < 100000; i += 100)
     {
@@ -279,6 +409,7 @@ static void setup()
     ///////////////////////////////////////////////
     //seed the RNG
     uint32_t rnd_seed = 0;
+    while (true)
     {
         float t;
         float h;
@@ -287,45 +418,34 @@ static void setup()
             s_sht.GetHumidity(h);
             s_sht.GetTemperature(t);
             float vcc = read_vcc();
-            hash_combine(rnd_seed, *reinterpret_cast<uint32_t*>(&vcc));
-            hash_combine(rnd_seed, *reinterpret_cast<uint32_t*>(&t));
-            hash_combine(rnd_seed, *reinterpret_cast<uint32_t*>(&h));
+            hash_combine(rnd_seed, *(uint32_t*)&vcc);
+            hash_combine(rnd_seed, *(uint32_t*)&t);
+            hash_combine(rnd_seed, *(uint32_t*)&h);
             sleep_exact(10);
         }
-        srandom(rnd_seed);
-        LOG(PSTR("Random seed: %lu\n"), rnd_seed);
-    }
-    //while (true);
+        if (rnd_seed != 0)
+        {
+            srandom(rnd_seed);
+            LOG(PSTR("Random seed: %lu\n"), rnd_seed);
+            break;
+        }
 
-    {
-        float t;
-        float h;
-        s_sht.GetHumidity(h);
-        s_sht.GetTemperature(t);
-        float vcc = read_vcc();      
-        LOG(PSTR("VCC: %d.%dV\n"), (int)vcc, int(vcc * 100.f) % 100);
-        LOG(PSTR("T: %d.%d'C\n"), (int)t, int(t * 100.f) % 100);
-        LOG(PSTR("H: %d.%d%%\n"), (int)h, int(h * 100.f) % 100);
+        LOG(PSTR("Random seed failed\n"));
+        blink_led(Blink_Led::Red, 6, chrono::millis(200));
+        sleep(chrono::seconds(3), false);
     }
-//    ///////////////////////////////////////////////
-//    //setup SPI
-//    pinModeFast(SS, OUTPUT);
-//    digitalWriteFast(SS, HIGH);
-//    sleep_exact(100);
-    
+
     ///////////////////////////////////////////////
-
-    LOG(PSTR("Starting RF setup..."));
-    
-    while (!s_comms.init(5, 15))
+    // Start the RF
+    while (!s_comms.init(5, 0))
     {
-        LOG(PSTR("failed\n"));
-        blink_leds(RED_LED, 3, chrono::millis(100));
-        sleep(chrono::seconds(5), false);
+        LOG(PSTR("RF failed\n"));
+        blink_led(Blink_Led::Red, 7, chrono::millis(200));
+        sleep(chrono::seconds(3), false);
     }
     s_comms.sleep_mode();
-    LOG(PSTR("done\n"));
 
+    /*
     //send some test garbage for frequency measurements
     {
         uint8_t raw_packet_data[packet_raw_size(Sensor_Comms::MAX_USER_DATA_SIZE)];
@@ -333,11 +453,11 @@ static void setup()
         s_comms.begin_packet(raw_packet_data, 0);
         s_comms.send_packet(raw_packet_data, 2);
     }
-
+    */
 
     ///////////////////////////////////////////////
     //done
-    blink_leds(GREEN_LED, 5, chrono::millis(50));
+    blink_led(Blink_Led::Green, 5, chrono::millis(50));
 
     ///////////////////////////////////////////////
     //settings
@@ -348,16 +468,10 @@ static void setup()
         if (s_serial_number == 0)
         {
             s_serial_number = rnd_seed;
-            while (s_serial_number == 0)
-            {
-                LOG(PSTR("Serial number failed\n"));
-                blink_leds(RED_LED, 8, chrono::millis(100));
-                sleep(chrono::seconds(60 * 60), false);
-            }
             save_settings(s_serial_number, address, s_calibration);
         }
 
-        if (ok)
+        if (ok && address >= Sensor_Comms::SLAVE_ADDRESS_BEGIN)
         {
             s_comms.set_address(address);
             s_state = State::FIRST_CONFIG;
@@ -377,7 +491,7 @@ static void setup()
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-static bool apply_config(const data::sensor::Config& config)
+static bool apply_config(const data::sensor::Config_Response& config)
 {
     if (config.measurement_period.count == 0 || config.comms_period.count == 0)
     {
@@ -458,7 +572,7 @@ static bool request_config()
     bool send_successful = false;
     {
         uint8_t raw_buffer[packet_raw_size(sizeof(data::sensor::Config_Request))];
-        s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::CONFIG_REQUEST));
+        s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::CONFIG_REQUEST), true);
         data::sensor::Config_Request req;
         req.first_measurement_index = s_first_stored_measurement_index;
         req.measurement_count = s_storage.get_data_count();
@@ -471,16 +585,16 @@ static bool request_config()
 
     if (send_successful)
     {
-        uint8_t size = sizeof(data::sensor::Config);
+        uint8_t size = sizeof(data::sensor::Config_Response);
         uint8_t raw_buffer[packet_raw_size(size)];
         uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, 500);
         if (buffer)
         {
             data::sensor::Type type = static_cast<data::sensor::Type>(s_comms.get_rx_packet_type(buffer));
-            if (type == data::sensor::Type::CONFIG && size == sizeof(data::sensor::Config))
+            if (type == data::sensor::Type::CONFIG_RESPONSE && size == sizeof(data::sensor::Config_Response))
             {
                 s_last_input_dBm = s_comms.get_input_dBm();
-                const data::sensor::Config* ptr = reinterpret_cast<const data::sensor::Config*>(s_comms.get_rx_packet_payload(buffer));
+                const data::sensor::Config_Response* ptr = reinterpret_cast<const data::sensor::Config_Response*>(s_comms.get_rx_packet_payload(buffer));
                 return apply_config(*ptr);
             }
         }
@@ -513,7 +627,7 @@ static void pair_state()
             if (is_pressed(Button::BUTTON1))
             {
                 tries = 0;
-                blink_leds(YELLOW_LED, 3, chrono::millis(500));
+                blink_led(Blink_Led::Yellow, 3, chrono::millis(500));
 
                 //wait for the user to release the button
                 wait_for_release(Button::BUTTON1);
@@ -523,7 +637,7 @@ static void pair_state()
                 bool send_successful = false;
                 {
                     uint8_t raw_buffer[packet_raw_size(sizeof(data::sensor::Pair_Request))];
-                    s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::PAIR_REQUEST));
+                    s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::PAIR_REQUEST), true);
                     data::sensor::Pair_Request request;
                     request.descriptor.sensor_type = SENSOR_TYPE;
                     request.descriptor.hardware_version = HARDWARE_VERSION;
@@ -543,7 +657,7 @@ static void pair_state()
                     uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, 2000);
                     if (buffer)
                     {
-                        LOG(PSTR("Received packet of %d bytes. Type %s\n"), (int)size, (int)s_comms.get_rx_packet_type(buffer));
+                        LOG(PSTR("Received packet type %d of %d bytes\n"), (int)s_comms.get_rx_packet_type(buffer), (int)size);
                     }
 
                     if (buffer && size == sizeof(data::sensor::Pair_Response) && 
@@ -559,7 +673,7 @@ static void pair_state()
 
                         save_settings(s_serial_number, response_ptr->address, s_calibration);
 
-                        blink_leds(GREEN_LED, 3, chrono::millis(500));
+                        blink_led(Blink_Led::Green, 3, chrono::millis(500));
 
                         done = true;
                         break;
@@ -574,12 +688,12 @@ static void pair_state()
                 {
                     LOG(PSTR("failed.\n"));
                 }
-                blink_leds(RED_LED, 3, chrono::millis(500));
+                blink_led(Blink_Led::Red, 3, chrono::millis(500));
             }
 
             s_comms.sleep_mode();
 
-            blink_leds(YELLOW_LED, 3, chrono::millis(100));
+            blink_led(Blink_Led::Yellow, 3, chrono::millis(100));
             sleep(chrono::millis(2000), true);
         }
 
@@ -603,7 +717,7 @@ static void pair_state()
 
     s_comms.sleep_mode();
 
-    blink_leds(GREEN_LED, 3, chrono::millis(500));
+    blink_led(Blink_Led::Green, 3, chrono::millis(500));
 
     //wait for the user to release the button
     wait_for_release(Button::BUTTON1);
@@ -681,8 +795,8 @@ static void do_comms()
         const chrono::millis COMMS_SLOT_DURATION = chrono::millis(7000);
         chrono::time_ms start_tp = chrono::now();
 
-        uint8_t raw_buffer[packet_raw_size(sizeof(data::sensor::Measurement_Batch))];
-        data::sensor::Measurement_Batch& batch = *(data::sensor::Measurement_Batch*)s_comms.get_tx_packet_payload(raw_buffer);
+        uint8_t raw_buffer[packet_raw_size(sizeof(data::sensor::Measurement_Batch_Request))];
+        data::sensor::Measurement_Batch_Request& batch = *(data::sensor::Measurement_Batch_Request*)s_comms.get_tx_packet_payload(raw_buffer);
 
         batch.start_index = s_first_stored_measurement_index;
         batch.count = 0;
@@ -716,7 +830,7 @@ static void do_comms()
                 }
             }
 
-            if (batch.count >= data::sensor::Measurement_Batch::MAX_COUNT)
+            if (batch.count >= data::sensor::Measurement_Batch_Request::MAX_COUNT)
             {
                 send = true;
             }
@@ -732,8 +846,8 @@ static void do_comms()
             {
                 batch.last_batch = done ? 1 : 0;
                 LOG(PSTR("Sending measurement batch of %d..."), (int)batch.count);
-                s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::MEASUREMENT_BATCH));
-                if (s_comms.send_packet(raw_buffer, sizeof(data::sensor::Measurement_Batch), 1) == true)
+                s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::MEASUREMENT_BATCH_REQUEST), false);
+                if (s_comms.send_packet(raw_buffer, sizeof(data::sensor::Measurement_Batch_Request), 1) == true)
                 {
                     s_error_flags = 0;
                     LOG(PSTR("done.\n"));
@@ -761,11 +875,11 @@ static void do_comms()
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-static bool apply_first_config(const data::sensor::First_Config& first_config)
+static bool apply_first_config(const data::sensor::First_Config_Response& first_config)
 {
     s_storage.clear();
 
-    if (!apply_config(first_config.config))
+    if (!apply_config(first_config))
     {
         return false;
     }
@@ -781,7 +895,7 @@ static bool request_first_config()
     bool send_successful = false;
     {
         uint8_t raw_buffer[packet_raw_size(sizeof(data::sensor::First_Config_Request))];
-        s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::FIRST_CONFIG_REQUEST));
+        s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::FIRST_CONFIG_REQUEST), true);
         data::sensor::First_Config_Request request;
         request.descriptor.sensor_type = SENSOR_TYPE;
         request.descriptor.hardware_version = HARDWARE_VERSION;
@@ -793,16 +907,16 @@ static bool request_first_config()
 
     if (send_successful)
     {
-        uint8_t size = sizeof(data::sensor::First_Config);
+        uint8_t size = sizeof(data::sensor::First_Config_Response);
         uint8_t raw_buffer[packet_raw_size(size)];
         uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, 500);
         if (buffer)
         {
             data::sensor::Type type = static_cast<data::sensor::Type>(s_comms.get_rx_packet_type(buffer));
-            if (type == data::sensor::Type::FIRST_CONFIG && size == sizeof(data::sensor::First_Config))
+            if (type == data::sensor::Type::FIRST_CONFIG_RESPONSE && size == sizeof(data::sensor::First_Config_Response))
             {
                 s_last_input_dBm = s_comms.get_input_dBm();
-                const data::sensor::First_Config* ptr = reinterpret_cast<const data::sensor::First_Config*>(s_comms.get_rx_packet_payload(buffer));
+                const data::sensor::First_Config_Response* ptr = reinterpret_cast<const data::sensor::First_Config_Response*>(s_comms.get_rx_packet_payload(buffer));
                 return apply_first_config(*ptr);
             }
         }
@@ -838,9 +952,9 @@ static void first_config_state()
             continue;
         }      
 
-        set_leds(YELLOW_LED);
+        set_led(Led::Yellow);
         sleep_exact(chrono::millis(100));
-        set_leds(0);
+        set_led(Led::None);
 
         bool got_it = request_first_config();
         s_comms.sleep_mode();
@@ -848,16 +962,16 @@ static void first_config_state()
         if (got_it)
         {
             LOG(PSTR("Received first config. Starting measuring.\n"));
-            set_leds(GREEN_LED);
+            set_led(Led::Green);
             sleep_exact(chrono::millis(100));
-            set_leds(0);
+            set_led(Led::None);
             s_state = State::MEASUREMENT_LOOP;
         }
         else
         {
-            set_leds(RED_LED);
+            set_led(Led::Red);
             sleep_exact(chrono::millis(100));
-            set_leds(0);
+            set_led(Led::None);
             sleep(chrono::millis(10000), true);
         }
     }
@@ -915,9 +1029,9 @@ static void measurement_loop_state()
 
             if (measure)
             {
-                set_leds(GREEN_LED);
+                set_led(Led::Green);
                 do_measurement();
-                set_leds(0);
+                set_led(Led::None);
             }
         }
 
@@ -928,9 +1042,9 @@ static void measurement_loop_state()
                 s_next_comms_time_point += s_comms_period;
             }
 
-            set_leds(YELLOW_LED);
+            set_led(Led::Yellow);
             sleep_exact(chrono::millis(100));
-            set_leds(0);
+            set_led(Led::None);
             
             do_comms();
         }
@@ -939,7 +1053,7 @@ static void measurement_loop_state()
         {
             LOG(PSTR("Going to sleep!\n"));
             s_state = State::SLEEPING_LOOP;
-            blink_leds(GREEN_LED, 8, chrono::millis(50));
+            blink_led(Blink_Led::Green, 8, chrono::millis(50));
             break;
         }
 
@@ -995,9 +1109,9 @@ static void sleep_loop_state()
 
         if (force_comms)
         {
-            set_leds(YELLOW_LED);
+            set_led(Led::Yellow);
             sleep_exact(chrono::millis(100));
-            set_leds(0);
+            set_led(Led::None);
             
             request_config();
         }
@@ -1006,7 +1120,7 @@ static void sleep_loop_state()
         {
             LOG(PSTR("Going to measurement!\n"));
             s_state = State::MEASUREMENT_LOOP;
-            blink_leds(YELLOW_LED, 8, chrono::millis(50));
+            blink_led(Blink_Led::Yellow, 8, chrono::millis(50));
             request_config(); //report back the sleeping status
             break;
         }
@@ -1047,7 +1161,7 @@ int main()
         }
         else
         {
-            blink_leds(RED_LED, 2, chrono::millis(50));
+            blink_led(Blink_Led::Red, 2, chrono::millis(50));
             sleep(chrono::millis(1000), true);
         }      
     }

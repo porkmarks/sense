@@ -214,42 +214,6 @@
 #define SX127X_RX_BW_MANT_AFC                         0b00001000  //  4     3     default RxBwMant parameter used during AFC
 #define SX127X_RX_BW_EXP_AFC                          0b00000011  //  2     0     default RxBwExp parameter used during AFC
 
-// SX127X_REG_OOK_PEAK
-#define SX127X_BIT_SYNC_OFF                           0b00000000  //  5     5     bit synchronizer disabled (not allowed in packet mode)
-#define SX127X_BIT_SYNC_ON                            0b00100000  //  5     5     bit synchronizer enabled (default)
-#define SX127X_OOK_THRESH_FIXED                       0b00000000  //  4     3     OOK threshold type: fixed value
-#define SX127X_OOK_THRESH_PEAK                        0b00001000  //  4     3                         peak mode (default)
-#define SX127X_OOK_THRESH_AVERAGE                     0b00010000  //  4     3                         average mode
-#define SX127X_OOK_PEAK_THRESH_STEP_0_5_DB            0b00000000  //  2     0     OOK demodulator step size: 0.5 dB (default)
-#define SX127X_OOK_PEAK_THRESH_STEP_1_0_DB            0b00000001  //  2     0                                1.0 dB
-#define SX127X_OOK_PEAK_THRESH_STEP_1_5_DB            0b00000010  //  2     0                                1.5 dB
-#define SX127X_OOK_PEAK_THRESH_STEP_2_0_DB            0b00000011  //  2     0                                2.0 dB
-#define SX127X_OOK_PEAK_THRESH_STEP_3_0_DB            0b00000100  //  2     0                                3.0 dB
-#define SX127X_OOK_PEAK_THRESH_STEP_4_0_DB            0b00000101  //  2     0                                4.0 dB
-#define SX127X_OOK_PEAK_THRESH_STEP_5_0_DB            0b00000110  //  2     0                                5.0 dB
-#define SX127X_OOK_PEAK_THRESH_STEP_6_0_DB            0b00000111  //  2     0                                6.0 dB
-
-// SX127X_REG_OOK_FIX
-#define SX127X_OOK_FIXED_THRESHOLD                    0x0C        //  7     0     default fixed threshold for OOK data slicer
-
-// SX127X_REG_OOK_AVG
-#define SX127X_OOK_PEAK_THRESH_DEC_1_1_CHIP           0b00000000  //  7     5     OOK demodulator step period: once per chip (default)
-#define SX127X_OOK_PEAK_THRESH_DEC_1_2_CHIP           0b00100000  //  7     5                                  once every 2 chips
-#define SX127X_OOK_PEAK_THRESH_DEC_1_4_CHIP           0b01000000  //  7     5                                  once every 4 chips
-#define SX127X_OOK_PEAK_THRESH_DEC_1_8_CHIP           0b01100000  //  7     5                                  once every 8 chips
-#define SX127X_OOK_PEAK_THRESH_DEC_2_1_CHIP           0b10000000  //  7     5                                  2 times per chip
-#define SX127X_OOK_PEAK_THRESH_DEC_4_1_CHIP           0b10100000  //  7     5                                  4 times per chip
-#define SX127X_OOK_PEAK_THRESH_DEC_8_1_CHIP           0b11000000  //  7     5                                  8 times per chip
-#define SX127X_OOK_PEAK_THRESH_DEC_16_1_CHIP          0b11100000  //  7     5                                  16 times per chip
-#define SX127X_OOK_AVERAGE_OFFSET_0_DB                0b00000000  //  3     2     OOK average threshold offset: 0.0 dB (default)
-#define SX127X_OOK_AVERAGE_OFFSET_2_DB                0b00000100  //  3     2                                   2.0 dB
-#define SX127X_OOK_AVERAGE_OFFSET_4_DB                0b00001000  //  3     2                                   4.0 dB
-#define SX127X_OOK_AVERAGE_OFFSET_6_DB                0b00001100  //  3     2                                   6.0 dB
-#define SX127X_OOK_AVG_THRESH_FILT_32_PI              0b00000000  //  1     0     OOK average filter coefficient: chip rate / 32*pi
-#define SX127X_OOK_AVG_THRESH_FILT_8_PI               0b00000001  //  1     0                                     chip rate / 8*pi
-#define SX127X_OOK_AVG_THRESH_FILT_4_PI               0b00000010  //  1     0                                     chip rate / 4*pi (default)
-#define SX127X_OOK_AVG_THRESH_FILT_2_PI               0b00000011  //  1     0                                     chip rate / 2*pi
-
 // SX127X_REG_AFC_FEI
 #define SX127X_AGC_START                              0b00010000  //  4     4     manually start AGC sequence
 #define SX127X_AFC_CLEAR                              0b00000010  //  1     1     manually clear AFC register
@@ -848,22 +812,45 @@ int16_t RFM95::setCodingRate(uint8_t cr) {
 }
 
 
+/*
+// SX127X_REG_PA_CONFIG
+#define SX127X_PA_SELECT_RFO                          0b00000000  //  7     7     RFO pin output, power limited to +14 dBm
+#define SX127X_PA_SELECT_BOOST                        0b10000000  //  7     7     PA_BOOST pin output, power limited to +20 dBm
+#define SX127X_OUTPUT_POWER                           0b00001111  //  3     0     output power: P_out = 2 + OUTPUT_POWER [dBm] for PA_SELECT_BOOST
+
+// SX127X_REG_PA_DAC
+#define SX127X_PA_BOOST_OFF                           0b00000100  //  2     0     PA_BOOST disabled
+#define SX127X_PA_BOOST_ON                            0b00000111  //  2     0     +20 dBm on PA_BOOST when OUTPUT_POWER = 0b1111
+
+// SX1278_REG_PA_CONFIG
+#define SX1278_MAX_POWER                              0b01110000  //  6     4     max power: P_max = 10.8 + 0.6*MAX_POWER [dBm]; P_max(MAX_POWER = 0b111) = 15 dBm
+#define SX1278_LOW_POWER                              0b00100000  //  6     4
+*/
+
 int16_t RFM95::setOutputPower(int8_t power) {
-  // check allowed power range
-  if(!(((power >= -3) && (power <= 17)) || (power == 20))) {
-    return(ERR_INVALID_OUTPUT_POWER);
+  if (power < 2)
+  {
+     power = 2;
+  }
+  if (power > 17)
+  {
+     power = 17;
   }
 
   // set mode to standby
   int16_t state = standby();
 
   // set output power
-  if(power < 2) {
+
+  //RFO is not connected on RFM95!!!
+/*  if(power < 2) {
     // power is less than 2 dBm, enable PA on RFO
     state |= _mod->SPIsetRegValue(SX127X_REG_PA_CONFIG, SX127X_PA_SELECT_RFO, 7, 7);
     state |= _mod->SPIsetRegValue(SX127X_REG_PA_CONFIG, SX1278_LOW_POWER | (power + 3), 6, 0);
     state |= _mod->SPIsetRegValue(SX1278_REG_PA_DAC, SX127X_PA_BOOST_OFF, 2, 0);
-  } else if((power >= 2) && (power <= 17)) {
+  } else 
+  */
+  if((power >= 2) && (power <= 17)) {
     // power is 2 - 17 dBm, enable PA1 + PA2 on PA_BOOST
     state |= _mod->SPIsetRegValue(SX127X_REG_PA_CONFIG, SX127X_PA_SELECT_BOOST, 7, 7);
     state |= _mod->SPIsetRegValue(SX127X_REG_PA_CONFIG, SX1278_MAX_POWER | (power - 2), 6, 0);

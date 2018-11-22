@@ -60,7 +60,7 @@ struct Item16
 static_assert(sizeof(Item8) == 1, "");
 static_assert(sizeof(Item16) == 2, "");
 
-static_assert(sizeof(Storage) <= 38 * 30 + 18, "");
+static_assert(sizeof(Storage) <= 38 * Storage::MAX_GROUP_COUNT + 18, "");
 
 
 //////////////////////////////////////////////////////////////////////////

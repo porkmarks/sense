@@ -159,7 +159,7 @@ uint8_t __attribute__ ((noinline)) i2c_read(bool last) __attribute__ ((used));
 // than 25KHz. This could be useful for problematic buses with high pull-ups
 // and high capasitance.
 #ifndef I2C_SLOWMODE
-#define I2C_SLOWMODE 1
+#define I2C_SLOWMODE 0
 #endif
 
 // If I2C_PULLUP is set to 1, then the internal pull-up resistors are used.
