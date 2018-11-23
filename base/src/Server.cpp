@@ -179,17 +179,25 @@ bool Server::init(uint16_t port, uint16_t broadcast_port)
 
 void Server::start_accept()
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
     LOGI << "Started accepting connections." << std::endl;
+    bool ok = true;
     try
     {
-        m_is_connected = false;
-        m_is_accepting = true;
         m_socket.close();
         m_acceptor->async_accept(m_socket, std::bind(&Server::accept_func, this, std::placeholders::_1));
     }
     catch (std::exception const& e)
     {
         LOGE << "Start accept error: " << e.what() << std::endl;
+        ok = false;
+    }
+
+    if (ok)
+    {
+        m_is_connected = false;
+        m_is_accepting = true;
     }
 }
 
@@ -197,6 +205,8 @@ void Server::start_accept()
 
 void Server::accept_func(asio::error_code ec)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
     if (ec)
     {
         LOGE << "Accept error: " << ec.message() << std::endl;
@@ -204,12 +214,26 @@ void Server::accept_func(asio::error_code ec)
     }
     else
     {
-        LOGI << "Connected!" << std::endl;
         m_is_accepting = false;
-        m_is_connected = true;
-        asio::ip::tcp::no_delay option(true);
-        m_socket.set_option(option);
-        m_socket_adapter.start();
+        bool ok = true;
+        try
+        {
+            asio::ip::tcp::no_delay option(true);
+            m_socket.set_option(option);
+            m_socket_adapter.start();
+        }
+        catch (std::exception const& e)
+        {
+            LOGE << "Start accept error: " << e.what() << std::endl;
+            ok = false;
+        }
+
+        if (ok)
+        {
+            LOGI << "Connected!" << std::endl;
+            m_is_connected = true;
+            m_last_talk_tp = Clock::now();
+        }
     }
 }
 
@@ -274,6 +298,7 @@ void Server::broadcast_thread_func()
 
 bool Server::is_connected() const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
     return m_is_connected;
 }
 
@@ -281,6 +306,8 @@ bool Server::is_connected() const
 
 Server::Result Server::send_sensor_message(Sensor_Request const& request, Sensor_Response& response)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
     if (!is_connected())
     {
         return Result::Connection_Error;
@@ -298,16 +325,14 @@ Server::Result Server::send_sensor_message(Sensor_Request const& request, Sensor
         pack(buffer, request.payload.data(), request.payload.size(), offset);
     }
 
-    Clock::time_point start_tp = Clock::now();
-
-    std::cout << "Sending: " << int(request.type);
-    std::cout.flush();
     m_channel.send(data::Server_Message::SENSOR_REQ, buffer.data(), offset);
+    if (!request.needs_response)
+    {
+        return Result::Ok;
+    }
 
     if (wait_for_message(data::Server_Message::SENSOR_RES, std::chrono::milliseconds(200)))
     {
-        std::cout << " ... done: " << std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - start_tp).count() << std::endl;
-
         size_t max_size = 0;
         bool ok = m_channel.unpack_fixed(buffer, max_size) == Channel::Unpack_Result::OK;
 
@@ -319,7 +344,7 @@ Server::Result Server::send_sensor_message(Sensor_Request const& request, Sensor
         ok &= unpack(buffer, has_response, offset);
         ok &= req_id == res_id;
 
-        if (!ok || !has_response)
+        if (ok && !has_response)
         {
             return Result::Ok;
         }
@@ -337,7 +362,6 @@ Server::Result Server::send_sensor_message(Sensor_Request const& request, Sensor
         }
         return ok ? Result::Has_Response : Result::Data_Error;
     }
-    std::cout << " ...timeout!" << std::endl;
     return Result::Timeout_Error;
 }
 
@@ -345,6 +369,8 @@ Server::Result Server::send_sensor_message(Sensor_Request const& request, Sensor
 
 bool Server::wait_for_message(data::Server_Message expected_message, Clock::duration timeout)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
     if (!m_socket.is_open() || !m_is_connected)
     {
         if (!m_is_accepting)
@@ -363,6 +389,7 @@ bool Server::wait_for_message(data::Server_Message expected_message, Clock::dura
         count++;
         if (m_channel.get_next_message(message))
         {
+            m_last_talk_tp = Clock::now();
             if (message == expected_message)
             {
                 return true;
@@ -376,12 +403,28 @@ bool Server::wait_for_message(data::Server_Message expected_message, Clock::dura
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
+void Server::process_ping()
+{
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
+    std::array<uint8_t, 1024> buffer;
+    size_t offset = 0;
+    uint32_t req_id = m_last_request_id++;
+    pack(buffer, req_id, offset);
+    m_channel.send(data::Server_Message::PONG, buffer.data(), offset);
+    //LOGI << "PING" << std::endl;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
 void Server::process_message(data::Server_Message message)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
     switch (message)
     {
     case data::Server_Message::PING:
-        //process_ping();
+        process_ping();
         break;
     default:
         LOGE << "Invalid message received: " << int(message) << std::endl;
@@ -392,6 +435,8 @@ void Server::process_message(data::Server_Message message)
 
 void Server::process()
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
     if (!m_socket.is_open() || !m_is_connected)
     {
         if (!m_is_accepting)
@@ -402,9 +447,17 @@ void Server::process()
         return;
     }
 
+    if (Clock::now() - m_last_talk_tp > std::chrono::seconds(10))
+    {
+        LOGI << "Timed out. Disconnecting & listening..." << std::endl;
+        start_accept();
+        return;
+    }
+
     data::Server_Message message;
     while (m_channel.get_next_message(message))
     {
+        m_last_talk_tp = Clock::now();
         process_message(message);
     }
 }

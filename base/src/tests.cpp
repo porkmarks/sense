@@ -25,7 +25,6 @@ static bool check_equal(const Storage& storage, const std::vector<Storage::Data>
 
     constexpr float TEMPERATURE_ACCURACY = 0.25f;
     constexpr float HUMIDITY_ACCURACY = 0.5f;
-    constexpr float VCC_ACCURACY = 0.1f;
 
     while (storage.unpack_next(it))
     {
@@ -156,7 +155,6 @@ static void test_storage_accuracy()
 
     constexpr float MAX_TEMPERATURE_VARIATION = 1.f;
     constexpr float MAX_HUMIDITY_VARIATION = 10.f;
-    constexpr float MAX_VCC_VARIATION = 0.1f;
 
     for (size_t i = 0; i < 100000; i++)
     {

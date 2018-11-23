@@ -31,7 +31,7 @@ void pack(C& c, void const* data, size_t size, size_t& offset)
 template<typename C, typename T>
 void pack(C& c, T const& t, size_t& offset)
 {
-    static_assert(std::is_standard_layout<T>::value, "Only PODs pls");
+    //static_assert(std::is_standard_layout<T>::value, "Only PODs pls");
     pack(c, &t, sizeof(T), offset);
 }
 
@@ -50,7 +50,7 @@ bool unpack(C const& c, void* data, size_t size, size_t& offset, size_t max_size
 template<typename C, typename T>
 bool unpack(C const& c, T& t, size_t& offset, size_t max_size)
 {
-    static_assert(std::is_standard_layout<T>::value, "Only PODs pls");
+    //static_assert(std::is_standard_layout<T>::value, "Only PODs pls");
     return unpack(c, &t, sizeof(T), offset, max_size);
 }
 
@@ -88,7 +88,7 @@ void Comms::broadcastReceived()
                 //reconnect?
                 {
                     auto it = std::find_if(m_initializedBaseStations.begin(), m_initializedBaseStations.end(), [&bs](std::unique_ptr<InitializedBaseStation> const& cbs) { return cbs->descriptor.mac == bs.mac; });
-                    if (it != m_initializedBaseStations.end() && (*it)->isConnected == false)
+                    if (it != m_initializedBaseStations.end() && (*it)->isConnected == false && (*it)->isConnecting == false)
                     {
                         reconnectToBaseStation(it->get());
                     }
@@ -167,6 +167,7 @@ void Comms::connectedToBaseStation(InitializedBaseStation* cbs)
 
         cbs->isConnecting = false;
         cbs->isConnected = true;
+        cbs->lastTalkTP = DB::Clock::now(); //this represents communication so reset the pong
 
         emit baseStationConnected(cbs->descriptor);
         cbs->socketAdapter.start();
@@ -179,14 +180,17 @@ void Comms::disconnectedFromBaseStation(InitializedBaseStation* cbs)
 {
     if (cbs)
     {
-        if (cbs->isConnected)
+        bool wasConnected = cbs->isConnected;
+        cbs->isConnected = false;
+        cbs->isConnecting = false;
+        cbs->socketAdapter.getSocket().abort();
+        //cbs->socketAdapter.getSocket().reset();
+
+        if (wasConnected)
         {
             s_logger.logWarning(QString("Disconnected from BS %1").arg(getMacStr(cbs->descriptor.mac).c_str()));
             emit baseStationDisconnected(cbs->descriptor);
         }
-
-        cbs->isConnected = false;
-        cbs->isConnecting = false;
     }
 }
 
@@ -234,6 +238,17 @@ void Comms::sendEmptySensorResponse(InitializedBaseStation& cbs, SensorRequest c
 
 //////////////////////////////////////////////////////////////////////////
 
+void Comms::sendPing(Comms::InitializedBaseStation& cbs)
+{
+    std::array<uint8_t, 1024> buffer;
+    size_t offset = 0;
+    pack(buffer, ++cbs.lastPingId, offset);
+    cbs.channel.send(data::Server_Message::PING, buffer.data(), offset);
+    cbs.lastPingTP = DB::Clock::now();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 template <typename T>
 void Comms::sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Type type, uint32_t address, uint8_t retries, T const& payload)
 {
@@ -254,7 +269,8 @@ void Comms::sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const&
 
 void Comms::processPong(InitializedBaseStation& cbs)
 {
-    std::cout << "PONG" << std::endl;
+    cbs.lastTalkTP = DB::Clock::now(); //this represents communication so reset the pong
+    //std::cout << "PONG" << std::endl;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -299,10 +315,10 @@ void Comms::processSensorReq(InitializedBaseStation& cbs, SensorRequest const& r
 {
     switch (static_cast<data::sensor::Type>(request.type))
     {
-    case data::sensor::Type::MEASUREMENT_BATCH:
-        if (request.payload.size() == sizeof(data::sensor::Measurement_Batch))
+    case data::sensor::Type::MEASUREMENT_BATCH_REQUEST:
+        if (request.payload.size() == sizeof(data::sensor::Measurement_Batch_Request))
         {
-            processSensorReq_MeasurementBatch(cbs, request, *reinterpret_cast<data::sensor::Measurement_Batch const*>(request.payload.data()));
+            processSensorReq_MeasurementBatch(cbs, request, *reinterpret_cast<data::sensor::Measurement_Batch_Request const*>(request.payload.data()));
         }
         break;
     case data::sensor::Type::CONFIG_REQUEST:
@@ -331,7 +347,7 @@ void Comms::processSensorReq(InitializedBaseStation& cbs, SensorRequest const& r
 }
 
 
-static void fillConfig(data::sensor::Config& config, DB::SensorsConfig const& sensorsConfig, DB::Sensor const& sensor, DB::SensorOutputDetails const& sensorOutputDetails, DB::Sensor::Calibration const& reportedCalibration)
+static void fillConfig(data::sensor::Config_Response& config, DB::SensorsConfig const& sensorsConfig, DB::Sensor const& sensor, DB::SensorOutputDetails const& sensorOutputDetails, DB::Sensor::Calibration const& reportedCalibration)
 {
     DB::Clock::time_point now = DB::Clock::now();
 
@@ -356,20 +372,19 @@ static void fillConfig(data::sensor::Config& config, DB::SensorsConfig const& se
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Measurement_Batch const& measurementBatch)
+void Comms::processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Measurement_Batch_Request const& measurementBatch)
 {
     int32_t sensorIndex = cbs.db.findSensorIndexByAddress(request.address);
     if (sensorIndex < 0)
     {
         std::cerr << "Invalid sensor address: " << request.address << std::endl;
-        sendEmptySensorResponse(cbs, request);
         return;
     }
 
     DB::Sensor const& sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
 
     std::vector<DB::MeasurementDescriptor> measurements;
-    uint32_t count = std::min<uint32_t>(measurementBatch.count, data::sensor::Measurement_Batch::MAX_COUNT);
+    uint32_t count = std::min<uint32_t>(measurementBatch.count, data::sensor::Measurement_Batch_Request::MAX_COUNT);
     measurements.reserve(count);
 
     for (uint32_t i = 0; i < count; i++)
@@ -392,7 +407,6 @@ void Comms::processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, Senso
         m.unpack(d.humidity, d.temperature);
         measurements.push_back(d);
     }
-    sendEmptySensorResponse(cbs, request);
 
     cbs.db.addMeasurements(measurements);
 }
@@ -430,10 +444,10 @@ void Comms::processSensorReq_ConfigRequest(InitializedBaseStation& cbs, SensorRe
     DB::Sensor::Calibration reportedCalibration{ static_cast<float>(configRequest.calibration.temperature_bias) / 100.f,
                 static_cast<float>(configRequest.calibration.humidity_bias) / 100.f};
 
-    data::sensor::Config config;
-    fillConfig(config, sensorsConfig, sensor, outputDetails, reportedCalibration);
+    data::sensor::Config_Response response;
+    fillConfig(response, sensorsConfig, sensor, outputDetails, reportedCalibration);
 
-    sendSensorResponse(cbs, request, data::sensor::Type::CONFIG, request.address, 1, config);
+    sendSensorResponse(cbs, request, data::sensor::Type::CONFIG_RESPONSE, request.address, 1, response);
 
     std::cout << "Received Config Request" << std::endl;
 }
@@ -452,17 +466,17 @@ void Comms::processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, Sen
 
     DB::Sensor const& sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
 
-    data::sensor::First_Config firstConfig;
+    data::sensor::First_Config_Response response;
 
     {
         DB::SensorOutputDetails outputDetails = cbs.db.computeSensorOutputDetails(sensor.id);
-        firstConfig.first_measurement_index = outputDetails.nextRealTimeMeasurementIndex; //since this sensor just booted, it cannot have measurements older than now
+        response.first_measurement_index = outputDetails.nextRealTimeMeasurementIndex; //since this sensor just booted, it cannot have measurements older than now
     }
 
     DB::SensorInputDetails details;
     details.id = sensor.id;
     details.hasStoredData = true;
-    details.firstStoredMeasurementIndex = firstConfig.first_measurement_index;
+    details.firstStoredMeasurementIndex = response.first_measurement_index;
     details.storedMeasurementCount = 0;
 
     cbs.db.setSensorInputDetails(details);
@@ -470,10 +484,10 @@ void Comms::processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, Sen
     {
         DB::SensorsConfig const& sensorsConfig = cbs.db.getLastSensorsConfig();
         DB::SensorOutputDetails outputDetails = cbs.db.computeSensorOutputDetails(sensor.id);
-        fillConfig(firstConfig.config, sensorsConfig, sensor, outputDetails, sensor.calibration);
+        fillConfig(response, sensorsConfig, sensor, outputDetails, sensor.calibration);
     }
 
-    sendSensorResponse(cbs, request, data::sensor::Type::FIRST_CONFIG, request.address, 2, firstConfig);
+    sendSensorResponse(cbs, request, data::sensor::Type::FIRST_CONFIG_RESPONSE, request.address, 2, response);
 
     std::cout << "Received First Config Request" << std::endl;
 }
@@ -536,8 +550,24 @@ void Comms::process()
     data::Server_Message message;
     for (std::unique_ptr<InitializedBaseStation>& cbs: m_initializedBaseStations)
     {
+        if (!cbs->isConnected)
+        {
+            continue;
+        }
+
+        if (DB::Clock::now() - cbs->lastPingTP > std::chrono::seconds(2))
+        {
+            sendPing(*cbs);
+        }
+        if (DB::Clock::now() - cbs->lastTalkTP > std::chrono::seconds(10))
+        {
+           disconnectedFromBaseStation(cbs.get());
+           continue;
+        }
+
         while (cbs->channel.get_next_message(message))
         {
+            cbs->lastTalkTP = DB::Clock::now(); //this represents communication so reset the pong
             switch (message)
             {
             case data::Server_Message::PONG:

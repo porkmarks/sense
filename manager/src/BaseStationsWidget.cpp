@@ -260,10 +260,11 @@ void BaseStationsWidget::baseStationDisconnected(Comms::BaseStationDescriptor co
 
 void BaseStationsWidget::showDisconnectionMessageBox(Settings::BaseStation const& bs, const QHostAddress& address)
 {
-    QMessageBox::critical(this, "Error", QString("Base Station %1, %2 has disconnected at %3")
-                    .arg(bs.descriptor.name.c_str())
-                    .arg(address.toString())
-                    .arg(QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm")));
+    //can't do this modal thing here!!
+//    QMessageBox::critical(this, "Error", QString("Base Station %1, %2 has disconnected at %3")
+//                    .arg(bs.descriptor.name.c_str())
+//                    .arg(address.toString())
+//                    .arg(QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm")));
 }
 
 //////////////////////////////////////////////////////////////////////////

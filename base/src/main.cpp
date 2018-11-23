@@ -97,28 +97,28 @@ void led_thread_func()
             {
                 gpioWrite(RED_LED_PIN, 0);
                 gpioWrite(GREEN_LED_PIN, 0);
-                chrono::delay(chrono::millis(100));
+                chrono::delay(chrono::millis(200));
                 gpioWrite(RED_LED_PIN, 1);
                 gpioWrite(GREEN_LED_PIN, 0);
-                chrono::delay(chrono::millis(100));
+                chrono::delay(chrono::millis(200));
             }
             else if (s_led_blink == Led_Blink::Slow_Green)
             {
                 gpioWrite(RED_LED_PIN, 0);
                 gpioWrite(GREEN_LED_PIN, 0);
-                chrono::delay(chrono::millis(100));
+                chrono::delay(chrono::millis(200));
                 gpioWrite(RED_LED_PIN, 0);
                 gpioWrite(GREEN_LED_PIN, 1);
-                chrono::delay(chrono::millis(100));
+                chrono::delay(chrono::millis(200));
             }
             else if (s_led_blink == Led_Blink::Slow_Yellow)
             {
                 gpioWrite(RED_LED_PIN, 0);
                 gpioWrite(GREEN_LED_PIN, 0);
-                chrono::delay(chrono::millis(100));
+                chrono::delay(chrono::millis(200));
                 gpioWrite(RED_LED_PIN, 1);
                 gpioWrite(GREEN_LED_PIN, 1);
-                chrono::delay(chrono::millis(100));
+                chrono::delay(chrono::millis(200));
             }
             else if (s_led_blink == Led_Blink::Fast_Red)
             {
@@ -204,7 +204,7 @@ int main(int, const char**)
     //send some test garbage for frequency measurements
     {
         s_sensor_comms.set_destination_address(Sensor_Comms::BROADCAST_ADDRESS);
-        s_sensor_comms.begin_packet(raw_packet_data.data(), 0);
+        s_sensor_comms.begin_packet(raw_packet_data.data(), 0, false);
         s_sensor_comms.send_packet(raw_packet_data.data(), 2);
     }
 
@@ -241,7 +241,11 @@ int main(int, const char**)
             request.type = s_sensor_comms.get_rx_packet_type(packet_data);
             request.signal_s2b = s_sensor_comms.get_input_dBm();
             request.address = s_sensor_comms.get_rx_packet_source_address(packet_data);
-            LOGI << "Signal strength " << (int)request.signal_s2b << "dBm" << std::endl;
+            request.needs_response = s_sensor_comms.get_rx_packet_needs_response(packet_data);
+            LOGI << "Incoming type " << (int)request.type
+                 << ", size " << (int)size
+                 << ", address " << (int)request.address
+                 << ", signal strength " << (int)request.signal_s2b << "dBm. Sending to manager..." << std::endl;
 
 //            if (request.address != 1004 && request.address >= 1000)
 //            {
@@ -260,22 +264,28 @@ int main(int, const char**)
             Server::Result result = s_server.send_sensor_message(request, response);
             if (result == Server::Result::Has_Response)
             {
+                LOGI << "\tdone. Sending response back..." << std::endl;
                 s_sensor_comms.set_destination_address(response.address);
-                s_sensor_comms.begin_packet(raw_packet_data.data(), response.type);
+                s_sensor_comms.begin_packet(raw_packet_data.data(), response.type, false);
                 if (!response.payload.empty())
                 {
                     s_sensor_comms.pack(raw_packet_data.data(), response.payload.data(), static_cast<uint8_t>(response.payload.size()));
                 }
-                if (!s_sensor_comms.send_packet(raw_packet_data.data(), response.retries))
+                if (s_sensor_comms.send_packet(raw_packet_data.data(), response.retries))
                 {
-                    set_led_blink(Led_Blink::Slow_Red, std::chrono::seconds(1), true);
-                    LOGE << "Sensor comms failed" << std::endl;
+                    set_led_blink(Led_Blink::Fast_Red, std::chrono::seconds(1), true);
+                    LOGI << "\tdone" << std::endl;
+                }
+                else
+                {
+                    set_led_blink(Led_Blink::Fast_Yellow, std::chrono::seconds(1), true);
+                    LOGE << "\tfailed" << std::endl;
                 }
             }
             else if (result != Server::Result::Ok)
             {
-                LOGE << "Server comms failed: " << int(result) << std::endl;
                 set_led_blink(Led_Blink::Fast_Red, std::chrono::seconds(1), true);
+                LOGE << "\tfailed: " << int(result) << std::endl;
             }
         }
         else

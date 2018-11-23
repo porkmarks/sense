@@ -27,6 +27,7 @@ public:
         uint8_t type = 0;
         int8_t signal_s2b = 0;
         uint32_t address = 0;
+        bool needs_response = true;
         std::vector<uint8_t> payload;
     };
 
@@ -60,15 +61,7 @@ private:
     bool wait_for_message(data::Server_Message expected_message, Clock::duration timeout);
     void process_message(data::Server_Message message);
 
-    void process_get_config_req();
-    void process_add_config_req();
-    void process_set_configs_req();
-    void process_set_sensors_req();
-    void process_add_sensor_req();
-    void process_remove_sensor_req();
-    void process_report_measurements_res();
-    void process_sensor_bound_res();
-    void process_power_off_req();
+    void process_ping();
 
     std::string compute_sensor_details_response() const;
     std::string compute_configs_response() const;
@@ -76,6 +69,7 @@ private:
     std::thread m_io_service_thread;
     asio::io_service m_io_service;
     std::shared_ptr<asio::io_service::work> m_io_service_work;
+    mutable std::recursive_mutex m_mutex;
 
     uint16_t m_port = 0;
     std::unique_ptr<asio::ip::tcp::acceptor> m_acceptor;
@@ -95,6 +89,8 @@ private:
     uint8_t m_mac_address[6];
 
     uint32_t m_last_request_id = 0;
+
+    Clock::time_point m_last_talk_tp = Clock::time_point(Clock::duration::zero());
 
     std::atomic_bool m_exit = { false };
 };

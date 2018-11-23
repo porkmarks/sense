@@ -67,6 +67,10 @@ private:
         bool isConnecting = false;
         bool isConnected = false;
 
+        uint32_t lastPingId = 0;
+        DB::Clock::time_point lastPingTP = DB::Clock::time_point(DB::Clock::duration::zero());
+        DB::Clock::time_point lastTalkTP = DB::Clock::time_point(DB::Clock::duration::zero());
+
         std::vector<QMetaObject::Connection> connections;
     };
 
@@ -91,10 +95,11 @@ private:
     template <typename T>
     void sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Type type, uint32_t address, uint8_t retries, T const& payload);
 
+    void sendPing(InitializedBaseStation& cbs);
     void processPong(InitializedBaseStation& cbs);
     void processSensorReq(InitializedBaseStation& cbs);
     void processSensorReq(InitializedBaseStation& cbs, SensorRequest const& request);
-    void processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Measurement_Batch const& payload);
+    void processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Measurement_Batch_Request const& payload);
     void processSensorReq_ConfigRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Config_Request const& payload);
     void processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::First_Config_Request const& payload);
     void processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Pair_Request const& payload);

@@ -5,6 +5,7 @@
 #include <mutex>
 #include <functional>
 #include <asio.hpp>
+#include <iostream>
 
 namespace util
 {
@@ -66,9 +67,16 @@ public:
                 std::copy(m_tx_pending_buffer.begin(), m_tx_pending_buffer.begin() + mtu_size, m_tx_crt_buffer.begin());
 
                 m_is_sending = true;
-                m_socket.async_write_some(asio::buffer(m_tx_crt_buffer),
-                                          std::bind(&ASIO_Socket_Adapter<Socket_t>::handle_send, this,
-                                                      std::placeholders::_1, std::placeholders::_2));
+                try
+                {
+                    m_socket.async_write_some(asio::buffer(m_tx_crt_buffer),
+                                              std::bind(&ASIO_Socket_Adapter<Socket_t>::handle_send, this,
+                                                        std::placeholders::_1, std::placeholders::_2));
+                }
+                catch (std::exception const& e)
+                {
+                    std::cerr << "async_write_some failed: " << e.what() << std::endl;
+                }
             }
         }
     }
@@ -83,7 +91,14 @@ private:
     {
         if (error)
         {
-            m_socket.close();
+            try
+            {
+                m_socket.close();
+            }
+            catch (std::exception const& e)
+            {
+                std::cerr << "close failed: " << e.what() << std::endl;
+            }
             m_is_sending = false;
         }
         else
@@ -107,9 +122,16 @@ private:
                 std::copy(m_tx_pending_buffer.begin(), m_tx_pending_buffer.begin() + mtu_size, m_tx_crt_buffer.begin());
 
                 m_is_sending = true;
-                m_socket.async_write_some(asio::buffer(m_tx_crt_buffer),
-                                          std::bind(&ASIO_Socket_Adapter<Socket_t>::handle_send, this,
-                                                      std::placeholders::_1, std::placeholders::_2));
+                try
+                {
+                    m_socket.async_write_some(asio::buffer(m_tx_crt_buffer),
+                                              std::bind(&ASIO_Socket_Adapter<Socket_t>::handle_send, this,
+                                                        std::placeholders::_1, std::placeholders::_2));
+                }
+                catch (std::exception const& e)
+                {
+                    std::cerr << "async_write_some failed: " << e.what() << std::endl;
+                }
             }
             else
             {
@@ -122,7 +144,14 @@ private:
     {
         if (error)
         {
-            m_socket.close();
+            try
+            {
+                m_socket.close();
+            }
+            catch (std::exception const& e)
+            {
+                std::cerr << "close failed: " << e.what() << std::endl;
+            }
         }
         else
         {
