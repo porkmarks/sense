@@ -519,6 +519,8 @@ RFM95::RFM95(Module* mod)
     _mod = mod;
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
+
 int16_t RFM95::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t syncWord, int8_t power, uint8_t currentLimit, uint16_t preambleLength, uint8_t gain)
 {
     // set module properties
@@ -607,6 +609,8 @@ int16_t RFM95::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t syncW
     return(state);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
+
 int16_t RFM95::setFrequency(float freq) {
     // check frequency range
     if((freq < 137.0) || (freq > 1020.0)) {
@@ -683,6 +687,8 @@ int16_t RFM95::setFrequency(float freq) {
     return state;
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
+
 int16_t RFM95::setFrequencyRaw(float newFreq)
 {
   // set mode to standby
@@ -705,6 +711,8 @@ int16_t RFM95::setFrequencyRaw(float newFreq)
   state |= _mod->SPIsetRegValue(SX127X_REG_FRF_LSB, FRF & 0x0000FF);
   return(state);
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 int16_t RFM95::setBandwidth(float bw) {
   uint8_t newBandwidth;
@@ -742,6 +750,7 @@ int16_t RFM95::setBandwidth(float bw) {
   return(state);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 int16_t RFM95::setSpreadingFactor(uint8_t sf) {
   uint8_t newSpreadingFactor;
@@ -781,6 +790,7 @@ int16_t RFM95::setSpreadingFactor(uint8_t sf) {
   return(state);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 int16_t RFM95::setCodingRate(uint8_t cr) {
   uint8_t newCodingRate;
@@ -811,6 +821,7 @@ int16_t RFM95::setCodingRate(uint8_t cr) {
   return(state);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 /*
 // SX127X_REG_PA_CONFIG
@@ -864,6 +875,7 @@ int16_t RFM95::setOutputPower(int8_t power) {
   return(state);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 int16_t RFM95::setGain(uint8_t gain) {
   // check allowed range
@@ -885,6 +897,7 @@ int16_t RFM95::setGain(uint8_t gain) {
   return(state);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 int16_t RFM95::setBandwidthRaw(uint8_t newBandwidth) {
   // set mode to standby
@@ -898,6 +911,7 @@ int16_t RFM95::setBandwidthRaw(uint8_t newBandwidth) {
   return(state);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 int16_t RFM95::setSpreadingFactorRaw(uint8_t newSpreadingFactor) {
   // set mode to standby
@@ -921,6 +935,7 @@ int16_t RFM95::setSpreadingFactorRaw(uint8_t newSpreadingFactor) {
   return(state);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 int16_t RFM95::setCodingRateRaw(uint8_t newCodingRate) {
   // set mode to standby
@@ -933,6 +948,8 @@ int16_t RFM95::setCodingRateRaw(uint8_t newCodingRate) {
   state |= _mod->SPIsetRegValue(SX127X_REG_MODEM_CONFIG_1, newCodingRate, 3, 1);
   return(state);
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 int16_t RFM95::transmit(uint8_t* data, size_t len) {
   // set mode to standby
@@ -952,7 +969,7 @@ int16_t RFM95::transmit(uint8_t* data, size_t len) {
   }
   float ih = (float)_mod->SPIgetRegValue(SX127X_REG_MODEM_CONFIG_1, 0, 0);
   float crc = (float)(_mod->SPIgetRegValue(SX127X_REG_MODEM_CONFIG_2, 2, 2) >> 2);
-  float n_pre = (float)_mod->SPIgetRegValue(SX127X_REG_PREAMBLE_LSB);
+  float n_pre = (float)_preambleLength;
   float n_pay = 8.0 + max(ceil((8.0 * (float)len - 4.0 * (float)_sf + 28.0 + 16.0 * crc - 20.0 * ih)/(4.0 * (float)_sf - 8.0 * de)) * (float)_cr, 0.0);
   auto timeout = chrono::millis(ceil(symbolLength * (n_pre + n_pay + 4.25) * 1.5));
   timeout = max(timeout, chrono::millis(chrono::k_period * 2));
@@ -999,6 +1016,7 @@ int16_t RFM95::transmit(uint8_t* data, size_t len) {
   return(ERR_NONE);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 int16_t RFM95::receive(uint8_t* data, size_t& len) {
   // set mode to standby
@@ -1020,9 +1038,18 @@ int16_t RFM95::receive(uint8_t* data, size_t& len) {
     return(state);
   }
 
+    // calculate timeout
+  uint16_t base = 1;
+  float symbolLength = (float)(base << _sf) / (float)_bw;
+
+  float n_pre = (float)_mod->SPIgetRegValue(SX127X_REG_SYMB_TIMEOUT_LSB, 7, 0);
+  auto timeout = chrono::millis(ceil(symbolLength * (n_pre + 4.25) * 1.5));
+  timeout = max(timeout, chrono::millis(chrono::k_period * 2));
+
+  auto start = chrono::now();
   // wait for packet reception or timeout
   while(!digitalReadFast(_mod->int0())) {
-    if(digitalReadFast(_mod->int1())) {
+    if(digitalReadFast(_mod->int1()) || chrono::now() - start > timeout) {
       clearIRQFlags();
       return(ERR_RX_TIMEOUT);
     }
@@ -1046,6 +1073,7 @@ int16_t RFM95::receive(uint8_t* data, size_t& len) {
   return(ERR_NONE);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 int16_t RFM95::scanChannel() {
   // set mode to standby
@@ -1077,18 +1105,21 @@ int16_t RFM95::scanChannel() {
   return(CHANNEL_FREE);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 int16_t RFM95::sleep() {
   // set mode to sleep
   return(setMode(SX127X_SLEEP));
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 int16_t RFM95::standby() {
   // set mode to standby
   return(setMode(SX127X_STANDBY));
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 int16_t RFM95::setSyncWord(uint8_t syncWord) {
   // set mode to standby
@@ -1098,6 +1129,7 @@ int16_t RFM95::setSyncWord(uint8_t syncWord) {
   return(_mod->SPIsetRegValue(SX127X_REG_SYNC_WORD, syncWord));
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 int16_t RFM95::setCurrentLimit(uint8_t currentLimit) {
   // check allowed range
@@ -1123,6 +1155,7 @@ int16_t RFM95::setCurrentLimit(uint8_t currentLimit) {
   return(state);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 int16_t RFM95::setPreambleLength(uint16_t preambleLength) {
   // check allowed range
@@ -1136,9 +1169,14 @@ int16_t RFM95::setPreambleLength(uint16_t preambleLength) {
   // set preamble length
   state |= _mod->SPIsetRegValue(SX127X_REG_PREAMBLE_MSB, (preambleLength & 0xFF00) >> 8);
   state |= _mod->SPIsetRegValue(SX127X_REG_PREAMBLE_LSB, preambleLength & 0x00FF);
+  if (state == ERR_NONE)
+  {
+    _preambleLength = preambleLength;
+  }
   return(state);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 float RFM95::getFrequencyError(bool autoCorrect) {
   // get raw frequency error
@@ -1168,6 +1206,7 @@ float RFM95::getFrequencyError(bool autoCorrect) {
   return(error);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 int8_t RFM95::getRSSI() {
   int8_t lastPacketRSSI;
@@ -1189,6 +1228,7 @@ int8_t RFM95::getRSSI() {
   return(lastPacketRSSI);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 float RFM95::getSNR() {
   // get SNR value
@@ -1201,6 +1241,7 @@ float RFM95::getDataRate() {
   return(_dataRate);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 bool RFM95::findChip(uint8_t ver) {
   uint8_t i = 0;
@@ -1229,16 +1270,19 @@ bool RFM95::findChip(uint8_t ver) {
   return(flagFound);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 int16_t RFM95::setMode(uint8_t mode) {
   return(_mod->SPIsetRegValue(SX127X_REG_OP_MODE, mode, 2, 0, 5));
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 int16_t RFM95::getActiveModem() {
   return(_mod->SPIgetRegValue(SX127X_REG_OP_MODE, 7, 7));
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 int16_t RFM95::setActiveModem(uint8_t modem) {
   // set mode to SLEEP
@@ -1252,11 +1296,13 @@ int16_t RFM95::setActiveModem(uint8_t modem) {
   return(state);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 void RFM95::clearIRQFlags() {
   _mod->SPIwriteRegister(SX127X_REG_IRQ_FLAGS, 0b11111111);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifdef KITELIB_DEBUG
 

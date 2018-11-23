@@ -252,8 +252,6 @@ static void setup()
 
     chrono::delay(chrono::millis(2000)); //wait for the main clock to get calibrated
 
-    
-
 /*
     printf_P(PSTR("0 %d\n"), (int)(EECR & bit(EERIE)));
     printf_P(PSTR("1 %d\n"), (int)(XFDCSR & bit(XFDIE)));

@@ -50,6 +50,7 @@ protected:
     float _bw;
     uint8_t _sf;
     uint8_t _cr;
+    uint16_t _preambleLength;
 
     int16_t tx(char* data, uint8_t length);
     int16_t rxSingle(char* data, uint8_t* length);
