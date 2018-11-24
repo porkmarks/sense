@@ -55,6 +55,7 @@ enum class Led_Blink
 Led_Color s_led_color = Led_Color::None;
 std::atomic<Led_Blink> s_led_blink;
 std::chrono::system_clock::time_point s_led_blink_time_point;
+volatile bool s_led_thread_on = true;
 
 void set_led_color(Led_Color color)
 {
@@ -88,7 +89,7 @@ void led_thread_func()
     gpioWrite(RED_LED_PIN, 0);
     gpioWrite(GREEN_LED_PIN, 0);
 
-    while (true)
+    while (s_led_thread_on)
     {
         auto now = std::chrono::system_clock::now();
         if (s_led_blink_time_point > now && s_led_blink != Led_Blink::None)
@@ -179,7 +180,12 @@ int main(int, const char**)
 
     srand(time(nullptr));
 
-    gpioInitialise();
+    if (gpioInitialise() < 0)
+    {
+        LOGE << "GPIO init failed." << std::endl;
+        s_led_thread_on = false;
+        return EXIT_FAILURE;
+    }
 
     std::thread led_thread(&led_thread_func);
 
@@ -187,12 +193,12 @@ int main(int, const char**)
     while (!s_sensor_comms.init(10, 20))
     {
         tries++;
-        LOGE << "comms init failed. Trying again: " << tries << std::endl;
+        LOGE << "Comms init failed. Trying again: " << tries << std::endl;
+        set_led_blink(Led_Blink::Fast_Red, std::chrono::hours(24 * 1000), true);
         std::this_thread::sleep_for(std::chrono::seconds(1));
         if (tries > 10)
         {
-            set_led_blink(Led_Blink::Fast_Red, std::chrono::hours(24 * 1000), true);
-            fatal_error();
+            s_led_thread_on = false;
             return EXIT_FAILURE;
         }
     }
@@ -205,16 +211,22 @@ int main(int, const char**)
     {
         s_sensor_comms.set_destination_address(Sensor_Comms::BROADCAST_ADDRESS);
         s_sensor_comms.begin_packet(raw_packet_data.data(), 0, false);
-        s_sensor_comms.send_packet(raw_packet_data.data(), 2);
+        s_sensor_comms.send_packed_packet(raw_packet_data.data(), true);
     }
 
 
-    if (!s_server.init(4444, 5555))
+    tries = 0;
+    while (!s_server.init(4444, 5555))
     {
-        LOGE << "Server init failed" << std::endl;
+        tries++;
+        LOGE << "Server init failed. Trying again: " << tries << std::endl;
         set_led_blink(Led_Blink::Fast_Yellow, std::chrono::hours(24 * 1000), true);
-        fatal_error();
-        return EXIT_FAILURE;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        if (tries > 10)
+        {
+            s_led_thread_on = false;
+            return EXIT_FAILURE;
+        }
     }
 
     set_led_color(Led_Color::Green);
@@ -233,7 +245,7 @@ int main(int, const char**)
         }
 
         uint8_t size = Sensor_Comms::MAX_USER_DATA_SIZE;
-        uint8_t* packet_data = s_sensor_comms.receive_packet(raw_packet_data.data(), size, 1000);
+        uint8_t* packet_data = s_sensor_comms.receive_packet(raw_packet_data.data(), size, chrono::millis(1000));
         if (packet_data)
         {
             set_led_color(Led_Color::Yellow);
@@ -271,7 +283,8 @@ int main(int, const char**)
                 {
                     s_sensor_comms.pack(raw_packet_data.data(), response.payload.data(), static_cast<uint8_t>(response.payload.size()));
                 }
-                if (s_sensor_comms.send_packet(raw_packet_data.data(), response.retries))
+
+                if (s_sensor_comms.send_packed_packet(raw_packet_data.data(), true))
                 {
                     set_led_blink(Led_Blink::Fast_Red, std::chrono::seconds(1), true);
                     LOGI << "\tdone" << std::endl;
@@ -294,6 +307,7 @@ int main(int, const char**)
         }
     }
 
-    return 0;
+    s_led_thread_on = false;
+    return EXIT_SUCCESS;
 }
 

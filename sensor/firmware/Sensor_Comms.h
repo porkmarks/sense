@@ -1,7 +1,8 @@
 #pragma once
 
 #include "Data_Defs.h"
-#include "LoRaLib.h"
+#include "Module.h"
+#include "RFM95.h"
 
 class Sensor_Comms
 {
@@ -53,10 +54,10 @@ public:
 
     uint8_t pack(uint8_t* raw_buffer, const void* data, uint8_t size);
 
-    bool send_packet(uint8_t* raw_buffer, uint8_t retries);
-    bool send_packet(uint8_t* raw_buffer, uint8_t packet_size, uint8_t retries);
+    bool send_packed_packet(uint8_t* raw_buffer, bool wait_minimum_time);
+    bool send_packet(uint8_t* raw_buffer, uint8_t packet_size, bool wait_minimum_time);
 
-    uint8_t* receive_packet(uint8_t* raw_buffer, uint8_t& packet_size, uint32_t timeout);
+    uint8_t* receive_packet(uint8_t* raw_buffer, uint8_t& packet_size, chrono::millis timeout);
 
     int8_t get_input_dBm();
     uint32_t get_rx_packet_source_address(uint8_t* received_buffer) const;
@@ -72,11 +73,16 @@ private:
     uint32_t m_destination_address = BROADCAST_ADDRESS;
     uint16_t m_last_req_id = 0;
 
-    static const uint8_t RESPONSE_BUFFER_SIZE = sizeof(Header) + sizeof(data::sensor::Response);
+    void wait_minimum_time() const;
+    chrono::millis m_acks_send_duration = chrono::millis(100);
+    chrono::time_ms m_last_send_time_point;
+    chrono::time_ms m_last_receive_time_point;
+
+    static const uint8_t ACK_BUFFER_SIZE = sizeof(Header) + sizeof(data::sensor::Ack);
 
     bool validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload_size);
 
-    void send_response(const Header& header);
+    void send_ack(const Header& header);
 
     uint8_t m_offset = 0;
 };

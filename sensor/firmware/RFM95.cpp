@@ -1075,6 +1075,62 @@ int16_t RFM95::receive(uint8_t* data, size_t& len) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
+int16_t RFM95::receive(uint8_t* data, size_t& len, chrono::millis timeout) {
+    if (timeout.count <= 0)
+    {
+        return(ERR_RX_TIMEOUT);
+    }
+  // set mode to standby
+  int16_t state = setMode(SX127X_STANDBY);
+
+  // set DIO pin mapping
+  state |= _mod->SPIsetRegValue(SX127X_REG_DIO_MAPPING_1, SX127X_DIO0_RX_DONE | SX127X_DIO1_RX_TIMEOUT, 7, 4);
+
+  // clear interrupt flags
+  clearIRQFlags();
+
+  // set FIFO pointers
+  state |= _mod->SPIsetRegValue(SX127X_REG_FIFO_RX_BASE_ADDR, SX127X_FIFO_RX_BASE_ADDR_MAX);
+  state |= _mod->SPIsetRegValue(SX127X_REG_FIFO_ADDR_PTR, SX127X_FIFO_RX_BASE_ADDR_MAX);
+
+  // set mode to receive
+  state |= setMode(SX127X_RXCONTINUOUS);
+  if(state != ERR_NONE) {
+    setMode(SX127X_STANDBY);
+    return(state);
+  }
+
+  auto start = chrono::now();
+  // wait for packet reception or timeout
+  while(!digitalReadFast(_mod->int0())) {
+    if(chrono::now() - start > timeout) {
+      clearIRQFlags();
+      setMode(SX127X_STANDBY);
+      return(ERR_RX_TIMEOUT);
+    }
+  }
+
+  // check integrity CRC
+  if(_mod->SPIgetRegValue(SX127X_REG_IRQ_FLAGS, 5, 5) == SX127X_CLEAR_IRQ_FLAG_PAYLOAD_CRC_ERROR) {
+    return(ERR_CRC_MISMATCH);
+  }
+
+  // get packet length
+  if(_sf != 6) {
+    len = _mod->SPIgetRegValue(SX127X_REG_RX_NB_BYTES);
+  }
+
+  _mod->SPIreadRegisterBurst(SX127X_REG_FIFO, len, data);
+
+  // clear interrupt flags
+  clearIRQFlags();
+  setMode(SX127X_STANDBY);
+
+  return(ERR_NONE);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
 int16_t RFM95::scanChannel() {
   // set mode to standby
   int16_t state = setMode(SX127X_STANDBY);

@@ -11,7 +11,7 @@ namespace sensor
 
 enum class Type : uint8_t
 {
-    /*  0 */ RESPONSE,
+    /*  0 */ ACK,
     /*  1 */ MEASUREMENT_BATCH_REQUEST,
     /*  2 */ PAIR_REQUEST,
     /*  3 */ PAIR_RESPONSE,
@@ -26,12 +26,12 @@ enum class Type : uint8_t
 #   pragma pack(push, 1) // exact fit - no padding
 #endif
 
-struct Response
+struct Ack
 {
     uint16_t ack : 1;
     uint16_t req_id : 15;
 };
-static_assert(sizeof(Response) == 2, "");
+static_assert(sizeof(Ack) == 2, "");
 
 struct Measurement
 {

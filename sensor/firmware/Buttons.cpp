@@ -1,6 +1,7 @@
 #include "Buttons.h"
 #include "Sleep.h"
 #include "Arduino_Compat.h"
+#include "Scope_Sync.h"
 
 void init_buttons()
 {
@@ -17,13 +18,13 @@ void wait_for_press(Button b)
 {
     while (!is_pressed(b))
     {
-        sleep(chrono::millis(120), true);
+        chrono::delay(chrono::millis(1));
     }
 }
 void wait_for_release(Button b)
 {
     while (is_pressed(b))
     {
-        sleep(chrono::millis(120), true);
+        chrono::delay(chrono::millis(1));
     }
 }

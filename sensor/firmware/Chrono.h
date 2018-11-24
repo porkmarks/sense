@@ -2,18 +2,25 @@
 
 #include <stdint.h>
 #ifdef __AVR__
-//#   include <Arduino.h>
-#   include "Scope_Sync.h"
-#   include <util/delay_basic.h>
 #   include <stdio.h>
 #else
 #   include <thread>
 #   include <chrono>
 #endif
 
-
 namespace chrono
 {
+#ifdef __AVR__
+extern uint32_t s_cpu_freq;
+constexpr uint32_t k_timer1_div = 64;
+constexpr uint32_t k_timer2_div = 1024; //the normal RTC div
+extern uint32_t s_timer1_period_us;
+extern uint32_t s_timer1_overflow_period_us;
+constexpr uint32_t k_timer2_period_us = 1000000ULL * k_timer2_div / 31250ULL;
+constexpr uint32_t k_max_timerh_increment = 8000000;
+#endif
+
+  
 struct millis;
 struct micros;
 struct seconds;
@@ -119,51 +126,24 @@ typedef time<uint64_t, millis> time_ms;
 typedef time<uint64_t, micros> time_us;
 typedef time<uint32_t, seconds> time_s;
 
+void delay_us(micros us);
 
 template<class D>
 void delay(D duration)
 {
-    micros us(duration);
-#ifdef __AVR__
-    constexpr uint8_t cycles_per_us = F_CPU / 1000000ULL;
-//    delayMicroseconds(us.count);
-    uint64_t cycles = (us.count * cycles_per_us) >> 2; //the _delay_loop_2 executes 4 cycles per iteration
-    while (cycles > 0)
-    {
-        uint16_t c = cycles > 65535 ? 65535 : (uint16_t)cycles;
-        _delay_loop_2(c);
-        cycles -= c;
-    }
-#else
-    std::this_thread::sleep_for(std::chrono::microseconds(us.count));
-#endif
+    delay_us(micros(duration));
 }
 
 #ifdef __AVR__
-extern volatile time_us s_time_point;
 static constexpr micros k_period(31250ULL);
 #else
 static constexpr micros k_period(1ULL);
 #endif
 
 
-inline time_ms now()
-{
-#ifdef __AVR__
-    Scope_Sync ss;
-    return time_ms(s_time_point.ticks / 1000);
-#else
-    return time_ms(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
-#endif
-}
-inline time_us now_us()
-{
-#ifdef __AVR__
-    Scope_Sync ss;
-    return time_us(s_time_point.ticks);
-#else
-    return time_us(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
-#endif
-}
+time_ms now();
+time_us now_us();
+void init_clock(uint32_t freq);
+void calibrate();
 
 }

@@ -2,24 +2,13 @@
 
 #include "Chrono.h"
 
-static constexpr  chrono::micros k_min_sleep_period = chrono::k_period;
+void init_sleep();
 
-void setup_clock(uint32_t freq);
 
-chrono::micros sleep(chrono::micros us, bool allow_button);
+constexpr chrono::micros k_sleep_period(chrono::k_max_timerh_increment);
 
-template< typename T>
-chrono::micros sleep(T duration, bool allow_button)
-{
-    return sleep(chrono::micros(duration), allow_button);
-}
+chrono::time_ms get_next_wakeup_time_point();
 
-void sleep_exact(chrono::micros us);
-template< typename T>
-void sleep_exact(T duration)
-{
-    return sleep_exact(chrono::micros(duration));
-}
-
+void sleep(bool allow_button);
 void soft_reset();
 

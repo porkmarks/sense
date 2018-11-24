@@ -3,6 +3,7 @@
 #include "TypeDef.h"
 #include "Module.h"
 #include <string.h>
+#include "Chrono.h"
 
 // SX127X_REG_VERSION
 #define RFM95_CHIP_VERSION                            0x11
@@ -18,6 +19,7 @@ public:
     int16_t begin(float freq = 434.0, float bw = 125.0, uint8_t sf = 9, uint8_t cr = 7, uint8_t syncWord = SX127X_SYNC_WORD, int8_t power = 17, uint8_t currentLimit = 100, uint16_t preambleLength = 8, uint8_t gain = 0);
     int16_t transmit(uint8_t* data, size_t len);
     int16_t receive(uint8_t* data, size_t& len);
+    int16_t receive(uint8_t* data, size_t& len, chrono::millis timeout);
     int16_t scanChannel();
     int16_t sleep();
     int16_t standby();

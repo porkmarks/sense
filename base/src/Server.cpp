@@ -352,7 +352,6 @@ Server::Result Server::send_sensor_message(Sensor_Request const& request, Sensor
         uint32_t payload_size = 0;
         ok &= unpack(buffer, response.type, offset);
         ok &= unpack(buffer, response.address, offset);
-        ok &= unpack(buffer, response.retries, offset);
         ok &= unpack(buffer, payload_size, offset);
         ok &= payload_size < 1024 * 1024;
         if (ok)

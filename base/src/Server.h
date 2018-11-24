@@ -35,7 +35,6 @@ public:
     {
         uint8_t type = 0;
         uint32_t address = 0;
-        uint8_t retries = 0;
         std::vector<uint8_t> payload;
     };
 

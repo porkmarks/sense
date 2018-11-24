@@ -250,7 +250,7 @@ void Comms::sendPing(Comms::InitializedBaseStation& cbs)
 //////////////////////////////////////////////////////////////////////////
 
 template <typename T>
-void Comms::sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Type type, uint32_t address, uint8_t retries, T const& payload)
+void Comms::sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Type type, uint32_t address, T const& payload)
 {
     std::array<uint8_t, 1024> buffer;
     size_t offset = 0;
@@ -258,7 +258,6 @@ void Comms::sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const&
     pack(buffer, true, offset);
     pack(buffer, type, offset);
     pack(buffer, address, offset);
-    pack(buffer, retries, offset);
     pack(buffer, static_cast<uint32_t>(sizeof(payload)), offset);
     pack(buffer, payload, offset);
 
@@ -447,7 +446,7 @@ void Comms::processSensorReq_ConfigRequest(InitializedBaseStation& cbs, SensorRe
     data::sensor::Config_Response response;
     fillConfig(response, sensorsConfig, sensor, outputDetails, reportedCalibration);
 
-    sendSensorResponse(cbs, request, data::sensor::Type::CONFIG_RESPONSE, request.address, 1, response);
+    sendSensorResponse(cbs, request, data::sensor::Type::CONFIG_RESPONSE, request.address, response);
 
     std::cout << "Received Config Request" << std::endl;
 }
@@ -487,7 +486,7 @@ void Comms::processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, Sen
         fillConfig(response, sensorsConfig, sensor, outputDetails, sensor.calibration);
     }
 
-    sendSensorResponse(cbs, request, data::sensor::Type::FIRST_CONFIG_RESPONSE, request.address, 2, response);
+    sendSensorResponse(cbs, request, data::sensor::Type::FIRST_CONFIG_RESPONSE, request.address, response);
 
     std::cout << "Received First Config Request" << std::endl;
 }
@@ -521,7 +520,7 @@ void Comms::processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequ
 
     data::sensor::Pair_Response response;
     response.address = sensor.address;
-    sendSensorResponse(cbs, request, data::sensor::Type::PAIR_RESPONSE, request.address, 10, response);
+    sendSensorResponse(cbs, request, data::sensor::Type::PAIR_RESPONSE, request.address, response);
 
     std::cout << "Received Pair Request" << std::endl;
 }

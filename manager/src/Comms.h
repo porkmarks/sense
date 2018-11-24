@@ -93,7 +93,7 @@ private:
 
     void sendEmptySensorResponse(InitializedBaseStation& cbs, SensorRequest const& request);
     template <typename T>
-    void sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Type type, uint32_t address, uint8_t retries, T const& payload);
+    void sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Type type, uint32_t address, T const& payload);
 
     void sendPing(InitializedBaseStation& cbs);
     void processPong(InitializedBaseStation& cbs);

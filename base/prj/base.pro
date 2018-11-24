@@ -63,7 +63,6 @@ HEADERS += \
     ../../sensor/firmware/Storage.h \
     ../src/Log.h \
     ../../common/src/spi.h \
-    ../../sensor/firmware/LoRaLib.h \
     ../../sensor/firmware/Module.h \
     ../../sensor/firmware/RFM95.h \
     ../../sensor/firmware/TypeDef.h
@@ -81,4 +80,5 @@ SOURCES += \
     ../../sensor/firmware/Storage.cpp \
     ../../common/src/spi.cpp \
     ../../sensor/firmware/Module.cpp \
-    ../../sensor/firmware/RFM95.cpp
+    ../../sensor/firmware/RFM95.cpp \
+    ../../sensor/firmware/Chrono.cpp

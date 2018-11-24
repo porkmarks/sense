@@ -26,7 +26,7 @@ uint8_t SPI2Class::inTransactionFlag = 0;
 void SPI2Class::begin()
 {
   uint8_t sreg = SREG;
-  noInterrupts(); // Protect from a scheduler and prevent transactionBegin
+  cli(); // Protect from a scheduler and prevent transactionBegin
   if (!initialized) {
     // Set SS to high so a connected chip will be "deselected" by default
     uint8_t port = digitalPinToPort(SS);
@@ -36,13 +36,13 @@ void SPI2Class::begin()
     // if the SS pin is not already configured as an output
     // then set it high (to enable the internal pull-up resistor)
     if(!(*reg & bit)){
-      digitalWrite(SS, HIGH);
+      digitalWriteFast(SS, HIGH);
     }
 
     // When the SS pin is set as OUTPUT, it can be used as
     // a general purpose output port (it doesn't influence
     // SPI operations).
-    pinMode(SS, OUTPUT);
+    pinModeFast(SS, OUTPUT);
 
     // Warning: if the SS pin ever becomes a LOW INPUT then SPI
     // automatically switches to Slave, so the data direction of
@@ -56,8 +56,8 @@ void SPI2Class::begin()
     // clocking in a single bit since the lines go directly
     // from "input" to SPI control.
     // http://code.google.com/p/arduino/issues/detail?id=888
-    pinMode(SCK, OUTPUT);
-    pinMode(MOSI, OUTPUT);
+    pinModeFast(SCK, OUTPUT);
+    pinModeFast(MOSI, OUTPUT);
   }
   initialized++; // reference count
   SREG = sreg;
@@ -65,7 +65,7 @@ void SPI2Class::begin()
 
 void SPI2Class::end() {
   uint8_t sreg = SREG;
-  noInterrupts(); // Protect from a scheduler and prevent transactionBegin
+  cli(); // Protect from a scheduler and prevent transactionBegin
   // Decrease the reference counter
   if (initialized)
     initialized--;
@@ -121,7 +121,7 @@ void SPI2Class::usingInterrupt(uint8_t interruptNumber)
 {
   uint8_t mask = 0;
   uint8_t sreg = SREG;
-  noInterrupts(); // Protect from a scheduler and prevent transactionBegin
+  cli(); // Protect from a scheduler and prevent transactionBegin
   switch (interruptNumber) {
   #ifdef SPI_INT0_MASK
   case 0: mask = SPI_INT0_MASK; break;
@@ -164,7 +164,7 @@ void SPI2Class::notUsingInterrupt(uint8_t interruptNumber)
     return;
   uint8_t mask = 0;
   uint8_t sreg = SREG;
-  noInterrupts(); // Protect from a scheduler and prevent transactionBegin
+  cli(); // Protect from a scheduler and prevent transactionBegin
   switch (interruptNumber) {
   #ifdef SPI_INT0_MASK
   case 0: mask = SPI_INT0_MASK; break;

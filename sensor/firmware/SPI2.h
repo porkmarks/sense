@@ -197,8 +197,8 @@ public:
 
     #ifdef SPI_TRANSACTION_MISMATCH_LED
     if (inTransactionFlag) {
-      pinMode(SPI_TRANSACTION_MISMATCH_LED, OUTPUT);
-      digitalWrite(SPI_TRANSACTION_MISMATCH_LED, HIGH);
+      pinModeFast(SPI_TRANSACTION_MISMATCH_LED, OUTPUT);
+      digitalWriteFast(SPI_TRANSACTION_MISMATCH_LED, HIGH);
     }
     inTransactionFlag = 1;
     #endif
@@ -263,8 +263,8 @@ public:
   inline static void endTransaction(void) {
     #ifdef SPI_TRANSACTION_MISMATCH_LED
     if (!inTransactionFlag) {
-      pinMode(SPI_TRANSACTION_MISMATCH_LED, OUTPUT);
-      digitalWrite(SPI_TRANSACTION_MISMATCH_LED, HIGH);
+      pinModeFast(SPI_TRANSACTION_MISMATCH_LED, OUTPUT);
+      digitalWriteFast(SPI_TRANSACTION_MISMATCH_LED, HIGH);
     }
     inTransactionFlag = 0;
     #endif
