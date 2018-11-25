@@ -28,8 +28,8 @@ SmtpClient::SmtpClient(const QString & host, int port, ConnectionType connection
     socket(NULL),
     name("localhost"),
     authMethod(AuthPlain),
-    connectionTimeout(5000),
-    responseTimeout(5000),
+    connectionTimeout(10000),
+    responseTimeout(10000),
     sendMessageTimeout(60000)
 {
     setConnectionType(connectionType);

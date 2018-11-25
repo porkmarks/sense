@@ -238,6 +238,7 @@ void SettingsWidget::sendTestEmail()
     progress.setAutoClose(false);
     progress.setAutoReset(false);
     progress.setMinimumDuration(0);
+    progress.setMinimumWidth(300);
 
     std::mutex errorMessageMutex;
     QString errorMessage;

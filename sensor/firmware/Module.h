@@ -23,7 +23,7 @@ class Module {
   public:
     Module(int cs = LORALIB_DEFAULT_SPI_CS, int int0 = 2, int int1 = 3);
     
-    void init(uint8_t interface, uint8_t gpio);
+    void init(uint8_t interf, uint8_t gpio);
     
     int16_t SPIgetRegValue(uint8_t reg, uint8_t msb = 7, uint8_t lsb = 0);
     int16_t SPIsetRegValue(uint8_t reg, uint8_t value, uint8_t msb = 7, uint8_t lsb = 0, uint8_t checkInterval = 2);
