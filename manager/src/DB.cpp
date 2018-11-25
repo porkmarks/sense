@@ -84,7 +84,7 @@ DB::~DB()
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::create(std::string const& name)
+Result<void> DB::create(std::string const& name)
 {
     m_dbName = "sense-" + name + ".db";
     m_dataName = "sense-" + name + ".data";
@@ -105,7 +105,7 @@ bool DB::create(std::string const& name)
 
     s_logger.logVerbose(QString("Creating DB files: '%1' & '%2'").arg(m_dataName.c_str()).arg(m_dbName.c_str()));
 
-    return true;
+    return success;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -129,7 +129,7 @@ void DB::process()
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::load(std::string const& name)
+Result<void> DB::load(std::string const& name)
 {
     Clock::time_point start = Clock::now();
 
@@ -149,7 +149,7 @@ bool DB::load(std::string const& name)
             if (!file.is_open())
             {
                 s_logger.logCritical(QString("Failed to open '%1': %2").arg(dataFilename.c_str()).arg(std::strerror(errno)));
-                return false;
+                return Error("Cannot open DB");
             }
 
             streamData = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
@@ -168,14 +168,14 @@ bool DB::load(std::string const& name)
             if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
             {
                 s_logger.logCritical(QString("Failed to open '%1': %2").arg(dataFilename.c_str()).arg(rapidjson::GetParseError_En(document.GetParseError())));
-                return false;
+                return Error("Cannot open DB");
             }
         }
 
         if (!document.IsObject())
         {
             s_logger.logCritical(QString("Failed to load '%1': Bad document").arg(dataFilename.c_str()));
-            return false;
+            return Error("Cannot open DB");
         }
 
         //////////////////////////////////////////////////////////////////////////////////
@@ -183,57 +183,9 @@ bool DB::load(std::string const& name)
         auto it = document.FindMember("sensors_configs");
         if (it == document.MemberEnd() || !it->value.IsArray())
         {
-            auto it = document.FindMember("sensor_settings");
-            if (it == document.MemberEnd() || !it->value.IsObject())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings object").arg(dataFilename.c_str()));
-                return false;
-            }
-
-            {
-                SensorsConfig config;
-
-                rapidjson::Value const& ssj = it->value;
-                auto it = ssj.FindMember("name");
-                if (it == ssj.MemberEnd() || !it->value.IsString())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings name").arg(dataFilename.c_str()));
-                    return false;
-                }
-                config.descriptor.name = it->value.GetString();
-
-                it = ssj.FindMember("measurement_period");
-                if (it == ssj.MemberEnd() || !it->value.IsUint64())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings measurement_period").arg(dataFilename.c_str()));
-                    return false;
-                }
-                config.descriptor.measurementPeriod = std::chrono::seconds(it->value.GetUint64());
-
-                it = ssj.FindMember("comms_period");
-                if (it == ssj.MemberEnd() || !it->value.IsUint64())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings comms_period").arg(dataFilename.c_str()));
-                    return false;
-                }
-                config.descriptor.commsPeriod = std::chrono::seconds(it->value.GetUint64());
-
-                it = ssj.FindMember("baseline");
-                if (it == ssj.MemberEnd() || !it->value.IsUint64())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor settings baseline").arg(dataFilename.c_str()));
-                    return false;
-                }
-                config.baselineMeasurementTimePoint = Clock::from_time_t(static_cast<time_t>(it->value.GetUint64()));
-                config.baselineMeasurementIndex = 0;
-
-                data.sensorsConfigs.push_back(config);
-            }
-
-//            s_logger.logCritical(QString("Failed to load '%1': Bad or missing base_sensor_configs array").arg(dataFilename.c_str()));
-//            return false;
+            s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor config array").arg(dataFilename.c_str()));
+            return Error("Cannot open DB");
         }
-        else //NEW
         {
             rapidjson::Value const& configsj = it->value;
             for (size_t i = 0; i < configsj.Size(); i++)
@@ -244,7 +196,7 @@ bool DB::load(std::string const& name)
                 if (it == configj.MemberEnd() || !it->value.IsString())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing config name").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 config.descriptor.name = it->value.GetString();
 
@@ -252,7 +204,7 @@ bool DB::load(std::string const& name)
                 if (it == configj.MemberEnd() || !it->value.IsInt())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing config sensors_power").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 config.descriptor.sensorsPower = static_cast<int8_t>(it->value.GetInt());
 
@@ -260,7 +212,7 @@ bool DB::load(std::string const& name)
                 if (it == configj.MemberEnd() || !it->value.IsUint64())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing config measurement_period").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 config.descriptor.measurementPeriod = std::chrono::seconds(it->value.GetUint64());
 
@@ -268,7 +220,7 @@ bool DB::load(std::string const& name)
                 if (it == configj.MemberEnd() || !it->value.IsUint64())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing config comms_period").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 config.descriptor.commsPeriod = std::chrono::seconds(it->value.GetUint64());
 
@@ -276,7 +228,7 @@ bool DB::load(std::string const& name)
                 if (it == configj.MemberEnd() || !it->value.IsUint64())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing config baseline_measurement_tp").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 config.baselineMeasurementTimePoint = Clock::from_time_t(static_cast<time_t>(it->value.GetUint64()));
 
@@ -284,7 +236,7 @@ bool DB::load(std::string const& name)
                 if (it == configj.MemberEnd() || !it->value.IsUint())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing config baseline_measurement_index").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 config.baselineMeasurementIndex = it->value.GetUint();
                 data.sensorsConfigs.push_back(config);
@@ -297,7 +249,7 @@ bool DB::load(std::string const& name)
         if (it == document.MemberEnd() || !it->value.IsArray())
         {
             s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensors array").arg(dataFilename.c_str()));
-            return false;
+            return Error("Cannot open DB");
         }
 
         {
@@ -310,7 +262,7 @@ bool DB::load(std::string const& name)
                 if (it == sensorj.MemberEnd() || !it->value.IsString())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor name").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 sensor.descriptor.name = it->value.GetString();
 
@@ -318,7 +270,7 @@ bool DB::load(std::string const& name)
                 if (it == sensorj.MemberEnd() || !it->value.IsUint())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor id").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 sensor.id = it->value.GetUint();
 
@@ -326,7 +278,7 @@ bool DB::load(std::string const& name)
                 if (it == sensorj.MemberEnd() || !it->value.IsUint())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor address").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 sensor.address = it->value.GetUint();
 
@@ -334,7 +286,7 @@ bool DB::load(std::string const& name)
                 if (it == sensorj.MemberEnd() || !it->value.IsUint())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor state").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 sensor.state = static_cast<Sensor::State>(it->value.GetUint());
 
@@ -342,7 +294,7 @@ bool DB::load(std::string const& name)
                 if (it == sensorj.MemberEnd() || !it->value.IsUint())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor serial_number").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 sensor.serialNumber = it->value.GetUint();
 
@@ -350,7 +302,7 @@ bool DB::load(std::string const& name)
                 if (it == sensorj.MemberEnd() || !it->value.IsUint())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor last_confirmed_measurement_index").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 sensor.lastConfirmedMeasurementIndex = it->value.GetUint();
 
@@ -360,7 +312,7 @@ bool DB::load(std::string const& name)
                     if (!it->value.IsUint64())
                     {
                         s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor next_comms").arg(dataFilename.c_str()));
-                        return false;
+                        return Error("Cannot open DB");
                     }
                     sensor.lastCommsTimePoint = Clock::from_time_t(static_cast<time_t>(it->value.GetUint64()));
                 }
@@ -369,7 +321,7 @@ bool DB::load(std::string const& name)
                 if (it == sensorj.MemberEnd() || !it->value.IsNumber())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor temperature_bias").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 sensor.calibration.temperatureBias = static_cast<float>(it->value.GetDouble());
 
@@ -377,7 +329,7 @@ bool DB::load(std::string const& name)
                 if (it == sensorj.MemberEnd() || !it->value.IsNumber())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor humidity_bias").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 sensor.calibration.humidityBias = static_cast<float>(it->value.GetDouble());
 
@@ -393,7 +345,7 @@ bool DB::load(std::string const& name)
         if (it == document.MemberEnd() || !it->value.IsArray())
         {
             s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarms array").arg(dataFilename.c_str()));
-            return false;
+            return Error("Cannot open DB");
         }
 
         {
@@ -406,7 +358,7 @@ bool DB::load(std::string const& name)
                 if (it == alarmj.MemberEnd() || !it->value.IsString())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm name").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 alarm.descriptor.name = it->value.GetString();
 
@@ -414,7 +366,7 @@ bool DB::load(std::string const& name)
                 if (it == alarmj.MemberEnd() || !it->value.IsUint())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm id").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 alarm.id = it->value.GetUint();
 
@@ -422,7 +374,7 @@ bool DB::load(std::string const& name)
                 if (it != alarmj.MemberEnd() && !it->value.IsBool())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad alarm filter_sensors").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 if (it != alarmj.MemberEnd())
                 {
@@ -435,7 +387,7 @@ bool DB::load(std::string const& name)
                     if (it == alarmj.MemberEnd() || !it->value.IsArray())
                     {
                         s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm sensors").arg(dataFilename.c_str()));
-                        return false;
+                        return Error("Cannot open DB");
                     }
                     rapidjson::Value const& sensorsj = it->value;
                     for (size_t si = 0; si < sensorsj.Size(); si++)
@@ -444,7 +396,7 @@ bool DB::load(std::string const& name)
                         if (!sensorj.IsUint())
                         {
                             s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm sensor id").arg(dataFilename.c_str()));
-                            return false;
+                            return Error("Cannot open DB");
                         }
                         alarm.descriptor.sensors.insert(sensorj.GetUint());
                     }
@@ -455,7 +407,7 @@ bool DB::load(std::string const& name)
                 if (it == alarmj.MemberEnd() || !it->value.IsBool())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm low_temperature_watch").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 alarm.descriptor.lowTemperatureWatch = it->value.GetBool();
 
@@ -463,7 +415,7 @@ bool DB::load(std::string const& name)
                 if (it == alarmj.MemberEnd() || !it->value.IsDouble())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm low_temperature").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 alarm.descriptor.lowTemperature = static_cast<float>(it->value.GetDouble());
 
@@ -471,7 +423,7 @@ bool DB::load(std::string const& name)
                 if (it == alarmj.MemberEnd() || !it->value.IsBool())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm high_temperature_watch").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 alarm.descriptor.highTemperatureWatch = it->value.GetBool();
 
@@ -479,7 +431,7 @@ bool DB::load(std::string const& name)
                 if (it == alarmj.MemberEnd() || !it->value.IsDouble())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm high_temperature").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 alarm.descriptor.highTemperature = static_cast<float>(it->value.GetDouble());
 
@@ -487,7 +439,7 @@ bool DB::load(std::string const& name)
                 if (it == alarmj.MemberEnd() || !it->value.IsBool())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm low_humidity_watch").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 alarm.descriptor.lowHumidityWatch = it->value.GetBool();
 
@@ -495,7 +447,7 @@ bool DB::load(std::string const& name)
                 if (it == alarmj.MemberEnd() || !it->value.IsDouble())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm low_humidity").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 alarm.descriptor.lowHumidity = static_cast<float>(it->value.GetDouble());
 
@@ -503,7 +455,7 @@ bool DB::load(std::string const& name)
                 if (it == alarmj.MemberEnd() || !it->value.IsBool())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm high_humidity_watch").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 alarm.descriptor.highHumidityWatch = it->value.GetBool();
 
@@ -511,7 +463,7 @@ bool DB::load(std::string const& name)
                 if (it == alarmj.MemberEnd() || !it->value.IsDouble())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm high_humidity").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 alarm.descriptor.highHumidity = static_cast<float>(it->value.GetDouble());
 
@@ -519,7 +471,7 @@ bool DB::load(std::string const& name)
                 if (it == alarmj.MemberEnd() || !it->value.IsBool())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm low_vcc_watch").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 alarm.descriptor.lowVccWatch = it->value.GetBool();
 
@@ -527,7 +479,7 @@ bool DB::load(std::string const& name)
                 if (it == alarmj.MemberEnd() || !it->value.IsBool())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm low_signal_watch").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 alarm.descriptor.lowSignalWatch = it->value.GetBool();
 
@@ -535,7 +487,7 @@ bool DB::load(std::string const& name)
 //                if (it == alarmj.MemberEnd() || !it->value.IsBool())
 //                {
 //                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm sensor_errors_watch").arg(dataFilename.c_str()));
-//                    return false;
+//                    return Error("Cannot open DB");
 //                }
 //                alarm.descriptor.sensorErrorsWatch = it->value.GetBool();
 
@@ -543,7 +495,7 @@ bool DB::load(std::string const& name)
                 if (it == alarmj.MemberEnd() || !it->value.IsBool())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm send_email_action").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 alarm.descriptor.sendEmailAction = it->value.GetBool();
 
@@ -558,7 +510,7 @@ bool DB::load(std::string const& name)
         if (it == document.MemberEnd() || !it->value.IsArray())
         {
             s_logger.logCritical(QString("Failed to load '%1': Bad or missing reports array").arg(dataFilename.c_str()));
-            return false;
+            return Error("Cannot open DB");
         }
 
         {
@@ -571,7 +523,7 @@ bool DB::load(std::string const& name)
                 if (it == reportj.MemberEnd() || !it->value.IsString())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing report name").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 report.descriptor.name = it->value.GetString();
 
@@ -579,7 +531,7 @@ bool DB::load(std::string const& name)
                 if (it == reportj.MemberEnd() || !it->value.IsUint())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing report id").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 report.id = it->value.GetUint();
 
@@ -587,7 +539,7 @@ bool DB::load(std::string const& name)
                 if (it == reportj.MemberEnd() || !it->value.IsUint64())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor report last_triggered").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 report.lastTriggeredTimePoint = Clock::from_time_t(static_cast<time_t>(it->value.GetUint64()));
 
@@ -595,7 +547,7 @@ bool DB::load(std::string const& name)
                 if (it == reportj.MemberEnd() || !it->value.IsBool())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad report filter_sensors").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 report.descriptor.filterSensors = it->value.GetBool();
 
@@ -605,7 +557,7 @@ bool DB::load(std::string const& name)
                     if (it == reportj.MemberEnd() || !it->value.IsArray())
                     {
                         s_logger.logCritical(QString("Failed to load '%1': Bad or missing report sensors").arg(dataFilename.c_str()));
-                        return false;
+                        return Error("Cannot open DB");
                     }
                     rapidjson::Value const& sensorsj = it->value;
                     for (size_t si = 0; si < sensorsj.Size(); si++)
@@ -614,7 +566,7 @@ bool DB::load(std::string const& name)
                         if (!sensorj.IsUint())
                         {
                             s_logger.logCritical(QString("Failed to load '%1': Bad or missing report sensor id").arg(dataFilename.c_str()));
-                            return false;
+                            return Error("Cannot open DB");
                         }
                         report.descriptor.sensors.insert(sensorj.GetUint());
                     }
@@ -624,7 +576,7 @@ bool DB::load(std::string const& name)
                 if (it == reportj.MemberEnd() || !it->value.IsInt())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing report period").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 report.descriptor.period = static_cast<DB::ReportDescriptor::Period>(it->value.GetInt());
 
@@ -632,7 +584,7 @@ bool DB::load(std::string const& name)
                 if (it == reportj.MemberEnd() || !it->value.IsUint64())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing report custom_period").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 report.descriptor.customPeriod = std::chrono::seconds(it->value.GetUint64());
 
@@ -640,7 +592,7 @@ bool DB::load(std::string const& name)
                 if (it == reportj.MemberEnd() || !it->value.IsInt())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing report data").arg(dataFilename.c_str()));
-                    return false;
+                    return Error("Cannot open DB");
                 }
                 report.descriptor.data = static_cast<DB::ReportDescriptor::Data>(it->value.GetInt());
 
@@ -659,7 +611,7 @@ bool DB::load(std::string const& name)
             if (!file.is_open())
             {
                 s_logger.logCritical(QString("Failed to open '%1': %2").arg(dbFilename.c_str()).arg(std::strerror(errno)));
-                return false;
+                return Error("Cannot open DB");
             }
 
             streamData = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
@@ -679,13 +631,13 @@ bool DB::load(std::string const& name)
             if (!read(stream, sensorCount))
             {
                 s_logger.logCritical(QString("Failed to read '%1': %2").arg(dbFilename.c_str()).arg(std::strerror(errno)));
-                return false;
+                return Error("Cannot open DB");
             }
         }
         if (sensorCount > 10000)
         {
             s_logger.logCritical(QString("Failed to read '%1': file seems to be corrupted").arg(dbFilename.c_str()));
-            return false;
+            return Error("Cannot open DB");
         }
 
         for (uint32_t i = 0; i < sensorCount; i++)
@@ -695,19 +647,19 @@ bool DB::load(std::string const& name)
             if (!read(stream, sensorId) || !read(stream, measurementsCount))
             {
                 s_logger.logCritical(QString("Failed to read '%1': %2").arg(dbFilename.c_str()).arg(std::strerror(errno)));
-                return false;
+                return Error("Cannot open DB");
             }
             if (measurementsCount > 100000000)
             {
                 s_logger.logCritical(QString("Failed to read '%1': file seems to be corrupted").arg(dbFilename.c_str()));
-                return false;
+                return Error("Cannot open DB");
             }
 
             auto sensorIt = std::find_if(data.sensors.begin(), data.sensors.end(), [&sensorId](Sensor const& sensor) { return sensor.id == sensorId; });
             if (sensorIt == data.sensors.end())
             {
                 s_logger.logCritical(QString("Failed to read '%1': cannot find sensor").arg(dbFilename.c_str()));
-                return false;
+                return Error("Cannot open DB");
             }
             Sensor& sensor = *sensorIt;
 
@@ -718,7 +670,7 @@ bool DB::load(std::string const& name)
             if (stream.read(reinterpret_cast<char*>(storedMeasurements.data()), storedMeasurements.size() * recordSize).bad())
             {
                 s_logger.logCritical(QString("Failed to read '%1': %2").arg(dbFilename.c_str()).arg(std::strerror(errno)));
-                return false;
+                return Error("Cannot open DB");
             }
 
             std::sort(storedMeasurements.begin(), storedMeasurements.end(), [](StoredMeasurement const& a, StoredMeasurement const& b)
@@ -797,7 +749,7 @@ bool DB::load(std::string const& name)
 
     s_logger.logVerbose(QString("Done loading DB from '%1' & '%2'. Time: %3s").arg(m_dataName.c_str()).arg(m_dbName.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()));
 
-    return true;
+    return success;
 }
 
 //void DB::test()
@@ -908,23 +860,23 @@ uint32_t DB::computeNextRealTimeMeasurementIndex() const
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
+Result<void> DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
 {
     if (descriptor.name.empty())
     {
-        return false;
+        return Error("Config without a name");
     }
-    if (descriptor.commsPeriod < std::chrono::seconds(1))
+    if (descriptor.commsPeriod < std::chrono::seconds(30))
     {
-        return false;
+        return Error("Comms period cannot be lower than 30 seconds");
     }
-    if (descriptor.measurementPeriod < std::chrono::seconds(1))
+    if (descriptor.measurementPeriod < std::chrono::seconds(10))
     {
-        return false;
+        return Error("Measurement period cannot be lower than 10 seconds");
     }
     if (descriptor.commsPeriod < descriptor.measurementPeriod)
     {
-        return false;
+        return Error("Comms period cannot be lower than the measurement period");
     }
 
     SensorsConfig config;
@@ -965,12 +917,12 @@ bool DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
 
     triggerDelayedSave(std::chrono::seconds(1));
 
-    return true;
+    return success;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::setSensorsConfigs(std::vector<SensorsConfig> const& configs)
+Result<void> DB::setSensorsConfigs(std::vector<SensorsConfig> const& configs)
 {
     emit sensorsConfigWillBeChanged();
 
@@ -990,7 +942,7 @@ bool DB::setSensorsConfigs(std::vector<SensorsConfig> const& configs)
     s_logger.logInfo("Changed sensors configs");
 
     triggerDelayedSave(std::chrono::seconds(1));
-    return true;
+    return success;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1033,16 +985,16 @@ DB::SensorsConfig const& DB::findSensorsConfigForMeasurementIndex(uint32_t index
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::addSensor(SensorDescriptor const& descriptor)
+Result<void> DB::addSensor(SensorDescriptor const& descriptor)
 {
     if (findSensorIndexByName(descriptor.name) >= 0)
     {
-        return false;
+        return Error("Name '" + descriptor.name + "' already in use");
     }
     auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [](Sensor const& sensor) { return sensor.state == Sensor::State::Unbound; });
     if (it != m_mainData.sensors.end())
     {
-        return false;
+        return Error("There is already an unbound sensor");
     }
 
     {
@@ -1058,25 +1010,32 @@ bool DB::addSensor(SensorDescriptor const& descriptor)
         s_logger.logInfo(QString("Added sensor '%1'").arg(descriptor.name.c_str()));
     }
 
+    //refresh computed comms period as new sensors are added
+    if (!m_mainData.sensorsConfigs.empty())
+    {
+        SensorsConfig& config = m_mainData.sensorsConfigs.back();
+        config.computedCommsPeriod = computeCommsPeriod();
+    }
+
     triggerDelayedSave(std::chrono::seconds(1));
 
-    return true;
+    return success;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::setSensor(SensorId id, SensorDescriptor const& descriptor)
+Result<void> DB::setSensor(SensorId id, SensorDescriptor const& descriptor)
 {
     int32_t _index = findSensorIndexByName(descriptor.name);
     if (_index >= 0 && getSensor(static_cast<size_t>(_index)).id != id)
     {
-        return false;
+        return Error("Name '" + descriptor.name + "' already in use");
     }
 
     _index = findSensorIndexById(id);
     if (_index < 0)
     {
-        return false;
+        return Error("Trying to change non-existing sensor");
     }
 
     size_t index = static_cast<size_t>(_index);
@@ -1087,24 +1046,24 @@ bool DB::setSensor(SensorId id, SensorDescriptor const& descriptor)
 
     triggerDelayedSave(std::chrono::seconds(1));
 
-    return true;
+    return success;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::bindSensor(uint32_t serialNumber, Sensor::Calibration const& calibration, SensorId& id)
+Result<void> DB::bindSensor(uint32_t serialNumber, Sensor::Calibration const& calibration, SensorId& id)
 {
     int32_t _index = findUnboundSensorIndex();
     if (_index < 0)
     {
-        return false;
+        return Error("No unbound sensor");
     }
 
     size_t index = static_cast<size_t>(_index);
     Sensor& sensor = m_mainData.sensors[index];
     if (sensor.state != Sensor::State::Unbound)
     {
-        return false;
+        return Error("No unbound sensor (inconsistent internal state)");
     }
 
     sensor.address = ++m_mainData.lastSensorAddress;
@@ -1117,24 +1076,31 @@ bool DB::bindSensor(uint32_t serialNumber, Sensor::Calibration const& calibratio
 
     s_logger.logInfo(QString("Sensor '%1' bound").arg(sensor.descriptor.name.c_str()));
 
+    //refresh computed comms period as new sensors are added
+    if (!m_mainData.sensorsConfigs.empty())
+    {
+        SensorsConfig& config = m_mainData.sensorsConfigs.back();
+        config.computedCommsPeriod = computeCommsPeriod();
+    }
+
     triggerDelayedSave(std::chrono::seconds(1));
 
     id = sensor.id;
-    return true;
+    return success;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::setSensorState(SensorId id, Sensor::State state)
+Result<void> DB::setSensorState(SensorId id, Sensor::State state)
 {
     int32_t _index = findSensorIndexById(id);
     if (_index < 0)
     {
-        return false;
+        return Error("Invalid sensor id");
     }
     if (state == Sensor::State::Unbound)
     {
-        return false;
+        return Error("Cannot change state for unbound sensor");
     }
 
     size_t index = static_cast<size_t>(_index);
@@ -1147,7 +1113,7 @@ bool DB::setSensorState(SensorId id, Sensor::State state)
 
     triggerDelayedSave(std::chrono::seconds(1));
 
-    return true;
+    return success;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1265,6 +1231,13 @@ void DB::removeSensor(size_t index)
     m_mainData.sensors.erase(m_mainData.sensors.begin() + index);
     emit sensorRemoved(sensorId);
 
+    //refresh computed comms period as new sensors are removed
+    if (!m_mainData.sensorsConfigs.empty())
+    {
+        SensorsConfig& config = m_mainData.sensorsConfigs.back();
+        config.computedCommsPeriod = computeCommsPeriod();
+    }
+
     triggerDelayedSave(std::chrono::seconds(1));
 }
 
@@ -1333,11 +1306,11 @@ DB::Alarm const& DB::getAlarm(size_t index) const
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::addAlarm(AlarmDescriptor const& descriptor)
+Result<void> DB::addAlarm(AlarmDescriptor const& descriptor)
 {
     if (findAlarmIndexByName(descriptor.name) >= 0)
     {
-        return false;
+        return Error("Name '" + descriptor.name + "' already in use");
     }
 
     Alarm alarm;
@@ -1357,23 +1330,23 @@ bool DB::addAlarm(AlarmDescriptor const& descriptor)
 
     triggerDelayedSave(std::chrono::seconds(1));
 
-    return true;
+    return success;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::setAlarm(AlarmId id, AlarmDescriptor const& descriptor)
+Result<void> DB::setAlarm(AlarmId id, AlarmDescriptor const& descriptor)
 {
     int32_t _index = findAlarmIndexByName(descriptor.name);
     if (_index >= 0 && getAlarm(static_cast<size_t>(_index)).id != id)
     {
-        return false;
+        return Error("Name to '" + descriptor.name + "' already in use");
     }
 
     _index = findAlarmIndexById(id);
     if (_index < 0)
     {
-        return false;
+        return Error("Trying to change non-existing alarm");
     }
 
     size_t index = static_cast<size_t>(_index);
@@ -1384,7 +1357,7 @@ bool DB::setAlarm(AlarmId id, AlarmDescriptor const& descriptor)
 
     triggerDelayedSave(std::chrono::seconds(1));
 
-    return true;
+    return success;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1521,11 +1494,11 @@ DB::Report const& DB::getReport(size_t index) const
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::addReport(ReportDescriptor const& descriptor)
+Result<void> DB::addReport(ReportDescriptor const& descriptor)
 {
     if (findReportIndexByName(descriptor.name) >= 0)
     {
-        return false;
+        return Error("Name '" + descriptor.name + "' already in use");
     }
 
     Report report;
@@ -1545,23 +1518,23 @@ bool DB::addReport(ReportDescriptor const& descriptor)
 
     triggerDelayedSave(std::chrono::seconds(1));
 
-    return true;
+    return success;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::setReport(ReportId id, ReportDescriptor const& descriptor)
+Result<void> DB::setReport(ReportId id, ReportDescriptor const& descriptor)
 {
     int32_t _index = findReportIndexByName(descriptor.name);
     if (_index >= 0 && getReport(static_cast<size_t>(_index)).id != id)
     {
-        return false;
+        return Error("Name to '" + descriptor.name + "' already in use");
     }
 
     _index = findReportIndexById(id);
     if (_index < 0)
     {
-        return false;
+        return Error("Trying to change non-existing report");
     }
 
     size_t index = static_cast<size_t>(_index);
@@ -1572,7 +1545,7 @@ bool DB::setReport(ReportId id, ReportDescriptor const& descriptor)
 
     triggerDelayedSave(std::chrono::seconds(1));
 
-    return true;
+    return success;
 }
 
 //////////////////////////////////////////////////////////////////////////

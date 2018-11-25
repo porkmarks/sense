@@ -554,9 +554,10 @@ void SettingsWidget::applySensorsConfig()
         return;
     }
 
-    if (!m_db->addSensorsConfig(config))
+    Result<void> result = m_db->addSensorsConfig(config);
+    if (result != success)
     {
-        QMessageBox::critical(this, "Error", "Cannot set sensor settings.");
+        QMessageBox::critical(this, "Error", QString("Cannot set sensor settings: %1").arg(result.error().what().c_str()));
     }
     setSensorsConfig(m_db->getLastSensorsConfig());
 }

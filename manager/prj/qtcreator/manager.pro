@@ -118,7 +118,8 @@ HEADERS += \
     ../../../sensor/firmware/CRC.h \
     ../../../sensor/firmware/Data_Defs.h \
     ../../src/qcustomplot.h \
-    ../../src/PlotToolTip.h
+    ../../src/PlotToolTip.h \
+    ../../../common/src/Result.h
 
 SOURCES += \
     ../../src/Manager.cpp \

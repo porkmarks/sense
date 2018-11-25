@@ -76,10 +76,7 @@ MeasurementsModel::MeasurementsModel(DB& db)
     connect(&db, &DB::measurementsAdded, this, &MeasurementsModel::startAutoRefresh);
     connect(m_refreshTimer, &QTimer::timeout, this, &MeasurementsModel::refresh);
 
-    for (size_t i = 0; i < s_headerNames.size(); i++)
-    {
-        m_columnsVisible[i] = true;
-    }
+    m_columnsVisible.resize(s_headerNames.size(), true);
     refreshVisibleColumnToRealColumn();
 }
 
@@ -126,7 +123,7 @@ int MeasurementsModel::rowCount(QModelIndex const& index) const
 
 int MeasurementsModel::columnCount(QModelIndex const& /*index*/) const
 {
-    int cc = static_cast<int>(m_columnsVisible.count());
+    int cc = static_cast<int>(std::count(m_columnsVisible.begin(), m_columnsVisible.end(), true));
     return cc;
 }
 

@@ -422,9 +422,9 @@ bool Settings::load(std::string const& name)
         std::string dbName = macStr;
 
         std::unique_ptr<DB> db(new DB());
-        if (!db->load(dbName))
+        if (db->load(dbName) != success)
         {
-            if (!db->create(dbName))
+            if (db->create(dbName) != success)
             {
                 s_logger.logCritical(QString("Cannot open nor create a DB for Base Station '%1' / %2").arg(bs.descriptor.name.c_str()).arg(macStr).toUtf8().data());
                 return false;
@@ -777,9 +777,9 @@ bool Settings::addBaseStation(BaseStationDescriptor const& descriptor)
     std::string dbName = macStr;
 
     std::unique_ptr<DB> db(new DB());
-    if (!db->load(dbName))
+    if (db->load(dbName) != success)
     {
-        if (!db->create(dbName))
+        if (db->create(dbName) != success)
         {
             s_logger.logCritical(QString("Cannot open nor create a DB for Base Station '%1' / %2").arg(descriptor.name.c_str()).arg(macStr).toUtf8().data());
             return false;

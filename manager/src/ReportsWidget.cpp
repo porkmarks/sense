@@ -97,7 +97,11 @@ void ReportsWidget::configureReport(QModelIndex const& index)
     if (result == QDialog::Accepted)
     {
         report = dialog.getReport();
-        m_db->setReport(report.id, report.descriptor);
+        Result<void> result = m_db->setReport(report.id, report.descriptor);
+        if (result != success)
+        {
+            QMessageBox::critical(this, "Error", QString("Cannot change report '%1': %2").arg(report.descriptor.name.c_str()).arg(result.error().what().c_str()));
+        }
         m_model->refresh();
     }
 }
@@ -116,7 +120,13 @@ void ReportsWidget::addReport()
     if (result == QDialog::Accepted)
     {
         report = dialog.getReport();
-        m_db->addReport(report.descriptor);
+
+        Result<void> result = m_db->addReport(report.descriptor);
+        if (result != success)
+        {
+            QMessageBox::critical(this, "Error", QString("Cannot add report '%1': %2").arg(report.descriptor.name.c_str())
+                                  .arg(result.error().what().c_str()));
+        }
         m_model->refresh();
     }
 }

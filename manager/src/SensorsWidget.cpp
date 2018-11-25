@@ -110,9 +110,10 @@ void SensorsWidget::bindSensor()
             continue;
         }
 
-        if (!m_db->addSensor(descriptor))
+        Result<void> result = m_db->addSensor(descriptor);
+        if (result != success)
         {
-            QMessageBox::critical(this, "Error", QString("Cannot add sensor '%1'").arg(text));
+            QMessageBox::critical(this, "Error", QString("Cannot add sensor '%1': %2").arg(text).arg(result.error().what().c_str()));
             continue;
         }
 
@@ -183,9 +184,10 @@ void SensorsWidget::configureSensor(QModelIndex const& index)
         }
         sensor.descriptor.name = text.toUtf8().data();
 
-        if (!m_db->setSensor(sensor.id, sensor.descriptor))
+        Result<void> result = m_db->setSensor(sensor.id, sensor.descriptor);
+        if (result != success)
         {
-            QMessageBox::critical(this, "Error", QString("Cannot rename sensor to '%1'.").arg(sensor.descriptor.name.c_str()));
+            QMessageBox::critical(this, "Error", QString("Cannot rename sensor to '%1': %2").arg(sensor.descriptor.name.c_str()).arg(result.error().what().c_str()));
             continue;
         }
         break;

@@ -10,6 +10,7 @@
 #include <thread>
 #include <atomic>
 #include <condition_variable>
+#include "Result.h"
 
 class DB : public QObject
 {
@@ -23,8 +24,8 @@ public:
     void test();
 
     void process();
-    bool create(std::string const& name);
-    bool load(std::string const& name);
+    Result<void> create(std::string const& name);
+    Result<void> load(std::string const& name);
 
     ////////////////////////////////////////////////////////////////////////////
 
@@ -46,8 +47,8 @@ public:
     };
 
 
-    bool addSensorsConfig(SensorsConfigDescriptor const& descriptor);
-    bool setSensorsConfigs(std::vector<SensorsConfig> const& configs);
+    Result<void> addSensorsConfig(SensorsConfigDescriptor const& descriptor);
+    Result<void> setSensorsConfigs(std::vector<SensorsConfig> const& configs);
 
     size_t getSensorsConfigCount() const;
     SensorsConfig const& getSensorsConfig(size_t index) const;
@@ -145,10 +146,10 @@ public:
 
     size_t getSensorCount() const;
     Sensor const& getSensor(size_t index) const;
-    bool addSensor(SensorDescriptor const& descriptor);
-    bool setSensor(SensorId id, SensorDescriptor const& descriptor);
-    bool bindSensor(uint32_t serialNumber, Sensor::Calibration const& calibration, SensorId& id);
-    bool setSensorState(SensorId id, Sensor::State state);
+    Result<void> addSensor(SensorDescriptor const& descriptor);
+    Result<void> setSensor(SensorId id, SensorDescriptor const& descriptor);
+    Result<void> bindSensor(uint32_t serialNumber, Sensor::Calibration const& calibration, SensorId& id);
+    Result<void> setSensorState(SensorId id, Sensor::State state);
 
     struct SensorInputDetails
     {
@@ -231,8 +232,8 @@ public:
     Alarm const& getAlarm(size_t index) const;
     int32_t findAlarmIndexByName(std::string const& name) const;
     int32_t findAlarmIndexById(AlarmId id) const;
-    bool addAlarm(AlarmDescriptor const& descriptor);
-    bool setAlarm(AlarmId id, AlarmDescriptor const& descriptor);
+    Result<void> addAlarm(AlarmDescriptor const& descriptor);
+    Result<void> setAlarm(AlarmId id, AlarmDescriptor const& descriptor);
     void removeAlarm(size_t index);
 
     ////////////////////////////////////////////////////////////////////////////
@@ -290,8 +291,8 @@ public:
     Report const& getReport(size_t index) const;
     int32_t findReportIndexByName(std::string const& name) const;
     int32_t findReportIndexById(ReportId id) const;
-    bool addReport(ReportDescriptor const& descriptor);
-    bool setReport(ReportId id, ReportDescriptor const& descriptor);
+    Result<void> addReport(ReportDescriptor const& descriptor);
+    Result<void> setReport(ReportId id, ReportDescriptor const& descriptor);
     void removeReport(size_t index);
     bool isReportTriggered(ReportId id) const;
     void setReportExecuted(ReportId id);

@@ -6,6 +6,8 @@
 
 #include "ui_LoginDialog.h"
 #include "Crypt.h"
+#include "Logger.h"
+#include "Settings.h"
 
 #ifdef NDEBUG
 #   define CHECK_PASSWORD

@@ -99,7 +99,11 @@ void AlarmsWidget::configureAlarm(QModelIndex const& index)
     if (result == QDialog::Accepted)
     {
         alarm = dialog.getAlarm();
-        m_db->setAlarm(alarm.id, alarm.descriptor);
+        Result<void> result = m_db->setAlarm(alarm.id, alarm.descriptor);
+        if (result != success)
+        {
+            QMessageBox::critical(this, "Error", QString("Cannot change alarm '%1': %2").arg(alarm.descriptor.name.c_str()).arg(result.error().what().c_str()));
+        }
         m_model->refresh();
     }
 }
@@ -118,7 +122,11 @@ void AlarmsWidget::addAlarm()
     if (result == QDialog::Accepted)
     {
         alarm = dialog.getAlarm();
-        m_db->addAlarm(alarm.descriptor);
+        Result<void> result = m_db->addAlarm(alarm.descriptor);
+        if (result != success)
+        {
+            QMessageBox::critical(this, "Error", QString("Cannot add alarm '%1': %2").arg(alarm.descriptor.name.c_str()).arg(result.error().what().c_str()));
+        }
         m_model->refresh();
     }
 }

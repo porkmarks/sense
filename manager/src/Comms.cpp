@@ -364,8 +364,8 @@ static void fillConfig(data::sensor::Config_Response& config, DB::SensorsConfig 
             chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(sensorOutputDetails.commsPeriod).count());
 
     config.last_confirmed_measurement_index = sensor.lastConfirmedMeasurementIndex;
-    config.calibration_change.temperature_bias = static_cast<int16_t>((sensor.calibration.temperatureBias - reportedCalibration.temperatureBias) * 100.f);
-    config.calibration_change.humidity_bias = static_cast<int16_t>((sensor.calibration.humidityBias - reportedCalibration.humidityBias) * 100.f);
+    config.calibration.temperature_bias = static_cast<int16_t>((sensor.calibration.temperatureBias) * 100.f);
+    config.calibration.humidity_bias = static_cast<int16_t>((sensor.calibration.humidityBias) * 100.f);
     config.power = sensorsConfig.descriptor.sensorsPower;
 }
 
@@ -501,9 +501,10 @@ void Comms::processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequ
     uint32_t serialNumber = pairRequest.descriptor.serial_number;
 
     DB::SensorId id;
-    if (!cbs.db.bindSensor(serialNumber, calibration, id))
+    Result<void> result = cbs.db.bindSensor(serialNumber, calibration, id);
+    if (result != success)
     {
-        s_logger.logWarning(QString("Unexpected bind request received from sensor SN %1").arg(serialNumber, 8, 18, QChar('0')));
+        s_logger.logWarning(QString("Unexpected bind request received from sensor SN %1: %2").arg(serialNumber, 8, 18, QChar('0')).arg(result.error().what().c_str()));
         sendEmptySensorResponse(cbs, request);
         return;
     }

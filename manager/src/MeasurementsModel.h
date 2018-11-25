@@ -80,6 +80,6 @@ private:
     std::vector<DB::Measurement> m_measurements;
     QTimer* m_refreshTimer = nullptr;
 
-    std::bitset<32> m_columnsVisible;
+    std::vector<bool> m_columnsVisible;
     std::vector<Column> m_visibleColumnToRealColumn;
 };
