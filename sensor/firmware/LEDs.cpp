@@ -41,7 +41,6 @@ void set_led(Led led)
     else if (led == Led::Red)
     {
       TCCR0B &= ~0x3;
-      TIMSK0 &= ~bit(OCIE0A);
       digitalWriteFast(GREEN_LED_PIN, LOW);
       digitalWriteFast(RED_LED_PIN, HIGH);
     }

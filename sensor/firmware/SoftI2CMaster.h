@@ -98,47 +98,16 @@
 
 
 
-// Init function. Needs to be called once in the beginning.
-// Returns false if SDA or SCL are low, which probably means
-// a I2C bus lockup or that the lines are not pulled up.
-bool __attribute__ ((noinline)) i2c_init(void) __attribute__ ((used));
-
-// Start transfer function: <addr> is the 8-bit I2C address (including the R/W
-// bit).
-// Return: true if the slave replies with an "acknowledge", false otherwise
-bool __attribute__ ((noinline)) i2c_start(uint8_t addr) __attribute__ ((used));
-
-// Similar to start function, but wait for an ACK! Will timeout if I2C_MAXWAIT > 0.
-bool  __attribute__ ((noinline)) i2c_start_wait(uint8_t addr) __attribute__ ((used));
-
-// Repeated start function: After having claimed the bus with a start condition,
-// you can address another or the same chip again without an intervening
-// stop condition.
-// Return: true if the slave replies with an "acknowledge", false otherwise
-bool __attribute__ ((noinline)) i2c_rep_start(uint8_t addr) __attribute__ ((used));
-
-// Issue a stop condition, freeing the bus.
-void __attribute__ ((noinline)) i2c_stop(void) asm("ass_i2c_stop") __attribute__ ((used));
-
-// Write one byte to the slave chip that had been addressed
-// by the previous start call. <value> is the byte to be sent.
-// Return: true if the slave replies with an "acknowledge", false otherwise
-bool __attribute__ ((noinline)) i2c_write(uint8_t value) asm("ass_i2c_write") __attribute__ ((used));
-
-
-// Read one byte. If <last> is true, we send a NAK after having received
-// the byte in order to terminate the read sequence.
-uint8_t __attribute__ ((noinline)) i2c_read(bool last) __attribute__ ((used));
-
 // If you want to use the TWI hardeware, you have to define I2C_HARDWARE to be 1
 #ifndef I2C_HARDWARE
 #define I2C_HARDWARE 0
 #endif
 
 #if I2C_HARDWARE
-#ifndef TWDR
+#ifndef TWDR0
 #error This chip does not support hardware I2C. Please undfine I2C_HARDWARE
 #endif
+#define TW0_STATUS   (TWSR0 & TW_STATUS_MASK)
 #endif
 
 // You can set I2C_CPUFREQ independently of F_CPU if you
@@ -223,10 +192,6 @@ uint8_t __attribute__ ((noinline)) i2c_read(bool last) __attribute__ ((used));
 #endif
 #endif
 
-// constants for reading & writing
-#define I2C_READ    1
-#define I2C_WRITE   0
-
 #if !I2C_HARDWARE
 // map the IO register back into the IO address space
 #define SDA_DDR       	(_SFR_IO_ADDR(SDA_PORT) - 1)
@@ -239,6 +204,7 @@ uint8_t __attribute__ ((noinline)) i2c_read(bool last) __attribute__ ((used));
 #ifndef __tmp_reg__
 #define __tmp_reg__ 0
 #endif
+
 
 // Internal delay functions.
 void __attribute__ ((noinline)) i2c_delay_half(void) asm("ass_i2c_delay_half")  __attribute__ ((used));
@@ -320,11 +286,11 @@ bool i2c_init(void)
   digitalWriteFast(SCL, 0);
 #endif
 #if ((I2C_CPUFREQ/SCL_CLOCK)-16)/2 < 250
-  TWSR = 0;                         /* no prescaler */
-  TWBR = ((I2C_CPUFREQ/SCL_CLOCK)-16)/2;  /* must be > 10 for stable operation */
+  TWSR0 = 0;                         /* no prescaler */
+  TWBR0 = ((I2C_CPUFREQ/SCL_CLOCK)-16)/2;  /* must be > 10 for stable operation */
 #else
-  TWSR = (1<<TWPS0); // prescaler is 4
-  TWBR = ((I2C_CPUFREQ/SCL_CLOCK)-16)/8;
+  TWSR0 = (1<<TWPS0); // prescaler is 4
+  TWBR0 = ((I2C_CPUFREQ/SCL_CLOCK)-16)/8;
 #endif
   return (digitalReadFast(SDA) != 0 && digitalReadFast(SCL) != 0);
 }
@@ -360,6 +326,19 @@ bool i2c_init(void)
 }
 #endif
 
+bool i2c_recover(void)
+#if I2C_HARDWARE
+{
+  TWCR0 = (1 << TWINT)|(1 << TWSTO);
+  chrono::delay(chrono::millis(1));
+  return (digitalReadFast(SDA) != 0 && digitalReadFast(SCL) != 0);
+}
+#else
+{
+#error Not implemented!
+}
+#endif
+
 bool  i2c_start(uint8_t addr)
 #if I2C_HARDWARE
 {
@@ -369,32 +348,32 @@ bool  i2c_start(uint8_t addr)
 #endif
 
   // send START condition
-  TWCR = (1<<TWINT) | (1<<TWSTA) | (1<<TWEN);
+  TWCR0 = (1<<TWINT) | (1<<TWSTA) | (1<<TWEN);
 
   // wait until transmission completed
-  while(!(TWCR & (1<<TWINT))) {
+  while(!(TWCR0 & (1<<TWINT))) {
 #if I2C_TIMEOUT
     if ((chrono::now() - start).count > I2C_TIMEOUT) return false;
 #endif
   }
 
   // check value of TWI Status Register. Mask prescaler bits.
-  twst = TW_STATUS & 0xF8;
+  twst = TW0_STATUS & 0xF8;
   if ( (twst != TW_START) && (twst != TW_REP_START)) return false;
 
   // send device address
-  TWDR = addr;
-  TWCR = (1<<TWINT) | (1<<TWEN);
+  TWDR0 = addr;
+  TWCR0 = (1<<TWINT) | (1<<TWEN);
 
   // wail until transmission completed and ACK/NACK has been received
-  while(!(TWCR & (1<<TWINT))) {
+  while(!(TWCR0 & (1<<TWINT))) {
 #if I2C_TIMEOUT
     if ((chrono::now() - start).count > I2C_TIMEOUT) return false;
 #endif
   }
 
   // check value of TWI Status Register. Mask prescaler bits.
-  twst = TW_STATUS & 0xF8;
+  twst = TW0_STATUS & 0xF8;
   if ( (twst != TW_MT_SLA_ACK) && (twst != TW_MR_SLA_ACK) ) return false;
 
   return true;
@@ -477,39 +456,39 @@ bool  i2c_start_wait(uint8_t addr)
 
   while (true) {
     // send START condition
-    TWCR = (1<<TWINT) | (1<<TWSTA) | (1<<TWEN);
+    TWCR0 = (1<<TWINT) | (1<<TWSTA) | (1<<TWEN);
 
     // wait until transmission completed
-    while(!(TWCR & (1<<TWINT))) {
+    while(!(TWCR0 & (1<<TWINT))) {
 #if I2C_TIMEOUT
     if ((chrono::now() - start).count > I2C_TIMEOUT) return false;
 #endif
     }
 
     // check value of TWI Status Register. Mask prescaler bits.
-    twst = TW_STATUS & 0xF8;
+    twst = TW0_STATUS & 0xF8;
     if ( (twst != TW_START) && (twst != TW_REP_START)) continue;
 
     // send device address
-    TWDR = addr;
-    TWCR = (1<<TWINT) | (1<<TWEN);
+    TWDR0 = addr;
+    TWCR0 = (1<<TWINT) | (1<<TWEN);
 
     // wail until transmission completed
-    while(!(TWCR & (1<<TWINT))) {
+    while(!(TWCR0 & (1<<TWINT))) {
 #if I2C_TIMEOUT
       if ((chrono::now() - start).count > I2C_TIMEOUT) return false;
 #endif
     }
 
     // check value of TWI Status Register. Mask prescaler bits.
-    twst = TW_STATUS & 0xF8;
+    twst = TW0_STATUS & 0xF8;
     if ( (twst == TW_MT_SLA_NACK )||(twst ==TW_MR_DATA_NACK) )
       {
 	/* device busy, send stop condition to terminate write operation */
-	TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO);
+	TWCR0 = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO);
 
 	// wait until stop condition is executed and bus released
-	while(TWCR & (1<<TWSTO)) {
+	while(TWCR0 & (1<<TWSTO)) {
 #if I2C_TIMEOUT
 	  if ((chrono::now() - start).count > I2C_TIMEOUT) return false;
 #endif
@@ -575,10 +554,10 @@ void  i2c_stop(void)
   auto start = chrono::now();
 #endif
   /* send stop condition */
-  TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO);
+  TWCR0 = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO);
 
   // wait until stop condition is executed and bus released
-  while(TWCR & (1<<TWSTO)) {
+  while(TWCR0 & (1<<TWSTO)) {
 #if I2C_TIMEOUT
     if ((chrono::now() - start).count > I2C_TIMEOUT) return;
 #endif
@@ -629,18 +608,18 @@ bool i2c_write(uint8_t value)
 
 
   // send data to the previously addressed device
-  TWDR = value;
-  TWCR = (1<<TWINT) | (1<<TWEN);
+  TWDR0 = value;
+  TWCR0 = (1<<TWINT) | (1<<TWEN);
 
   // wait until transmission completed
-  while(!(TWCR & (1<<TWINT))) {
+  while(!(TWCR0 & (1<<TWINT))) {
 #if I2C_TIMEOUT
     if ((chrono::now() - start).count > I2C_TIMEOUT) return false;
 #endif
   }
 
   // check value of TWI Status Register. Mask prescaler bits
-  twst = TW_STATUS & 0xF8;
+  twst = TW0_STATUS & 0xF8;
   if( twst != TW_MT_DATA_ACK) return false;
   return true;
 }
@@ -754,13 +733,13 @@ uint8_t i2c_read(bool last)
   auto start = chrono::now();
 #endif
 
-  TWCR = (1<<TWINT) | (1<<TWEN) | (last ? 0 : (1<<TWEA));
-  while(!(TWCR & (1<<TWINT))) {
+  TWCR0 = (1<<TWINT) | (1<<TWEN) | (last ? 0 : (1<<TWEA));
+  while(!(TWCR0 & (1<<TWINT))) {
 #if I2C_TIMEOUT
     if ((chrono::now() - start).count > I2C_TIMEOUT) return 0xFF;
 #endif
   }
-  return TWDR;
+  return TWDR0;
 }
 #else
 {

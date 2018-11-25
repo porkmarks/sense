@@ -18,6 +18,7 @@
 #include "Storage.h"
 #include "Sleep.h"
 #include "digitalWriteFast.h"
+#include "i2c.h"
 
 #define BAUD 57600
 #include <util/setbaud.h>
@@ -217,7 +218,6 @@ static bool load_settings(uint32_t& serial_number, uint32_t& address, data::sens
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-extern bool _i2c_init();
 
 static void setup()
 {
@@ -356,15 +356,20 @@ static void setup()
 
     ///////////////////////////////////////////////
     //initialize the bus and sensors
-    while (!_i2c_init())
+    while (!i2c_init())
     {
         LOG(PSTR("I2C failed\n"));
         blink_led(Blink_Led::Red, 4, chrono::millis(200));
-//        while (true)
-//        {
-//            LOG(PSTR("%d, %d\n"), digitalReadFast(18), digitalReadFast(19));
-//            chrono::delay(chrono::millis(20));
-//        }
+        float h;
+        //try to read something
+        //sometimes the sht21 gets stuck and we just have to read smth for it to release the lines
+        s_sht.GetHumidity(h); 
+        chrono::delay(chrono::millis(100));
+        //reinit
+        if (i2c_init())
+        {
+            break;
+        }
         sleep(true);
     }
     chrono::delay(chrono::millis(50));
@@ -497,12 +502,9 @@ static bool apply_config(const data::sensor::Config_Response& config)
 
     s_baseline_measurement_index = config.baseline_measurement_index;
 
-    data::sensor::Calibration calibration = s_calibration;
-    calibration.temperature_bias += config.calibration_change.temperature_bias;
-    calibration.humidity_bias += config.calibration_change.humidity_bias;
-    if (calibration.temperature_bias != s_calibration.temperature_bias || calibration.humidity_bias != s_calibration.humidity_bias)
+    if (config.calibration.temperature_bias != s_calibration.temperature_bias || config.calibration.humidity_bias != s_calibration.humidity_bias)
     {
-        s_calibration = calibration;
+        s_calibration = config.calibration;
         save_settings(s_serial_number, s_comms.get_address(), s_calibration);
     }
 

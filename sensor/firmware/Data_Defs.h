@@ -92,8 +92,9 @@ struct Calibration
 {
     int16_t temperature_bias = 0; //*100
     int16_t humidity_bias = 0; //*100
+    uint32_t reserved[4];
 };
-static_assert(sizeof(Calibration) == 4, "");
+static_assert(sizeof(Calibration) == 20, "");
 
 
 struct Config_Request
@@ -104,8 +105,9 @@ struct Config_Request
     bool sleeping = false;
 
     Calibration calibration;
+    uint32_t reserved[4];
 };
-static_assert(sizeof(Config_Request) == 14, "");
+static_assert(sizeof(Config_Request) == 46, "");
 
 struct Config_Response
 {
@@ -118,12 +120,12 @@ struct Config_Response
     uint32_t last_confirmed_measurement_index = 0;
 
     //how much to change calibration. 0 means leave it unchanged
-    Calibration calibration_change;
+    Calibration calibration;
 
     bool sleeping = false;
     int8_t power = 15;
 };
-static_assert(sizeof(Config_Response) == 30, "");
+static_assert(sizeof(Config_Response) == 46, "");
 
 struct Descriptor
 {
@@ -131,26 +133,27 @@ struct Descriptor
     uint8_t hardware_version = 0;
     uint8_t software_version = 0;
     uint32_t serial_number;
+    uint32_t reserved[4];
 };
 
 struct First_Config_Request
 {
     Descriptor descriptor;
 };
-static_assert(sizeof(First_Config_Request) == 7, "");
+static_assert(sizeof(First_Config_Request) == 23, "");
 
 struct First_Config_Response : Config_Response
 {
     uint32_t first_measurement_index = 0;
 };
-static_assert(sizeof(First_Config_Response) == 34, "");
+static_assert(sizeof(First_Config_Response) == 50, "");
 
 struct Pair_Request
 {
     Descriptor descriptor;
     Calibration calibration;
 };
-static_assert(sizeof(Pair_Request) == 11, "");
+static_assert(sizeof(Pair_Request) == 43, "");
 
 struct Pair_Response
 {
