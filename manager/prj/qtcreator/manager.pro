@@ -195,7 +195,8 @@ FORMS += \
     ../../src/LogsWidget.ui \
     ../../src/ExportLogsDialog.ui \
     ../../src/DateTimeFilterWidget.ui \
-    ../../src/SensorsFilterWidget.ui
+    ../../src/SensorsFilterWidget.ui \
+    ../../src/SensorDetailsDialog.ui
 
 DISTFILES += \
 

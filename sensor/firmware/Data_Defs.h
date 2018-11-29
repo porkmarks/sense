@@ -35,16 +35,6 @@ static_assert(sizeof(Ack) == 2, "");
 
 struct Measurement
 {
-    enum class Flag : uint8_t
-    {
-        SENSOR_ERROR    = 1 << 0,
-        COMMS_ERROR     = 1 << 1,
-        REBOOT_POWER_ON = 1 << 2,
-        REBOOT_RESET    = 1 << 3,
-        REBOOT_BROWNOUT = 1 << 4,
-        REBOOT_WATCHDOG = 1 << 5
-    };
-
     void pack(float humidity, float temperature)
     {
         this->humidity = static_cast<uint8_t>(humidity * 2.55f);
@@ -58,11 +48,10 @@ struct Measurement
     }
 
 //packed data
-    uint8_t flags = 0;
     uint8_t humidity = 0; //*2.55
     int16_t temperature = 0; //*100
 };
-static_assert(sizeof(Measurement) == 4, "");
+static_assert(sizeof(Measurement) == 3, "");
 
 struct Measurement_Batch_Request
 {
@@ -84,7 +73,7 @@ struct Measurement_Batch_Request
     enum { MAX_COUNT = 8 };
     Measurement measurements[MAX_COUNT];
 };
-static_assert(sizeof(Measurement_Batch_Request) == 38, "");
+static_assert(sizeof(Measurement_Batch_Request) == 30, "");
 //template<int s> struct Size_Checker;
 //Size_Checker<sizeof(Measurement_Batch)> size_checker;
 
@@ -92,13 +81,23 @@ struct Calibration
 {
     int16_t temperature_bias = 0; //*100
     int16_t humidity_bias = 0; //*100
-    uint32_t reserved[4];
+    uint8_t reserved[16];
 };
 static_assert(sizeof(Calibration) == 20, "");
 
+enum class Reboot_Flag : uint8_t
+{
+    REBOOT_POWER_ON = 1 << 0,
+    REBOOT_RESET    = 1 << 1,
+    REBOOT_BROWNOUT = 1 << 2,
+    REBOOT_WATCHDOG = 1 << 3,
+    REBOOT_UNKNOWN  = 1 << 4,
+};
 
 struct Config_Request
 {
+    uint8_t reboot_flags = 0;
+    uint8_t comms_errors = 0;
     uint32_t first_measurement_index = 0;
     uint32_t measurement_count = 0;
     int8_t b2s_input_dBm = 0;
@@ -107,7 +106,7 @@ struct Config_Request
     Calibration calibration;
     uint32_t reserved[4];
 };
-static_assert(sizeof(Config_Request) == 46, "");
+static_assert(sizeof(Config_Request) == 48, "");
 
 struct Config_Response
 {
@@ -133,7 +132,7 @@ struct Descriptor
     uint8_t hardware_version = 0;
     uint8_t software_version = 0;
     uint32_t serial_number;
-    uint32_t reserved[4];
+    uint8_t reserved[16];
 };
 
 struct First_Config_Request

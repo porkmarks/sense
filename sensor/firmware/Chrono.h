@@ -122,9 +122,9 @@ struct time
     Duration time_since_epoch() const { return Duration(static_cast<typename Duration::rep_t>(ticks)); }
 };
 
-typedef time<uint64_t, millis> time_ms;
-typedef time<uint64_t, micros> time_us;
-typedef time<uint32_t, seconds> time_s;
+typedef time<int64_t, millis> time_ms;
+typedef time<int64_t, micros> time_us;
+typedef time<int32_t, seconds> time_s;
 
 void delay_us(micros us);
 

@@ -42,6 +42,10 @@ namespace chrono
 
 void delay_us(micros us)
 {
+    if (us.count <= 3)
+    {
+      return;
+    }
 #ifdef __AVR__
     constexpr uint8_t cycles_per_us = F_CPU / 1000000ULL;
 //    delayMicroseconds(us.count);

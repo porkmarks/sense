@@ -1062,10 +1062,17 @@ int16_t RFM95::receive(uint8_t* data, size_t& len) {
 
   // get packet length
   if(_sf != 6) {
-    len = _mod->SPIgetRegValue(SX127X_REG_RX_NB_BYTES);
+    size_t rlen = _mod->SPIgetRegValue(SX127X_REG_RX_NB_BYTES);
+    if (rlen < len)
+    {
+        len = rlen;
+    }
   }
 
-  _mod->SPIreadRegisterBurst(SX127X_REG_FIFO, len, data);
+  if (len > 0)
+  {
+    _mod->SPIreadRegisterBurst(SX127X_REG_FIFO, len, data);
+  }
 
   // clear interrupt flags
   clearIRQFlags();
@@ -1117,10 +1124,17 @@ int16_t RFM95::receive(uint8_t* data, size_t& len, chrono::millis timeout) {
 
   // get packet length
   if(_sf != 6) {
-    len = _mod->SPIgetRegValue(SX127X_REG_RX_NB_BYTES);
+    size_t rlen = _mod->SPIgetRegValue(SX127X_REG_RX_NB_BYTES);
+    if (rlen < len)
+    {
+        len = rlen;
+    }
   }
 
-  _mod->SPIreadRegisterBurst(SX127X_REG_FIFO, len, data);
+  if (len > 0)
+  {
+    _mod->SPIreadRegisterBurst(SX127X_REG_FIFO, len, data);
+  }
 
   // clear interrupt flags
   clearIRQFlags();

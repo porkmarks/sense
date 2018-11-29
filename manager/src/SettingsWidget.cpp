@@ -68,6 +68,12 @@ void SettingsWidget::shutdown()
     m_settings = nullptr;
     m_db = nullptr;
 
+    for (const QMetaObject::Connection& connection: m_dbConnections)
+    {
+        QObject::disconnect(connection);
+    }
+    m_dbConnections.clear();
+
 //    m_ui.baseStationsWidget->shutdown();
     m_ui.usersWidget->shutdown();
 }
@@ -83,6 +89,12 @@ void SettingsWidget::initBaseStation(Settings::BaseStationId id)
         return;
     }
 
+    for (const QMetaObject::Connection& connection: m_dbConnections)
+    {
+        QObject::disconnect(connection);
+    }
+    m_dbConnections.clear();
+
     //Settings::BaseStation const& bs = m_settings->getBaseStation(index);
     size_t index = static_cast<size_t>(_index);
     DB& db = m_settings->getBaseStationDB(index);
@@ -90,6 +102,7 @@ void SettingsWidget::initBaseStation(Settings::BaseStationId id)
     m_ui.reportsWidget->init(*m_settings, db);
 
     setSensorsConfig(m_db->getLastSensorsConfig());
+    m_dbConnections.push_back(connect(&db, &DB::sensorsConfigChanged, [this]() { if (m_db) setSensorsConfig(m_db->getLastSensorsConfig()); }));
 
     setRW();
 }

@@ -21,7 +21,6 @@ public:
     enum class Column
     {
         Name,
-        Id,
         SerialNumber,
         Temperature,
         Humidity,
@@ -34,6 +33,8 @@ public:
 
     size_t getSensorCount() const;
     DB::Sensor const& getSensor(size_t index) const;
+
+    int32_t getSensorIndex(QModelIndex index) const;
 
 signals:
     void sensorCheckedChanged(DB::SensorId id);

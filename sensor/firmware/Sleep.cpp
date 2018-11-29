@@ -6,6 +6,7 @@
 #include <avr/pgmspace.h>
 #include <stdio.h>
 #include "avr_stdio.h"
+#include "i2c.h"
 
 //#include <Arduino.h>
 #include <avr/sleep.h>
@@ -116,33 +117,34 @@ void init_sleep()
 
 void sleep(bool allow_button)
 {
-    uart_flush();
-
-    cli();
-
     if (allow_button)
     {
         s_button_interrupt_fired = false;
         uint8_t button_pin = static_cast<uint8_t>(Button::BUTTON1);
-        if (digitalReadFast(button_pin) == LOW)
+        if (s_button_interrupt_fired == true || digitalReadFast(button_pin) == LOW)
         {
-            sei();
             return;
         }
     }
+
+    uart_shutdown();
+    i2c_shutdown();
+
+    cli();
 
     //LOG(PSTR(">osccal %d\n"), (int)OSCCAL);
 
     uint8_t adcsra = ADCSRA;
     ADCSRA &= ~bit(ADEN); //turn off adc
     PRR0 = (uint8_t)(~bit(PRTIM2)); //turn off everything except timer2
-    PRR1 = 0xFF;
+    PRR1 = bit(PRTWI1) | bit(PRPTC) | bit(PRTIM4) | bit(PRSPI1) | bit(PRTIM3);
     
     s_timer2_interrupt_fired = false;
     //SYNC_R_TCNT();
     //no need to sync here, as TCNT2 should be readable before sleeping
     uint8_t start_cycle = TCNT2;
 
+    set_sleep_mode(SLEEP_MODE_PWR_SAVE);
     sleep_enable();
     sei();
     sleep_cpu();
@@ -171,6 +173,9 @@ void sleep(bool allow_button)
     ADCSRA = adcsra; //restore adc
     PRR0 = 0;
     PRR1 = 0;
+
+    i2c_init();
+    uart_init();
 
     //LOG(PSTR("s: %ld -> %ld, %d, %d, %ld\n"), ((uint32_t)start_cycle * chrono::k_timer2_period_us) / 1000, ((uint32_t)end_cycle * chrono::k_timer2_period_us) / 1000, s_timer2_interrupt_fired ? 1 : 0, s_button_interrupt_fired ? 1 : 0, (uint32_t)TCNT1);
 }

@@ -1,6 +1,5 @@
 //#include <Arduino.h>
 //#include <HardwareSerial.h>
-#include <avr/eeprom.h>
 #include <avr/interrupt.h>
 #include <avr/io.h>
 #include <avr/pgmspace.h>
@@ -19,9 +18,8 @@
 #include "Sleep.h"
 #include "digitalWriteFast.h"
 #include "i2c.h"
-
-#define BAUD 57600
-#include <util/setbaud.h>
+#include "Util.h"
+#include "Settings.h"
 
 #include "SHT2x.h"
 
@@ -41,12 +39,6 @@ inline void operator delete(void* p) { free(p); }
 inline void operator delete[](void* p) { free(p); }
 inline void* operator new(size_t size_, void *ptr_) { return ptr_; }
 */
-//////////////////////////////////////////////////////////////////////////////////////////
-
-static void hash_combine(uint32_t& seed, uint32_t v)
-{
-    seed ^= v + 0x9e3779b9 + (seed<<6) + (seed>>2);
-}
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -63,7 +55,8 @@ static State s_state = State::PAIR;
 #define HARDWARE_VERSION  2
 #define SOFTWARE_VERSION  2
 
-static uint8_t s_error_flags = 0;
+static uint8_t s_reboot_flags = 0;
+static uint8_t s_comms_errors = 0;
 
 static SHT2x s_sht;
 static Sensor_Comms s_comms;
@@ -81,10 +74,9 @@ static chrono::millis s_comms_period;
 static int8_t s_last_input_dBm = 0;
 
 static Storage s_storage;
-static data::sensor::Calibration s_calibration;
-static uint32_t s_serial_number = 0;
 static bool s_sensor_sleeping = false;
-
+static Settings s_settings;
+static Stable_Settings s_stable_settings;
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -94,6 +86,7 @@ ISR(BADISR_vect)
     {
       blink_led(Blink_Led::Red, 255, chrono::millis(50));
     }
+    //soft_reset();
 }
 
 void wdt_init(void) __attribute__((naked)) __attribute__((section(".init3")));
@@ -114,7 +107,7 @@ static void stack_paint(void)
 
     while(p < (uint8_t*)&p)
     {
-        *p = 0xc5;
+        *p = STACK_CANARY;
         p++;
     }  
 }
@@ -129,7 +122,7 @@ static uint16_t stack_size(void)
     const uint8_t *p = &_end;
     uint16_t       c = 0;
 
-    while(*p == 0xc5 && p < (uint8_t*)&p)
+    while(*p == STACK_CANARY && p < (uint8_t*)&p)
     {
         p++;
         c++;
@@ -140,96 +133,12 @@ static uint16_t stack_size(void)
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-static constexpr uint8_t SETTINGS_VERSION = 2;
-
-static uint8_t  EEMEM eeprom_version;
-static uint32_t EEMEM eeprom_serial_number;
-static uint32_t EEMEM eeprom_address;
-static uint16_t EEMEM eeprom_temperature_bias;
-static uint16_t EEMEM eeprom_humidity_bias;
-static uint32_t EEMEM eeprom_crc;
-
-static void reset_settings()
-{
-    eeprom_write_byte(&eeprom_version, 0);
-}
-
-static void save_settings(uint32_t serial_number, uint32_t address, data::sensor::Calibration const& calibration)
-{
-    LOG(PSTR("Saving settings..."));
-    uint32_t crc = 123456789ULL;
-    eeprom_write_byte(&eeprom_version, SETTINGS_VERSION);
-    hash_combine(crc, SETTINGS_VERSION);
-    
-    eeprom_write_dword(&eeprom_serial_number, serial_number);
-    hash_combine(crc, serial_number);
-    
-    eeprom_write_dword(&eeprom_address, address);
-    hash_combine(crc, address);
-    
-    eeprom_write_word(&eeprom_temperature_bias, *(uint16_t*)&calibration.temperature_bias);
-    hash_combine(crc, int32_t(calibration.temperature_bias) + 65535ULL);
-    
-    eeprom_write_word(&eeprom_humidity_bias, *(uint16_t*)&calibration.humidity_bias);
-    hash_combine(crc, int32_t(calibration.humidity_bias) + 65535ULL);
-
-    eeprom_write_dword(&eeprom_crc, crc);
-    LOG(PSTR("done\n"));
-}
-
-static bool load_settings(uint32_t& serial_number, uint32_t& address, data::sensor::Calibration& calibration)
-{
-    LOG(PSTR("Loading settings..."));
-    if (eeprom_read_byte(&eeprom_version) == SETTINGS_VERSION)
-    {
-        uint32_t crc = 123456789ULL;
-        hash_combine(crc, SETTINGS_VERSION);
-        
-        serial_number = eeprom_read_dword(&eeprom_serial_number);
-        hash_combine(crc, serial_number);
-        
-        address = eeprom_read_dword(&eeprom_address);
-        hash_combine(crc, address);
-
-        uint16_t v = eeprom_read_word(&eeprom_temperature_bias);
-        calibration.temperature_bias = *(int16_t*)&v;
-        hash_combine(crc, int32_t(calibration.temperature_bias) + 65535ULL);
-
-        v = eeprom_read_word(&eeprom_humidity_bias);
-        calibration.humidity_bias = *(int16_t*)&v;
-        hash_combine(crc, int32_t(calibration.humidity_bias) + 65535ULL);
-
-        uint32_t stored_crc = eeprom_read_dword(&eeprom_crc);
-        if (stored_crc != crc)
-        {
-            LOG(PSTR("failed: crc mismatch\n"));
-            //reset_settings();
-            return false;
-        }
-        LOG(PSTR("done\n"));
-        return true;
-    }
-    else
-    {
-        LOG(PSTR("failed: old version\n"));
-        reset_settings();
-        return false;
-    }
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////
-
 static void setup()
 {
     int mcusr_value = MCUSR;
     MCUSR = 0;
 
-    //setup serial.
-    //Serial.begin(57600);
-    // Turn on the transmission/reception circuitry
-    UCSR0B |= (1 << RXEN0) | (1 <<TXEN0); 
-    UBRR0L = UBRRL_VALUE;
-    UBRR0H = UBRRH_VALUE;
+    uart_init();
 
     fdev_setup_stream(&s_uart_output, uart_putchar, NULL, _FDEV_SETUP_WRITE);
     stdout = &s_uart_output;
@@ -329,26 +238,30 @@ static void setup()
     ////////////////////////////////////////////
 
     LOG(PSTR("*** "));
-    s_error_flags = 0;
+    s_reboot_flags = 0;
     if (mcusr_value & bit(PORF))
     {
-        s_error_flags |= static_cast<uint8_t>(data::sensor::Measurement::Flag::REBOOT_POWER_ON);
-        LOG(PSTR("Power-on reset."));
+        s_reboot_flags |= static_cast<uint8_t>(data::sensor::Reboot_Flag::REBOOT_POWER_ON);
+        LOG(PSTR("POR."));
     }
     if (mcusr_value & bit(EXTRF))
     {
-        s_error_flags |= static_cast<uint8_t>(data::sensor::Measurement::Flag::REBOOT_RESET);
-        LOG(PSTR("External reset!"));
+        s_reboot_flags |= static_cast<uint8_t>(data::sensor::Reboot_Flag::REBOOT_RESET);
+        LOG(PSTR("ER!"));
     }
     if (mcusr_value & bit(BORF))
     {
-        s_error_flags |= static_cast<uint8_t>(data::sensor::Measurement::Flag::REBOOT_BROWNOUT);
-        LOG(PSTR("Brownout reset!"));
+        s_reboot_flags |= static_cast<uint8_t>(data::sensor::Reboot_Flag::REBOOT_BROWNOUT);
+        LOG(PSTR("BOR!"));
     }
     if (mcusr_value & bit(WDRF))
     {
-        s_error_flags |= static_cast<uint8_t>(data::sensor::Measurement::Flag::REBOOT_WATCHDOG);
-        LOG(PSTR("Watchdog reset!"));
+        s_reboot_flags |= static_cast<uint8_t>(data::sensor::Reboot_Flag::REBOOT_WATCHDOG);
+        LOG(PSTR("WR!"));
+    }
+    if (s_reboot_flags == 0)
+    {
+        s_reboot_flags |= static_cast<uint8_t>(data::sensor::Reboot_Flag::REBOOT_UNKNOWN);
     }
     LOG(PSTR(" ***\n"));
 
@@ -383,18 +296,19 @@ static void setup()
         float h;
         s_sht.GetHumidity(h);
         s_sht.GetTemperature(t);
-        float vcc = read_vcc();      
-        LOG(PSTR("VCC: %d.%dV\n"), (int)vcc, int(vcc * 100.f) % 100);
-        LOG(PSTR("T: %d.%d'C\n"), (int)t, int(t * 100.f) % 100);
-        LOG(PSTR("H: %d.%d%%\n"), (int)h, int(h * 100.f) % 100);
+        float vcc = read_vcc(s_stable_settings.vref / 100.f);
+        LOG(PSTR("VCC: %dmV\n"), (int)(vcc*1000.f));
+        LOG(PSTR("T: %dm'C\n"), (int)(t*1000.f));
+        LOG(PSTR("H: %d%%\n"), (int)h);
         if (t != 0.f && h > 0.1f && vcc > 1.5f)
         {
           break;
         }
         LOG(PSTR("Sensors failed\n"));
-        blink_led(Blink_Led::Red, 5, chrono::millis(200));
+        blink_led(Blink_Led::Red, 2, chrono::millis(200));
         sleep(true);
     }
+
     ///////////////////////////////////////////////
 
         
@@ -418,7 +332,7 @@ static void setup()
         {
             s_sht.GetHumidity(h);
             s_sht.GetTemperature(t);
-            float vcc = read_vcc();
+            float vcc = read_vcc(s_stable_settings.vref / 100.f);
             hash_combine(rnd_seed, *(uint32_t*)&vcc);
             hash_combine(rnd_seed, *(uint32_t*)&t);
             hash_combine(rnd_seed, *(uint32_t*)&h);
@@ -427,12 +341,12 @@ static void setup()
         if (rnd_seed != 0)
         {
             srandom(rnd_seed);
-            LOG(PSTR("Random seed: %lu\n"), rnd_seed);
+            LOG(PSTR("Seed: %lu\n"), rnd_seed);
             break;
         }
 
-        LOG(PSTR("Random seed failed\n"));
-        blink_led(Blink_Led::Red, 6, chrono::millis(200));
+        LOG(PSTR("Seed failed\n"));
+        blink_led(Blink_Led::Red, 3, chrono::millis(200));
         sleep(true);
     }
 
@@ -441,7 +355,7 @@ static void setup()
     while (!s_comms.init(5, 0))
     {
         LOG(PSTR("RF failed\n"));
-        blink_led(Blink_Led::Red, 7, chrono::millis(200));
+        blink_led(Blink_Led::Red, 4, chrono::millis(200));
         sleep(true);
     }
     s_comms.sleep_mode();
@@ -463,18 +377,17 @@ static void setup()
     ///////////////////////////////////////////////
     //settings
     {
-        uint32_t address = 0;
-        bool ok = load_settings(s_serial_number, address, s_calibration);
+        bool ok = load_stable_settings(s_stable_settings) & load_settings(s_settings);
 
-        if (s_serial_number == 0)
+        if (s_stable_settings.serial_number == 0)
         {
-            s_serial_number = rnd_seed;
-            save_settings(s_serial_number, address, s_calibration);
+            s_stable_settings.serial_number = rnd_seed;
+            save_stable_settings(s_stable_settings);
         }
 
-        if (ok && address >= Sensor_Comms::SLAVE_ADDRESS_BEGIN)
+        if (ok && s_settings.address >= Sensor_Comms::SLAVE_ADDRESS_BEGIN)
         {
-            s_comms.set_address(address);
+            s_comms.set_address(s_settings.address);
             s_state = State::FIRST_CONFIG;
         }
         else
@@ -483,11 +396,50 @@ static void setup()
         }
     }
 
-    LOG(PSTR("Sensor Type: %d\n"), SENSOR_TYPE);
-    LOG(PSTR("Hardware Version: %d\n"), HARDWARE_VERSION);
-    LOG(PSTR("Software Version: %d\n"), SOFTWARE_VERSION);
-    LOG(PSTR("Serial Number: %lx\n"), s_serial_number);
-    LOG(PSTR("Address: %lu\n"), s_comms.get_address());
+    ///////////////////////////////////////////////
+    //calibrate VCC
+    if (is_pressed(Button::BUTTON1))
+    {
+      LOG(PSTR("Calib vref...\n"));
+      bool calibration_done = false;
+      float vref = s_stable_settings.vref / 100.f;
+      float new_vref = vref;
+      do
+      {
+        constexpr float k_calibration_voltage = 3.5f;
+        float vcc = read_vcc(vref);
+        if (vcc >= k_calibration_voltage - 0.2f)
+        {
+            float x = vref * 1024.f / vcc;
+            new_vref = k_calibration_voltage * x / 1024.f;
+            LOG(PSTR("vcc: %dmV vref: %dmV -> %dmV\n"), (int)(vcc*1000.f), (int)(vref*1000.f), (int)(new_vref*1000.f));
+            calibration_done = true;
+            vref = new_vref;
+        }
+        else
+        {
+          LOG(PSTR("vref calib skipped, vcc failed: %dmV\n"), (int)(vcc*1000.f));
+        }
+      }
+      while (is_pressed(Button::BUTTON1));
+      
+      uint8_t new_ivref = uint8_t(new_vref * 100.f + 0.5f);
+      if (calibration_done && s_stable_settings.vref != new_ivref)
+      {
+        s_stable_settings.vref = new_ivref;
+        save_stable_settings(s_stable_settings);
+      }
+    }
+
+    ///////////////////////////////////////////////
+    //battery guard
+    battery_guard(s_stable_settings.vref / 100.f);
+
+    LOG(PSTR("Type: %d\n"), SENSOR_TYPE);
+    LOG(PSTR("HW Ver: %d\n"), HARDWARE_VERSION);
+    LOG(PSTR("SW Ver: %d\n"), SOFTWARE_VERSION);
+    LOG(PSTR("SN: %lx\n"), s_stable_settings.serial_number);
+    LOG(PSTR("Addr: %lu\n"), s_settings.address);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -496,46 +448,32 @@ static bool apply_config(const data::sensor::Config_Response& config)
 {
     if (config.measurement_period.count == 0 || config.comms_period.count == 0)
     {
-        LOG(PSTR("Bag config received!!!\n"));
+        LOG(PSTR("Bag config recv!\n"));
         return false;
     }
 
     s_baseline_measurement_index = config.baseline_measurement_index;
 
-    if (config.calibration.temperature_bias != s_calibration.temperature_bias || config.calibration.humidity_bias != s_calibration.humidity_bias)
+    if (config.calibration.temperature_bias != s_settings.calibration.temperature_bias || 
+        config.calibration.humidity_bias != s_settings.calibration.humidity_bias)
     {
-        s_calibration = config.calibration;
-        save_settings(s_serial_number, s_comms.get_address(), s_calibration);
+        s_settings.calibration = config.calibration;
+        save_settings(s_settings);
     }
 
     s_comms_period = chrono::millis(config.comms_period.count * 1000LL);
     s_measurement_period = chrono::millis(config.measurement_period.count * 1000LL);
 
     chrono::time_ms now = chrono::now();
-    if (config.next_comms_delay.count < 0 && (now + chrono::millis(config.next_comms_delay)) > now) //overflow?
-    {
-        s_next_comms_time_point = chrono::time_ms(0);
-    }
-    else
-    {
-        s_next_comms_time_point = now + chrono::millis(config.next_comms_delay);
-    }
-
-    if (config.next_measurement_delay.count < 0 && (now + chrono::millis(config.next_measurement_delay)) > now) //overflow?
-    {
-        s_next_comms_time_point = chrono::time_ms(0);
-    }
-    else
-    {
-        s_next_measurement_time_point = now + chrono::millis(config.next_measurement_delay);
-    }
+    s_next_comms_time_point = now + chrono::millis(config.next_comms_delay);
+    s_next_measurement_time_point = now + chrono::millis(config.next_measurement_delay);
 
     //remove confirmed measurements
     while (s_first_stored_measurement_index <= config.last_confirmed_measurement_index)
     {
         if (!s_storage.pop_front())
         {
-            LOG(PSTR("Failed to pop storage data. Left: %ld\n"), config.last_confirmed_measurement_index - s_first_stored_measurement_index);
+            LOG(PSTR("Storage pop failed. Left: %ld\n"), config.last_confirmed_measurement_index - s_first_stored_measurement_index);
             s_first_stored_measurement_index = config.last_confirmed_measurement_index + 1;
             break;
         }
@@ -548,14 +486,14 @@ static bool apply_config(const data::sensor::Config_Response& config)
     s_comms.set_transmission_power(config.power);
     s_comms.sleep_mode();
 
-    LOG(PSTR("temp bias: %d\n"), (int)(s_calibration.temperature_bias));
-    LOG(PSTR("humidity bias: %d\n"), (int)(s_calibration.humidity_bias));
-    LOG(PSTR("next comms delay: %ld\n"), config.next_comms_delay.count);
-    LOG(PSTR("comms period: %ld\n"), config.comms_period.count);
-    LOG(PSTR("next measurement delay: %ld\n"), config.next_measurement_delay.count);
-    LOG(PSTR("measurement period: %ld\n"), config.measurement_period.count);
+    LOG(PSTR("T bias: %d\n"), (int)(s_settings.calibration.temperature_bias));
+    LOG(PSTR("H bias: %d\n"), (int)(s_settings.calibration.humidity_bias));
+    LOG(PSTR("next comms dt: %ld\n"), config.next_comms_delay.count);
+    LOG(PSTR("comms per: %ld\n"), config.comms_period.count);
+    LOG(PSTR("next meas dt: %ld\n"), config.next_measurement_delay.count);
+    LOG(PSTR("meas per: %ld\n"), config.measurement_period.count);
     LOG(PSTR("baseline index: %lu\n"), config.baseline_measurement_index);
-    LOG(PSTR("last confirmed index: %lu\n"), config.last_confirmed_measurement_index);
+    LOG(PSTR("last conf index: %lu\n"), config.last_confirmed_measurement_index);
     LOG(PSTR("first stored index: %lu\n"), s_first_stored_measurement_index);
     LOG(PSTR("count: %lu\n"), measurement_count);
     LOG(PSTR("sleeping: %d\n"), s_sensor_sleeping ? 1 : 0);
@@ -573,10 +511,12 @@ static bool request_config()
         uint8_t raw_buffer[packet_raw_size(sizeof(data::sensor::Config_Request))];
         s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::CONFIG_REQUEST), true);
         data::sensor::Config_Request req;
+        req.reboot_flags = s_reboot_flags;
+        req.comms_errors = s_comms_errors;
         req.first_measurement_index = s_first_stored_measurement_index;
         req.measurement_count = s_storage.get_data_count();
         req.b2s_input_dBm = s_last_input_dBm;
-        req.calibration = s_calibration;
+        req.calibration = s_settings.calibration;
         req.sleeping = s_sensor_sleeping;
         s_comms.pack(raw_buffer, &req, sizeof(req));
         send_successful = s_comms.send_packed_packet(raw_buffer, true);
@@ -584,6 +524,9 @@ static bool request_config()
 
     if (send_successful)
     {
+        s_reboot_flags = 0;
+        s_comms_errors = 0;
+      
         uint8_t size = sizeof(data::sensor::Config_Response);
         uint8_t raw_buffer[packet_raw_size(size)];
         uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, chrono::millis(500));
@@ -598,6 +541,10 @@ static bool request_config()
                 return apply_config(*ptr);
             }
         }
+    }
+    else
+    {
+        s_comms_errors++;
     }
 
     s_comms.sleep_mode();
@@ -614,7 +561,7 @@ static void pair_state()
     s_comms.set_address(addr);
     s_comms.set_destination_address(Sensor_Comms::BASE_ADDRESS);
 
-    LOG(PSTR("Starting pairing\n"));
+    LOG(PSTR("pairing...\n"));
 
     s_comms.sleep_mode();
 
@@ -634,7 +581,7 @@ static void pair_state()
                 //wait for the user to release the button
                 wait_for_release(Button::BUTTON1);
 
-                LOG(PSTR("Sending request..."));
+                LOG(PSTR("Send req..."));
 
                 bool send_successful = false;
                 {
@@ -644,23 +591,19 @@ static void pair_state()
                     request.descriptor.sensor_type = SENSOR_TYPE;
                     request.descriptor.hardware_version = HARDWARE_VERSION;
                     request.descriptor.software_version = SOFTWARE_VERSION;
-                    request.descriptor.serial_number = s_serial_number;
-                    request.calibration = s_calibration;
+                    request.descriptor.serial_number = s_stable_settings.serial_number;
+                    request.calibration = s_settings.calibration;
                     s_comms.pack(raw_buffer, &request, sizeof(request));
                     send_successful = s_comms.send_packed_packet(raw_buffer, true);
                 }
 
                 if (send_successful)
                 {
-                    LOG(PSTR("done.\nWaiting for response..."));
+                    LOG(PSTR("done.\nWait for resp..."));
 
                     uint8_t size = sizeof(data::sensor::Pair_Response);
                     uint8_t raw_buffer[packet_raw_size(size)];
                     uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, chrono::millis(2000));
-                    if (buffer)
-                    {
-                        LOG(PSTR("Received packet type %d of %d bytes\n"), (int)s_comms.get_rx_packet_type(buffer), (int)size);
-                    }
                     s_comms.sleep_mode();
 
                     if (buffer && size == sizeof(data::sensor::Pair_Response) && 
@@ -673,7 +616,8 @@ static void pair_state()
 
                         LOG(PSTR("done. Addr: %lu\n"), response_ptr->address);
 
-                        save_settings(s_serial_number, response_ptr->address, s_calibration);
+                        s_settings.address = response_ptr->address;
+                        save_settings(s_settings);
 
                         blink_led(Blink_Led::Green, 3, chrono::millis(500));
 
@@ -688,7 +632,7 @@ static void pair_state()
                 else
                 {
                     s_comms.sleep_mode();
-                    LOG(PSTR("failed.\n"));
+                    LOG(PSTR("failed\n"));
                 }
                 blink_led(Blink_Led::Red, 3, chrono::millis(500));
             }
@@ -701,7 +645,7 @@ static void pair_state()
 
         if (!done)
         {
-            LOG(PSTR("Going to sleep..."));
+            LOG(PSTR("Sleeping..."));
 
             //fade_out_leds(YELLOW_LED, chrono::millis(1000));
 
@@ -712,12 +656,14 @@ static void pair_state()
             } while (!is_pressed(Button::BUTTON1));
 
             chrono::calibrate();
-            LOG(PSTR("done.\n"));
+            LOG(PSTR("done\n"));
 
             //fade_in_leds(YELLOW_LED, chrono::millis(1000));
 
             //we probably woken up because the user pressed the button - wait for him to release it
             wait_for_release(Button::BUTTON1);
+
+            battery_guard(s_stable_settings.vref / 100.f);
         }
     }
 
@@ -750,11 +696,11 @@ static void do_measurement()
     uint8_t tries = 0;
     do
     {
-        LOG(PSTR("Measuring %d..."), tries);
+        LOG(PSTR("Meas %d..."), tries);
         if (s_sht.GetTemperature(data.temperature) && s_sht.GetHumidity(data.humidity))
         {
-            data.temperature += static_cast<float>(s_calibration.temperature_bias) * 0.01f;
-            data.humidity += static_cast<float>(s_calibration.humidity_bias) * 0.01f;
+            data.temperature += static_cast<float>(s_settings.calibration.temperature_bias) * 0.01f;
+            data.humidity += static_cast<float>(s_settings.calibration.humidity_bias) * 0.01f;
             break;
         }
     } while (++tries < max_tries);
@@ -771,7 +717,7 @@ static void do_measurement()
     }
 
     //push back and make room if it fails
-    LOG(PSTR("Storing..."));
+    LOG(PSTR("store %dm'C, %d%%..."), (int)(data.temperature*1000.f), (int)data.humidity);
     while (s_storage.push_back(data) == false)
     {
         LOG(PSTR("*"));
@@ -785,23 +731,18 @@ static void do_measurement()
 
 static void do_comms()
 {
-    size_t count = s_storage.get_data_count();
-    if (count == 0)
-    {
-        LOG(PSTR("No data to send!!!!\n"));
-    }
-    else
-    {
-        LOG(PSTR("%d items to send\n"), count);
-    }
-
     //send measurements
-    if (count > 0)
+    if (!s_storage.empty())
     {
+        int8_t allowed_failures = 3;
         const chrono::millis COMMS_SLOT_DURATION = chrono::millis(7000);
         chrono::time_ms start_tp = chrono::now();
 
-        uint8_t raw_buffer[packet_raw_size(sizeof(data::sensor::Measurement_Batch_Request))];
+        float vcc = read_vcc(s_stable_settings.vref / 100.f);
+
+        uint8_t raw_buffer_size = packet_raw_size(sizeof(data::sensor::Measurement_Batch_Request));
+        uint8_t raw_buffer[raw_buffer_size];
+        memset(raw_buffer, 0, raw_buffer_size);
         data::sensor::Measurement_Batch_Request& batch = *(data::sensor::Measurement_Batch_Request*)s_comms.get_tx_packet_payload(raw_buffer);
 
         batch.start_index = s_first_stored_measurement_index;
@@ -814,18 +755,14 @@ static void do_comms()
             bool send = false;
             if (s_storage.unpack_next(it) == false)
             {
-                LOG(PSTR("Finished the data.\n"));
                 done = true;
                 send = true;
             }
             else
             {
-                float vcc = read_vcc();
                 data::sensor::Measurement& item = batch.measurements[batch.count++];
-                item.flags = s_error_flags;
                 if (it.data.humidity < MIN_VALID_HUMIDITY)
                 {
-                    item.flags |= static_cast<uint8_t>(data::sensor::Measurement::Flag::SENSOR_ERROR);
                     item.pack(0.f, 0.f);
                     batch.pack(vcc);
                 }
@@ -844,25 +781,27 @@ static void do_comms()
             chrono::time_ms now = chrono::now();
             if (now < start_tp || now - start_tp >= COMMS_SLOT_DURATION)
             {
-                LOG(PSTR("Comms time slot expired\n"));
+                LOG(PSTR("Comms slot expired\n"));
                 done = true;
             }
 
             if (send && batch.count > 0)
             {
                 batch.last_batch = done ? 1 : 0;
-                LOG(PSTR("Sending measurement batch of %d..."), (int)batch.count);
+                LOG(PSTR("Send batch of %d..."), (int)batch.count);
                 s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::MEASUREMENT_BATCH_REQUEST), false);
                 if (s_comms.send_packet(raw_buffer, sizeof(data::sensor::Measurement_Batch_Request), true) == true)
                 {
-                    s_error_flags = 0;
                     LOG(PSTR("done.\n"));
                 }
                 else
                 {
-                    s_error_flags |= static_cast<uint8_t>(data::sensor::Measurement::Flag::COMMS_ERROR);
+                    s_comms_errors++;
                     LOG(PSTR("failed: comms\n"));
-                    break;
+                    if (allowed_failures-- == 0)
+                    {
+                      break;
+                    }
                 }
 
                 batch.start_index += batch.count;
@@ -873,7 +812,7 @@ static void do_comms()
         } while (!done);
     }
 
-    LOG(PSTR("done with batches\n"));
+    LOG(PSTR("done sending\n"));
     chrono::delay(chrono::millis(200));
     request_config();
 }
@@ -905,7 +844,7 @@ static bool request_first_config()
         request.descriptor.sensor_type = SENSOR_TYPE;
         request.descriptor.hardware_version = HARDWARE_VERSION;
         request.descriptor.software_version = SOFTWARE_VERSION;
-        request.descriptor.serial_number = s_serial_number;
+        request.descriptor.serial_number = s_stable_settings.serial_number;
         s_comms.pack(raw_buffer, &request, sizeof(request));
         send_successful = s_comms.send_packed_packet(raw_buffer, true);
     }
@@ -941,20 +880,20 @@ static void first_config_state()
     {
         if (is_pressed(Button::BUTTON1))
         {
-            LOG(PSTR("Hold for 1 second to pair again..."));
+            LOG(PSTR("Hold for 1 second to pair..."));
             chrono::time_ms start_tp = chrono::now();
             while (is_pressed(Button::BUTTON1))
             {
                 if (chrono::now() - start_tp > chrono::millis(1000))
                 {
-                    LOG(PSTR("...repairing.\n"));
+                    LOG(PSTR("repairing.\n"));
                     s_state = State::PAIR;
                     break;
                 }
             }
             if (s_state == State::FIRST_CONFIG)
             {
-                LOG(PSTR("...cancelled.\n"));
+                LOG(PSTR("cancelled.\n"));
             }
             continue;
         }      
@@ -966,7 +905,7 @@ static void first_config_state()
         bool got_it = request_first_config();
         if (got_it)
         {
-            LOG(PSTR("Received first config. Starting measuring.\n"));
+            LOG(PSTR("First config done. Starting meas\n"));
             set_led(Led::Green);
             chrono::delay(chrono::millis(100));
             set_led(Led::None);
@@ -988,7 +927,7 @@ static void first_config_state()
 
 static void measurement_loop_state()
 {
-    LOG(PSTR(">>> measuring loop state\n"));
+    LOG(PSTR(">>> meas loop state\n"));
     while (true)
     { 
         bool force_comms = false;
@@ -1000,12 +939,12 @@ static void measurement_loop_state()
             {
                 if (chrono::now() - start_tp > chrono::millis(10000))
                 {
-                    LOG(PSTR("...resetting.\n"));
+                    LOG(PSTR("resetting.\n"));
                     reset_settings();
                     soft_reset();
                 }
             }
-            LOG(PSTR("...cancelled.\n"));
+            LOG(PSTR("cancelled.\n"));
             force_comms = true;
         }
 
@@ -1019,13 +958,13 @@ static void measurement_loop_state()
             {
                 if (s_storage.empty())
                 {
-                    LOG(PSTR("Skipping indices\n"));
+                    LOG(PSTR("Skip indices\n"));
                     s_first_stored_measurement_index = s_baseline_measurement_index;
                 }
                 else
                 {
                     measure = false;
-                    LOG(PSTR("Skipping measurement until storage empty due to index skipping!\n"));
+                    LOG(PSTR("Skip meas until storage empty\n"));
                 }
             }
 
@@ -1055,20 +994,19 @@ static void measurement_loop_state()
 
         if (s_sensor_sleeping == true)
         {
-            LOG(PSTR("Going to sleep!\n"));
             s_state = State::SLEEPING_LOOP;
             blink_led(Blink_Led::Green, 8, chrono::millis(50));
             break;
         }
 
-        //chrono::time_ms now = chrono::now();
-        //LOG(PSTR("tp: %lu, nm: %lu, nc: %lu\n"), uint32_t(now.ticks), uint32_t(s_next_measurement_time_point.ticks), uint32_t(s_next_comms_time_point.ticks));
+        chrono::time_ms now = chrono::now();
+        LOG(PSTR("tp: %ld, nm: %ld, nc: %ld\n"), int32_t(now.ticks / 1000), int32_t(s_next_measurement_time_point.ticks / 1000), int32_t(s_next_comms_time_point.ticks / 1000));
 
         if (get_next_wakeup_time_point() > s_next_comms_time_point + chrono::millis(2000))
         {
             chrono::time_ms next = min(s_next_measurement_time_point, s_next_comms_time_point);
             chrono::millis dt = next - chrono::now();
-            LOG(PSTR("Delaying %ld ms...\n"), (uint32_t)dt.count);
+            LOG(PSTR("Delay %ld ms...\n"), (int32_t)dt.count);
             if (dt.count > 0)
             {
                 chrono::delay(dt);
@@ -1076,9 +1014,10 @@ static void measurement_loop_state()
         }
         else
         {
-            LOG(PSTR("Sleeping..."));
+            LOG(PSTR("Sleep..."));
             sleep(true);
         }
+        battery_guard(s_stable_settings.vref / 100.f);
         chrono::calibrate();
         LOG(PSTR("done\n"));
     }
@@ -1111,8 +1050,6 @@ static void sleep_loop_state()
             force_comms = true;
         }
 
-        chrono::time_us now = chrono::now_us();
-
         if (force_comms)
         {
             set_led(Led::Yellow);
@@ -1124,7 +1061,6 @@ static void sleep_loop_state()
 
         if (s_sensor_sleeping == false)
         {
-            LOG(PSTR("Going to measurement!\n"));
             s_state = State::MEASUREMENT_LOOP;
             blink_led(Blink_Led::Yellow, 8, chrono::millis(50));
             request_config(); //report back the sleeping status
@@ -1133,6 +1069,7 @@ static void sleep_loop_state()
 
         LOG(PSTR("Sleeping..."));
         sleep(true);
+        battery_guard(s_stable_settings.vref / 100.f);
         chrono::calibrate();
         LOG(PSTR("done\n"));
     }
@@ -1168,6 +1105,7 @@ int main()
         {
             blink_led(Blink_Led::Red, 2, chrono::millis(50));
             sleep(true);
+            battery_guard(s_stable_settings.vref / 100.f);
         }      
     }
 }

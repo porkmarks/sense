@@ -10,7 +10,7 @@
 #include <algorithm>
 #include <cassert>
 
-static std::array<const char*, 10> s_headerNames = {"Name", "Id", "Serial Number", "Temperature", "Humidity", "Battery", "Signal", "Comms", "Stored", "Alarms"};
+static std::array<const char*, 9> s_headerNames = {"Name", "Serial Number", "Temperature", "Humidity", "Battery", "Signal", "Comms", "Stored", "Alarms"};
 
 extern float getBatteryLevel(float vcc);
 extern QIcon getBatteryIcon(float vcc);
@@ -114,6 +114,19 @@ size_t SensorsModel::getSensorCount() const
 DB::Sensor const& SensorsModel::getSensor(size_t index) const
 {
     return m_db.getSensor(index);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+int32_t SensorsModel::getSensorIndex(QModelIndex index) const
+{
+    size_t indexRow = static_cast<size_t>(index.row());
+    if (indexRow >= m_sensors.size())
+    {
+        return -1;
+    }
+    SensorData const& sensorData = m_sensors[indexRow];
+    return m_db.findSensorIndexById(sensorData.sensorId);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -409,10 +422,6 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         if (column == Column::Name)
         {
             return sensor.descriptor.name.c_str();
-        }
-        else if (column == Column::Id)
-        {
-            return sensor.id;
         }
         else if (column == Column::SerialNumber)
         {

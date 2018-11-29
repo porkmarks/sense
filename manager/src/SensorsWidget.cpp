@@ -132,9 +132,8 @@ void SensorsWidget::unbindSensor()
         return;
     }
 
-    QModelIndex mi = m_sortingModel.index(selected.at(0).row(), static_cast<int>(SensorsModel::Column::Id));
-    DB::SensorId id = m_sortingModel.data(mi).toUInt();
-    int32_t _index = m_db->findSensorIndexById(id);
+    QModelIndex mi = m_sortingModel.mapToSource(m_sortingModel.index(selected.at(0).row(), 0));
+    int32_t _index = m_model->getSensorIndex(mi);
     if (_index < 0)
     {
         QMessageBox::critical(this, "Error", "Invalid sensor selected.");
@@ -157,9 +156,8 @@ void SensorsWidget::unbindSensor()
 
 void SensorsWidget::configureSensor(QModelIndex const& index)
 {
-    QModelIndex mi = m_sortingModel.index(index.row(), static_cast<int>(SensorsModel::Column::Id));
-    DB::SensorId id = m_sortingModel.data(mi).toUInt();
-    int32_t _sensorIndex = m_db->findSensorIndexById(id);
+    QModelIndex mi = m_sortingModel.mapToSource(index);
+    int32_t _sensorIndex = m_model->getSensorIndex(mi);
     if (_sensorIndex < 0)
     {
         QMessageBox::critical(this, "Error", "Invalid sensor selected.");

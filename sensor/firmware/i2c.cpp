@@ -10,4 +10,10 @@
 
 #include "SoftI2CMaster.h"
 
+void i2c_shutdown(void)
+{
+  // turn off I2C
+  TWCR0 &= ~(bit(TWEN) | bit(TWIE) | bit(TWEA));  
+}
+
 

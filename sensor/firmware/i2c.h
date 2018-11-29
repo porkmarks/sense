@@ -11,7 +11,7 @@
 // a I2C bus lockup or that the lines are not pulled up.
 bool __attribute__ ((noinline)) i2c_init(void) __attribute__ ((used));
 
-bool __attribute__ ((noinline)) i2c_recover(void) __attribute__ ((used));
+void __attribute__ ((noinline)) i2c_shutdown(void) __attribute__ ((used));
 
 // Start transfer function: <addr> is the 8-bit I2C address (including the R/W
 // bit).

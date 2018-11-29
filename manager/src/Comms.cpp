@@ -391,14 +391,14 @@ void Comms::processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, Senso
         data::sensor::Measurement const& m = measurementBatch.measurements[i];
         DB::MeasurementDescriptor d;
         d.index = measurementBatch.start_index + i;
-        if (m.flags & static_cast<int>(data::sensor::Measurement::Flag::COMMS_ERROR))
-        {
-            d.sensorErrors |= DB::SensorErrors::Comms;
-        }
-        else if (m.flags > 0)// & static_cast<int>(data::sensor::Measurement::Flag::SENSOR_ERROR))
-        {
-            d.sensorErrors |= DB::SensorErrors::Hardware;
-        }
+//        if (m.flags & static_cast<int>(data::sensor::Measurement::Flag::COMMS_ERROR))
+//        {
+//            d.sensorErrors |= DB::SensorErrors::Comms;
+//        }
+//        else if (m.flags > 0)// & static_cast<int>(data::sensor::Measurement::Flag::SENSOR_ERROR))
+//        {
+//            d.sensorErrors |= DB::SensorErrors::Hardware;
+//        }
         d.sensorId = sensor.id;
         d.signalStrength.b2s = sensor.lastSignalStrengthB2S;
         d.signalStrength.s2b = request.signalS2B;
@@ -435,6 +435,14 @@ void Comms::processSensorReq_ConfigRequest(InitializedBaseStation& cbs, SensorRe
     details.sleeping = configRequest.sleeping;
     details.hasLastCommsTimePoint = true;
     details.lastCommsTimePoint = Clock::now();
+
+    details.hasErrorCountersDelta = true;
+    details.errorCountersDelta.comms = configRequest.comms_errors;
+    details.errorCountersDelta.reboot_reset = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_RESET)) ? 1 : 0;
+    details.errorCountersDelta.reboot_unknown = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_UNKNOWN)) ? 1 : 0;
+    details.errorCountersDelta.reboot_brownout = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_BROWNOUT)) ? 1 : 0;
+    details.errorCountersDelta.reboot_power_on = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_POWER_ON)) ? 1 : 0;
+    details.errorCountersDelta.reboot_watchdog = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_WATCHDOG)) ? 1 : 0;
 
     cbs.db.setSensorInputDetails(details);
 

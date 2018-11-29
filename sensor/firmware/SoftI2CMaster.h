@@ -278,6 +278,8 @@ void i2c_wait_scl_high(void)
 bool i2c_init(void)
 #if I2C_HARDWARE
 {
+  pinModeFast(SDA, INPUT);
+  pinModeFast(SCL, INPUT);
 #if I2C_PULLUP
   digitalWriteFast(SDA, 1);
   digitalWriteFast(SCL, 1);
@@ -323,19 +325,6 @@ bool i2c_init(void)
        [SDADDR] "I"  (SDA_DDR), [SDAPIN] "I" (SDA_PIN),
        [SDAIN] "I" (SDA_IN), [SDAOUT] "I" (SDA_OUT));
   return true;
-}
-#endif
-
-bool i2c_recover(void)
-#if I2C_HARDWARE
-{
-  TWCR0 = (1 << TWINT)|(1 << TWSTO);
-  chrono::delay(chrono::millis(1));
-  return (digitalReadFast(SDA) != 0 && digitalReadFast(SCL) != 0);
-}
-#else
-{
-#error Not implemented!
 }
 #endif
 

@@ -21,7 +21,6 @@
 #include "Utils.h"
 #include "Crypt.h"
 #include "Logger.h"
-#include "Sensor_Comms.h"
 
 #define USE_DB_ENCRYPTION
 //#define USE_DATA_ENCRYPTION
@@ -100,7 +99,6 @@ Result<void> DB::create(std::string const& name)
     remove((dataFilename).c_str());
 
     m_mainData = Data();
-    m_mainData.lastSensorAddress = Sensor_Comms::SLAVE_ADDRESS_BEGIN;
     save(m_mainData);
 
     s_logger.logVerbose(QString("Creating DB files: '%1' & '%2'").arg(m_dataName.c_str()).arg(m_dbName.c_str()));
@@ -332,6 +330,54 @@ Result<void> DB::load(std::string const& name)
                     return Error("Cannot open DB");
                 }
                 sensor.calibration.humidityBias = static_cast<float>(it->value.GetDouble());
+
+                it = sensorj.FindMember("error_counter_comms");
+                if (it == sensorj.MemberEnd() || !it->value.IsUint())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor error_counter_comms").arg(dataFilename.c_str()));
+                    return Error("Cannot open DB");
+                }
+                sensor.errorCounters.comms = it->value.GetUint();
+
+                it = sensorj.FindMember("error_counter_reboot_unknown");
+                if (it == sensorj.MemberEnd() || !it->value.IsUint())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor error_counter_reboot_unknown").arg(dataFilename.c_str()));
+                    return Error("Cannot open DB");
+                }
+                sensor.errorCounters.reboot_unknown = it->value.GetUint();
+
+                it = sensorj.FindMember("error_counter_reboot_power_on");
+                if (it == sensorj.MemberEnd() || !it->value.IsUint())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor error_counter_reboot_power_on").arg(dataFilename.c_str()));
+                    return Error("Cannot open DB");
+                }
+                sensor.errorCounters.reboot_power_on = it->value.GetUint();
+
+                it = sensorj.FindMember("error_counter_reboot_reset");
+                if (it == sensorj.MemberEnd() || !it->value.IsUint())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor error_counter_reboot_reset").arg(dataFilename.c_str()));
+                    return Error("Cannot open DB");
+                }
+                sensor.errorCounters.reboot_reset = it->value.GetUint();
+
+                it = sensorj.FindMember("error_counter_reboot_brownout");
+                if (it == sensorj.MemberEnd() || !it->value.IsUint())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor error_counter_reboot_brownout").arg(dataFilename.c_str()));
+                    return Error("Cannot open DB");
+                }
+                sensor.errorCounters.reboot_brownout = it->value.GetUint();
+
+                it = sensorj.FindMember("error_counter_reboot_watchdog");
+                if (it == sensorj.MemberEnd() || !it->value.IsUint())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor error_counter_reboot_watchdog").arg(dataFilename.c_str()));
+                    return Error("Cannot open DB");
+                }
+                sensor.errorCounters.reboot_watchdog = it->value.GetUint();
 
                 data.lastSensorAddress = std::max(data.lastSensorAddress, sensor.address);
                 data.lastSensorId = std::max(data.lastSensorId, sensor.id);
@@ -1015,6 +1061,7 @@ Result<void> DB::addSensor(SensorDescriptor const& descriptor)
     {
         SensorsConfig& config = m_mainData.sensorsConfigs.back();
         config.computedCommsPeriod = computeCommsPeriod();
+        emit sensorsConfigChanged();
     }
 
     triggerDelayedSave(std::chrono::seconds(1));
@@ -1081,6 +1128,7 @@ Result<void> DB::bindSensor(uint32_t serialNumber, Sensor::Calibration const& ca
     {
         SensorsConfig& config = m_mainData.sensorsConfigs.back();
         config.computedCommsPeriod = computeCommsPeriod();
+        emit sensorsConfigChanged();
     }
 
     triggerDelayedSave(std::chrono::seconds(1));
@@ -1188,6 +1236,16 @@ bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
             sensor.lastSignalStrengthB2S = d.signalStrengthB2S;
         }
 
+        if (d.hasErrorCountersDelta)
+        {
+            sensor.errorCounters.comms += d.errorCountersDelta.comms;
+            sensor.errorCounters.reboot_reset += d.errorCountersDelta.reboot_reset;
+            sensor.errorCounters.reboot_unknown += d.errorCountersDelta.reboot_unknown;
+            sensor.errorCounters.reboot_brownout += d.errorCountersDelta.reboot_brownout;
+            sensor.errorCounters.reboot_power_on += d.errorCountersDelta.reboot_power_on;
+            sensor.errorCounters.reboot_watchdog += d.errorCountersDelta.reboot_watchdog;
+        }
+
         emit sensorDataChanged(sensor.id);
     }
 
@@ -1236,6 +1294,7 @@ void DB::removeSensor(size_t index)
     {
         SensorsConfig& config = m_mainData.sensorsConfigs.back();
         config.computedCommsPeriod = computeCommsPeriod();
+        emit sensorsConfigChanged();
     }
 
     triggerDelayedSave(std::chrono::seconds(1));
@@ -1270,6 +1329,18 @@ int32_t DB::findSensorIndexById(SensorId id) const
 int32_t DB::findSensorIndexByAddress(SensorAddress address) const
 {
     auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [&address](Sensor const& sensor) { return sensor.address == address; });
+    if (it == m_mainData.sensors.end())
+    {
+        return -1;
+    }
+    return std::distance(m_mainData.sensors.begin(), it);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+int32_t DB::findSensorIndexBySerialNumber(SensorSerialNumber serialNumber) const
+{
+    auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [&serialNumber](Sensor const& sensor) { return sensor.serialNumber == serialNumber; });
     if (it == m_mainData.sensors.end())
     {
         return -1;
@@ -2186,6 +2257,12 @@ void DB::save(Data const& data) const
                 sensorj.AddMember("humidity_bias", sensor.calibration.humidityBias, document.GetAllocator());
                 sensorj.AddMember("serial_number", sensor.serialNumber, document.GetAllocator());
                 sensorj.AddMember("last_confirmed_measurement_index", sensor.lastConfirmedMeasurementIndex, document.GetAllocator());
+                sensorj.AddMember("error_counter_comms", sensor.errorCounters.comms, document.GetAllocator());
+                sensorj.AddMember("error_counter_reboot_unknown", sensor.errorCounters.reboot_unknown, document.GetAllocator());
+                sensorj.AddMember("error_counter_reboot_power_on", sensor.errorCounters.reboot_power_on, document.GetAllocator());
+                sensorj.AddMember("error_counter_reboot_reset", sensor.errorCounters.reboot_reset, document.GetAllocator());
+                sensorj.AddMember("error_counter_reboot_brownout", sensor.errorCounters.reboot_brownout, document.GetAllocator());
+                sensorj.AddMember("error_counter_reboot_watchdog", sensor.errorCounters.reboot_watchdog, document.GetAllocator());
                 sensorsj.PushBack(sensorj, document.GetAllocator());
             }
             document.AddMember("sensors", sensorsj, document.GetAllocator());

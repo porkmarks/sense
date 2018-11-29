@@ -49,5 +49,6 @@ private:
     Settings* m_settings = nullptr;
     DB* m_db = nullptr;
     std::vector<QMetaObject::Connection> m_uiConnections;
+    std::vector<QMetaObject::Connection> m_dbConnections;
 };
 

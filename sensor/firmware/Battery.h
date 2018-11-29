@@ -1,54 +1,68 @@
 #pragma once
 
+#include "Log.h"
+#include "Sleep.h"
+
+constexpr float k_min_battery_vcc = 2.3f;
+
 void init_adc()
 {
-#if defined(ADCSRA)
-  // set a2d prescaler so we are inside the desired 50-200 KHz range.
-  #if F_CPU >= 16000000 // 16 MHz / 128 = 125 KHz
+    //1000000 /128 = 7.8KHz
     sbi(ADCSRA, ADPS2);
     sbi(ADCSRA, ADPS1);
     sbi(ADCSRA, ADPS0);
-  #elif F_CPU >= 8000000 // 8 MHz / 64 = 125 KHz
-    sbi(ADCSRA, ADPS2);
-    sbi(ADCSRA, ADPS1);
-    cbi(ADCSRA, ADPS0);
-  #elif F_CPU >= 4000000 // 4 MHz / 32 = 125 KHz
-    sbi(ADCSRA, ADPS2);
-    cbi(ADCSRA, ADPS1);
-    sbi(ADCSRA, ADPS0);
-  #elif F_CPU >= 2000000 // 2 MHz / 16 = 125 KHz
-    sbi(ADCSRA, ADPS2);
-    cbi(ADCSRA, ADPS1);
-    cbi(ADCSRA, ADPS0);
-  #elif F_CPU >= 1000000 // 1 MHz / 8 = 125 KHz
-    cbi(ADCSRA, ADPS2);
-    sbi(ADCSRA, ADPS1);
-    sbi(ADCSRA, ADPS0);
-  #else // 128 kHz / 2 = 64 KHz -> This is the closest you can get, the prescaler is 2
-    cbi(ADCSRA, ADPS2);
-    cbi(ADCSRA, ADPS1);
-    sbi(ADCSRA, ADPS0);
-  #endif
-  // enable a2d conversions
-  sbi(ADCSRA, ADEN);
-#endif  
 }
 
-float read_vcc()
+float read_vcc(float vref)
 {
+    // enable a2d conversions
+    sbi(ADCSRA, ADEN);
+
     // Read 1.1V reference against AVcc
     // set the reference to Vcc and the measurement to the internal 1.1V reference
-    ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+    ADMUX = bit(REFS0) | bit(MUX3) | bit(MUX2) | bit(MUX1);
+  
+    chrono::delay(chrono::millis(20)); // Wait for Vref to settle
+  
+    constexpr uint8_t k_skip_count = 10;
+    for (uint8_t i = 0; i < k_skip_count; i++) //skip a bunch of samples... desperate to get this stable
+    {
+        ADCSRA |= bit(ADSC); // Start conversion
+        while (bit_is_set(ADCSRA, ADSC)); // measuring
+    }
+    
+    uint32_t result = 0;
+    constexpr uint8_t k_measurement_count = 10;
+    for (uint8_t i = 0; i < k_measurement_count; i++) //read a bunch of samples and average them
+    {
+        ADCSRA |= bit(ADSC); // Start conversion
+        while (bit_is_set(ADCSRA, ADSC)); // measuring
+        uint8_t low  = ADCL; // must read ADCL first - it then locks ADCH
+        uint8_t high = ADCH; // unlocks both
+        result += (high<<8) | low;
+    }
 
-    chrono::delay(chrono::millis(2)); // Wait for Vref to settle
-    ADCSRA |= _BV(ADSC); // Start conversion
-    while (bit_is_set(ADCSRA,ADSC)); // measuring
+    cbi(ADCSRA, ADEN);
 
-    uint8_t low  = ADCL; // must read ADCL first - it then locks ADCH
-    uint8_t high = ADCH; // unlocks both
 
-    int32_t result = (high<<8) | low;
+    result /= k_measurement_count;
 
-    float vcc = 1.1f * 1023.f / result;//1125300L / result; // Calculate Vcc (in mV); 1125300 = 1.1*1023*1000
+    float vcc = vref * 1024.f / result;
     return vcc;
 }
+
+void battery_guard(float vref)
+{
+    do 
+    {
+        float vcc = read_vcc(vref);
+        if (vcc > k_min_battery_vcc)
+        {
+            break;
+        }
+        LOG(PSTR("VCC failed\n"));
+        blink_led(Blink_Led::Red, 5, chrono::millis(200));
+        sleep(true);
+    } while (true);
+}
+

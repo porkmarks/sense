@@ -11,6 +11,7 @@
 #include <atomic>
 #include <condition_variable>
 #include "Result.h"
+#include "Sensor_Comms.h"
 
 class DB : public QObject
 {
@@ -65,6 +66,7 @@ public:
 
     typedef uint32_t SensorId;
     typedef uint32_t SensorAddress;
+    typedef uint32_t SensorSerialNumber;
     typedef uint64_t MeasurementId;
 
     struct SignalStrength
@@ -92,6 +94,16 @@ public:
         int8_t combinedSignalStrength = 0;
     };
 
+    struct ErrorCounters
+    {
+        uint32_t comms = 0;
+        uint32_t reboot_unknown = 0;
+        uint32_t reboot_power_on = 0;
+        uint32_t reboot_reset = 0;
+        uint32_t reboot_brownout = 0;
+        uint32_t reboot_watchdog = 0;
+    };
+
     struct SensorDescriptor
     {
         std::string name;
@@ -116,8 +128,10 @@ public:
         SensorId id = 0;
         SensorAddress address = 0;
         Calibration calibration;
-        uint32_t serialNumber = 0;
+        SensorSerialNumber serialNumber = 0;
         State state = State::Active;
+
+        ErrorCounters errorCounters;
 
         Clock::time_point lastCommsTimePoint = Clock::time_point(Clock::duration::zero());
 
@@ -167,6 +181,9 @@ public:
 
         bool hasSleepingData = false;
         bool sleeping = false;
+
+        bool hasErrorCountersDelta = false;
+        ErrorCounters errorCountersDelta;
     };
 
     bool setSensorInputDetails(SensorInputDetails const& details);
@@ -189,6 +206,7 @@ public:
     int32_t findSensorIndexByName(std::string const& name) const;
     int32_t findSensorIndexById(SensorId id) const;
     int32_t findSensorIndexByAddress(SensorAddress address) const;
+    int32_t findSensorIndexBySerialNumber(SensorSerialNumber serialNumber) const;
     int32_t findUnboundSensorIndex() const;
 
     ////////////////////////////////////////////////////////////////////////////
@@ -432,7 +450,7 @@ private:
         AlarmId lastAlarmId = 0;
         ReportId lastReportId = 0;
         MeasurementId lastMeasurementId = 0;
-        uint32_t lastSensorAddress = 0;
+        uint32_t lastSensorAddress = Sensor_Comms::SLAVE_ADDRESS_BEGIN;
     };
 
     Data m_mainData;
