@@ -1858,6 +1858,8 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
 
     emit measurementsWillBeAdded(sensorId);
 
+    uint32_t minIndex = std::numeric_limits<uint32_t>::max();
+    uint32_t maxIndex = std::numeric_limits<uint32_t>::lowest();
     for (MeasurementDescriptor const& md: mds)
     {
         MeasurementId id = computeMeasurementId(md);
@@ -1897,10 +1899,11 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
 
             storedMeasurements.insert(smit, pack(measurement));
         }
+        minIndex = std::min(minIndex, md.index);
+        maxIndex = std::max(maxIndex, md.index);
         sensor.lastMeasurement = measurement;
-
-        s_logger.logVerbose(QString("Added measurement index %1, sensor '%2'").arg(md.index).arg(sensor.descriptor.name.c_str()));
     }
+    s_logger.logVerbose(QString("Added measurement indices %1 to %2, sensor '%3'").arg(minIndex).arg(maxIndex).arg(sensor.descriptor.name.c_str()));
 
     emit measurementsAdded(sensorId);
 
@@ -2037,11 +2040,11 @@ Result<DB::Measurement> DB::getLastMeasurementForSensor(SensorId sensor_id) cons
     auto it = m_mainData.measurements.find(sensor_id);
     if (it == m_mainData.measurements.end())
     {
-        assert(false);
-        return false;
+        return Error("Sensor not found");
     }
 
     bool found = false;
+    Measurement measurement;
     Clock::time_point best_time_point = Clock::time_point(Clock::duration::zero());
     for (StoredMeasurement const& sm: it->second)
     {
@@ -2054,7 +2057,11 @@ Result<DB::Measurement> DB::getLastMeasurementForSensor(SensorId sensor_id) cons
         }
     }
 
-    return found;
+    if (found)
+    {
+        return measurement;
+    }
+    return Error("Sensor doesn't have any measurements");
 }
 
 //////////////////////////////////////////////////////////////////////////
