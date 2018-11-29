@@ -54,7 +54,7 @@ bool Sensor_Comms::init(uint8_t retries, int8_t power_dBm)
         {
             break;
         }
-        LOG(PSTR("Try failed %d: %d\n"), int(i), state);
+        //LOG(PSTR("Try failed %d: %d\n"), int(i), state);
         chrono::delay(chrono::millis(500));
     }
 
@@ -177,11 +177,11 @@ bool Sensor_Comms::send_packet(uint8_t* raw_buffer, uint8_t packet_size, bool _w
                 }
             }
         }
-        LOG(PSTR("no ack\n"));
+        LOG(PSTR("noack\n"));
     }
     else
     {
-        LOG(PSTR("transmit error: %d\n"), (int)state);
+        LOG(PSTR("txerr %d\n"), (int)state);
     }
 
     return false;
@@ -191,7 +191,7 @@ bool Sensor_Comms::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_
 {
     if (!data || size <= sizeof(Header))
     {
-        LOG(PSTR("null or wrong size\n"));
+        LOG(PSTR("null/size\n"));
         return false;
     }
 
@@ -200,7 +200,7 @@ bool Sensor_Comms::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_
     //insufficient data?
     if (size < sizeof(Header) + desired_payload_size)
     {
-        LOG(PSTR("insuficient data: %d < %d for type %d\n"), (int)size, (int)(sizeof(Header) + desired_payload_size), (int)header_ptr->type);
+        LOG(PSTR("insuf data: %d<%d, type %d\n"), (int)size, (int)(sizeof(Header) + desired_payload_size), (int)header_ptr->type);
         return false;
     }
 
@@ -213,14 +213,14 @@ bool Sensor_Comms::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_
     uint32_t computed_crc = crc32(data, size);
     if (crc != computed_crc)
     {
-        LOG(PSTR("bad crc %lu/%lu for type %d\n"), crc, computed_crc, (int)header_ptr->type);
+        LOG(PSTR("crc %lu/%lu, type %d\n"), crc, computed_crc, (int)header_ptr->type);
         return false;
     }
 
     //not addressed to me?
     if (header_ptr->destination_address != m_address && header_ptr->destination_address != BROADCAST_ADDRESS)
     {
-        LOG(PSTR("not for me\n"));
+        LOG(PSTR("notForMe\n"));
         return false;
     }
 

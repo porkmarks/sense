@@ -519,8 +519,7 @@ void SettingsWidget::setSensorsConfig(DB::SensorsConfig const& config)
 {
     m_ui.sensorsMeasurementPeriod->setValue(std::chrono::duration<float>(config.descriptor.measurementPeriod).count() / 60.f);
     m_ui.sensorsCommsPeriod->setValue(std::chrono::duration<float>(config.descriptor.commsPeriod).count() / 60.f);
-    m_ui.sensorsComputedCommsPeriod->setValue(std::chrono::duration<float>(config.computedCommsPeriod).count() / 60.f);
-    //m_ui.sensorsSleeping->setChecked(config.descriptor.sensorsSleeping);
+    m_ui.sensorsComputedCommsPeriod->setText(QString("%1").arg(std::chrono::duration<float>(config.computedCommsPeriod).count() / 60.f));
     m_ui.sensorsPower->setValue(config.descriptor.sensorsPower);
 }
 
@@ -530,7 +529,6 @@ bool SettingsWidget::getSensorsConfig(DB::SensorsConfigDescriptor& descriptor)
 {
     descriptor.measurementPeriod = std::chrono::seconds(static_cast<size_t>(m_ui.sensorsMeasurementPeriod->value() * 60.0));
     descriptor.commsPeriod = std::chrono::seconds(static_cast<size_t>(m_ui.sensorsCommsPeriod->value() * 60.0));
-    //descriptor.sensorsSleeping = m_ui.sensorsSleeping->isChecked();
     descriptor.sensorsPower = static_cast<int8_t>(m_ui.sensorsPower->value());
 
     if (descriptor.commsPeriod.count() == 0)

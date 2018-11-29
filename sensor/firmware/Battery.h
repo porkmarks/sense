@@ -60,7 +60,7 @@ void battery_guard(float vref)
         {
             break;
         }
-        LOG(PSTR("VCC failed\n"));
+        //LOG(PSTR("VCC failed\n"));
         blink_led(Blink_Led::Red, 5, chrono::millis(200));
         sleep(true);
     } while (true);

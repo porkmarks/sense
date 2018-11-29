@@ -536,63 +536,6 @@
               <property name="verticalSpacing">
                <number>6</number>
               </property>
-              <item row="4" column="0">
-               <widget class="QLabel" name="label_9">
-                <property name="text">
-                 <string>Actual Comms Period</string>
-                </property>
-               </widget>
-              </item>
-              <item row="4" column="1">
-               <widget class="QDoubleSpinBox" name="sensorsComputedCommsPeriod">
-                <property name="enabled">
-                 <bool>false</bool>
-                </property>
-                <property name="suffix">
-                 <string> minutes</string>
-                </property>
-                <property name="decimals">
-                 <number>1</number>
-                </property>
-                <property name="minimum">
-                 <double>1.000000000000000</double>
-                </property>
-               </widget>
-              </item>
-              <item row="5" column="0" colspan="2">
-               <widget class="QCheckBox" name="sensorsSleeping">
-                <property name="enabled">
-                 <bool>true</bool>
-                </property>
-                <property name="text">
-                 <string>Put Sensors To Sleep</string>
-                </property>
-               </widget>
-              </item>
-              <item row="6" column="0" colspan="2">
-               <widget class="QLabel" name="label_16">
-                <property name="font">
-                 <font>
-                  <pointsize>8</pointsize>
-                 </font>
-                </property>
-                <property name="text">
-                 <string>To put them to sleep, check the box and press the sensor button briefly</string>
-                </property>
-               </widget>
-              </item>
-              <item row="7" column="0" colspan="2">
-               <widget class="QLabel" name="label_17">
-                <property name="font">
-                 <font>
-                  <pointsize>8</pointsize>
-                 </font>
-                </property>
-                <property name="text">
-                 <string>To wake them up, uncheck the box and press the sensor button briefly</string>
-                </property>
-               </widget>
-              </item>
               <item row="0" column="0">
                <widget class="QLabel" name="label_6">
                 <property name="text">
@@ -639,14 +582,36 @@
                 </property>
                </widget>
               </item>
-              <item row="8" column="0">
+              <item row="4" column="0">
+               <widget class="QLabel" name="label_9">
+                <property name="text">
+                 <string>Actual Comms Period</string>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="0" colspan="2">
+               <widget class="QLabel" name="label_16">
+                <property name="font">
+                 <font>
+                  <pointsize>8</pointsize>
+                 </font>
+                </property>
+                <property name="text">
+                 <string>The actual comms period takes into account the number or sensors so that each sensor has about 10 seconds or time to communicate. It can result in comms periods larger that the one configured.</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="6" column="0">
                <widget class="QLabel" name="label_15">
                 <property name="text">
                  <string>Transmission Power</string>
                 </property>
                </widget>
               </item>
-              <item row="8" column="1">
+              <item row="6" column="1">
                <widget class="QSpinBox" name="sensorsPower">
                 <property name="suffix">
                  <string> dBm</string>
@@ -662,7 +627,7 @@
                 </property>
                </widget>
               </item>
-              <item row="9" column="0" colspan="2">
+              <item row="7" column="0" colspan="2">
                <widget class="QLabel" name="label_18">
                 <property name="font">
                  <font>
@@ -674,6 +639,13 @@
                 </property>
                 <property name="wordWrap">
                  <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="1">
+               <widget class="QLabel" name="sensorsComputedCommsPeriod">
+                <property name="text">
+                 <string>1.0</string>
                 </property>
                </widget>
               </item>
@@ -790,8 +762,6 @@
   <tabstop>ftpReset</tabstop>
   <tabstop>scrollArea</tabstop>
   <tabstop>tabWidget</tabstop>
-  <tabstop>sensorsComputedCommsPeriod</tabstop>
-  <tabstop>sensorsSleeping</tabstop>
   <tabstop>sensorsApply</tabstop>
   <tabstop>sensorsReset</tabstop>
  </tabstops>

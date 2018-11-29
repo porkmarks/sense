@@ -97,11 +97,11 @@ public:
     struct ErrorCounters
     {
         uint32_t comms = 0;
-        uint32_t reboot_unknown = 0;
-        uint32_t reboot_power_on = 0;
-        uint32_t reboot_reset = 0;
-        uint32_t reboot_brownout = 0;
-        uint32_t reboot_watchdog = 0;
+        uint32_t unknownReboots = 0;
+        uint32_t powerOnReboots = 0;
+        uint32_t resetReboots = 0;
+        uint32_t brownoutReboots = 0;
+        uint32_t watchdogReboots = 0;
     };
 
     struct SensorDescriptor
@@ -127,9 +127,14 @@ public:
         SensorDescriptor descriptor;
         SensorId id = 0;
         SensorAddress address = 0;
+        uint8_t sensorType = 0;
+        uint8_t hardwareVersion = 0;
+        uint8_t softwareVersion = 0;
         Calibration calibration;
         SensorSerialNumber serialNumber = 0;
-        State state = State::Active;
+        State state = State::Active; //the current state of the sensor
+        bool shouldSleep = false; //the command given to the sensor
+        Clock::time_point sleepStateTimePoint = Clock::time_point(Clock::duration::zero());
 
         ErrorCounters errorCounters;
 
@@ -162,8 +167,9 @@ public:
     Sensor const& getSensor(size_t index) const;
     Result<void> addSensor(SensorDescriptor const& descriptor);
     Result<void> setSensor(SensorId id, SensorDescriptor const& descriptor);
-    Result<void> bindSensor(uint32_t serialNumber, Sensor::Calibration const& calibration, SensorId& id);
-    Result<void> setSensorState(SensorId id, Sensor::State state);
+    Result<void> setSensorCalibration(SensorId id, Sensor::Calibration const& calibration);
+    Result<void> setSensorSleep(SensorId id, bool sleep);
+    Result<SensorId> bindSensor(uint32_t serialNumber, uint8_t sensorType, uint8_t hardwareVersion, uint8_t softwareRevision, Sensor::Calibration const& calibration);
 
     struct SensorInputDetails
     {
@@ -197,7 +203,7 @@ public:
         Clock::time_point nextMeasurementTimePoint = Clock::time_point(Clock::duration::zero());
         uint32_t nextRealTimeMeasurementIndex = 0; //the next measurement index for the crt date/time
         uint32_t nextMeasurementIndex = 0; //the next measurement index for this sensor
-        uint32_t baselineMeasurementIndex = 0; //this sensor will measure starting from this index only
+        //uint32_t baselineMeasurementIndex = 0; //this sensor will measure starting from this index only
     };
 
     SensorOutputDetails computeSensorOutputDetails(SensorId id) const;
@@ -360,7 +366,7 @@ public:
     std::vector<Measurement> getFilteredMeasurements(Filter const& filter) const;
     size_t getFilteredMeasurementCount(Filter const& filter) const;
 
-    bool getLastMeasurementForSensor(SensorId sensorId, Measurement& measurement) const;
+    Result<Measurement> getLastMeasurementForSensor(SensorId sensorId) const;
 
     ////////////////////////////////////////////////////////////////////////////
 

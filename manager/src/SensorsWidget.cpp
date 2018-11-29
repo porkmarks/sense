@@ -1,5 +1,6 @@
 #include "SensorsWidget.h"
 #include "Settings.h"
+#include "SensorDetailsDialog.h"
 #include <QSettings>
 
 #include <QMessageBox>
@@ -167,29 +168,37 @@ void SensorsWidget::configureSensor(QModelIndex const& index)
     size_t sensorIndex = static_cast<size_t>(_sensorIndex);
     DB::Sensor sensor = m_db->getSensor(sensorIndex);
 
-    while (true)
-    {
-        bool ok = false;
-        QString text = QInputDialog::getText(this, tr("Input Sensor Name"), tr("Name:"), QLineEdit::Normal, sensor.descriptor.name.c_str(), &ok);
-        if (!ok)
-        {
-            return;
-        }
-        if (text.isEmpty())
-        {
-            QMessageBox::critical(this, "Error", "Please enter a name.");
-            continue;
-        }
-        sensor.descriptor.name = text.toUtf8().data();
+    SensorDetailsDialog dialog(*m_db);
+    dialog.setSensor(sensor);
+    dialog.setEnabled(m_settings->isLoggedInAsAdmin());
 
-        Result<void> result = m_db->setSensor(sensor.id, sensor.descriptor);
-        if (result != success)
+    do
+    {
+        int result = dialog.exec();
+        if (result == QDialog::Accepted)
         {
-            QMessageBox::critical(this, "Error", QString("Cannot rename sensor to '%1': %2").arg(sensor.descriptor.name.c_str()).arg(result.error().what().c_str()));
-            continue;
+            sensor = dialog.getSensor();
+            Result<void> result = m_db->setSensor(sensor.id, sensor.descriptor);
+            if (result != success)
+            {
+                QMessageBox::critical(this, "Error", QString("Cannot change sensor '%1': %2").arg(sensor.descriptor.name.c_str()).arg(result.error().what().c_str()));
+                continue;
+            }
+            result = m_db->setSensorCalibration(sensor.id, sensor.calibration);
+            if (result != success)
+            {
+                QMessageBox::critical(this, "Error", QString("Sensor '%1' calibration failed: %2").arg(sensor.descriptor.name.c_str()).arg(result.error().what().c_str()));
+                continue;
+            }
+            result = m_db->setSensorSleep(sensor.id, sensor.shouldSleep);
+            if (result != success)
+            {
+                QMessageBox::critical(this, "Error", QString("Sensor '%1' sleep failed: %2").arg(sensor.descriptor.name.c_str()).arg(result.error().what().c_str()));
+                continue;
+            }
         }
         break;
-    }
+    } while (true);
 }
 //////////////////////////////////////////////////////////////////////////
 

@@ -119,7 +119,8 @@ HEADERS += \
     ../../../sensor/firmware/Data_Defs.h \
     ../../src/qcustomplot.h \
     ../../src/PlotToolTip.h \
-    ../../../common/src/Result.h
+    ../../../common/src/Result.h \
+    ../../src/SensorDetailsDialog.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -173,7 +174,8 @@ SOURCES += \
     ../../src/SensorsFilterWidget.cpp \
     ../../../sensor/firmware/CRC.cpp \
     ../../src/qcustomplot.cpp \
-    ../../src/PlotToolTip.cpp
+    ../../src/PlotToolTip.cpp \
+    ../../src/SensorDetailsDialog.cpp
 
 FORMS += \
     ../../src/Manager.ui \

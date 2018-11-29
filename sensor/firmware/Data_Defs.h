@@ -110,7 +110,6 @@ static_assert(sizeof(Config_Request) == 48, "");
 
 struct Config_Response
 {
-    uint32_t baseline_measurement_index = 0; //sensors should start counting from this one
     //all are in seconds
     chrono::seconds next_comms_delay; //how much to wait for next comms
     chrono::seconds comms_period; //comms every this much seconds
@@ -124,7 +123,7 @@ struct Config_Response
     bool sleeping = false;
     int8_t power = 15;
 };
-static_assert(sizeof(Config_Response) == 46, "");
+static_assert(sizeof(Config_Response) == 42, "");
 
 struct Descriptor
 {
@@ -145,7 +144,7 @@ struct First_Config_Response : Config_Response
 {
     uint32_t first_measurement_index = 0;
 };
-static_assert(sizeof(First_Config_Response) == 50, "");
+static_assert(sizeof(First_Config_Response) == 46, "");
 
 struct Pair_Request
 {

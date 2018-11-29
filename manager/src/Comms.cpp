@@ -350,7 +350,6 @@ static void fillConfig(data::sensor::Config_Response& config, DB::SensorsConfig 
 {
     DB::Clock::time_point now = DB::Clock::now();
 
-    config.baseline_measurement_index = sensorOutputDetails.baselineMeasurementIndex;
     config.next_measurement_delay =
             chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(sensorOutputDetails.nextMeasurementTimePoint - now).count());
 
@@ -367,6 +366,7 @@ static void fillConfig(data::sensor::Config_Response& config, DB::SensorsConfig 
     config.calibration.temperature_bias = static_cast<int16_t>((sensor.calibration.temperatureBias) * 100.f);
     config.calibration.humidity_bias = static_cast<int16_t>((sensor.calibration.humidityBias) * 100.f);
     config.power = sensorsConfig.descriptor.sensorsPower;
+    config.sleeping = sensor.shouldSleep;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -438,11 +438,11 @@ void Comms::processSensorReq_ConfigRequest(InitializedBaseStation& cbs, SensorRe
 
     details.hasErrorCountersDelta = true;
     details.errorCountersDelta.comms = configRequest.comms_errors;
-    details.errorCountersDelta.reboot_reset = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_RESET)) ? 1 : 0;
-    details.errorCountersDelta.reboot_unknown = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_UNKNOWN)) ? 1 : 0;
-    details.errorCountersDelta.reboot_brownout = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_BROWNOUT)) ? 1 : 0;
-    details.errorCountersDelta.reboot_power_on = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_POWER_ON)) ? 1 : 0;
-    details.errorCountersDelta.reboot_watchdog = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_WATCHDOG)) ? 1 : 0;
+    details.errorCountersDelta.resetReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_RESET)) ? 1 : 0;
+    details.errorCountersDelta.unknownReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_UNKNOWN)) ? 1 : 0;
+    details.errorCountersDelta.brownoutReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_BROWNOUT)) ? 1 : 0;
+    details.errorCountersDelta.powerOnReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_POWER_ON)) ? 1 : 0;
+    details.errorCountersDelta.watchdogReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_WATCHDOG)) ? 1 : 0;
 
     cbs.db.setSensorInputDetails(details);
 
@@ -506,17 +506,20 @@ void Comms::processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequ
     DB::Sensor::Calibration calibration;
     calibration.temperatureBias = static_cast<float>(pairRequest.calibration.temperature_bias) / 100.f;
     calibration.humidityBias = static_cast<float>(pairRequest.calibration.humidity_bias) / 100.f;
-    uint32_t serialNumber = pairRequest.descriptor.serial_number;
 
-    DB::SensorId id;
-    Result<void> result = cbs.db.bindSensor(serialNumber, calibration, id);
+    Result<DB::SensorId> result = cbs.db.bindSensor(pairRequest.descriptor.serial_number,
+                                                    pairRequest.descriptor.sensor_type,
+                                                    pairRequest.descriptor.hardware_version,
+                                                    pairRequest.descriptor.software_version,
+                                                    calibration);
     if (result != success)
     {
-        s_logger.logWarning(QString("Unexpected bind request received from sensor SN %1: %2").arg(serialNumber, 8, 18, QChar('0')).arg(result.error().what().c_str()));
+        s_logger.logWarning(QString("Unexpected bind request received from sensor SN %1: %2").arg(pairRequest.descriptor.serial_number, 8, 18, QChar('0')).arg(result.error().what().c_str()));
         sendEmptySensorResponse(cbs, request);
         return;
     }
 
+    DB::SensorId id = result.payload();
     int32_t sensorIndex = cbs.db.findSensorIndexById(id);
     if (sensorIndex < 0)
     {

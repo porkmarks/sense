@@ -17,7 +17,7 @@
 
 void soft_reset()
 {
-    LOG(PSTR("********** resetting..."));
+    LOG(PSTR("XOXOXOXO"));
     //cli();
     //wdt_enable(WDTO_15MS);
     //while(1);

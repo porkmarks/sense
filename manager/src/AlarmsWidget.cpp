@@ -95,17 +95,22 @@ void AlarmsWidget::configureAlarm(QModelIndex const& index)
     dialog.setAlarm(alarm);
     dialog.setEnabled(m_settings->isLoggedInAsAdmin());
 
-    int result = dialog.exec();
-    if (result == QDialog::Accepted)
+    do
     {
-        alarm = dialog.getAlarm();
-        Result<void> result = m_db->setAlarm(alarm.id, alarm.descriptor);
-        if (result != success)
+        int result = dialog.exec();
+        if (result == QDialog::Accepted)
         {
-            QMessageBox::critical(this, "Error", QString("Cannot change alarm '%1': %2").arg(alarm.descriptor.name.c_str()).arg(result.error().what().c_str()));
+            alarm = dialog.getAlarm();
+            Result<void> result = m_db->setAlarm(alarm.id, alarm.descriptor);
+            if (result != success)
+            {
+                QMessageBox::critical(this, "Error", QString("Cannot change alarm '%1': %2").arg(alarm.descriptor.name.c_str()).arg(result.error().what().c_str()));
+                continue;
+            }
+            m_model->refresh();
         }
-        m_model->refresh();
-    }
+        break;
+    } while (true);
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -288,6 +288,22 @@ Result<void> DB::load(std::string const& name)
                 }
                 sensor.state = static_cast<Sensor::State>(it->value.GetUint());
 
+                it = sensorj.FindMember("should_sleep");
+                if (it == sensorj.MemberEnd() || !it->value.IsBool())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor should_sleep").arg(dataFilename.c_str()));
+                    return Error("Cannot open DB");
+                }
+                sensor.shouldSleep = it->value.GetBool();
+
+                it = sensorj.FindMember("sleep_state_tp");
+                if (it == sensorj.MemberEnd() || !it->value.IsUint64())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing config sleep_state_tp").arg(dataFilename.c_str()));
+                    return Error("Cannot open DB");
+                }
+                sensor.sleepStateTimePoint = Clock::from_time_t(static_cast<time_t>(it->value.GetUint64()));
+
                 it = sensorj.FindMember("serial_number");
                 if (it == sensorj.MemberEnd() || !it->value.IsUint())
                 {
@@ -345,7 +361,7 @@ Result<void> DB::load(std::string const& name)
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor error_counter_reboot_unknown").arg(dataFilename.c_str()));
                     return Error("Cannot open DB");
                 }
-                sensor.errorCounters.reboot_unknown = it->value.GetUint();
+                sensor.errorCounters.unknownReboots = it->value.GetUint();
 
                 it = sensorj.FindMember("error_counter_reboot_power_on");
                 if (it == sensorj.MemberEnd() || !it->value.IsUint())
@@ -353,7 +369,7 @@ Result<void> DB::load(std::string const& name)
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor error_counter_reboot_power_on").arg(dataFilename.c_str()));
                     return Error("Cannot open DB");
                 }
-                sensor.errorCounters.reboot_power_on = it->value.GetUint();
+                sensor.errorCounters.powerOnReboots = it->value.GetUint();
 
                 it = sensorj.FindMember("error_counter_reboot_reset");
                 if (it == sensorj.MemberEnd() || !it->value.IsUint())
@@ -361,7 +377,7 @@ Result<void> DB::load(std::string const& name)
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor error_counter_reboot_reset").arg(dataFilename.c_str()));
                     return Error("Cannot open DB");
                 }
-                sensor.errorCounters.reboot_reset = it->value.GetUint();
+                sensor.errorCounters.resetReboots = it->value.GetUint();
 
                 it = sensorj.FindMember("error_counter_reboot_brownout");
                 if (it == sensorj.MemberEnd() || !it->value.IsUint())
@@ -369,7 +385,7 @@ Result<void> DB::load(std::string const& name)
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor error_counter_reboot_brownout").arg(dataFilename.c_str()));
                     return Error("Cannot open DB");
                 }
-                sensor.errorCounters.reboot_brownout = it->value.GetUint();
+                sensor.errorCounters.brownoutReboots = it->value.GetUint();
 
                 it = sensorj.FindMember("error_counter_reboot_watchdog");
                 if (it == sensorj.MemberEnd() || !it->value.IsUint())
@@ -377,7 +393,7 @@ Result<void> DB::load(std::string const& name)
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor error_counter_reboot_watchdog").arg(dataFilename.c_str()));
                     return Error("Cannot open DB");
                 }
-                sensor.errorCounters.reboot_watchdog = it->value.GetUint();
+                sensor.errorCounters.watchdogReboots = it->value.GetUint();
 
                 data.lastSensorAddress = std::max(data.lastSensorAddress, sensor.address);
                 data.lastSensorId = std::max(data.lastSensorId, sensor.id);
@@ -1098,7 +1114,7 @@ Result<void> DB::setSensor(SensorId id, SensorDescriptor const& descriptor)
 
 //////////////////////////////////////////////////////////////////////////
 
-Result<void> DB::bindSensor(uint32_t serialNumber, Sensor::Calibration const& calibration, SensorId& id)
+Result<DB::SensorId> DB::bindSensor(uint32_t serialNumber, uint8_t sensorType, uint8_t hardwareVersion, uint8_t softwareVersion, Sensor::Calibration const& calibration)
 {
     int32_t _index = findUnboundSensorIndex();
     if (_index < 0)
@@ -1114,8 +1130,11 @@ Result<void> DB::bindSensor(uint32_t serialNumber, Sensor::Calibration const& ca
     }
 
     sensor.address = ++m_mainData.lastSensorAddress;
-    sensor.state = Sensor::State::Active;
+    sensor.sensorType = sensorType;
+    sensor.hardwareVersion = hardwareVersion;
+    sensor.softwareVersion = softwareVersion;
     sensor.calibration = calibration;
+    sensor.state = Sensor::State::Active;
     sensor.serialNumber = serialNumber;
 
     emit sensorBound(sensor.id);
@@ -1133,31 +1152,75 @@ Result<void> DB::bindSensor(uint32_t serialNumber, Sensor::Calibration const& ca
 
     triggerDelayedSave(std::chrono::seconds(1));
 
-    id = sensor.id;
-    return success;
+    return sensor.id;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-Result<void> DB::setSensorState(SensorId id, Sensor::State state)
+Result<void> DB::setSensorCalibration(SensorId id, Sensor::Calibration const& calibration)
 {
     int32_t _index = findSensorIndexById(id);
     if (_index < 0)
     {
         return Error("Invalid sensor id");
     }
-    if (state == Sensor::State::Unbound)
-    {
-        return Error("Cannot change state for unbound sensor");
-    }
-
     size_t index = static_cast<size_t>(_index);
     Sensor& sensor = m_mainData.sensors[index];
-    sensor.state = state;
+    if (sensor.state == Sensor::State::Unbound)
+    {
+        return Error("Cannot change calibration for unbound sensor");
+    }
+
+    sensor.calibration = calibration;
 
     emit sensorChanged(sensor.id);
 
-    s_logger.logInfo(QString("Sensor '%1' changed state to %2").arg(sensor.descriptor.name.c_str()).arg(static_cast<int>(state)));
+    s_logger.logInfo(QString("Sensor '%1' calibration changed").arg(sensor.descriptor.name.c_str()));
+
+    triggerDelayedSave(std::chrono::seconds(1));
+
+    return success;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+Result<void> DB::setSensorSleep(SensorId id, bool sleep)
+{
+    int32_t _index = findSensorIndexById(id);
+    if (_index < 0)
+    {
+        return Error("Invalid sensor id");
+    }
+    size_t index = static_cast<size_t>(_index);
+    Sensor& sensor = m_mainData.sensors[index];
+    if (sensor.state == Sensor::State::Unbound)
+    {
+        return Error("Cannot put unbound sensor to sleep");
+    }
+
+    if (sensor.shouldSleep == sleep)
+    {
+        return success;
+    }
+
+    DB::SensorsConfig config = getLastSensorsConfig();
+    bool hasMeasurements = sensor.estimatedStoredMeasurementCount > 0;
+    bool commedRecently = (DB::Clock::now() - sensor.lastCommsTimePoint) < config.descriptor.commsPeriod * 2;
+    bool allowedToSleep = !hasMeasurements && commedRecently;
+    if (sleep && !sensor.shouldSleep && !allowedToSleep)
+    {
+        if (hasMeasurements)
+        {
+            return Error("Cannot put sensor to sleep because it has stored measurements");
+        }
+        return Error("Cannot put sensor to sleep because it didn't communicate recently");
+    }
+
+    sensor.shouldSleep = sleep;
+
+    emit sensorChanged(sensor.id);
+
+    s_logger.logInfo(QString("Sensor '%1' sleep state changed to %2").arg(sensor.descriptor.name.c_str()).arg(sleep));
 
     triggerDelayedSave(std::chrono::seconds(1));
 
@@ -1227,6 +1290,16 @@ bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
         {
             if (sensor.state != Sensor::State::Unbound)
             {
+                if (sensor.state == Sensor::State::Sleeping && !d.sleeping)
+                {
+                    //the sensor has slept, now it wakes up and start measuring from the current index
+                    sensor.lastConfirmedMeasurementIndex = computeNextRealTimeMeasurementIndex();
+                }
+                if (sensor.state != Sensor::State::Sleeping && d.sleeping)
+                {
+                    //mark the moment the sensor went to sleep
+                    sensor.sleepStateTimePoint = Clock::now();
+                }
                 sensor.state = d.sleeping ? Sensor::State::Sleeping : Sensor::State::Active;
             }
         }
@@ -1239,11 +1312,11 @@ bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
         if (d.hasErrorCountersDelta)
         {
             sensor.errorCounters.comms += d.errorCountersDelta.comms;
-            sensor.errorCounters.reboot_reset += d.errorCountersDelta.reboot_reset;
-            sensor.errorCounters.reboot_unknown += d.errorCountersDelta.reboot_unknown;
-            sensor.errorCounters.reboot_brownout += d.errorCountersDelta.reboot_brownout;
-            sensor.errorCounters.reboot_power_on += d.errorCountersDelta.reboot_power_on;
-            sensor.errorCounters.reboot_watchdog += d.errorCountersDelta.reboot_watchdog;
+            sensor.errorCounters.resetReboots += d.errorCountersDelta.resetReboots;
+            sensor.errorCounters.unknownReboots += d.errorCountersDelta.unknownReboots;
+            sensor.errorCounters.brownoutReboots += d.errorCountersDelta.brownoutReboots;
+            sensor.errorCounters.powerOnReboots += d.errorCountersDelta.powerOnReboots;
+            sensor.errorCounters.watchdogReboots += d.errorCountersDelta.watchdogReboots;
         }
 
         emit sensorDataChanged(sensor.id);
@@ -1959,7 +2032,7 @@ size_t DB::_getFilteredMeasurements(Filter const& filter, std::vector<DB::Measur
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::getLastMeasurementForSensor(SensorId sensor_id, Measurement& measurement) const
+Result<DB::Measurement> DB::getLastMeasurementForSensor(SensorId sensor_id) const
 {
     auto it = m_mainData.measurements.find(sensor_id);
     if (it == m_mainData.measurements.end())
@@ -1968,18 +2041,20 @@ bool DB::getLastMeasurementForSensor(SensorId sensor_id, Measurement& measuremen
         return false;
     }
 
+    bool found = false;
     Clock::time_point best_time_point = Clock::time_point(Clock::duration::zero());
     for (StoredMeasurement const& sm: it->second)
     {
         Measurement m = unpack(sensor_id, sm);
         if (m.timePoint > best_time_point)
         {
+            found = true;
             measurement = m;
             best_time_point = m.timePoint;
         }
     }
 
-    return true;
+    return found;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -2252,17 +2327,19 @@ void DB::save(Data const& data) const
                 sensorj.AddMember("id", sensor.id, document.GetAllocator());
                 sensorj.AddMember("address", sensor.address, document.GetAllocator());
                 sensorj.AddMember("state", static_cast<int>(sensor.state), document.GetAllocator());
+                sensorj.AddMember("should_sleep", sensor.shouldSleep, document.GetAllocator());
+                sensorj.AddMember("sleep_state_tp", static_cast<uint64_t>(Clock::to_time_t(sensor.sleepStateTimePoint)), document.GetAllocator());
                 sensorj.AddMember("last_comms", static_cast<uint64_t>(Clock::to_time_t(sensor.lastCommsTimePoint)), document.GetAllocator());
                 sensorj.AddMember("temperature_bias", sensor.calibration.temperatureBias, document.GetAllocator());
                 sensorj.AddMember("humidity_bias", sensor.calibration.humidityBias, document.GetAllocator());
                 sensorj.AddMember("serial_number", sensor.serialNumber, document.GetAllocator());
                 sensorj.AddMember("last_confirmed_measurement_index", sensor.lastConfirmedMeasurementIndex, document.GetAllocator());
                 sensorj.AddMember("error_counter_comms", sensor.errorCounters.comms, document.GetAllocator());
-                sensorj.AddMember("error_counter_reboot_unknown", sensor.errorCounters.reboot_unknown, document.GetAllocator());
-                sensorj.AddMember("error_counter_reboot_power_on", sensor.errorCounters.reboot_power_on, document.GetAllocator());
-                sensorj.AddMember("error_counter_reboot_reset", sensor.errorCounters.reboot_reset, document.GetAllocator());
-                sensorj.AddMember("error_counter_reboot_brownout", sensor.errorCounters.reboot_brownout, document.GetAllocator());
-                sensorj.AddMember("error_counter_reboot_watchdog", sensor.errorCounters.reboot_watchdog, document.GetAllocator());
+                sensorj.AddMember("error_counter_reboot_unknown", sensor.errorCounters.unknownReboots, document.GetAllocator());
+                sensorj.AddMember("error_counter_reboot_power_on", sensor.errorCounters.powerOnReboots, document.GetAllocator());
+                sensorj.AddMember("error_counter_reboot_reset", sensor.errorCounters.resetReboots, document.GetAllocator());
+                sensorj.AddMember("error_counter_reboot_brownout", sensor.errorCounters.brownoutReboots, document.GetAllocator());
+                sensorj.AddMember("error_counter_reboot_watchdog", sensor.errorCounters.watchdogReboots, document.GetAllocator());
                 sensorsj.PushBack(sensorj, document.GetAllocator());
             }
             document.AddMember("sensors", sensorsj, document.GetAllocator());

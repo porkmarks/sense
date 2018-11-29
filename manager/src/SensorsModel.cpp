@@ -17,11 +17,13 @@ extern QIcon getBatteryIcon(float vcc);
 extern float getSignalLevel(int8_t dBm);
 extern QIcon getSignalIcon(int8_t dBm);
 
-std::pair<std::string, int32_t> computeNextTimePointString(DB::Clock::time_point tp)
+std::pair<std::string, int32_t> computeRelativeTimePointString(DB::Clock::time_point tp)
 {
     int32_t totalSeconds = std::chrono::duration_cast<std::chrono::seconds>(tp - DB::Clock::now()).count();
-
     int32_t seconds = std::abs(totalSeconds);
+
+    int32_t days = seconds / (24 * 3600);
+    seconds -= days * (24 * 3600);
 
     int32_t hours = seconds / 3600;
     seconds -= hours * 3600;
@@ -30,17 +32,21 @@ std::pair<std::string, int32_t> computeNextTimePointString(DB::Clock::time_point
     seconds -= minutes * 60;
 
     char buf[256] = { '\0' };
-    if (hours > 0)
+    if (days > 0)
     {
-        sprintf(buf, "%02d:%02d:%02d", hours, minutes, seconds);
+        sprintf(buf, "%dd %02dh %02dm %02ds", days, hours, minutes, seconds);
+    }
+    else if (hours > 0)
+    {
+        sprintf(buf, "%dh %02dm %02ds", hours, minutes, seconds);
     }
     else if (minutes > 0)
     {
-        sprintf(buf, "%02d:%02d", minutes, seconds);
+        sprintf(buf, "%dm %02ds", minutes, seconds);
     }
     else if (seconds > 0)
     {
-        sprintf(buf, "%02d", seconds);
+        sprintf(buf, "%ds", seconds);
     }
 
     std::string str(buf);
@@ -55,6 +61,18 @@ std::pair<std::string, int32_t> computeNextTimePointString(DB::Clock::time_point
     }
 
     return std::make_pair(str, totalSeconds);
+}
+
+uint32_t getSensorStorageCapacity(DB::Sensor const& sensor)
+{
+    if (sensor.sensorType == 1)
+    {
+        if (sensor.hardwareVersion == 2)
+        {
+            return 1000;
+        }
+    }
+    return 0;
 }
 
 constexpr int32_t k_imminentMaxSecond = 5;
@@ -333,7 +351,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
             {
                 if (sensor.lastCommsTimePoint.time_since_epoch().count() != 0)
                 {
-                    auto p = computeNextTimePointString(sensor.lastCommsTimePoint + m_db.getLastSensorsConfig().computedCommsPeriod);
+                    auto p = computeRelativeTimePointString(sensor.lastCommsTimePoint + m_db.getLastSensorsConfig().computedCommsPeriod);
                     if (p.second < k_imminentMaxSecond && p.second > k_imminentMinSecond)
                     {
                         return QVariant(QColor(255, 255, 150));
@@ -437,7 +455,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
             {
                 if (sensor.lastCommsTimePoint.time_since_epoch().count() != 0)
                 {
-                    auto p = computeNextTimePointString(sensor.lastCommsTimePoint + m_db.getLastSensorsConfig().computedCommsPeriod);
+                    auto p = computeRelativeTimePointString(sensor.lastCommsTimePoint + m_db.getLastSensorsConfig().computedCommsPeriod);
                     if (p.second < k_imminentMaxSecond && p.second > k_imminentMinSecond)
                     {
                         return "Imminent";
