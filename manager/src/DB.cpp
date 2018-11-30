@@ -840,7 +840,9 @@ DB::Clock::time_point DB::computeNextMeasurementTimePoint(Sensor const& sensor) 
 {
     uint32_t nextMeasurementIndex = computeNextMeasurementIndex(sensor);
     SensorsConfig const& config = findSensorsConfigForMeasurementIndex(nextMeasurementIndex);
-    Clock::time_point tp = config.baselineMeasurementTimePoint + config.descriptor.measurementPeriod * (nextMeasurementIndex - config.baselineMeasurementIndex);
+
+    uint32_t index = nextMeasurementIndex >= config.baselineMeasurementIndex ? nextMeasurementIndex - config.baselineMeasurementIndex : 0;
+    Clock::time_point tp = config.baselineMeasurementTimePoint + config.descriptor.measurementPeriod * index;
     return tp;
 }
 
@@ -949,7 +951,8 @@ Result<void> DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
         uint32_t nextRealTimeMeasurementIndex = computeNextRealTimeMeasurementIndex();
 
         SensorsConfig const& c = findSensorsConfigForMeasurementIndex(nextRealTimeMeasurementIndex);
-        Clock::time_point nextMeasurementTP = c.baselineMeasurementTimePoint + c.descriptor.measurementPeriod * (nextRealTimeMeasurementIndex - c.baselineMeasurementIndex);
+        uint32_t index = nextRealTimeMeasurementIndex >= c.baselineMeasurementIndex ? nextRealTimeMeasurementIndex - c.baselineMeasurementIndex : 0;
+        Clock::time_point nextMeasurementTP = c.baselineMeasurementTimePoint + c.descriptor.measurementPeriod * index;
 
         m_mainData.sensorsConfigs.erase(std::remove_if(m_mainData.sensorsConfigs.begin(), m_mainData.sensorsConfigs.end(), [&nextRealTimeMeasurementIndex](SensorsConfig const& c)
         {
@@ -1922,7 +1925,8 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
 DB::Clock::time_point DB::computeMeasurementTimepoint(MeasurementDescriptor const& md) const
 {
     SensorsConfig const& config = findSensorsConfigForMeasurementIndex(md.index);
-    Clock::time_point tp = config.baselineMeasurementTimePoint + config.descriptor.measurementPeriod * (md.index - config.baselineMeasurementIndex);
+    uint32_t index = md.index >= config.baselineMeasurementIndex ? md.index - config.baselineMeasurementIndex : 0;
+    Clock::time_point tp = config.baselineMeasurementTimePoint + config.descriptor.measurementPeriod * index;
     return tp;
 }
 
