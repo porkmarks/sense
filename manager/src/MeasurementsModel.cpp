@@ -265,7 +265,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Temperature)
         {
-            return QString("%1°C").arg(measurement.descriptor.temperature, 0, 'f', 1);
+            return QString("%1 °C").arg(measurement.descriptor.temperature, 0, 'f', 1);
         }
         else if (column == Column::Humidity)
         {

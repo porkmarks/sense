@@ -11,8 +11,9 @@ extern uint32_t getSensorStorageCapacity(DB::Sensor const& sensor);
 
 //////////////////////////////////////////////////////////////////////////
 
-SensorDetailsDialog::SensorDetailsDialog(DB& db)
-    : m_db(db)
+SensorDetailsDialog::SensorDetailsDialog(DB& db, QWidget* parent)
+    : QDialog(parent)
+    , m_db(db)
 {
     m_ui.setupUi(this);
 }
@@ -57,11 +58,11 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
     if (lastMeasurementResult == success)
     {
         float vcc = lastMeasurementResult.payload().descriptor.vcc;
-        m_ui.battery->setText(QString("%1 % (%2V)").arg(static_cast<int>(getBatteryLevel(vcc) * 100.f)).arg(vcc, 0, 'f', 1));
+        m_ui.battery->setText(QString("%1% (%2V)").arg(static_cast<int>(getBatteryLevel(vcc) * 100.f)).arg(vcc, 0, 'f', 1));
         m_ui.batteryIcon->setPixmap(getBatteryIcon(vcc).pixmap(24, 24));
 
         int8_t signal = static_cast<int8_t>(getSignalLevel(m_sensor.averageCombinedSignalStrength) * 100.f);
-        m_ui.signalStrength->setText(QString("%1 % (%2 dBm)").arg(signal).arg(m_sensor.averageCombinedSignalStrength));
+        m_ui.signalStrength->setText(QString("%1% (%2 dBm)").arg(signal).arg(m_sensor.averageCombinedSignalStrength));
         m_ui.signalStrengthIcon->setPixmap(getSignalIcon(signal).pixmap(24, 24));
     }
     else
@@ -81,7 +82,7 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
         {
             float p = float(m_sensor.estimatedStoredMeasurementCount) / float(capacity);
             p = std::max(std::min(p, 1.f), 0.f) * 100.f;
-            m_ui.storage->setText(QString("%1 (%2 %)").arg(m_sensor.estimatedStoredMeasurementCount).arg(int(p)));
+            m_ui.storage->setText(QString("%1 (%2%)").arg(m_sensor.estimatedStoredMeasurementCount).arg(int(p)));
         }
     }
 

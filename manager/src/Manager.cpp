@@ -13,7 +13,7 @@
 #   define CHECK_PASSWORD
 #endif
 
-static const std::string s_version = "1.0.11";
+static const std::string s_version = "1.0.12";
 
 Logger s_logger;
 
@@ -113,7 +113,7 @@ void Manager::checkIfAdminExists()
 
         QMessageBox::information(this, "Admin", "No admin user exists. Please create one now.");
 
-        ConfigureUserDialog dialog(m_settings);
+        ConfigureUserDialog dialog(m_settings, this);
 
         Settings::User user;
         dialog.setUser(user);
@@ -167,7 +167,7 @@ void Manager::login()
     {
         s_logger.logInfo("Asking the user to log in");
 
-        QDialog dialog;
+        QDialog dialog(this);
         Ui::LoginDialog ui;
         ui.setupUi(&dialog);
 

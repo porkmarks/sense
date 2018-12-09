@@ -121,7 +121,7 @@ void LogsWidget::refresh()
 
 void LogsWidget::exportData()
 {
-    ExportLogsDialog dialog(*m_model);
+    ExportLogsDialog dialog(*m_model, this);
     int result = dialog.exec();
     if (result != QDialog::Accepted)
     {

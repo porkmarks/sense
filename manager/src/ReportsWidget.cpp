@@ -83,7 +83,7 @@ void ReportsWidget::setRW()
 
 void ReportsWidget::configureReport(QModelIndex const& index)
 {
-    if (!adminCheck(*m_settings))
+    if (!adminCheck(*m_settings, this))
     {
         return;
     }
@@ -96,7 +96,7 @@ void ReportsWidget::configureReport(QModelIndex const& index)
 
     DB::Report report = m_db->getReport(indexRow);
 
-    ConfigureReportDialog dialog(*m_settings, *m_db);
+    ConfigureReportDialog dialog(*m_settings, *m_db, this);
     dialog.setReport(report);
     dialog.setEnabled(m_settings->isLoggedInAsAdmin());
 
@@ -117,12 +117,12 @@ void ReportsWidget::configureReport(QModelIndex const& index)
 
 void ReportsWidget::addReport()
 {
-    if (!adminCheck(*m_settings))
+    if (!adminCheck(*m_settings, this))
     {
         return;
     }
 
-    ConfigureReportDialog dialog(*m_settings, *m_db);
+    ConfigureReportDialog dialog(*m_settings, *m_db, this);
 
     DB::Report report;
     report.descriptor.name = "Report " + std::to_string(m_db->getReportCount());
@@ -147,7 +147,7 @@ void ReportsWidget::addReport()
 
 void ReportsWidget::removeReports()
 {
-    if (!adminCheck(*m_settings))
+    if (!adminCheck(*m_settings, this))
     {
         return;
     }

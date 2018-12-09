@@ -16,8 +16,9 @@ extern Logger s_logger;
 extern float getBatteryLevel(float vcc);
 
 
-ExportLogsDialog::ExportLogsDialog(LogsModel& model)
-    : m_model(model)
+ExportLogsDialog::ExportLogsDialog(LogsModel& model, QWidget* parent)
+    : QDialog(parent)
+    , m_model(model)
 {
     m_ui.setupUi(this);
 

@@ -4,8 +4,9 @@
 
 //////////////////////////////////////////////////////////////////////////
 
-ConfigureReportDialog::ConfigureReportDialog(Settings& settings, DB& db)
-    : m_settings(settings)
+ConfigureReportDialog::ConfigureReportDialog(Settings& settings, DB& db, QWidget* parent)
+    : QDialog(parent)
+    , m_settings(settings)
     , m_db(db)
 {
     m_ui.setupUi(this);

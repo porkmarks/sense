@@ -214,8 +214,7 @@ bool SettingsWidget::getEmailSettings(Settings::EmailSettings& settings)
     }
     if (settings.recipients.empty())
     {
-        QMessageBox::critical(this, "Error", "You need to specify a valid recipient.");
-        return false;
+        QMessageBox::warning(this, "Warning", "No email recipients configured, emails will not be sent.");
     }
 
     return true;
@@ -241,6 +240,12 @@ void SettingsWidget::sendTestEmail()
     Settings::EmailSettings settings;
     if (!getEmailSettings(settings))
     {
+        return;
+    }
+
+    if (settings.recipients.empty())
+    {
+        QMessageBox::critical(this, "Error", "No email recipients configured.");
         return;
     }
 
@@ -341,7 +346,7 @@ void SettingsWidget::sendTestEmail()
                          "<ul>"
                          "<li>Temperature: <strong>23 &deg;C</strong></li>"
                          "<li>Humidity: <strong>77 %RH</strong></li>"
-                         "<li>Battery: <strong>55&nbsp;%</strong></li>"
+                         "<li>Battery: <strong>55 %</strong></li>"
                          "</ul>"
                          "<p>Timestamp: <strong>12-23-2017 12:00</strong> <span style=\"font-size: 8pt;\"><em>(dd-mm-yyyy hh:mm)</em></span></p>"
                          "<p><span style=\"font-size: 12pt; color: #ff0000;\">&lt;&lt;&lt; This is a test email! &gt;&gt;&gt;</span></p>"

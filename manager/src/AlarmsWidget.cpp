@@ -84,7 +84,7 @@ void AlarmsWidget::setRW()
 
 void AlarmsWidget::configureAlarm(QModelIndex const& index)
 {
-    if (!adminCheck(*m_settings))
+    if (!adminCheck(*m_settings, this))
     {
         return;
     }
@@ -97,7 +97,7 @@ void AlarmsWidget::configureAlarm(QModelIndex const& index)
 
     DB::Alarm alarm = m_db->getAlarm(indexRow);
 
-    ConfigureAlarmDialog dialog(*m_db);
+    ConfigureAlarmDialog dialog(*m_db, this);
     dialog.setAlarm(alarm);
     dialog.setEnabled(m_settings->isLoggedInAsAdmin());
 
@@ -123,12 +123,12 @@ void AlarmsWidget::configureAlarm(QModelIndex const& index)
 
 void AlarmsWidget::addAlarm()
 {
-    if (!adminCheck(*m_settings))
+    if (!adminCheck(*m_settings, this))
     {
         return;
     }
 
-    ConfigureAlarmDialog dialog(*m_db);
+    ConfigureAlarmDialog dialog(*m_db, this);
 
     DB::Alarm alarm;
     alarm.descriptor.name = "Alarm " + std::to_string(m_db->getAlarmCount());
@@ -151,7 +151,7 @@ void AlarmsWidget::addAlarm()
 
 void AlarmsWidget::removeAlarms()
 {
-    if (!adminCheck(*m_settings))
+    if (!adminCheck(*m_settings, this))
     {
         return;
     }

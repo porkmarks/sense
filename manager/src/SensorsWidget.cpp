@@ -158,7 +158,7 @@ void SensorsWidget::unbindSensor()
 
 void SensorsWidget::configureSensor(QModelIndex const& index)
 {
-    if (!adminCheck(*m_settings))
+    if (!adminCheck(*m_settings, this))
     {
         return;
     }
@@ -174,7 +174,7 @@ void SensorsWidget::configureSensor(QModelIndex const& index)
     size_t sensorIndex = static_cast<size_t>(_sensorIndex);
     DB::Sensor sensor = m_db->getSensor(sensorIndex);
 
-    SensorDetailsDialog dialog(*m_db);
+    SensorDetailsDialog dialog(*m_db, this);
     dialog.setSensor(sensor);
 
     do

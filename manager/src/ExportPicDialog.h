@@ -9,7 +9,7 @@
 class ExportPicDialog : public QDialog
 {
 public:
-    ExportPicDialog(PlotWidget& plotWidget);
+    ExportPicDialog(PlotWidget& plotWidget, QWidget* parent);
 
 private slots:
     void accept() override;

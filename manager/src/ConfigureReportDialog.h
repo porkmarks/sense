@@ -12,7 +12,7 @@
 class ConfigureReportDialog : public QDialog
 {
 public:
-    ConfigureReportDialog(Settings& settings, DB& db);
+    ConfigureReportDialog(Settings& settings, DB& db, QWidget* parent);
 
     DB::Report const& getReport() const;
     void setReport(DB::Report const& report);

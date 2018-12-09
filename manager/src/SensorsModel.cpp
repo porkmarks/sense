@@ -482,20 +482,20 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
             {
                 if (column == Column::Temperature)
                 {
-                    return QString("%1°C").arg(sensor.lastMeasurement.descriptor.temperature, 0, 'f', 1);
+                    return QString("%1 °C").arg(sensor.lastMeasurement.descriptor.temperature, 0, 'f', 1);
                 }
                 else if (column == Column::Humidity)
                 {
-                    return QString("%1%RH").arg(sensor.lastMeasurement.descriptor.humidity, 0, 'f', 1);
+                    return QString("%1 %RH").arg(sensor.lastMeasurement.descriptor.humidity, 0, 'f', 1);
                 }
                 else if (column == Column::Battery)
                 {
-                    return QString("%1%").arg(static_cast<int>(getBatteryLevel(sensor.lastMeasurement.descriptor.vcc) * 100.f));
+                    return QString("%1 %").arg(static_cast<int>(getBatteryLevel(sensor.lastMeasurement.descriptor.vcc) * 100.f));
                 }
                 else if (column == Column::Signal)
                 {
                     int average = static_cast<int>(getSignalLevel(sensor.averageCombinedSignalStrength) * 100.f);
-                    return QString("%1%").arg(average);
+                    return QString("%1 %").arg(average);
                 }
             }
         }

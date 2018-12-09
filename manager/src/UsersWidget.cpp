@@ -91,13 +91,13 @@ void UsersWidget::configureUser(QModelIndex const& index)
     Settings::User user = m_settings->getUser(indexRow);
     if (m_settings->getLoggedInUserId() != user.id)
     {
-        if (!adminCheck(*m_settings))
+        if (!adminCheck(*m_settings, this))
         {
             return;
         }
     }
 
-    ConfigureUserDialog dialog(*m_settings);
+    ConfigureUserDialog dialog(*m_settings, this);
     dialog.setUser(user);
 
     if (user.descriptor.type == Settings::UserDescriptor::Type::Admin)
@@ -122,12 +122,12 @@ void UsersWidget::configureUser(QModelIndex const& index)
 
 void UsersWidget::addUser()
 {
-    if (!adminCheck(*m_settings))
+    if (!adminCheck(*m_settings, this))
     {
         return;
     }
 
-    ConfigureUserDialog dialog(*m_settings);
+    ConfigureUserDialog dialog(*m_settings, this);
 
     Settings::User user;
     dialog.setUser(user);
@@ -154,7 +154,7 @@ void UsersWidget::addUser()
 
 void UsersWidget::removeUsers()
 {
-    if (!adminCheck(*m_settings))
+    if (!adminCheck(*m_settings, this))
     {
         return;
     }

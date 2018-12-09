@@ -174,7 +174,7 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
                           <li><span style="color:%1">Temperature: <strong>%2 &deg;C</strong> %3</span></li>
                           <li><span style="color:%4">Humidity: <strong>%5 %RH</strong> %6</span></li>
                           <li><span style="color:%7">Battery: <strong>%8 %</strong> %9</span></li>
-                          <li><span style="color:%10">Signal: <strong>%11 %</strong> %12</span></li>
+                          <li><span style="color:%10">Signal: <strong>%11</strong> %12</span></li>
                           </ul>
                           <p>Timestamp: <strong>%13</strong> <span style="font-size: 8pt;"><em>(dd-mm-yyyy hh:mm)</em></span></p>
                           <p>&nbsp;</p>
@@ -388,7 +388,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
                                   <tr>
                                       <td style="width: 80.6667px;">%1</td>
                                       <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%2</td>
-                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%3&nbsp;&deg;C</td>
+                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%3 &deg;C</td>
                                       <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%4 %RH</td>
                                       <td style="width: 81.3333px; text-align: right; white-space: nowrap;">%5</td>
                                   </tr>)X").arg(sensorName.c_str())
@@ -427,6 +427,12 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
 {
     for (Email const& email: emails)
     {
+        if (email.settings.recipients.empty())
+        {
+            s_logger.logCritical(QString("Failed to send email: no recipients configured"));
+            continue;
+        }
+
         SmtpClient::ConnectionType connectionType = SmtpClient::SslConnection;
         switch (email.settings.connection)
         {

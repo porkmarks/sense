@@ -10,7 +10,7 @@
 extern Logger s_logger;
 extern std::string k_passwordHashReferenceText;
 
-bool adminCheck(Settings& settings)
+bool adminCheck(Settings& settings, QWidget* parent)
 {
     Settings::User const* user = settings.getLoggedInUser();
     if (user && user->descriptor.type == Settings::UserDescriptor::Type::Admin)
@@ -20,7 +20,7 @@ bool adminCheck(Settings& settings)
 
     s_logger.logInfo("Asking the user to log in");
 
-    QDialog dialog;
+    QDialog dialog(parent);
     Ui::LoginDialog ui;
     ui.setupUi(&dialog);
     dialog.setWindowTitle("Admin credentials needed");

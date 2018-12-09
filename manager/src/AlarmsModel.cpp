@@ -140,7 +140,7 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
             QString str;
             if (descriptor.lowTemperatureWatch)
             {
-                str += QString("< %1°C").arg(descriptor.lowTemperature, 0, 'f', 1);
+                str += QString("< %1 °C").arg(descriptor.lowTemperature, 0, 'f', 1);
             }
             if (descriptor.highTemperatureWatch)
             {
@@ -148,7 +148,7 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
                 {
                     str += " and ";
                 }
-                str += QString("> %1°C").arg(descriptor.highTemperature, 0, 'f', 1);
+                str += QString("> %1 °C").arg(descriptor.highTemperature, 0, 'f', 1);
             }
             return str;
         }

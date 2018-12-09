@@ -214,6 +214,11 @@ void MeasurementsWidget::loadSettings()
         }
     }
 
+    m_ui.minTemperature->setEnabled(m_ui.useTemperature->isChecked());
+    m_ui.maxTemperature->setEnabled(m_ui.useTemperature->isChecked());
+    m_ui.minHumidity->setEnabled(m_ui.useHumidity->isChecked());
+    m_ui.maxHumidity->setEnabled(m_ui.useHumidity->isChecked());
+
     if (showTemperature != m_ui.showTemperature->isChecked() ||
             showHumidity != m_ui.showHumidity->isChecked() ||
             showBattery != m_ui.showBattery->isChecked() ||
@@ -392,7 +397,7 @@ void MeasurementsWidget::maxHumidityChanged()
 
 void MeasurementsWidget::exportData()
 {
-    ExportDataDialog dialog(*m_db, *m_model);
+    ExportDataDialog dialog(*m_db, *m_model, this);
     int result = dialog.exec();
     if (result != QDialog::Accepted)
     {
@@ -404,7 +409,7 @@ void MeasurementsWidget::exportData()
 
 void MeasurementsWidget::selectSensors()
 {
-    QDialog dialog;
+    QDialog dialog(this);
     Ui::SensorsFilterDialog ui;
     ui.setupUi(&dialog);
 
