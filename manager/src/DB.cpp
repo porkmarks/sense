@@ -561,6 +561,37 @@ Result<void> DB::load(std::string const& name)
                 }
                 alarm.descriptor.sendEmailAction = it->value.GetBool();
 
+                it = alarmj.FindMember("triggers_per_sensor");
+                if (it != alarmj.MemberEnd() && it->value.IsArray())
+                {
+                    rapidjson::Value const& triggersPerSensorj = it->value;
+                    for (size_t si = 0; si < triggersPerSensorj.Size(); si++)
+                    {
+                        rapidjson::Value const& elementj = triggersPerSensorj[si];
+                        if (!elementj.IsObject())
+                        {
+                            s_logger.logCritical(QString("Failed to load '%1': Bad triggers_per_sensor").arg(dataFilename.c_str()));
+                            return Error("Cannot open DB");
+                        }
+                        it = alarmj.FindMember("sensor");
+                        if (it == alarmj.MemberEnd() || !it->value.IsUint())
+                        {
+                            s_logger.logCritical(QString("Failed to load '%1': Bad or missing triggers_per_sensor->sensor").arg(dataFilename.c_str()));
+                            return Error("Cannot open DB");
+                        }
+                        rapidjson::Value const& sensorj = it->value;
+
+                        it = alarmj.FindMember("triggers");
+                        if (it == alarmj.MemberEnd() || !it->value.IsUint())
+                        {
+                            s_logger.logCritical(QString("Failed to load '%1': Bad or missing triggers_per_sensor->triggers").arg(dataFilename.c_str()));
+                            return Error("Cannot open DB");
+                        }
+                        rapidjson::Value const& triggersj = it->value;
+                        alarm.triggersPerSensor.emplace(sensorj.GetUint(), triggersj.GetUint());
+                    }
+                }
+
                 data.lastAlarmId = std::max(data.lastAlarmId, alarm.id);
                 data.alarms.push_back(alarm);
             }
@@ -1359,6 +1390,17 @@ void DB::removeSensor(size_t index)
         }
     }
 
+    for (Alarm& alarm: m_mainData.alarms)
+    {
+        alarm.descriptor.sensors.erase(sensorId);
+        alarm.triggersPerSensor.erase(sensorId);
+    }
+
+    for (Report& report: m_mainData.reports)
+    {
+        report.descriptor.sensors.erase(sensorId);
+    }
+
     s_logger.logInfo(QString("Removing sensor '%1'").arg(m_mainData.sensors[index].descriptor.name.c_str()));
 
     emit sensorWillBeRemoved(sensorId);
@@ -1549,34 +1591,22 @@ int32_t DB::findAlarmIndexById(AlarmId id) const
 
 //////////////////////////////////////////////////////////////////////////
 
-uint8_t DB::computeTriggeredAlarm(Measurement const& m)
+uint8_t DB::computeAlarmTriggers(Measurement const& m)
 {
-    uint8_t allTriggered = 0;
+    uint8_t allTriggers = 0;
 
     for (Alarm& alarm: m_mainData.alarms)
     {
-        uint8_t triggered = _computeTriggeredAlarm(alarm, m);
-        allTriggered |= triggered;
+        uint8_t triggers = _computeAlarmTriggers(alarm, m);
+        allTriggers |= triggers;
     }
 
-    return allTriggered;
+    return allTriggers;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-Result<uint8_t> DB::computeTriggeredAlarm(AlarmId id, Measurement const& m)
-{
-    int32_t _index = findAlarmIndexById(id);
-    if (_index < 0)
-    {
-        return Error("Trying to change non-existing alarm");
-    }
-    return _computeTriggeredAlarm(m_mainData.alarms[static_cast<size_t>(_index)], m);
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-uint8_t DB::_computeTriggeredAlarm(Alarm& alarm, Measurement const& m)
+uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
 {
     AlarmDescriptor const& ad = alarm.descriptor;
     if (ad.filterSensors)
@@ -1587,61 +1617,72 @@ uint8_t DB::_computeTriggeredAlarm(Alarm& alarm, Measurement const& m)
         }
     }
 
-    uint8_t triggered = 0;
+    uint8_t triggers = 0;
     if (ad.highTemperatureWatch && m.descriptor.temperature > ad.highTemperature)
     {
-        triggered |= TriggeredAlarm::Temperature;
+        triggers |= AlarmTrigger::Temperature;
     }
     if (ad.lowTemperatureWatch && m.descriptor.temperature < ad.lowTemperature)
     {
-        triggered |= TriggeredAlarm::Temperature;
+        triggers |= AlarmTrigger::Temperature;
     }
 
     if (ad.highHumidityWatch && m.descriptor.humidity > ad.highHumidity)
     {
-        triggered |= TriggeredAlarm::Humidity;
+        triggers |= AlarmTrigger::Humidity;
     }
     if (ad.lowHumidityWatch && m.descriptor.humidity < ad.lowHumidity)
     {
-        triggered |= TriggeredAlarm::Humidity;
+        triggers |= AlarmTrigger::Humidity;
     }
 
     if (ad.lowVccWatch && m.descriptor.vcc <= k_alertVcc)
     {
-        triggered |= TriggeredAlarm::LowVcc;
+        triggers |= AlarmTrigger::LowVcc;
     }
 //        if (ad.sensorErrorsWatch && m.descriptor.sensorErrors != 0)
 //        {
-//            triggered |= TriggeredAlarm::SensorErrors;
+//            triggers |= AlarmTrigger::SensorErrors;
 //        }
     if (ad.lowSignalWatch && std::min(m.descriptor.signalStrength.s2b, m.descriptor.signalStrength.b2s) <= k_alertSignal)
     {
-        triggered |= TriggeredAlarm::LowSignal;
+        triggers |= AlarmTrigger::LowSignal;
     }
 
-    auto it = alarm.triggeringSensors.find(m.descriptor.sensorId);
-    if (triggered)
+    uint8_t oldTriggers = 0;
+    auto it = alarm.triggersPerSensor.find(m.descriptor.sensorId);
+    if (it != alarm.triggersPerSensor.end())
     {
-        if (it == alarm.triggeringSensors.end())
-        {
-            alarm.triggeringSensors.insert(m.descriptor.sensorId);
-            s_logger.logInfo(QString("Alarm '%1' was triggered by measurement index %2").arg(ad.name.c_str()).arg(m.descriptor.index));
+        oldTriggers = it->second;
+    }
 
-            emit alarmWasTriggered(alarm.id, m);
+    if (triggers != oldTriggers)
+    {
+        if (triggers == 0)
+        {
+            alarm.triggersPerSensor.erase(m.descriptor.sensorId);
         }
-    }
-    else
-    {
-        if (it != alarm.triggeringSensors.end())
+        else
         {
-            alarm.triggeringSensors.erase(it);
-            s_logger.logInfo(QString("Alarm '%1' stopped being triggered by measurement index %2").arg(ad.name.c_str()).arg(m.descriptor.index));
-
-            emit alarmWasUntriggered(alarm.id, m);
+            alarm.triggersPerSensor[m.descriptor.sensorId] = triggers;
         }
     }
 
-    return triggered;
+    uint8_t diff = oldTriggers ^ triggers;
+    uint8_t removed = diff & oldTriggers;
+    uint8_t added = diff & triggers;
+
+    s_logger.logInfo(QString("Alarm '%1' triggers for measurement index %2 have changed: old %3, new %4, added %5, removed %6")
+                     .arg(ad.name.c_str())
+                     .arg(m.descriptor.index)
+                     .arg(oldTriggers)
+                     .arg(triggers)
+                     .arg(added)
+                     .arg(removed));
+
+    emit alarmTriggersChanged(alarm.id, m, oldTriggers, triggers, added, removed);
+
+    return triggers;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1904,7 +1945,7 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
         measurement.id = id;
         measurement.descriptor = md;
         measurement.timePoint = computeMeasurementTimepoint(md);
-        measurement.triggeredAlarms = computeTriggeredAlarm(measurement);
+        measurement.alarmTriggers = computeAlarmTriggers(measurement);
         measurement.combinedSignalStrength = std::min(md.signalStrength.b2s, md.signalStrength.s2b);
 
         //insert sorted id
@@ -2069,15 +2110,15 @@ Result<DB::Measurement> DB::getLastMeasurementForSensor(SensorId sensor_id) cons
 
     bool found = false;
     Measurement measurement;
-    Clock::time_point best_time_point = Clock::time_point(Clock::duration::zero());
+    Clock::time_point bestTimePoint = Clock::time_point(Clock::duration::zero());
     for (StoredMeasurement const& sm: it->second)
     {
         Measurement m = unpack(sensor_id, sm);
-        if (m.timePoint > best_time_point)
+        if (m.timePoint > bestTimePoint)
         {
             found = true;
             measurement = m;
-            best_time_point = m.timePoint;
+            bestTimePoint = m.timePoint;
         }
     }
 
@@ -2166,7 +2207,7 @@ inline DB::StoredMeasurement DB::pack(Measurement const& m)
     sm.b2s = m.descriptor.signalStrength.b2s;
     sm.s2b = m.descriptor.signalStrength.s2b;
     sm.sensorErrors = m.descriptor.sensorErrors;
-    sm.triggeredAlarms = m.triggeredAlarms;
+    sm.alarmTriggers = m.alarmTriggers;
     return sm;
 }
 
@@ -2186,7 +2227,7 @@ inline DB::Measurement DB::unpack(SensorId sensorId, StoredMeasurement const& sm
     m.descriptor.signalStrength.s2b = sm.s2b;
     m.combinedSignalStrength = std::min(sm.b2s, sm.s2b);
     m.descriptor.sensorErrors = sm.sensorErrors;
-    m.triggeredAlarms = sm.triggeredAlarms;
+    m.alarmTriggers = sm.alarmTriggers;
     return m;
 }
 
@@ -2408,6 +2449,21 @@ void DB::save(Data const& data) const
                 alarmj.AddMember("low_signal_watch", alarm.descriptor.lowSignalWatch, document.GetAllocator());
 //                alarmj.AddMember("sensor_errors_watch", alarm.descriptor.sensorErrorsWatch, document.GetAllocator());
                 alarmj.AddMember("send_email_action", alarm.descriptor.sendEmailAction, document.GetAllocator());
+
+                {
+                    rapidjson::Value triggersPerSensorj;
+                    triggersPerSensorj.SetArray();
+                    for (auto const& pair: alarm.triggersPerSensor)
+                    {
+                        rapidjson::Value elementj;
+                        elementj.SetObject();
+                        elementj.AddMember("sensor", pair.first, document.GetAllocator());
+                        elementj.AddMember("triggers", pair.second, document.GetAllocator());
+                        triggersPerSensorj.PushBack(elementj, document.GetAllocator());
+                    }
+                    alarmj.AddMember("triggers_per_sensor", triggersPerSensorj, document.GetAllocator());
+                }
+
                 alarmsj.PushBack(alarmj, document.GetAllocator());
             }
             document.AddMember("alarms", alarmsj, document.GetAllocator());

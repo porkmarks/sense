@@ -470,7 +470,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Alarms)
         {
-            return sensor.isLastMeasurementValid ? sensor.lastMeasurement.triggeredAlarms : -1;
+            return sensor.isLastMeasurementValid ? sensor.lastMeasurement.alarmTriggers : -1;
         }
 //        else if (column == Column::SensorErrors)
 //        {

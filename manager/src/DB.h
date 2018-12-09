@@ -90,7 +90,7 @@ public:
         MeasurementId id;
         MeasurementDescriptor descriptor;
         Clock::time_point timePoint;
-        uint8_t triggeredAlarms = 0;
+        uint8_t alarmTriggers = 0;
         int8_t combinedSignalStrength = 0;
     };
 
@@ -249,7 +249,7 @@ public:
         AlarmDescriptor descriptor;
         AlarmId id;
 
-        std::set<SensorId> triggeringSensors;
+        std::map<SensorId, uint8_t> triggersPerSensor;
     };
 
     size_t getAlarmCount() const;
@@ -262,7 +262,7 @@ public:
 
     ////////////////////////////////////////////////////////////////////////////
 
-    struct TriggeredAlarm
+    struct AlarmTrigger
     {
         enum
         {
@@ -275,8 +275,6 @@ public:
             All             = Temperature | Humidity | LowVcc | LowSignal/* | SensorErrors*/
         };
     };
-
-    Result<uint8_t> computeTriggeredAlarm(AlarmId id, Measurement const& m);
 
     struct ReportDescriptor
     {
@@ -392,7 +390,6 @@ signals:
     void alarmWillBeRemoved(AlarmId id);
     void alarmRemoved(AlarmId id);
     void alarmChanged(AlarmId id);
-    void alarmTriggered(AlarmId id);
 
     void reportWillBeAdded(ReportId id);
     void reportAdded(ReportId id);
@@ -405,11 +402,10 @@ signals:
     void measurementsWillBeRemoved(SensorId id);
     void measurementsRemoved(SensorId id);
 
-    void alarmWasTriggered(AlarmId alarmId, Measurement const& m);
-    void alarmWasUntriggered(AlarmId alarmId, Measurement const& m);
+   void alarmTriggersChanged(AlarmId alarmId, Measurement const& m, uint8_t oldTriggers, uint8_t newTriggers, uint8_t addedTriggers, uint8_t removedTriggers);
 
 private:
-    uint8_t _computeTriggeredAlarm(Alarm& alarm, Measurement const& m);
+    uint8_t _computeAlarmTriggers(Alarm& alarm, Measurement const& m);
     bool _addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> mds);
     size_t _getFilteredMeasurements(Filter const& filter, std::vector<Measurement>* result) const;
     bool cull(Measurement const& measurement, Filter const& filter) const;
@@ -426,7 +422,7 @@ private:
         int8_t b2s;
         int8_t s2b;
         uint8_t sensorErrors;
-        uint8_t triggeredAlarms;
+        uint8_t alarmTriggers;
     };
 
 #pragma pack(pop) // exact fit - no padding
@@ -445,7 +441,7 @@ private:
     uint32_t computeNextRealTimeMeasurementIndex() const;
     SensorsConfig const& findSensorsConfigForMeasurementIndex(uint32_t index) const;
     Clock::time_point computeMeasurementTimepoint(MeasurementDescriptor const& md) const;
-    uint8_t computeTriggeredAlarm(Measurement const& m);
+    uint8_t computeAlarmTriggers(Measurement const& m);
 
     struct Data
     {

@@ -1,10 +1,11 @@
 #include "AlarmsWidget.h"
 #include "ConfigureAlarmDialog.h"
 #include "Settings.h"
+#include "AdminCheck.h"
+#include "DB.h"
+
 #include <QMessageBox>
 #include <QSettings>
-
-#include "DB.h"
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -83,6 +84,11 @@ void AlarmsWidget::setRW()
 
 void AlarmsWidget::configureAlarm(QModelIndex const& index)
 {
+    if (!adminCheck(*m_settings))
+    {
+        return;
+    }
+
     size_t indexRow = static_cast<size_t>(index.row());
     if (!index.isValid() || indexRow >= m_db->getAlarmCount())
     {
@@ -117,6 +123,11 @@ void AlarmsWidget::configureAlarm(QModelIndex const& index)
 
 void AlarmsWidget::addAlarm()
 {
+    if (!adminCheck(*m_settings))
+    {
+        return;
+    }
+
     ConfigureAlarmDialog dialog(*m_db);
 
     DB::Alarm alarm;
@@ -140,6 +151,11 @@ void AlarmsWidget::addAlarm()
 
 void AlarmsWidget::removeAlarms()
 {
+    if (!adminCheck(*m_settings))
+    {
+        return;
+    }
+
     QModelIndexList selected = m_ui.list->selectionModel()->selectedIndexes();
     if (selected.isEmpty())
     {

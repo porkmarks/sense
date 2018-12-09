@@ -1,6 +1,8 @@
 #include "ReportsWidget.h"
 #include "ConfigureReportDialog.h"
 #include "Settings.h"
+#include "AdminCheck.h"
+
 #include <QSettings>
 #include <QMessageBox>
 
@@ -81,6 +83,11 @@ void ReportsWidget::setRW()
 
 void ReportsWidget::configureReport(QModelIndex const& index)
 {
+    if (!adminCheck(*m_settings))
+    {
+        return;
+    }
+
     size_t indexRow = static_cast<size_t>(index.row());
     if (!index.isValid() || indexRow >= m_db->getReportCount())
     {
@@ -110,6 +117,11 @@ void ReportsWidget::configureReport(QModelIndex const& index)
 
 void ReportsWidget::addReport()
 {
+    if (!adminCheck(*m_settings))
+    {
+        return;
+    }
+
     ConfigureReportDialog dialog(*m_settings, *m_db);
 
     DB::Report report;
@@ -135,6 +147,11 @@ void ReportsWidget::addReport()
 
 void ReportsWidget::removeReports()
 {
+    if (!adminCheck(*m_settings))
+    {
+        return;
+    }
+
     QModelIndexList selected = m_ui.list->selectionModel()->selectedIndexes();
     if (selected.isEmpty())
     {

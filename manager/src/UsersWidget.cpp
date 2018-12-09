@@ -1,9 +1,10 @@
 #include "UsersWidget.h"
 #include "ConfigureUserDialog.h"
+#include "AdminCheck.h"
+#include "Settings.h"
+
 #include <QMessageBox>
 #include <QSettings>
-
-#include "Settings.h"
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -88,6 +89,13 @@ void UsersWidget::configureUser(QModelIndex const& index)
     }
 
     Settings::User user = m_settings->getUser(indexRow);
+    if (m_settings->getLoggedInUserId() != user.id)
+    {
+        if (!adminCheck(*m_settings))
+        {
+            return;
+        }
+    }
 
     ConfigureUserDialog dialog(*m_settings);
     dialog.setUser(user);
@@ -114,6 +122,11 @@ void UsersWidget::configureUser(QModelIndex const& index)
 
 void UsersWidget::addUser()
 {
+    if (!adminCheck(*m_settings))
+    {
+        return;
+    }
+
     ConfigureUserDialog dialog(*m_settings);
 
     Settings::User user;
@@ -141,6 +154,11 @@ void UsersWidget::addUser()
 
 void UsersWidget::removeUsers()
 {
+    if (!adminCheck(*m_settings))
+    {
+        return;
+    }
+
     QModelIndexList selected = m_ui.list->selectionModel()->selectedIndexes();
     if (selected.isEmpty())
     {

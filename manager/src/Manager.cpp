@@ -182,7 +182,7 @@ void Manager::login()
                 {
                     attempts++;
                     s_logger.logCritical(QString("Invalid login credentials (user not found), attempt %1").arg(attempts).toUtf8().data());
-                    QMessageBox::critical(this, "Error", "Invalid username/password.");
+                    QMessageBox::critical(this, "Error", QString("Invalid username '%1'.").arg(ui.username->text()));
                     continue;
                 }
 
