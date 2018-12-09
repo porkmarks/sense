@@ -204,7 +204,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
 //        }
         else if (column == Column::Alarms)
         {
-            return static_cast<uint32_t>(std::bitset<8>(measurement.triggeredAlarms).count());
+            return static_cast<uint32_t>(std::bitset<8>(measurement.alarmTriggers).count());
         }
 
         return data(index, Qt::DisplayRole);
@@ -265,7 +265,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Temperature)
         {
-            return QString("%1°C").arg(measurement.descriptor.temperature, 0, 'f', 1);
+            return QString("%1 °C").arg(measurement.descriptor.temperature, 0, 'f', 1);
         }
         else if (column == Column::Humidity)
         {
@@ -288,7 +288,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
 //        }
         else if (column == Column::Alarms)
         {
-            return measurement.triggeredAlarms;
+            return measurement.alarmTriggers;
         }
     }
 

@@ -41,7 +41,7 @@ void SensorsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
     SensorsModel::Column column = static_cast<SensorsModel::Column>(index.column());
     if (column == SensorsModel::Column::Alarms)
     {
-        int triggeredAlarms = m_model.data(index).toInt();
+        int alarmTriggers = m_model.data(index).toInt();
 
         QApplication::style()->drawControl(QStyle::CE_ItemViewItem, &option, painter);
 
@@ -50,7 +50,7 @@ void SensorsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
         QPoint pos = option.rect.topLeft() + QPoint(k_iconMargin.width(), k_iconMargin.height());
         int32_t iconSize = option.rect.height();
 
-        if (triggeredAlarms == -1)
+        if (alarmTriggers == -1)
         {
             static QIcon icon(":/icons/ui/question.png");
             painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
@@ -58,31 +58,31 @@ void SensorsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
         }
         else
         {
-            if (triggeredAlarms & DB::TriggeredAlarm::Temperature)
+            if (alarmTriggers & DB::AlarmTrigger::Temperature)
             {
                 static QIcon icon(":/icons/ui/temperature.png");
                 painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
                 pos.setX(pos.x() + iconSize + k_iconMargin.width());
             }
-            if (triggeredAlarms & DB::TriggeredAlarm::Humidity)
+            if (alarmTriggers & DB::AlarmTrigger::Humidity)
             {
                 static QIcon icon(":/icons/ui/humidity.png");
                 painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
                 pos.setX(pos.x() + iconSize + k_iconMargin.width());
             }
-            if (triggeredAlarms & DB::TriggeredAlarm::LowVcc)
+            if (alarmTriggers & DB::AlarmTrigger::LowVcc)
             {
                 static QIcon icon(":/icons/ui/battery-0.png");
                 painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
                 pos.setX(pos.x() + iconSize + k_iconMargin.width());
             }
-//            if (triggeredAlarms & DB::TriggeredAlarm::SensorErrors)
+//            if (alarmTriggers & DB::AlarmTrigger::SensorErrors)
 //            {
 //                static QIcon icon(":/icons/ui/sensor-error.png");
 //                            painter->drawPixmap(option.rect, icon.pixmap(option.rect.size() - QSize(2, 2)));
 //                pos.setX(pos.x() + k_iconSize.width() + k_iconMargin);
 //            }
-            if (triggeredAlarms & DB::TriggeredAlarm::LowSignal)
+            if (alarmTriggers & DB::AlarmTrigger::LowSignal)
             {
                 static QIcon icon(":/icons/ui/signal-0.png");
                 painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
@@ -144,34 +144,34 @@ QSize SensorsDelegate::sizeHint(const QStyleOptionViewItem& option, const QModel
     SensorsModel::Column column = static_cast<SensorsModel::Column>(index.column());
     if (column == SensorsModel::Column::Alarms)
     {
-        int triggeredAlarms = m_model.data(index).toInt();
+        int alarmTriggers = m_model.data(index).toInt();
 
         int32_t width = 0;
         int32_t iconSize = option.rect.height();
 
-        if (triggeredAlarms == -1)
+        if (alarmTriggers == -1)
         {
             width += iconSize + k_iconMargin.width();
         }
         else
         {
-            if (triggeredAlarms & DB::TriggeredAlarm::Temperature)
+            if (alarmTriggers & DB::AlarmTrigger::Temperature)
             {
                 width += iconSize + k_iconMargin.width();
             }
-            if (triggeredAlarms & DB::TriggeredAlarm::Humidity)
+            if (alarmTriggers & DB::AlarmTrigger::Humidity)
             {
                 width += iconSize + k_iconMargin.width();
             }
-            if (triggeredAlarms & DB::TriggeredAlarm::LowVcc)
+            if (alarmTriggers & DB::AlarmTrigger::LowVcc)
             {
                 width += iconSize + k_iconMargin.width();
             }
-//            if (triggeredAlarms & DB::TriggeredAlarm::SensorErrors)
+//            if (alarmTriggers & DB::AlarmTrigger::SensorErrors)
 //            {
 //                width += iconSize + k_iconMargin.width();
 //            }
-            if (triggeredAlarms & DB::TriggeredAlarm::LowSignal)
+            if (alarmTriggers & DB::AlarmTrigger::LowSignal)
             {
                 width += iconSize + k_iconMargin.width();
             }

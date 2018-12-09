@@ -8,7 +8,7 @@
 class ConfigureUserDialog : public QDialog
 {
 public:
-    ConfigureUserDialog(Settings& settings);
+    ConfigureUserDialog(Settings& settings, QWidget* parent);
 
     Settings::User const& getUser() const;
     void setUser(Settings::User const& user);

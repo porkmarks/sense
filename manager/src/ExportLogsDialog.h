@@ -9,7 +9,7 @@
 class ExportLogsDialog : public QDialog
 {
 public:
-    ExportLogsDialog(LogsModel& model);
+    ExportLogsDialog(LogsModel& model, QWidget* parent);
 
 private slots:
     void accept() override;

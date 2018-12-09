@@ -1,6 +1,8 @@
 #include "ReportsWidget.h"
 #include "ConfigureReportDialog.h"
 #include "Settings.h"
+#include "AdminCheck.h"
+
 #include <QSettings>
 #include <QMessageBox>
 
@@ -81,6 +83,11 @@ void ReportsWidget::setRW()
 
 void ReportsWidget::configureReport(QModelIndex const& index)
 {
+    if (!adminCheck(*m_settings, this))
+    {
+        return;
+    }
+
     size_t indexRow = static_cast<size_t>(index.row());
     if (!index.isValid() || indexRow >= m_db->getReportCount())
     {
@@ -89,7 +96,7 @@ void ReportsWidget::configureReport(QModelIndex const& index)
 
     DB::Report report = m_db->getReport(indexRow);
 
-    ConfigureReportDialog dialog(*m_settings, *m_db);
+    ConfigureReportDialog dialog(*m_settings, *m_db, this);
     dialog.setReport(report);
     dialog.setEnabled(m_settings->isLoggedInAsAdmin());
 
@@ -110,7 +117,12 @@ void ReportsWidget::configureReport(QModelIndex const& index)
 
 void ReportsWidget::addReport()
 {
-    ConfigureReportDialog dialog(*m_settings, *m_db);
+    if (!adminCheck(*m_settings, this))
+    {
+        return;
+    }
+
+    ConfigureReportDialog dialog(*m_settings, *m_db, this);
 
     DB::Report report;
     report.descriptor.name = "Report " + std::to_string(m_db->getReportCount());
@@ -135,6 +147,11 @@ void ReportsWidget::addReport()
 
 void ReportsWidget::removeReports()
 {
+    if (!adminCheck(*m_settings, this))
+    {
+        return;
+    }
+
     QModelIndexList selected = m_ui.list->selectionModel()->selectedIndexes();
     if (selected.isEmpty())
     {

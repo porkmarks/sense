@@ -1,8 +1,9 @@
 #include "SensorsWidget.h"
 #include "Settings.h"
 #include "SensorDetailsDialog.h"
-#include <QSettings>
+#include "AdminCheck.h"
 
+#include <QSettings>
 #include <QMessageBox>
 #include <QInputDialog>
 
@@ -157,6 +158,11 @@ void SensorsWidget::unbindSensor()
 
 void SensorsWidget::configureSensor(QModelIndex const& index)
 {
+    if (!adminCheck(*m_settings, this))
+    {
+        return;
+    }
+
     QModelIndex mi = m_sortingModel.mapToSource(index);
     int32_t _sensorIndex = m_model->getSensorIndex(mi);
     if (_sensorIndex < 0)
@@ -168,9 +174,8 @@ void SensorsWidget::configureSensor(QModelIndex const& index)
     size_t sensorIndex = static_cast<size_t>(_sensorIndex);
     DB::Sensor sensor = m_db->getSensor(sensorIndex);
 
-    SensorDetailsDialog dialog(*m_db);
+    SensorDetailsDialog dialog(*m_db, this);
     dialog.setSensor(sensor);
-    dialog.setEnabled(m_settings->isLoggedInAsAdmin());
 
     do
     {

@@ -3,8 +3,9 @@
 
 //////////////////////////////////////////////////////////////////////////
 
-ConfigureAlarmDialog::ConfigureAlarmDialog(DB& db)
-    : m_db(db)
+ConfigureAlarmDialog::ConfigureAlarmDialog(DB& db, QWidget* parent)
+    : QDialog(parent)
+    , m_db(db)
 {
     m_ui.setupUi(this);
     m_ui.sensorFilter->init(db);

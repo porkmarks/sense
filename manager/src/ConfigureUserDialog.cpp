@@ -6,8 +6,9 @@ std::string k_passwordHashReferenceText = "Cannot open file.";
 
 //////////////////////////////////////////////////////////////////////////
 
-ConfigureUserDialog::ConfigureUserDialog(Settings& settings)
-    : m_settings(settings)
+ConfigureUserDialog::ConfigureUserDialog(Settings& settings, QWidget* parent)
+    : QDialog(parent)
+    , m_settings(settings)
 {
     m_ui.setupUi(this);
 }

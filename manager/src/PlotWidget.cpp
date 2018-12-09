@@ -143,6 +143,11 @@ void PlotWidget::loadSettings()
     m_ui.minTemperature->blockSignals(false);
     m_ui.maxTemperature->blockSignals(false);
 
+    m_ui.minTemperature->setEnabled(!m_ui.fitMeasurements->isChecked());
+    m_ui.maxTemperature->setEnabled(!m_ui.fitMeasurements->isChecked());
+    m_ui.minHumidity->setEnabled(!m_ui.fitMeasurements->isChecked());
+    m_ui.maxHumidity->setEnabled(!m_ui.fitMeasurements->isChecked());
+
     m_selectedSensorIds.clear();
     QList<QVariant> ssid = settings.value("filter/selectedSensors", QList<QVariant>()).toList();
     if (!ssid.empty())
@@ -271,7 +276,7 @@ void PlotWidget::refresh()
 
 void PlotWidget::exportData()
 {
-    ExportPicDialog dialog(*this);
+    ExportPicDialog dialog(*this, this);
     int result = dialog.exec();
     if (result != QDialog::Accepted)
     {
@@ -283,7 +288,7 @@ void PlotWidget::exportData()
 
 void PlotWidget::selectSensors()
 {
-    QDialog dialog;
+    QDialog dialog(this);
     Ui::SensorsFilterDialog ui;
     ui.setupUi(&dialog);
 
@@ -592,7 +597,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
             pen.setWidth(2);
             pen.setColor(color);
             graph->setPen(pen);
-            graph->setName(QString("%1°C").arg(graphData.sensor.descriptor.name.c_str()));
+            graph->setName(QString("%1 °C").arg(graphData.sensor.descriptor.name.c_str()));
 
             QVector<double> const& keys = graphData.temperatureKeys;
             QVector<double> const& values = graphData.temperatureValues;
@@ -801,7 +806,7 @@ void PlotWidget::createAnnotation(QCPGraph* graph, QPointF point, double key, do
         dt.setSecsSinceEpoch(static_cast<int64_t>(key));
         if (temperature)
         {
-            m_annotation->setText(QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Temperature: <b>%3°C</b>")
+            m_annotation->setText(QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Temperature: <b>%3 °C</b>")
                                .arg(sensor.descriptor.name.c_str())
                                .arg(dt.toString("dd-MM-yyyy h:mm"))
                                .arg(value, 0, 'f', 1)

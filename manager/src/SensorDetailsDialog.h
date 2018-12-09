@@ -9,7 +9,7 @@
 class SensorDetailsDialog : public QDialog
 {
 public:
-    SensorDetailsDialog(DB& db);
+    SensorDetailsDialog(DB& db, QWidget* parent);
 
     DB::Sensor const& getSensor() const;
     void setSensor(DB::Sensor const& sensor);

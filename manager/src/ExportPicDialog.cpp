@@ -10,8 +10,9 @@
 extern Logger s_logger;
 
 
-ExportPicDialog::ExportPicDialog(PlotWidget& plotWidget)
-    : m_plotWidget(plotWidget)
+ExportPicDialog::ExportPicDialog(PlotWidget& plotWidget, QWidget* parent)
+    : QDialog(parent)
+    , m_plotWidget(plotWidget)
 {
     m_ui.setupUi(this);
 

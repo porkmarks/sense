@@ -9,7 +9,7 @@
 class ConfigureAlarmDialog : public QDialog
 {
 public:
-    ConfigureAlarmDialog(DB& db);
+    ConfigureAlarmDialog(DB& db, QWidget* parent);
 
     DB::Alarm const& getAlarm() const;
     void setAlarm(DB::Alarm const& alarm);

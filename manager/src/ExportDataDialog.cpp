@@ -15,8 +15,9 @@ extern Logger s_logger;
 extern float getBatteryLevel(float vcc);
 extern float getSignalLevel(int8_t dBm);
 
-ExportDataDialog::ExportDataDialog(DB& db, MeasurementsModel& model)
-    : m_db(db)
+ExportDataDialog::ExportDataDialog(DB& db, MeasurementsModel& model, QWidget* parent)
+    : QDialog(parent)
+    , m_db(db)
     , m_model(model)
 {
     m_ui.setupUi(this);
@@ -330,7 +331,7 @@ bool ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount, bool show
             stream << std::fixed << std::setprecision(decimalPlaces) << m.descriptor.temperature;
             if (unitsFormat == UnitsFormat::Embedded)
             {
-                stream << "°C";
+                stream << " °C";
             }
             stream << separator;
             if (unitsFormat == UnitsFormat::SeparateColumn)

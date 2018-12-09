@@ -120,7 +120,8 @@ HEADERS += \
     ../../src/qcustomplot.h \
     ../../src/PlotToolTip.h \
     ../../../common/src/Result.h \
-    ../../src/SensorDetailsDialog.h
+    ../../src/SensorDetailsDialog.h \
+    ../../src/AdminCheck.h
 
 SOURCES += \
     ../../src/Manager.cpp \
@@ -175,7 +176,8 @@ SOURCES += \
     ../../../sensor/firmware/CRC.cpp \
     ../../src/qcustomplot.cpp \
     ../../src/PlotToolTip.cpp \
-    ../../src/SensorDetailsDialog.cpp
+    ../../src/SensorDetailsDialog.cpp \
+    ../../src/AdminCheck.cpp
 
 FORMS += \
     ../../src/Manager.ui \
@@ -198,6 +200,7 @@ FORMS += \
     ../../src/ExportLogsDialog.ui \
     ../../src/DateTimeFilterWidget.ui \
     ../../src/SensorsFilterWidget.ui \
+    ../../src/SensorDetailsDialog.ui \
     ../../src/SensorDetailsDialog.ui
 
 DISTFILES += \

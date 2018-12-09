@@ -42,8 +42,7 @@ Emailer::Emailer(Settings& settings, DB& db)
 {
     m_emailThread = std::thread(std::bind(&Emailer::emailThreadProc, this));
 
-    connect(&m_db, &DB::alarmWasTriggered, this, &Emailer::alarmTriggered);
-    connect(&m_db, &DB::alarmWasUntriggered, this, &Emailer::alarmUntriggered);
+    connect(&m_db, &DB::alarmTriggersChanged, this, &Emailer::alarmTriggersChanged);
 
     m_timer.setSingleShot(false);
     m_timer.setInterval(60 * 1000); //every minute
@@ -82,7 +81,7 @@ void Emailer::checkReports()
 
 //////////////////////////////////////////////////////////////////////////
 
-void Emailer::alarmTriggered(DB::AlarmId alarmId, DB::Measurement const& m)
+void Emailer::alarmTriggersChanged(DB::AlarmId alarmId, DB::Measurement const& m, uint8_t oldTriggers, uint8_t newTriggers, uint8_t addedTriggers, uint8_t removedTriggers)
 {
     int32_t alarmIndex = m_db.findAlarmIndexById(alarmId);
     int32_t sensorIndex = m_db.findSensorIndexById(m.descriptor.sensorId);
@@ -97,57 +96,71 @@ void Emailer::alarmTriggered(DB::AlarmId alarmId, DB::Measurement const& m)
 
     if (alarm.descriptor.sendEmailAction)
     {
-        sendAlarmTriggeredEmail(alarm, sensor, m);
+        sendAlarmEmail(alarm, sensor, m, oldTriggers, newTriggers, addedTriggers, removedTriggers);
     }
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Emailer::alarmUntriggered(DB::AlarmId alarmId, DB::Measurement const& m)
+void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m, uint8_t oldTriggers, uint8_t newTriggers, uint8_t addedTriggers, uint8_t removedTriggers)
 {
-    int32_t alarmIndex = m_db.findAlarmIndexById(alarmId);
-    int32_t sensorIndex = m_db.findSensorIndexById(m.descriptor.sensorId);
-    if (alarmIndex < 0 || sensorIndex < 0)
+    auto toString = [](uint8_t triggers)
     {
-        assert(false);
-        return;
-    }
-
-    DB::Alarm const& alarm = m_db.getAlarm(static_cast<size_t>(alarmIndex));
-    DB::Sensor const& sensor = m_db.getSensor(static_cast<size_t>(sensorIndex));
-
-    if (alarm.descriptor.sendEmailAction)
+        std::string str;
+        str += (triggers & DB::AlarmTrigger::Temperature) ? "Temperature, " : "";
+        str += (triggers & DB::AlarmTrigger::Humidity) ? "Humidity, " : "";
+        str += (triggers & DB::AlarmTrigger::LowVcc) ? "Battery, " : "";
+        str += (triggers & DB::AlarmTrigger::LowSignal) ? "Signal, " : "";
+        if (!str.empty())
+        {
+            str.pop_back(); //' '
+            str.pop_back(); //','
+        }
+        return str;
+    };
+    auto getColor = [removedTriggers, newTriggers](uint8_t trigger)
     {
-        sendAlarmUntriggeredEmail(alarm, sensor, m);
-    }
-}
+        return (newTriggers & trigger) ? "red" : //ond and new triggers
+           (removedTriggers & trigger) ? "green" : //removed triggers
+                                         "black"; //not triggered
+    };
 
-//////////////////////////////////////////////////////////////////////////
+    //this returns:
+    //      "triggered" for new triggers
+    //      "back to normal" when a trigger dies
+    //      "" for old triggers
+    //      "normal" for untriggered stuff
+    auto getStatus = [addedTriggers, removedTriggers, oldTriggers](uint8_t trigger)
+    {
+        return (addedTriggers & trigger) ? "triggered" :
+             (removedTriggers & trigger) ? "back to normal" :
+             (oldTriggers & trigger) ? "" :
+                                       "normal";
+    };
 
-void Emailer::sendAlarmTriggeredEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m)
-{
+
     Email email;
-    email.subject = "Sensor '" + sensor.descriptor.name + "' triggered alarm '" + alarm.descriptor.name + "'";
+
+    ///////////////////////////////
+    // SUBJECT
+    email.subject = "Sensor '" + sensor.descriptor.name + "', alarm '" + alarm.descriptor.name + "': ";
+    if (addedTriggers != 0)
+    {
+        email.subject += toString(addedTriggers) + " triggered";
+    }
+    else if (removedTriggers != 0)
+    {
+        if (addedTriggers)
+        {
+            email.subject += "; ";
+        }
+        email.subject += toString(removedTriggers) + " back to normal";
+    }
+
+    ///////////////////////////////
+    // BODY
     email.body = "<p>Sensor '<strong>" + sensor.descriptor.name + "</strong>' triggered alarm '<strong>" + alarm.descriptor.name + "</strong>'.</p>";
 
-    sendAlarmEmail(email, alarm, sensor, m);
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Emailer::sendAlarmUntriggeredEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m)
-{
-    Email email;
-    email.subject = "Sensor '" + sensor.descriptor.name + "' stopped triggering alarm '" + alarm.descriptor.name + "'";
-    email.body = "<p>Sensor '<strong>" + sensor.descriptor.name + "</strong>' stopped triggering alarm '<strong>" + alarm.descriptor.name + "</strong>'.</p>";
-
-    sendAlarmEmail(email, alarm, sensor, m);
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Emailer::sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m)
-{
     email.settings = m_settings.getEmailSettings();
 
     s_logger.logInfo(QString("Sending alarm email'"));
@@ -158,16 +171,30 @@ void Emailer::sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor co
     email.body += QString(R"X(
                           <p>Measurement:</p>
                           <ul>
-                          <li>Temperature: <strong>%1 &deg;C</strong></li>
-                          <li>Humidity: <strong>%2 %RH</strong></li>
-                          <li>Battery: <strong>%3 %</strong></li>
+                          <li><span style="color:%1">Temperature: <strong>%2 &deg;C</strong> %3</span></li>
+                          <li><span style="color:%4">Humidity: <strong>%5 %RH</strong> %6</span></li>
+                          <li><span style="color:%7">Battery: <strong>%8 %</strong> %9</span></li>
+                          <li><span style="color:%10">Signal: <strong>%11</strong> %12</span></li>
                           </ul>
-                          <p>Timestamp: <strong>%4</strong> <span style="font-size: 8pt;"><em>(dd-mm-yyyy hh:mm)</em></span></p>
+                          <p>Timestamp: <strong>%13</strong> <span style="font-size: 8pt;"><em>(dd-mm-yyyy hh:mm)</em></span></p>
                           <p>&nbsp;</p>
                           <p><span style="font-size: 10pt;"><em>- Sense -</em></span></p>)X")
+            .arg(getColor(DB::AlarmTrigger::Temperature))
             .arg(m.descriptor.temperature, 0, 'f', 1)
+            .arg(getStatus(DB::AlarmTrigger::Temperature))
+
+            .arg(getColor(DB::AlarmTrigger::Humidity))
             .arg(m.descriptor.humidity, 0, 'f', 1)
+            .arg(getStatus(DB::AlarmTrigger::Humidity))
+
+            .arg(getColor(DB::AlarmTrigger::LowVcc))
             .arg(static_cast<int>(getBatteryLevel(m.descriptor.vcc)*100.f))
+            .arg(getStatus(DB::AlarmTrigger::LowVcc))
+
+            .arg(getColor(DB::AlarmTrigger::LowSignal))
+            .arg((newTriggers & DB::AlarmTrigger::LowSignal) ? "Low" : "Normal")
+            .arg(getStatus(DB::AlarmTrigger::LowSignal))
+
             .arg(dt.toString("dd-MM-yyyy HH:mm"))
             .toUtf8().data();
 
@@ -281,7 +308,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
             float maxTemperature = std::numeric_limits<float>::lowest();
             float minHumidity = std::numeric_limits<float>::max();
             float maxHumidity = std::numeric_limits<float>::lowest();
-            uint8_t triggeredAlarms = 0;
+            uint8_t alarmTriggers = 0;
         };
 
         std::vector<SensorData> sensorDatas;
@@ -306,7 +333,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
             sd.minTemperature = std::min(sd.minTemperature, m.descriptor.temperature);
             sd.maxHumidity = std::max(sd.maxHumidity, m.descriptor.humidity);
             sd.minHumidity = std::min(sd.minHumidity, m.descriptor.humidity);
-            sd.triggeredAlarms |= m.triggeredAlarms;
+            sd.alarmTriggers |= m.alarmTriggers;
         }
 
         for (SensorData const& sd: sensorDatas)
@@ -326,7 +353,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
                     .arg(sd.maxTemperature, 0, 'f', 1)
                     .arg(sd.minHumidity, 0, 'f', 1)
                     .arg(sd.maxHumidity, 0, 'f', 1)
-                    .arg(sd.triggeredAlarms == 0 ? "no" : "yes")
+                    .arg(sd.alarmTriggers == 0 ? "no" : "yes")
                     .toUtf8().data();
         }
 
@@ -361,14 +388,14 @@ void Emailer::sendReportEmail(DB::Report const& report)
                                   <tr>
                                       <td style="width: 80.6667px;">%1</td>
                                       <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%2</td>
-                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%3&nbsp;&deg;C</td>
+                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%3 &deg;C</td>
                                       <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%4 %RH</td>
                                       <td style="width: 81.3333px; text-align: right; white-space: nowrap;">%5</td>
                                   </tr>)X").arg(sensorName.c_str())
                     .arg(dt.toString("dd-MM-yyyy HH:mm"))
                     .arg(m.descriptor.temperature, 0, 'f', 1)
                     .arg(m.descriptor.humidity, 0, 'f', 1)
-                    .arg(m.triggeredAlarms == 0 ? "no" : "yes")
+                    .arg(m.alarmTriggers == 0 ? "no" : "yes")
                     .toUtf8().data();
         }
         email.body += R"X(
@@ -400,6 +427,12 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
 {
     for (Email const& email: emails)
     {
+        if (email.settings.recipients.empty())
+        {
+            s_logger.logCritical(QString("Failed to send email: no recipients configured"));
+            continue;
+        }
+
         SmtpClient::ConnectionType connectionType = SmtpClient::SslConnection;
         switch (email.settings.connection)
         {
