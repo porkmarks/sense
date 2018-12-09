@@ -6,11 +6,13 @@ SRCS	:= ../src/main.cpp \
 	../src/Scheduler.cpp \
 	../src/Sensors.cpp \
 	../src/Server.cpp \
-	../../sensor/firmware/rfm22b.cpp \
+	../../sensor/firmware/Module.cpp \
+	../../sensor/firmware/RFM95.cpp \
+	../../sensor/firmware/Chrono.cpp \
 	../../sensor/firmware/Sensor_Comms.cpp \
 	../../sensor/firmware/Storage.cpp \
 	../../sensor/firmware/CRC.cpp \
-	../../common/src/rfm22b_spi.cpp \
+	../../common/src/spi.cpp \
 	../src/pigpio.c \
 	../src/command.c
 
