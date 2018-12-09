@@ -13,7 +13,7 @@
 #   define CHECK_PASSWORD
 #endif
 
-static const std::string s_version = "1.0.10";
+static const std::string s_version = "1.0.11";
 
 Logger s_logger;
 

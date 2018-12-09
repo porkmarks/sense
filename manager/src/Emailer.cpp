@@ -155,19 +155,36 @@ void Emailer::sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor co
     QDateTime dt;
     dt.setTime_t(DB::Clock::to_time_t(m.timePoint));
 
+    uint8_t triggered = 0;
+    Result<uint8_t> triggeredResult = m_db.computeTriggeredAlarm(alarm.id, m);
+    if (triggeredResult == success)
+    {
+        triggered = triggeredResult.payload();
+    }
+    else
+    {
+        s_logger.logCritical(QString("Consistency error: alarm '%1' didn't trigger anything but it's still wants to send an email.").arg(alarm.descriptor.name.c_str()));
+    }
+
     email.body += QString(R"X(
                           <p>Measurement:</p>
                           <ul>
-                          <li>Temperature: <strong>%1 &deg;C</strong></li>
-                          <li>Humidity: <strong>%2 %RH</strong></li>
-                          <li>Battery: <strong>%3 %</strong></li>
+                          <li><span style="color:%1">Temperature: <strong>%2 &deg;C</strong></span></li>
+                          <li><span style="color:%3">Humidity: <strong>%4 %RH</strong></span></li>
+                          <li><span style="color:%5">Battery: <strong>%6 %</strong></span></li>
+                          <li><span style="color:%7">%8</span></li>
                           </ul>
-                          <p>Timestamp: <strong>%4</strong> <span style="font-size: 8pt;"><em>(dd-mm-yyyy hh:mm)</em></span></p>
+                          <p>Timestamp: <strong>%9</strong> <span style="font-size: 8pt;"><em>(dd-mm-yyyy hh:mm)</em></span></p>
                           <p>&nbsp;</p>
                           <p><span style="font-size: 10pt;"><em>- Sense -</em></span></p>)X")
+            .arg((triggered & DB::TriggeredAlarm::Temperature) ? "red" : "black")
             .arg(m.descriptor.temperature, 0, 'f', 1)
+            .arg((triggered & DB::TriggeredAlarm::Humidity) ? "red" : "black")
             .arg(m.descriptor.humidity, 0, 'f', 1)
+            .arg((triggered & DB::TriggeredAlarm::LowVcc) ? "red" : "black")
             .arg(static_cast<int>(getBatteryLevel(m.descriptor.vcc)*100.f))
+            .arg((triggered & DB::TriggeredAlarm::LowSignal) ? "red" : "black")
+            .arg((triggered & DB::TriggeredAlarm::LowSignal) ? "Low Signal" : "")
             .arg(dt.toString("dd-MM-yyyy HH:mm"))
             .toUtf8().data();
 

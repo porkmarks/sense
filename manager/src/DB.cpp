@@ -1555,73 +1555,93 @@ uint8_t DB::computeTriggeredAlarm(Measurement const& m)
 
     for (Alarm& alarm: m_mainData.alarms)
     {
-        AlarmDescriptor const& ad = alarm.descriptor;
-        if (ad.filterSensors)
-        {
-            if (ad.sensors.find(m.descriptor.sensorId) == ad.sensors.end())
-            {
-                continue;
-            }
-        }
-
-        uint8_t triggered = 0;
-        if (ad.highTemperatureWatch && m.descriptor.temperature > ad.highTemperature)
-        {
-            triggered |= TriggeredAlarm::Temperature;
-        }
-        if (ad.lowTemperatureWatch && m.descriptor.temperature < ad.lowTemperature)
-        {
-            triggered |= TriggeredAlarm::Temperature;
-        }
-
-        if (ad.highHumidityWatch && m.descriptor.humidity > ad.highHumidity)
-        {
-            triggered |= TriggeredAlarm::Humidity;
-        }
-        if (ad.lowHumidityWatch && m.descriptor.humidity < ad.lowHumidity)
-        {
-            triggered |= TriggeredAlarm::Humidity;
-        }
-
-        if (ad.lowVccWatch && m.descriptor.vcc <= k_alertVcc)
-        {
-            triggered |= TriggeredAlarm::LowVcc;
-        }
-//        if (ad.sensorErrorsWatch && m.descriptor.sensorErrors != 0)
-//        {
-//            triggered |= TriggeredAlarm::SensorErrors;
-//        }
-        if (ad.lowSignalWatch && std::min(m.descriptor.signalStrength.s2b, m.descriptor.signalStrength.b2s) <= k_alertSignal)
-        {
-            triggered |= TriggeredAlarm::LowSignal;
-        }
-
-        auto it = alarm.triggeringSensors.find(m.descriptor.sensorId);
-        if (triggered)
-        {
-            if (it == alarm.triggeringSensors.end())
-            {
-                alarm.triggeringSensors.insert(m.descriptor.sensorId);
-                s_logger.logInfo(QString("Alarm '%1' was triggered by measurement index %2").arg(ad.name.c_str()).arg(m.descriptor.index));
-
-                emit alarmWasTriggered(alarm.id, m);
-            }
-        }
-        else
-        {
-            if (it != alarm.triggeringSensors.end())
-            {
-                alarm.triggeringSensors.erase(it);
-                s_logger.logInfo(QString("Alarm '%1' stopped being triggered by measurement index %2").arg(ad.name.c_str()).arg(m.descriptor.index));
-
-                emit alarmWasUntriggered(alarm.id, m);
-            }
-        }
-
+        uint8_t triggered = _computeTriggeredAlarm(alarm, m);
         allTriggered |= triggered;
     }
 
     return allTriggered;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+Result<uint8_t> DB::computeTriggeredAlarm(AlarmId id, Measurement const& m)
+{
+    int32_t _index = findAlarmIndexById(id);
+    if (_index < 0)
+    {
+        return Error("Trying to change non-existing alarm");
+    }
+    return _computeTriggeredAlarm(m_mainData.alarms[static_cast<size_t>(_index)], m);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+uint8_t DB::_computeTriggeredAlarm(Alarm& alarm, Measurement const& m)
+{
+    AlarmDescriptor const& ad = alarm.descriptor;
+    if (ad.filterSensors)
+    {
+        if (ad.sensors.find(m.descriptor.sensorId) == ad.sensors.end())
+        {
+            return 0;
+        }
+    }
+
+    uint8_t triggered = 0;
+    if (ad.highTemperatureWatch && m.descriptor.temperature > ad.highTemperature)
+    {
+        triggered |= TriggeredAlarm::Temperature;
+    }
+    if (ad.lowTemperatureWatch && m.descriptor.temperature < ad.lowTemperature)
+    {
+        triggered |= TriggeredAlarm::Temperature;
+    }
+
+    if (ad.highHumidityWatch && m.descriptor.humidity > ad.highHumidity)
+    {
+        triggered |= TriggeredAlarm::Humidity;
+    }
+    if (ad.lowHumidityWatch && m.descriptor.humidity < ad.lowHumidity)
+    {
+        triggered |= TriggeredAlarm::Humidity;
+    }
+
+    if (ad.lowVccWatch && m.descriptor.vcc <= k_alertVcc)
+    {
+        triggered |= TriggeredAlarm::LowVcc;
+    }
+//        if (ad.sensorErrorsWatch && m.descriptor.sensorErrors != 0)
+//        {
+//            triggered |= TriggeredAlarm::SensorErrors;
+//        }
+    if (ad.lowSignalWatch && std::min(m.descriptor.signalStrength.s2b, m.descriptor.signalStrength.b2s) <= k_alertSignal)
+    {
+        triggered |= TriggeredAlarm::LowSignal;
+    }
+
+    auto it = alarm.triggeringSensors.find(m.descriptor.sensorId);
+    if (triggered)
+    {
+        if (it == alarm.triggeringSensors.end())
+        {
+            alarm.triggeringSensors.insert(m.descriptor.sensorId);
+            s_logger.logInfo(QString("Alarm '%1' was triggered by measurement index %2").arg(ad.name.c_str()).arg(m.descriptor.index));
+
+            emit alarmWasTriggered(alarm.id, m);
+        }
+    }
+    else
+    {
+        if (it != alarm.triggeringSensors.end())
+        {
+            alarm.triggeringSensors.erase(it);
+            s_logger.logInfo(QString("Alarm '%1' stopped being triggered by measurement index %2").arg(ad.name.c_str()).arg(m.descriptor.index));
+
+            emit alarmWasUntriggered(alarm.id, m);
+        }
+    }
+
+    return triggered;
 }
 
 //////////////////////////////////////////////////////////////////////////

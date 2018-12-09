@@ -276,6 +276,8 @@ public:
         };
     };
 
+    Result<uint8_t> computeTriggeredAlarm(AlarmId id, Measurement const& m);
+
     struct ReportDescriptor
     {
         std::string name;
@@ -407,6 +409,7 @@ signals:
     void alarmWasUntriggered(AlarmId alarmId, Measurement const& m);
 
 private:
+    uint8_t _computeTriggeredAlarm(Alarm& alarm, Measurement const& m);
     bool _addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> mds);
     size_t _getFilteredMeasurements(Filter const& filter, std::vector<Measurement>* result) const;
     bool cull(Measurement const& measurement, Filter const& filter) const;
