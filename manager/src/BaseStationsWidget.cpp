@@ -87,6 +87,8 @@ void BaseStationsWidget::init(Comms& comms, Settings& settings)
             macItem->setText(QString("   %1   ").arg(getMacStr(mac).c_str()));
             macItem->setEditable(false);
         }
+        ipItem->setEditable(false);
+        statusItem->setEditable(false);
 
         m_model.appendRow({ nameItem, macItem, ipItem, statusItem });
 
@@ -143,7 +145,6 @@ void BaseStationsWidget::setAddress(size_t row, QHostAddress const& address)
     char buf[128];
     sprintf(buf, "  %s  ", address.isNull() ? "N/A" : address.toString().toLatin1().data());
     item->setText(buf);
-    item->setEditable(false);
 }
 
 //////////////////////////////////////////////////////////////////////////
