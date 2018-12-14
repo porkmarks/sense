@@ -13,63 +13,179 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout">
+  <layout class="QHBoxLayout" name="horizontalLayout_2">
    <item>
-    <widget class="QTabWidget" name="tabWidget">
-     <property name="currentIndex">
-      <number>1</number>
+    <widget class="QTreeWidget" name="list">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Fixed" vsizetype="MinimumExpanding">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
      </property>
-     <widget class="QWidget" name="baseStationsTab">
-      <attribute name="icon">
+     <property name="showDropIndicator" stdset="0">
+      <bool>false</bool>
+     </property>
+     <property name="alternatingRowColors">
+      <bool>true</bool>
+     </property>
+     <property name="rootIsDecorated">
+      <bool>false</bool>
+     </property>
+     <property name="uniformRowHeights">
+      <bool>true</bool>
+     </property>
+     <property name="itemsExpandable">
+      <bool>false</bool>
+     </property>
+     <attribute name="headerVisible">
+      <bool>false</bool>
+     </attribute>
+     <column>
+      <property name="text">
+       <string>1</string>
+      </property>
+     </column>
+     <item>
+      <property name="text">
+       <string>Base Stations</string>
+      </property>
+      <property name="icon">
        <iconset resource="../res/res.qrc">
         <normaloff>:/icons/ui/station.png</normaloff>:/icons/ui/station.png</iconset>
-      </attribute>
-      <attribute name="title">
-       <string>Base Stations</string>
-      </attribute>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Users</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../res/res.qrc">
+        <normaloff>:/icons/ui/users.png</normaloff>:/icons/ui/users.png</iconset>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Reports</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../res/res.qrc">
+        <normaloff>:/icons/ui/report.png</normaloff>:/icons/ui/report.png</iconset>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Email</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../res/res.qrc">
+        <normaloff>:/icons/ui/email.png</normaloff>:/icons/ui/email.png</iconset>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>FTP</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../res/res.qrc">
+        <normaloff>:/icons/ui/ftp.png</normaloff>:/icons/ui/ftp.png</iconset>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Sensors</string>
+      </property>
+      <property name="icon">
+       <iconset resource="../res/res.qrc">
+        <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
+      </property>
+     </item>
+    </widget>
+   </item>
+   <item>
+    <widget class="QStackedWidget" name="stackedWidget">
+     <widget class="QWidget" name="baseStationsPage">
       <layout class="QVBoxLayout" name="verticalLayout_3">
+       <property name="spacing">
+        <number>0</number>
+       </property>
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
        <item>
         <widget class="BaseStationsWidget" name="baseStationsWidget" native="true"/>
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="usersTab">
-      <attribute name="icon">
-       <iconset resource="../res/res.qrc">
-        <normaloff>:/icons/ui/users.png</normaloff>:/icons/ui/users.png</iconset>
-      </attribute>
-      <attribute name="title">
-       <string>Users</string>
-      </attribute>
+     <widget class="QWidget" name="usersPage">
       <layout class="QVBoxLayout" name="verticalLayout_6">
+       <property name="spacing">
+        <number>0</number>
+       </property>
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
        <item>
         <widget class="UsersWidget" name="usersWidget" native="true"/>
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="reportsTab">
-      <attribute name="icon">
-       <iconset resource="../res/res.qrc">
-        <normaloff>:/icons/ui/report.png</normaloff>:/icons/ui/report.png</iconset>
-      </attribute>
-      <attribute name="title">
-       <string>Reports</string>
-      </attribute>
+     <widget class="QWidget" name="reportsPage">
       <layout class="QVBoxLayout" name="verticalLayout_4">
+       <property name="spacing">
+        <number>0</number>
+       </property>
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
        <item>
         <widget class="ReportsWidget" name="reportsWidget" native="true"/>
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="emailTab">
-      <attribute name="icon">
-       <iconset resource="../res/res.qrc">
-        <normaloff>:/icons/ui/email.png</normaloff>:/icons/ui/email.png</iconset>
-      </attribute>
-      <attribute name="title">
-       <string>Email</string>
-      </attribute>
+     <widget class="QWidget" name="emailPage">
       <layout class="QVBoxLayout" name="verticalLayout_7">
+       <property name="spacing">
+        <number>0</number>
+       </property>
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
        <item>
         <widget class="QWidget" name="widget" native="true">
          <layout class="QGridLayout" name="gridLayout_2">
@@ -307,18 +423,23 @@
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="ftpTab">
-      <property name="enabled">
-       <bool>false</bool>
-      </property>
-      <attribute name="icon">
-       <iconset resource="../res/res.qrc">
-        <normaloff>:/icons/ui/ftp.png</normaloff>:/icons/ui/ftp.png</iconset>
-      </attribute>
-      <attribute name="title">
-       <string>FTP</string>
-      </attribute>
+     <widget class="QWidget" name="ftpPage">
       <layout class="QVBoxLayout" name="verticalLayout_11">
+       <property name="spacing">
+        <number>0</number>
+       </property>
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
        <item>
         <widget class="QWidget" name="widget_2" native="true">
          <layout class="QGridLayout" name="gridLayout">
@@ -497,15 +618,23 @@
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="sensorsTab">
-      <attribute name="icon">
-       <iconset resource="../res/res.qrc">
-        <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
-      </attribute>
-      <attribute name="title">
-       <string>Sensors</string>
-      </attribute>
+     <widget class="QWidget" name="sensorsPage">
       <layout class="QVBoxLayout" name="verticalLayout_12">
+       <property name="spacing">
+        <number>0</number>
+       </property>
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
        <item>
         <widget class="QWidget" name="widget_6" native="true">
          <layout class="QFormLayout" name="formLayout_5">
@@ -700,6 +829,37 @@
    <container>1</container>
   </customwidget>
  </customwidgets>
+ <tabstops>
+  <tabstop>emailHost</tabstop>
+  <tabstop>emailPort</tabstop>
+  <tabstop>emailConnection</tabstop>
+  <tabstop>emailUsername</tabstop>
+  <tabstop>emailPassword</tabstop>
+  <tabstop>emailFrom</tabstop>
+  <tabstop>emailRecipientList</tabstop>
+  <tabstop>emailAddRecipient</tabstop>
+  <tabstop>emailRemoveRecipient</tabstop>
+  <tabstop>emailTest</tabstop>
+  <tabstop>emailApply</tabstop>
+  <tabstop>emailReset</tabstop>
+  <tabstop>ftpHost</tabstop>
+  <tabstop>ftpPort</tabstop>
+  <tabstop>ftpUsername</tabstop>
+  <tabstop>ftpPassword</tabstop>
+  <tabstop>ftpFolder</tabstop>
+  <tabstop>ftpBrowse</tabstop>
+  <tabstop>ftpUploadBackups</tabstop>
+  <tabstop>ftpBackupPeriod</tabstop>
+  <tabstop>ftpTest</tabstop>
+  <tabstop>ftpApply</tabstop>
+  <tabstop>ftpReset</tabstop>
+  <tabstop>stackedWidget</tabstop>
+  <tabstop>sensorsMeasurementPeriod</tabstop>
+  <tabstop>sensorsCommsPeriod</tabstop>
+  <tabstop>sensorsPower</tabstop>
+  <tabstop>sensorsApply</tabstop>
+  <tabstop>sensorsReset</tabstop>
+ </tabstops>
  <resources>
   <include location="../res/res.qrc"/>
  </resources>

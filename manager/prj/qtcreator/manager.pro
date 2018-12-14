@@ -201,7 +201,8 @@ FORMS += \
     ../../src/DateTimeFilterWidget.ui \
     ../../src/SensorsFilterWidget.ui \
     ../../src/SensorDetailsDialog.ui \
-    ../../src/SensorDetailsDialog.ui
+    ../../src/SensorDetailsDialog.ui \
+    ../../src/AboutDialog.ui
 
 DISTFILES += \
 

@@ -5,6 +5,7 @@
 #include "ConfigureUserDialog.h"
 
 #include "ui_LoginDialog.h"
+#include "ui_AboutDialog.h"
 #include "Crypt.h"
 #include "Logger.h"
 #include "Settings.h"
@@ -13,7 +14,7 @@
 #   define CHECK_PASSWORD
 #endif
 
-static const std::string s_version = "1.0.12";
+static const std::string s_version = "1.0.13";
 
 Logger s_logger;
 
@@ -32,8 +33,6 @@ Manager::Manager(QWidget *parent)
     : QMainWindow(parent)
 {
     m_ui.setupUi(this);
-
-    statusBar()->showMessage(("Version: " + s_version).c_str(), 0);
 
     if (!s_logger.load("log"))
     {
@@ -67,6 +66,9 @@ Manager::Manager(QWidget *parent)
 
     connect(&m_settings, &Settings::baseStationActivated, this, &Manager::activateBaseStation);
     connect(&m_settings, &Settings::baseStationDeactivated, this, &Manager::deactivateBaseStation);
+    connect(m_ui.actionExit, &QAction::triggered, this, &Manager::exitAction);
+    connect(m_ui.actionAbout, &QAction::triggered, this, &Manager::showAbout);
+    connect(m_ui.actionLogout, &QAction::triggered, this, &Manager::logout);
 
     m_tabChangedConnection = connect(m_ui.tabWidget, &QTabWidget::currentChanged, this, &Manager::tabChanged);
     m_currentTabIndex = m_ui.tabWidget->currentIndex();
@@ -163,59 +165,82 @@ void Manager::checkIfAdminExists()
 
 void Manager::login()
 {
-    if (!m_settings.getLoggedInUser())
+    s_logger.logInfo("Asking the user to log in");
+
+    QDialog dialog(this);
+    Ui::LoginDialog ui;
+    ui.setupUi(&dialog);
+
+    size_t attempts = 0;
+    while (true)
     {
-        s_logger.logInfo("Asking the user to log in");
-
-        QDialog dialog(this);
-        Ui::LoginDialog ui;
-        ui.setupUi(&dialog);
-
-        size_t attempts = 0;
-        while (true)
+        int result = dialog.exec();
+        if (result == QDialog::Accepted)
         {
-            int result = dialog.exec();
-            if (result == QDialog::Accepted)
+            int32_t _userIndex = m_settings.findUserIndexByName(ui.username->text().toUtf8().data());
+            if (_userIndex < 0)
             {
-                int32_t _userIndex = m_settings.findUserIndexByName(ui.username->text().toUtf8().data());
-                if (_userIndex < 0)
-                {
-                    attempts++;
-                    s_logger.logCritical(QString("Invalid login credentials (user not found), attempt %1").arg(attempts).toUtf8().data());
-                    QMessageBox::critical(this, "Error", QString("Invalid username '%1'.").arg(ui.username->text()));
-                    continue;
-                }
+                attempts++;
+                s_logger.logCritical(QString("Invalid login credentials (user not found), attempt %1").arg(attempts).toUtf8().data());
+                QMessageBox::critical(this, "Error", QString("Invalid username '%1'.").arg(ui.username->text()));
+                continue;
+            }
 
-                size_t userIndex = static_cast<size_t>(_userIndex);
-                Settings::User const& user = m_settings.getUser(userIndex);
+            size_t userIndex = static_cast<size_t>(_userIndex);
+            Settings::User const& user = m_settings.getUser(userIndex);
 
 #ifdef CHECK_PASSWORD
-                Crypt crypt;
-                crypt.setAddRandomSalt(false);
-                crypt.setIntegrityProtectionMode(Crypt::ProtectionHash);
-                crypt.setCompressionMode(Crypt::CompressionAlways);
-                crypt.setKey(ui.password->text());
-                std::string passwordHash = crypt.encryptToString(QString(k_passwordHashReferenceText.c_str())).toUtf8().data();
-                if (user.descriptor.passwordHash != passwordHash)
-                {
-                    attempts++;
-                    s_logger.logCritical(QString("Invalid login credentials (wrong password), attempt %1").arg(attempts).toUtf8().data());
-                    QMessageBox::critical(this, "Error", "Invalid username/password.");
-                    continue;
-                }
+            Crypt crypt;
+            crypt.setAddRandomSalt(false);
+            crypt.setIntegrityProtectionMode(Crypt::ProtectionHash);
+            crypt.setCompressionMode(Crypt::CompressionAlways);
+            crypt.setKey(ui.password->text());
+            std::string passwordHash = crypt.encryptToString(QString(k_passwordHashReferenceText.c_str())).toUtf8().data();
+            if (user.descriptor.passwordHash != passwordHash)
+            {
+                attempts++;
+                s_logger.logCritical(QString("Invalid login credentials (wrong password), attempt %1").arg(attempts).toUtf8().data());
+                QMessageBox::critical(this, "Error", "Invalid username/password.");
+                continue;
+            }
 #endif
 
-                m_settings.setLoggedInUserId(user.id);
-                break;
-            }
-            else
-            {
-                s_logger.logCritical("User failed to log in. Exiting");
-                QMessageBox::critical(this, "Error", "You need to be logged in to user this program.\nThe program will now close.");
-                exit(1);
-            }
+            m_settings.setLoggedInUserId(user.id);
+            break;
+        }
+        else
+        {
+            s_logger.logCritical("User failed to log in. Exiting");
+            QMessageBox::critical(this, "Error", "You need to be logged in to user this program.\nThe program will now close.");
+            exit(1);
         }
     }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Manager::logout()
+{
+    login();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Manager::showAbout()
+{
+    QDialog dialog(this);
+    Ui::AboutDialog ui;
+    ui.setupUi(&dialog);
+    ui.version->setText(s_version.c_str());
+
+    dialog.exec();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Manager::exitAction()
+{
+    exit(0);
 }
 
 //////////////////////////////////////////////////////////////////////////

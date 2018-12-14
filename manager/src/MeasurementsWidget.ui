@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1137</width>
+    <width>1153</width>
     <height>781</height>
    </rect>
   </property>
@@ -480,6 +480,21 @@
    <container>1</container>
   </customwidget>
  </customwidgets>
+ <tabstops>
+  <tabstop>useTemperature</tabstop>
+  <tabstop>minTemperature</tabstop>
+  <tabstop>maxTemperature</tabstop>
+  <tabstop>useHumidity</tabstop>
+  <tabstop>minHumidity</tabstop>
+  <tabstop>maxHumidity</tabstop>
+  <tabstop>showTemperature</tabstop>
+  <tabstop>showHumidity</tabstop>
+  <tabstop>showBattery</tabstop>
+  <tabstop>showSignal</tabstop>
+  <tabstop>selectSensors</tabstop>
+  <tabstop>exportData</tabstop>
+  <tabstop>list</tabstop>
+ </tabstops>
  <resources>
   <include location="../res/res.qrc"/>
  </resources>

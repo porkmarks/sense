@@ -476,6 +476,19 @@
    <container>1</container>
   </customwidget>
  </customwidgets>
+ <tabstops>
+  <tabstop>fitMeasurements</tabstop>
+  <tabstop>minTemperature</tabstop>
+  <tabstop>maxTemperature</tabstop>
+  <tabstop>maxHumidity</tabstop>
+  <tabstop>minHumidity</tabstop>
+  <tabstop>showTemperature</tabstop>
+  <tabstop>showHumidity</tabstop>
+  <tabstop>useSmoothing</tabstop>
+  <tabstop>clearAnnotations</tabstop>
+  <tabstop>selectSensors</tabstop>
+  <tabstop>exportData</tabstop>
+ </tabstops>
  <resources>
   <include location="../res/res.qrc"/>
  </resources>

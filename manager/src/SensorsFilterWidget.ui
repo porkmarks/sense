@@ -70,6 +70,11 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>selectAll</tabstop>
+  <tabstop>selectNone</tabstop>
+  <tabstop>list</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

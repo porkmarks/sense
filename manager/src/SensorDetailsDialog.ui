@@ -552,6 +552,12 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>name</tabstop>
+  <tabstop>shoudSleep</tabstop>
+  <tabstop>temperatureBias</tabstop>
+  <tabstop>humidityBias</tabstop>
+ </tabstops>
  <resources/>
  <connections>
   <connection>

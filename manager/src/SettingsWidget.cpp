@@ -57,7 +57,13 @@ void SettingsWidget::init(Comms& comms, Settings& settings)
 
     m_uiConnections.push_back(connect(m_ui.sensorsApply, &QPushButton::released, this, &SettingsWidget::applySensorsConfig));
     m_uiConnections.push_back(connect(m_ui.sensorsReset, &QPushButton::released, [this]() { if (m_db) setSensorsConfig(m_db->getLastSensorsConfig()); }));
-    m_ui.sensorsTab->setEnabled(m_settings->getActiveBaseStationId() != 0);
+    m_uiConnections.push_back(connect(m_ui.list, &QTreeWidget::currentItemChanged, [this](QTreeWidgetItem* current, QTreeWidgetItem* previous)
+    {
+        m_ui.stackedWidget->setCurrentIndex(m_ui.list->indexOfTopLevelItem(current));
+    }));
+    m_ui.list->setCurrentItem(m_ui.list->topLevelItem(0));
+
+    m_ui.sensorsPage->setEnabled(m_settings->getActiveBaseStationId() != 0);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -114,16 +120,16 @@ void SettingsWidget::shutdownBaseStation(Settings::BaseStationId /*id*/)
     m_db = nullptr;
     m_ui.reportsWidget->shutdown();
     m_ui.reportsWidget->setEnabled(false);
-    m_ui.sensorsTab->setEnabled(false);
+    m_ui.sensorsPage->setEnabled(false);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void SettingsWidget::setRW()
 {
-    m_ui.emailTab->setEnabled(m_settings->isLoggedInAsAdmin());
-    m_ui.ftpTab->setEnabled(m_settings->isLoggedInAsAdmin());
-    m_ui.sensorsTab->setEnabled(m_settings->isLoggedInAsAdmin());
+    m_ui.emailPage->setEnabled(m_settings->isLoggedInAsAdmin());
+    m_ui.ftpPage->setEnabled(m_settings->isLoggedInAsAdmin());
+    m_ui.sensorsPage->setEnabled(m_settings->isLoggedInAsAdmin());
 }
 
 //////////////////////////////////////////////////////////////////////////

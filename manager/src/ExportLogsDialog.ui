@@ -248,6 +248,7 @@
   </layout>
  </widget>
  <tabstops>
+  <tabstop>exportIndex</tabstop>
   <tabstop>exportTimePoint</tabstop>
   <tabstop>exportType</tabstop>
   <tabstop>exportMessage</tabstop>

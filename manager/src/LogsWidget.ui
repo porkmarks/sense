@@ -206,6 +206,7 @@
   <tabstop>info</tabstop>
   <tabstop>warning</tabstop>
   <tabstop>error</tabstop>
+  <tabstop>exportLogs</tabstop>
   <tabstop>list</tabstop>
  </tabstops>
  <resources>

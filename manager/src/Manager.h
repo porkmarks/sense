@@ -16,6 +16,9 @@ public:
 private slots:
     void activateBaseStation(Settings::BaseStationId id);
     void deactivateBaseStation(Settings::BaseStationId id);
+    void showAbout();
+    void exitAction();
+    void logout();
 
 private:
     void process();

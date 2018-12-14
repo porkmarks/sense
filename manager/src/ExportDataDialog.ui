@@ -382,6 +382,7 @@
   <tabstop>exportTemperature</tabstop>
   <tabstop>exportHumidity</tabstop>
   <tabstop>exportBattery</tabstop>
+  <tabstop>exportSignal</tabstop>
   <tabstop>fileFormat</tabstop>
   <tabstop>separator</tabstop>
   <tabstop>tabSeparator</tabstop>
