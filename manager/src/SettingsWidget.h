@@ -43,7 +43,9 @@ private:
     bool getFtpSettings(Settings::FtpSettings& settings);
 
     void setSensorsConfig(DB::SensorsConfig const& config);
-    bool getSensorsConfig(DB::SensorsConfigDescriptor& config);
+    Result<DB::SensorsConfigDescriptor> getSensorsConfig() const;
+
+    void computeBatteryLife();
 
     Ui::SettingsWidget m_ui;
     Settings* m_settings = nullptr;

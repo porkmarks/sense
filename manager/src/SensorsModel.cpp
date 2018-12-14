@@ -17,9 +17,9 @@ extern QIcon getBatteryIcon(float vcc);
 extern float getSignalLevel(int8_t dBm);
 extern QIcon getSignalIcon(int8_t dBm);
 
-std::pair<std::string, int32_t> computeRelativeTimePointString(DB::Clock::time_point tp)
+std::pair<std::string, int32_t> computeDurationString(DB::Clock::duration d)
 {
-    int32_t totalSeconds = std::chrono::duration_cast<std::chrono::seconds>(tp - DB::Clock::now()).count();
+    int32_t totalSeconds = std::chrono::duration_cast<std::chrono::seconds>(d).count();
     int32_t seconds = std::abs(totalSeconds);
 
     int32_t days = seconds / (24 * 3600);
@@ -61,6 +61,11 @@ std::pair<std::string, int32_t> computeRelativeTimePointString(DB::Clock::time_p
     }
 
     return std::make_pair(str, totalSeconds);
+}
+
+std::pair<std::string, int32_t> computeRelativeTimePointString(DB::Clock::time_point tp)
+{
+    return computeDurationString(tp - DB::Clock::now());
 }
 
 uint32_t getSensorStorageCapacity(DB::Sensor const& sensor)
@@ -456,11 +461,20 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                 if (sensor.lastCommsTimePoint.time_since_epoch().count() != 0)
                 {
                     auto p = computeRelativeTimePointString(sensor.lastCommsTimePoint + m_db.getLastSensorsConfig().computedCommsPeriod);
+                    std::string str = p.first;
+                    if (p.second > 0)
+                    {
+                        str = "In " + str;
+                    }
+                    else
+                    {
+                        str = str + " ago";
+                    }
                     if (p.second < k_imminentMaxSecond && p.second > k_imminentMinSecond)
                     {
                         return "Imminent";
                     }
-                    return p.first.c_str();
+                    return str.c_str();
                 }
             }
         }

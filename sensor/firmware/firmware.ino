@@ -364,8 +364,11 @@ static void setup()
     {
         uint8_t raw_packet_data[packet_raw_size(Sensor_Comms::MAX_USER_DATA_SIZE)];
         s_comms.set_destination_address(Sensor_Comms::BROADCAST_ADDRESS);
-        s_comms.begin_packet(raw_packet_data, 0);
-        s_comms.send_packet(raw_packet_data, 2);
+        while (true)
+        {
+          s_comms.begin_packet(raw_packet_data, 0, false);
+          s_comms.send_packet(raw_packet_data, Sensor_Comms::MAX_USER_DATA_SIZE, false);
+        }
     }
     */
 

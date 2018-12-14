@@ -40,6 +40,13 @@ void ConfigureAlarmDialog::setAlarm(DB::Alarm const& alarm)
         {
             m_ui.sensorFilter->getSensorModel().setSensorChecked(id, true);
         }
+        if (descriptor.sensors.empty()) //if no sensors were selected, select all
+        {
+            for (size_t i = 0; i < sensorCount; i++)
+            {
+                m_ui.sensorFilter->getSensorModel().setSensorChecked(m_db.getSensor(i).id, true);
+            }
+        }
     }
     else
     {
@@ -85,6 +92,13 @@ void ConfigureAlarmDialog::accept()
             if (m_ui.sensorFilter->getSensorModel().isSensorChecked(sensor.id))
             {
                 descriptor.sensors.insert(sensor.id);
+            }
+        }
+        if (descriptor.sensors.empty()) //if no sensors were selected, select all
+        {
+            for (size_t i = 0; i < sensorCount; i++)
+            {
+                descriptor.sensors.insert(m_db.getSensor(i).id);
             }
         }
     }

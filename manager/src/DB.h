@@ -32,7 +32,6 @@ public:
 
     struct SensorsConfigDescriptor
     {
-        std::string name = "Base Station";
         int8_t sensorsPower = 10;
         Clock::duration measurementPeriod = std::chrono::minutes(5);
         Clock::duration commsPeriod = std::chrono::minutes(10);
@@ -54,6 +53,8 @@ public:
     size_t getSensorsConfigCount() const;
     SensorsConfig const& getSensorsConfig(size_t index) const;
     SensorsConfig const& getLastSensorsConfig() const;
+    Clock::duration computeActualCommsPeriod(SensorsConfigDescriptor const& descriptor) const;
+
 
     struct SensorErrors
     {
@@ -437,7 +438,6 @@ private:
     Clock::time_point computeNextCommsTimePoint(Sensor const& sensor, size_t sensorIndex) const;
     Clock::time_point computeNextMeasurementTimePoint(Sensor const& sensor) const;
     uint32_t computeNextMeasurementIndex(Sensor const& sensor) const;
-    Clock::duration computeCommsPeriod() const;
     uint32_t computeNextRealTimeMeasurementIndex() const;
     SensorsConfig const& findSensorsConfigForMeasurementIndex(uint32_t index) const;
     Clock::time_point computeMeasurementTimepoint(MeasurementDescriptor const& md) const;

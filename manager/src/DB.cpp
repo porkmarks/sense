@@ -99,6 +99,7 @@ Result<void> DB::create(std::string const& name)
     remove((dataFilename).c_str());
 
     m_mainData = Data();
+    addSensorsConfig(SensorsConfigDescriptor());
     save(m_mainData);
 
     s_logger.logVerbose(QString("Creating DB files: '%1' & '%2'").arg(m_dataName.c_str()).arg(m_dbName.c_str()));
@@ -190,15 +191,7 @@ Result<void> DB::load(std::string const& name)
             {
                 SensorsConfig config;
                 rapidjson::Value const& configj = configsj[i];
-                auto it = configj.FindMember("name");
-                if (it == configj.MemberEnd() || !it->value.IsString())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing config name").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                config.descriptor.name = it->value.GetString();
-
-                it = configj.FindMember("sensors_power");
+                auto it = configj.FindMember("sensors_power");
                 if (it == configj.MemberEnd() || !it->value.IsInt())
                 {
                     s_logger.logCritical(QString("Failed to load '%1': Bad or missing config sensors_power").arg(dataFilename.c_str()));
@@ -837,7 +830,7 @@ Result<void> DB::load(std::string const& name)
     if (!m_mainData.sensorsConfigs.empty())
     {
         SensorsConfig& config = m_mainData.sensorsConfigs.back();
-        config.computedCommsPeriod = computeCommsPeriod();
+        config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
     }
 
     s_logger.logVerbose(QString("Done loading DB from '%1' & '%2'. Time: %3s").arg(m_dataName.c_str()).arg(m_dbName.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()));
@@ -856,13 +849,11 @@ Result<void> DB::load(std::string const& name)
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-DB::Clock::duration DB::computeCommsPeriod() const
+DB::Clock::duration DB::computeActualCommsPeriod(SensorsConfigDescriptor const& config) const
 {
-    SensorsConfig const& config = getLastSensorsConfig();
-
     Clock::duration max_period = m_mainData.sensors.size() * COMMS_DURATION;
-    Clock::duration period = std::max(config.descriptor.commsPeriod, max_period);
-    return std::max(period, config.descriptor.measurementPeriod + MEASUREMENT_JITTER);
+    Clock::duration period = std::max(config.commsPeriod, max_period);
+    return std::max(period, config.measurementPeriod + MEASUREMENT_JITTER);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -882,7 +873,7 @@ DB::Clock::time_point DB::computeNextMeasurementTimePoint(Sensor const& sensor) 
 DB::Clock::time_point DB::computeNextCommsTimePoint(Sensor const& /*sensor*/, size_t sensorIndex) const
 {
     SensorsConfig const& config = getLastSensorsConfig();
-    Clock::duration period = computeCommsPeriod();
+    Clock::duration period = computeActualCommsPeriod(config.descriptor);
 
     Clock::time_point now = Clock::now();
     uint32_t index = static_cast<uint32_t>(std::ceil(((now - config.baselineMeasurementTimePoint) / period))) + 1;
@@ -934,7 +925,7 @@ DB::SensorOutputDetails DB::computeSensorOutputDetails(SensorId id) const
     SensorsConfig const& config = getLastSensorsConfig();
 
     SensorOutputDetails details;
-    details.commsPeriod = computeCommsPeriod();
+    details.commsPeriod = computeActualCommsPeriod(config.descriptor);
     details.nextCommsTimePoint = computeNextCommsTimePoint(sensor, index);
     details.measurementPeriod = config.descriptor.measurementPeriod;
     details.nextMeasurementTimePoint = computeNextMeasurementTimePoint(sensor);
@@ -957,10 +948,6 @@ uint32_t DB::computeNextRealTimeMeasurementIndex() const
 
 Result<void> DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
 {
-    if (descriptor.name.empty())
-    {
-        return Error("Config without a name");
-    }
     if (descriptor.commsPeriod < std::chrono::seconds(30))
     {
         return Error("Comms period cannot be lower than 30 seconds");
@@ -1005,7 +992,7 @@ Result<void> DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
     {
         m_mainData.sensorsConfigs.erase(m_mainData.sensorsConfigs.begin());
     }
-    m_mainData.sensorsConfigs.back().computedCommsPeriod = computeCommsPeriod(); //make sure the computed commd config is up-to-date
+    m_mainData.sensorsConfigs.back().computedCommsPeriod = computeActualCommsPeriod(m_mainData.sensorsConfigs.back().descriptor); //make sure the computed commd config is up-to-date
 
     emit sensorsConfigAdded();
 
@@ -1030,7 +1017,7 @@ Result<void> DB::setSensorsConfigs(std::vector<SensorsConfig> const& configs)
     if (!m_mainData.sensorsConfigs.empty())
     {
         SensorsConfig& config = m_mainData.sensorsConfigs.back();
-        config.computedCommsPeriod = computeCommsPeriod();
+        config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
     }
 
     emit sensorsConfigChanged();
@@ -1110,7 +1097,7 @@ Result<void> DB::addSensor(SensorDescriptor const& descriptor)
     if (!m_mainData.sensorsConfigs.empty())
     {
         SensorsConfig& config = m_mainData.sensorsConfigs.back();
-        config.computedCommsPeriod = computeCommsPeriod();
+        config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
         emit sensorsConfigChanged();
     }
 
@@ -1180,7 +1167,7 @@ Result<DB::SensorId> DB::bindSensor(uint32_t serialNumber, uint8_t sensorType, u
     if (!m_mainData.sensorsConfigs.empty())
     {
         SensorsConfig& config = m_mainData.sensorsConfigs.back();
-        config.computedCommsPeriod = computeCommsPeriod();
+        config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
         emit sensorsConfigChanged();
     }
 
@@ -1411,7 +1398,7 @@ void DB::removeSensor(size_t index)
     if (!m_mainData.sensorsConfigs.empty())
     {
         SensorsConfig& config = m_mainData.sensorsConfigs.back();
-        config.computedCommsPeriod = computeCommsPeriod();
+        config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
         emit sensorsConfigChanged();
     }
 
@@ -2377,7 +2364,6 @@ void DB::save(Data const& data) const
             {
                 rapidjson::Value configj;
                 configj.SetObject();
-                configj.AddMember("name", rapidjson::Value(config.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
                 configj.AddMember("sensors_power", static_cast<int32_t>(config.descriptor.sensorsPower), document.GetAllocator());
                 configj.AddMember("measurement_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.measurementPeriod).count()), document.GetAllocator());
                 configj.AddMember("comms_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.commsPeriod).count()), document.GetAllocator());

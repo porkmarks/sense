@@ -205,7 +205,7 @@ void MeasurementsWidget::loadSettings()
             }
         }
     }
-    else if (m_db)
+    if (m_db && m_selectedSensorIds.empty()) //if no sensors were selected, select all
     {
         for (size_t i = 0; i < m_db->getSensorCount(); i++)
         {
@@ -416,7 +416,7 @@ void MeasurementsWidget::selectSensors()
     ui.filter->init(*m_db);
 
     size_t sensorCount = m_db->getSensorCount();
-    if (m_selectedSensorIds.empty())
+    if (m_selectedSensorIds.empty()) //if no sensors were selected, select all
     {
         for (size_t i = 0; i < sensorCount; i++)
         {
@@ -441,6 +441,14 @@ void MeasurementsWidget::selectSensors()
             if (ui.filter->getSensorModel().isSensorChecked(sensor.id))
             {
                 m_selectedSensorIds.insert(sensor.id);
+            }
+        }
+        //if no sensors were selected, select all
+        if (m_selectedSensorIds.empty()) //if no sensors were selected, select all
+        {
+            for (size_t i = 0; i < sensorCount; i++)
+            {
+                m_selectedSensorIds.insert(m_db->getSensor(i).id);
             }
         }
     }

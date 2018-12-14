@@ -64,7 +64,7 @@ public:
         bool allowVerbose = true;
         bool allowInfo = true;
         bool allowWarning = true;
-        bool allowError = true;
+        bool allowCritical = true;
     };
 
     std::vector<LogLine> getFilteredLogLines(Filter const& filter) const;
@@ -82,18 +82,8 @@ private:
     {
         uint64_t timePoint; //milliseconds
         uint32_t index;
-        Type type;
         uint32_t messageOffset;
         uint32_t messageSize;
-    };
-
-    struct StoredLogLineOld
-    {
-        uint64_t timePoint; //milliseconds
-        uint64_t index;
-        Type type;
-        size_t messageOffset;
-        size_t messageSize;
     };
 
 #pragma pack(pop) // exact fit - no padding
@@ -101,16 +91,19 @@ private:
     struct Data
     {
         std::string logs;
-        std::vector<StoredLogLine> storedLogLines;
+        std::vector<StoredLogLine> storedVerboseLogLines;
+        std::vector<StoredLogLine> storedInfoLogLines;
+        std::vector<StoredLogLine> storedWarningLogLines;
+        std::vector<StoredLogLine> storedCriticalLogLines;
     };
 
     bool load(Data& data, std::string const& filename) const;
-    bool loadV1(Data& data, std::string const& filename, std::ifstream& file) const;
+    bool loadV2(Data& data, std::string const& filename, std::ifstream& file) const;
 
-    bool loadAndMerge(Data& data, Data const& delta) const;
+    //bool loadAndMerge(Data& data, Data const& delta) const;
 
     mutable std::mutex m_mainDataMutex;
-    Data m_mainDataDelta;
+    Data m_mainData;
     uint32_t m_mainDataLastLineIndex = 0;
 
     std::atomic_bool m_threadsExit = { false };
@@ -121,7 +114,7 @@ private:
     std::thread m_storeThread;
     std::condition_variable m_storeCV;
     std::mutex m_storeMutex;
-    Data m_storeDataDelta;
+    Data m_storeData;
 
     std::string m_dataFolder;
     std::string m_dataName;

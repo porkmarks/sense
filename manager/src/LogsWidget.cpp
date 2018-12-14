@@ -94,7 +94,7 @@ Logger::Filter LogsWidget::createFilter() const
     filter.allowVerbose = m_ui.verbose->isChecked();
     filter.allowInfo = m_ui.info->isChecked();
     filter.allowWarning = m_ui.warning->isChecked();
-    filter.allowError = m_ui.error->isChecked();
+    filter.allowCritical = m_ui.error->isChecked();
 
     return filter;
 }

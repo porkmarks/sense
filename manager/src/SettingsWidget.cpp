@@ -8,6 +8,50 @@
 
 #include "DB.h"
 
+extern std::pair<std::string, int32_t> computeDurationString(DB::Clock::duration d);
+
+DB::Clock::duration computeBatteryLife(float capacity, DB::Clock::duration measurementPeriod, DB::Clock::duration commsPeriod, float power, uint8_t hardwareVersion)
+{
+    float idleMAh = 0.01f;
+    float powerMu = std::min(std::max(float(power), 0.f), 20.f) / 20.f;
+    float commsMAh = 0;
+    float measurementMAh = 0;
+    if (hardwareVersion == 3)
+    {
+        float minMAh = 20.f;
+        float maxMAh = 80.f;
+        commsMAh = minMAh + (maxMAh - minMAh) * powerMu;
+        measurementMAh = 3;
+    }
+    else
+    {
+        float minMAh = 60.f;
+        float maxMAh = 130.f;
+        commsMAh = minMAh + (maxMAh - minMAh) * powerMu;
+        measurementMAh = 3;
+    }
+
+    float commsDuration = 2.f;
+    float commsPeriodS = std::chrono::duration<float>(commsPeriod).count();
+
+    float measurementDuration = 1.f;
+    float measurementPeriodS = std::chrono::duration<float>(measurementPeriod).count();
+
+    float measurementPerHour = 3600.f / measurementPeriodS;
+    float commsPerHour = 3600.f / commsPeriodS;
+
+    float measurementDurationPerHour = measurementPerHour * measurementDuration;
+    float commsDurationPerHour = commsPerHour * commsDuration;
+
+    float commsUsagePerHour = commsMAh * commsDurationPerHour / 3600.f;
+    float measurementUsagePerHour = measurementMAh * measurementDurationPerHour / 3600.f;
+
+    float usagePerHour = commsUsagePerHour + measurementUsagePerHour + idleMAh;
+
+    float hours = capacity / usagePerHour;
+    return std::chrono::hours(static_cast<int32_t>(hours));
+}
+
 //////////////////////////////////////////////////////////////////////////
 
 SettingsWidget::SettingsWidget(QWidget *parent)
@@ -43,6 +87,11 @@ void SettingsWidget::init(Comms& comms, Settings& settings)
 
     setRW();
     m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &SettingsWidget::setRW));
+
+    m_uiConnections.push_back(connect(m_ui.sensorsPower, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
+    m_uiConnections.push_back(connect(m_ui.sensorsMeasurementPeriod, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
+    m_uiConnections.push_back(connect(m_ui.sensorsCommsPeriod, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
+    m_uiConnections.push_back(connect(m_ui.batteryCapacity, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
 
     setEmailSettings(m_settings->getEmailSettings());
     m_uiConnections.push_back(connect(m_ui.emailAddRecipient, &QPushButton::released, this, &SettingsWidget::addEmailRecipient));
@@ -536,29 +585,26 @@ void SettingsWidget::setSensorsConfig(DB::SensorsConfig const& config)
 
 //////////////////////////////////////////////////////////////////////////
 
-bool SettingsWidget::getSensorsConfig(DB::SensorsConfigDescriptor& descriptor)
+Result<DB::SensorsConfigDescriptor> SettingsWidget::getSensorsConfig() const
 {
+    DB::SensorsConfigDescriptor descriptor;
     descriptor.measurementPeriod = std::chrono::seconds(static_cast<size_t>(m_ui.sensorsMeasurementPeriod->value() * 60.0));
     descriptor.commsPeriod = std::chrono::seconds(static_cast<size_t>(m_ui.sensorsCommsPeriod->value() * 60.0));
     descriptor.sensorsPower = static_cast<int8_t>(m_ui.sensorsPower->value());
 
     if (descriptor.commsPeriod.count() == 0)
     {
-        QMessageBox::critical(this, "Error", "You need to specify a valid comms duration.");
-        return false;
+        return Error("You need to specify a valid comms duration.");
     }
     if (descriptor.measurementPeriod.count() == 0)
     {
-        QMessageBox::critical(this, "Error", "You need to specify a valid measurement duration.");
-        return false;
+        return Error("You need to specify a valid measurement duration.");
     }
     if (descriptor.commsPeriod < descriptor.measurementPeriod)
     {
-        QMessageBox::critical(this, "Error", "The comms period cannot be smaller than the measurement period.");
-        return false;
+        return Error("The comms period cannot be smaller than the measurement period.");
     }
-
-    return true;
+    return descriptor;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -570,17 +616,47 @@ void SettingsWidget::applySensorsConfig()
         return;
     }
 
-    DB::SensorsConfigDescriptor config;
-    if (!getSensorsConfig(config))
+    Result<DB::SensorsConfigDescriptor> result = getSensorsConfig();
+    if (result != success)
     {
+        QMessageBox::critical(this, "Error", result.error().what().c_str());
         return;
     }
 
-    Result<void> result = m_db->addSensorsConfig(config);
-    if (result != success)
+    Result<void> applyResult = m_db->addSensorsConfig(result.payload());
+    if (applyResult != success)
     {
-        QMessageBox::critical(this, "Error", QString("Cannot set sensor settings: %1").arg(result.error().what().c_str()));
+        QMessageBox::critical(this, "Error", QString("Cannot set sensor settings: %1").arg(applyResult.error().what().c_str()));
     }
     setSensorsConfig(m_db->getLastSensorsConfig());
+    computeBatteryLife();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::computeBatteryLife()
+{
+    if (!m_db)
+    {
+        return;
+    }
+    Result<DB::SensorsConfigDescriptor> result = getSensorsConfig();
+    if (result == success)
+    {
+        DB::SensorsConfigDescriptor descriptor = result.extract_payload();
+        DB::Clock::duration d = ::computeBatteryLife(m_ui.batteryCapacity->value(),
+                                                     descriptor.measurementPeriod,
+                                                     m_db->computeActualCommsPeriod(descriptor),
+                                                     descriptor.sensorsPower,
+                                                     1);
+
+        int64_t seconds = std::chrono::duration_cast<std::chrono::seconds>(d).count();
+        int64_t days = seconds / (24 * 3600);
+        m_ui.batteryLife->setText(QString("~%1 days").arg(days));
+    }
+    else
+    {
+        m_ui.batteryLife->setText(QString("Error: %1").arg(result.error().what().c_str()));
+    }
 }
 
