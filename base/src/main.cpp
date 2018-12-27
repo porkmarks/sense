@@ -57,14 +57,15 @@ std::atomic<Led_Blink> s_led_blink;
 std::chrono::system_clock::time_point s_led_blink_time_point;
 volatile bool s_led_thread_on = true;
 
+constexpr int k_red_pwm = 30;
+
 void set_led_color(Led_Color color)
 {
-    if (color == Led_Color::None)
-    {
-        gpioWrite(RED_LED_PIN, 0);
-        gpioWrite(GREEN_LED_PIN, 0);
-    }
-    else if (color == Led_Color::Green)
+    gpioPWM(RED_LED_PIN, 0);
+    gpioWrite(RED_LED_PIN, 0);
+    gpioWrite(GREEN_LED_PIN, 0);
+
+    if (color == Led_Color::Green)
     {
         gpioWrite(RED_LED_PIN, 0);
         gpioWrite(GREEN_LED_PIN, 1);
@@ -76,7 +77,7 @@ void set_led_color(Led_Color color)
     }
     else if (color == Led_Color::Yellow)
     {
-        gpioWrite(RED_LED_PIN, 1);
+        gpioPWM(RED_LED_PIN, k_red_pwm);
         gpioWrite(GREEN_LED_PIN, 1);
     }
     s_led_color = color;
@@ -94,6 +95,10 @@ void led_thread_func()
         auto now = std::chrono::system_clock::now();
         if (s_led_blink_time_point > now && s_led_blink != Led_Blink::None)
         {
+            gpioPWM(RED_LED_PIN, 0);
+            gpioWrite(RED_LED_PIN, 0);
+            gpioWrite(GREEN_LED_PIN, 0);
+
             if (s_led_blink == Led_Blink::Slow_Red)
             {
                 gpioWrite(RED_LED_PIN, 0);
@@ -114,10 +119,10 @@ void led_thread_func()
             }
             else if (s_led_blink == Led_Blink::Slow_Yellow)
             {
-                gpioWrite(RED_LED_PIN, 0);
+                gpioPWM(RED_LED_PIN, 0);
                 gpioWrite(GREEN_LED_PIN, 0);
                 chrono::delay(chrono::millis(200));
-                gpioWrite(RED_LED_PIN, 1);
+                gpioPWM(RED_LED_PIN, k_red_pwm);
                 gpioWrite(GREEN_LED_PIN, 1);
                 chrono::delay(chrono::millis(200));
             }
@@ -141,10 +146,10 @@ void led_thread_func()
             }
             else if (s_led_blink == Led_Blink::Fast_Yellow)
             {
-                gpioWrite(RED_LED_PIN, 0);
+                gpioPWM(RED_LED_PIN, 0);
                 gpioWrite(GREEN_LED_PIN, 0);
                 chrono::delay(chrono::millis(50));
-                gpioWrite(RED_LED_PIN, 1);
+                gpioPWM(RED_LED_PIN, k_red_pwm);
                 gpioWrite(GREEN_LED_PIN, 1);
                 chrono::delay(chrono::millis(50));
             }
@@ -207,13 +212,55 @@ int main(int, const char**)
 
     std::vector<uint8_t> raw_packet_data(packet_raw_size(Sensor_Comms::MAX_USER_DATA_SIZE));
 
+
+    /*
+    //comms testing
+    {
+        s_sensor_comms.set_destination_address(Sensor_Comms::BROADCAST_ADDRESS);
+        constexpr size_t sz = 10;
+        char data[sz];
+        memset(data, 0, sz);
+
+        uint32_t counter = 0;
+        while (true)
+        {
+            LOGI << "Sending " << counter << " ..." << std::endl;
+            std::cout.flush();
+
+            s_sensor_comms.begin_packet(raw_packet_data.data(), 1, true);
+            s_sensor_comms.pack(raw_packet_data.data(), &counter, sizeof(counter));
+            s_sensor_comms.pack(raw_packet_data.data(), data, sz);
+            bool ok = s_sensor_comms.send_packed_packet(raw_packet_data.data(), true);
+            LOGI << "\t\t" << (ok ? "done" : "failed") << ". RX ..." << std::endl;
+            std::cout.flush();
+
+            uint8_t size = Sensor_Comms::MAX_USER_DATA_SIZE;
+            uint8_t* packet_data = s_sensor_comms.receive_packet(raw_packet_data.data(), size, chrono::millis(500));
+            if (packet_data)
+            {
+                uint32_t rcounter = *((uint32_t*)s_sensor_comms.get_rx_packet_payload(packet_data));
+                LOGI << "\t\t" << "done: " << rcounter << std::endl;
+                std::cout.flush();
+            }
+            else
+            {
+                LOGI << "\t\t" << "timeout " << std::endl;
+                std::cout.flush();
+            }
+
+            counter++;
+        }
+    }
+//*/
+
+    /*
     //send some test garbage for frequency measurements
     {
         s_sensor_comms.set_destination_address(Sensor_Comms::BROADCAST_ADDRESS);
         s_sensor_comms.begin_packet(raw_packet_data.data(), 0, false);
         s_sensor_comms.send_packed_packet(raw_packet_data.data(), true);
     }
-
+    */
 
     tries = 0;
     while (!s_server.init(4444, 5555))
@@ -286,12 +333,12 @@ int main(int, const char**)
 
                 if (s_sensor_comms.send_packed_packet(raw_packet_data.data(), true))
                 {
-                    set_led_blink(Led_Blink::Fast_Red, std::chrono::seconds(1), true);
+                    set_led_blink(Led_Blink::Fast_Yellow, std::chrono::seconds(1), true);
                     LOGI << "\tdone" << std::endl;
                 }
                 else
                 {
-                    set_led_blink(Led_Blink::Fast_Yellow, std::chrono::seconds(1), true);
+                    set_led_blink(Led_Blink::Fast_Red, std::chrono::seconds(1), true);
                     LOGE << "\tfailed" << std::endl;
                 }
             }
