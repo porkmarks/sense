@@ -37,38 +37,39 @@ struct Measurement
 {
     void pack(float humidity, float temperature)
     {
-        this->humidity = static_cast<uint8_t>(humidity * 2.55f);
-        this->temperature = static_cast<uint16_t>(temperature * 100.f);
+        this->qhumidity = static_cast<uint8_t>(humidity * 2.55f);
+        this->qtemperature = static_cast<uint16_t>(temperature * 100.f);
     }
 
     void unpack(float& humidity, float& temperature) const
     {
-        humidity = static_cast<float>(this->humidity) / 2.55f;
-        temperature = static_cast<float>(this->temperature) / 100.f;
+        humidity = static_cast<float>(this->qhumidity) / 2.55f;
+        temperature = static_cast<float>(this->qtemperature) / 100.f;
     }
 
 //packed data
-    uint8_t humidity = 0; //*2.55
-    int16_t temperature = 0; //*100
+    uint8_t qhumidity = 0; //*2.55
+    int16_t qtemperature = 0; //*100
 };
 static_assert(sizeof(Measurement) == 3, "");
+
+typedef uint8_t QVCC;
+inline QVCC pack_qvcc(float vcc)
+{
+    vcc -= 2.f;
+    return static_cast<QVCC>(fmin(fmax(vcc, 0.f), 2.55f) * 100.f);
+}
+inline float unpack_qvcc(QVCC qvcc)
+{
+    return static_cast<float>(qvcc) / 100.f + 2.f;
+}
 
 struct Measurement_Batch_Request
 {
     uint32_t start_index = 0;
     uint8_t last_batch : 1; //indicates if there are more batches after this one
     uint8_t count : 7;
-
-    uint8_t vcc = 0; //(vcc - 2) * 100
-    void pack(float vcc)
-    {
-        vcc -= 2.f;
-        this->vcc = static_cast<uint8_t>(fmin(fmax(vcc, 0.f), 2.55f) * 100.f);
-    }
-    void unpack(float& vcc) const
-    {
-        vcc = static_cast<float>(this->vcc) / 100.f + 2.f;
-    }
+    QVCC qvcc = 0; //(vcc - 2) * 100
 
     enum { MAX_COUNT = 8 };
     Measurement measurements[MAX_COUNT];
@@ -102,9 +103,11 @@ struct Config_Request
     uint32_t measurement_count = 0;
     int8_t b2s_input_dBm = 0;
     bool sleeping = false;
+    Measurement measurement;
+    QVCC qvcc;
 
     Calibration calibration;
-    uint32_t reserved[4];
+    uint32_t reserved[3];
 };
 static_assert(sizeof(Config_Request) == 48, "");
 
@@ -134,11 +137,11 @@ struct Descriptor
     uint8_t reserved[16];
 };
 
-struct First_Config_Request
+struct First_Config_Request : Config_Request
 {
     Descriptor descriptor;
 };
-static_assert(sizeof(First_Config_Request) == 23, "");
+static_assert(sizeof(First_Config_Request) == 71, "");
 
 struct First_Config_Response : Config_Response
 {
