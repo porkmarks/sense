@@ -9,6 +9,7 @@
 #include "ASIO_Socket_Adapter.h"
 #include "Channel.h"
 #include "Data_Defs.h"
+#include "Sensor_Comms.h"
 
 class Server
 {
@@ -26,7 +27,7 @@ public:
     {
         uint8_t type = 0;
         int8_t signal_s2b = 0;
-        uint32_t address = 0;
+        Sensor_Comms::Address address = 0;
         bool needs_response = true;
         std::vector<uint8_t> payload;
     };
@@ -34,7 +35,7 @@ public:
     struct Sensor_Response
     {
         uint8_t type = 0;
-        uint32_t address = 0;
+        Sensor_Comms::Address address = 0;
         std::vector<uint8_t> payload;
     };
 
