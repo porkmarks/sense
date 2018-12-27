@@ -50,6 +50,8 @@ bool read(Stream& s, T& t)
 const DB::Clock::duration MEASUREMENT_JITTER = std::chrono::seconds(10);
 const DB::Clock::duration COMMS_DURATION = std::chrono::seconds(10);
 
+extern std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac);
+
 //////////////////////////////////////////////////////////////////////////
 
 DB::DB()
@@ -83,10 +85,12 @@ DB::~DB()
 
 //////////////////////////////////////////////////////////////////////////
 
-Result<void> DB::create(std::string const& name)
+Result<void> DB::create()
 {
-    m_dbName = "sense-" + name + ".db";
-    m_dataName = "sense-" + name + ".data";
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
+    m_dbName = "sense.db";
+    m_dataName = "sense.data";
     m_mainData.measurements.clear();
 
     std::string dataFilename = s_dataFolder + "/" + m_dataName;
@@ -128,16 +132,15 @@ void DB::process()
 
 //////////////////////////////////////////////////////////////////////////
 
-Result<void> DB::load(std::string const& name)
+Result<void> DB::load()
 {
     Clock::time_point start = Clock::now();
 
-    m_dbName = "sense-" + name + ".db";
-    m_dataName = "sense-" + name + ".data";
+    m_dbName = "sense.db";
+    m_dataName = "sense.data";
 
     std::string dataFilename = (s_dataFolder + "/" + m_dataName);
     std::string dbFilename = (s_dataFolder + "/" + m_dbName);
-
 
     Data data;
 
@@ -179,7 +182,67 @@ Result<void> DB::load(std::string const& name)
 
         //////////////////////////////////////////////////////////////////////////////////
 
-        auto it = document.FindMember("sensors_configs");
+        auto it = document.FindMember("base_stations");
+        if (it == document.MemberEnd() || !it->value.IsArray())
+        {
+            s_logger.logCritical(QString("Failed to load '%1': Bad or missing base_stations array").arg(dataFilename.c_str()));
+            return Error("Cannot open DB");
+        }
+
+        {
+            rapidjson::Value const& bssj = it->value;
+            for (size_t i = 0; i < bssj.Size(); i++)
+            {
+                BaseStation bs;
+                rapidjson::Value const& bsj = bssj[i];
+                auto it = bsj.FindMember("name");
+                if (it == bsj.MemberEnd() || !it->value.IsString())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing base station name").arg(dataFilename.c_str()));
+                    return Error("Cannot open DB");
+                }
+                bs.descriptor.name = it->value.GetString();
+
+//                it = bsj.FindMember("address");
+//                if (it == bsj.MemberEnd() || !it->value.IsString())
+//                {
+//                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing base station address").arg(dataFilename.c_str()));
+//                    return Error("Cannot open DB");
+//                }
+//                bs.descriptor.address = QHostAddress(it->value.GetString());
+
+                it = bsj.FindMember("id");
+                if (it == bsj.MemberEnd() || !it->value.IsUint())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing base station id").arg(dataFilename.c_str()));
+                    return Error("Cannot open DB");
+                }
+                bs.id = it->value.GetUint();
+
+                it = bsj.FindMember("mac");
+                if (it == bsj.MemberEnd() || !it->value.IsString())
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing base station mac").arg(dataFilename.c_str()));
+                    return Error("Cannot open DB");
+                }
+
+                int m0, m1, m2, m3, m4, m5;
+                if (sscanf(it->value.GetString(), "%X:%X:%X:%X:%X:%X", &m0, &m1, &m2, &m3, &m4, &m5) != 6)
+                {
+                    s_logger.logCritical(QString("Failed to load '%1': Bad base station mac").arg(dataFilename.c_str()));
+                    return Error("Cannot open DB");
+                }
+                bs.descriptor.mac = { static_cast<uint8_t>(m0&0xFF), static_cast<uint8_t>(m1&0xFF), static_cast<uint8_t>(m2&0xFF),
+                            static_cast<uint8_t>(m3&0xFF), static_cast<uint8_t>(m4&0xFF), static_cast<uint8_t>(m5&0xFF) };
+
+                data.lastBaseStationId = std::max(data.lastBaseStationId, bs.id);
+                data.baseStations.push_back(bs);
+            }
+        }
+
+        //////////////////////////////////////////////////////////////////////////////////
+
+        it = document.FindMember("sensors_configs");
         if (it == document.MemberEnd() || !it->value.IsArray())
         {
             s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor config array").arg(dataFilename.c_str()));
@@ -783,8 +846,6 @@ Result<void> DB::load(std::string const& name)
                 else
                 {
                     data.sortedMeasurementIds.insert(lbit, id);
-                    sensor.isLastMeasurementValid = true;
-                    sensor.lastMeasurement = measurement;
                     ++it;
                 }
             }
@@ -792,8 +853,10 @@ Result<void> DB::load(std::string const& name)
             if (!storedMeasurements.empty())
             {
                 Measurement measurement = unpack(sensorId, storedMeasurements.back());
-                sensor.isLastMeasurementValid = true;
-                sensor.lastMeasurement = measurement;
+                sensor.isMeasurementValid = true;
+                sensor.measurementTemperature = measurement.descriptor.temperature;
+                sensor.measurementHumidity = measurement.descriptor.humidity;
+                sensor.measurementVcc = measurement.descriptor.vcc;
             }
         }
     }
@@ -819,21 +882,24 @@ Result<void> DB::load(std::string const& name)
         m_lastWeeklyBackupTP = DB::Clock::from_time_t(bkf.second);
     }
 
-    m_mainData = data;
-    //refresh signal strengths
-    for (Sensor& sensor: m_mainData.sensors)
     {
-        sensor.averageSignalStrength = computeAverageSignalStrength(sensor.id, m_mainData);
-        sensor.averageCombinedSignalStrength = std::min(sensor.averageSignalStrength.b2s, sensor.averageSignalStrength.s2b);
-    }
-    //refresh computed comms period
-    if (!m_mainData.sensorsConfigs.empty())
-    {
-        SensorsConfig& config = m_mainData.sensorsConfigs.back();
-        config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
-    }
+        std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+        m_mainData = data;
+        //refresh signal strengths
+        for (Sensor& sensor: m_mainData.sensors)
+        {
+            sensor.averageSignalStrength = computeAverageSignalStrength(sensor.id, m_mainData);
+            sensor.averageCombinedSignalStrength = std::min(sensor.averageSignalStrength.b2s, sensor.averageSignalStrength.s2b);
+        }
+        //refresh computed comms period
+        if (!m_mainData.sensorsConfigs.empty())
+        {
+            SensorsConfig& config = m_mainData.sensorsConfigs.back();
+            config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
+        }
 
-    s_logger.logVerbose(QString("Done loading DB from '%1' & '%2'. Time: %3s").arg(m_dataName.c_str()).arg(m_dbName.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()));
+        s_logger.logVerbose(QString("Done loading DB from '%1' & '%2'. Time: %3s").arg(m_dataName.c_str()).arg(m_dbName.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()));
+    }
 
     return success;
 }
@@ -851,6 +917,8 @@ Result<void> DB::load(std::string const& name)
 
 DB::Clock::duration DB::computeActualCommsPeriod(SensorsConfigDescriptor const& config) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     Clock::duration max_period = m_mainData.sensors.size() * COMMS_DURATION;
     Clock::duration period = std::max(config.commsPeriod, max_period);
     return std::max(period, config.measurementPeriod + MEASUREMENT_JITTER);
@@ -896,8 +964,167 @@ uint32_t DB::computeNextMeasurementIndex(Sensor const& sensor) const
 
 //////////////////////////////////////////////////////////////////////////
 
+size_t DB::getBaseStationCount() const
+{
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
+    return m_mainData.baseStations.size();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+DB::BaseStation const& DB::getBaseStation(size_t index) const
+{
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
+    assert(index < m_mainData.baseStations.size());
+    return m_mainData.baseStations[index];
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool DB::addBaseStation(BaseStationDescriptor const& descriptor)
+{
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
+    if (findBaseStationIndexByName(descriptor.name) >= 0)
+    {
+        return false;
+    }
+    if (findBaseStationIndexByMac(descriptor.mac) >= 0)
+    {
+        return false;
+    }
+
+    BaseStationDescriptor::Mac const& mac = descriptor.mac;
+    char macStr[128];
+    sprintf(macStr, "%X_%X_%X_%X_%X_%X", mac[0]&0xFF, mac[1]&0xFF, mac[2]&0xFF, mac[3]&0xFF, mac[4]&0xFF, mac[5]&0xFF);
+    std::string dbName = macStr;
+
+    std::unique_ptr<DB> db(new DB());
+    if (db->load() != success)
+    {
+        if (db->create() != success)
+        {
+            s_logger.logCritical(QString("Cannot open nor create a DB for Base Station '%1' / %2").arg(descriptor.name.c_str()).arg(macStr).toUtf8().data());
+            return false;
+        }
+    }
+
+    s_logger.logInfo(QString("Adding base station '%1' / %2").arg(descriptor.name.c_str()).arg(getMacStr(descriptor.mac).c_str()));
+
+    BaseStation baseStation;
+    baseStation.descriptor = descriptor;
+    baseStation.id = ++m_mainData.lastBaseStationId;
+
+    m_mainData.baseStations.push_back(baseStation);
+    emit baseStationAdded(baseStation.id);
+
+    triggerSave();
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool DB::setBaseStation(BaseStationId id, BaseStationDescriptor const& descriptor)
+{
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
+    int32_t _index = findBaseStationIndexByName(descriptor.name);
+    if (_index >= 0 && getBaseStation(static_cast<size_t>(_index)).id != id)
+    {
+        return false;
+    }
+    _index = findBaseStationIndexByMac(descriptor.mac);
+    if (_index >= 0 && getBaseStation(static_cast<size_t>(_index)).id != id)
+    {
+        return false;
+    }
+
+    _index = findBaseStationIndexById(id);
+    if (_index < 0)
+    {
+        return false;
+    }
+
+    size_t index = static_cast<size_t>(_index);
+
+    s_logger.logInfo(QString("Changing base station '%1' / %2").arg(descriptor.name.c_str()).arg(getMacStr(descriptor.mac).c_str()));
+
+    m_mainData.baseStations[index].descriptor = descriptor;
+    emit baseStationChanged(id);
+
+    triggerSave();
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void DB::removeBaseStation(size_t index)
+{
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
+    assert(index < m_mainData.baseStations.size());
+    BaseStationId id = m_mainData.baseStations[index].id;
+
+    BaseStationDescriptor const& descriptor = m_mainData.baseStations[index].descriptor;
+    s_logger.logInfo(QString("Removing base station '%1' / %2").arg(descriptor.name.c_str()).arg(getMacStr(descriptor.mac).c_str()));
+
+    m_mainData.baseStations.erase(m_mainData.baseStations.begin() + index);
+    emit baseStationRemoved(id);
+
+    triggerSave();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+int32_t DB::findBaseStationIndexByName(std::string const& name) const
+{
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
+    auto it = std::find_if(m_mainData.baseStations.begin(), m_mainData.baseStations.end(), [&name](BaseStation const& baseStation) { return baseStation.descriptor.name == name; });
+    if (it == m_mainData.baseStations.end())
+    {
+        return -1;
+    }
+    return std::distance(m_mainData.baseStations.begin(), it);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+int32_t DB::findBaseStationIndexById(BaseStationId id) const
+{
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
+    auto it = std::find_if(m_mainData.baseStations.begin(), m_mainData.baseStations.end(), [id](BaseStation const& baseStation) { return baseStation.id == id; });
+    if (it == m_mainData.baseStations.end())
+    {
+        return -1;
+    }
+    return std::distance(m_mainData.baseStations.begin(), it);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+int32_t DB::findBaseStationIndexByMac(BaseStationDescriptor::Mac const& mac) const
+{
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
+    auto it = std::find_if(m_mainData.baseStations.begin(), m_mainData.baseStations.end(), [&mac](BaseStation const& baseStation) { return baseStation.descriptor.mac == mac; });
+    if (it == m_mainData.baseStations.end())
+    {
+        return -1;
+    }
+    return std::distance(m_mainData.baseStations.begin(), it);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 size_t DB::getSensorCount() const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
     return m_mainData.sensors.size();
 }
 
@@ -905,6 +1132,7 @@ size_t DB::getSensorCount() const
 
 DB::Sensor const& DB::getSensor(size_t index) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
     assert(index < m_mainData.sensors.size());
     Sensor const& sensor = m_mainData.sensors[index];
     return sensor;
@@ -914,6 +1142,8 @@ DB::Sensor const& DB::getSensor(size_t index) const
 
 DB::SensorOutputDetails DB::computeSensorOutputDetails(SensorId id) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     int32_t _index = findSensorIndexById(id);
     if (_index < 0)
     {
@@ -948,6 +1178,8 @@ uint32_t DB::computeNextRealTimeMeasurementIndex() const
 
 Result<void> DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     if (descriptor.commsPeriod < std::chrono::seconds(30))
     {
         return Error("Comms period cannot be lower than 30 seconds");
@@ -985,8 +1217,6 @@ Result<void> DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
         config.baselineMeasurementTimePoint = Clock::now();
     }
 
-    emit sensorsConfigWillBeAdded();
-
     m_mainData.sensorsConfigs.push_back(config);
     while (m_mainData.sensorsConfigs.size() > 100)
     {
@@ -1007,7 +1237,7 @@ Result<void> DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
 
 Result<void> DB::setSensorsConfigs(std::vector<SensorsConfig> const& configs)
 {
-    emit sensorsConfigWillBeChanged();
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
 
     m_mainData.sensorsConfigs = configs;
     for (SensorsConfig& config: m_mainData.sensorsConfigs)
@@ -1032,6 +1262,8 @@ Result<void> DB::setSensorsConfigs(std::vector<SensorsConfig> const& configs)
 
 DB::SensorsConfig const& DB::getLastSensorsConfig() const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     static SensorsConfig s_empty;
     return m_mainData.sensorsConfigs.empty() ? s_empty : m_mainData.sensorsConfigs.back();
 }
@@ -1040,6 +1272,7 @@ DB::SensorsConfig const& DB::getLastSensorsConfig() const
 
 size_t DB::getSensorsConfigCount() const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
     return m_mainData.sensorsConfigs.size();
 }
 
@@ -1047,6 +1280,7 @@ size_t DB::getSensorsConfigCount() const
 
 DB::SensorsConfig const& DB::getSensorsConfig(size_t index) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
     assert(index < m_mainData.sensorsConfigs.size());
     return m_mainData.sensorsConfigs[index];
 }
@@ -1055,6 +1289,8 @@ DB::SensorsConfig const& DB::getSensorsConfig(size_t index) const
 
 DB::SensorsConfig const& DB::findSensorsConfigForMeasurementIndex(uint32_t index) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     for (auto it = m_mainData.sensorsConfigs.rbegin(); it != m_mainData.sensorsConfigs.rend(); ++it)
     {
         SensorsConfig const& c = *it;
@@ -1070,6 +1306,8 @@ DB::SensorsConfig const& DB::findSensorsConfigForMeasurementIndex(uint32_t index
 
 Result<void> DB::addSensor(SensorDescriptor const& descriptor)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     if (findSensorIndexByName(descriptor.name) >= 0)
     {
         return Error("Name '" + descriptor.name + "' already in use");
@@ -1086,7 +1324,6 @@ Result<void> DB::addSensor(SensorDescriptor const& descriptor)
         sensor.id = ++m_mainData.lastSensorId;
         sensor.state = Sensor::State::Unbound;
 
-        emit sensorWillBeAdded(sensor.id);
         m_mainData.sensors.push_back(sensor);
         emit sensorAdded(sensor.id);
 
@@ -1110,6 +1347,8 @@ Result<void> DB::addSensor(SensorDescriptor const& descriptor)
 
 Result<void> DB::setSensor(SensorId id, SensorDescriptor const& descriptor)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     int32_t _index = findSensorIndexByName(descriptor.name);
     if (_index >= 0 && getSensor(static_cast<size_t>(_index)).id != id)
     {
@@ -1137,6 +1376,8 @@ Result<void> DB::setSensor(SensorId id, SensorDescriptor const& descriptor)
 
 Result<DB::SensorId> DB::bindSensor(uint32_t serialNumber, uint8_t sensorType, uint8_t hardwareVersion, uint8_t softwareVersion, Sensor::Calibration const& calibration)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     int32_t _index = findUnboundSensorIndex();
     if (_index < 0)
     {
@@ -1180,6 +1421,8 @@ Result<DB::SensorId> DB::bindSensor(uint32_t serialNumber, uint8_t sensorType, u
 
 Result<void> DB::setSensorCalibration(SensorId id, Sensor::Calibration const& calibration)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     int32_t _index = findSensorIndexById(id);
     if (_index < 0)
     {
@@ -1207,6 +1450,8 @@ Result<void> DB::setSensorCalibration(SensorId id, Sensor::Calibration const& ca
 
 Result<void> DB::setSensorSleep(SensorId id, bool sleep)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     int32_t _index = findSensorIndexById(id);
     if (_index < 0)
     {
@@ -1252,6 +1497,8 @@ Result<void> DB::setSensorSleep(SensorId id, bool sleep)
 
 bool DB::setSensorInputDetails(SensorInputDetails const& details)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     return setSensorsInputDetails({details});
 }
 
@@ -1259,6 +1506,8 @@ bool DB::setSensorInputDetails(SensorInputDetails const& details)
 
 bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     bool ok = true;
     for (SensorInputDetails const& d: details)
     {
@@ -1340,6 +1589,14 @@ bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
             sensor.errorCounters.watchdogReboots += d.errorCountersDelta.watchdogReboots;
         }
 
+        if (d.hasMeasurement)
+        {
+            sensor.isMeasurementValid = true;
+            sensor.measurementTemperature = d.measurementTemperature;
+            sensor.measurementHumidity = d.measurementHumidity;
+            sensor.measurementVcc = d.measurementVcc;
+        }
+
         emit sensorDataChanged(sensor.id);
     }
 
@@ -1352,6 +1609,8 @@ bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
 
 void DB::removeSensor(size_t index)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     assert(index < m_mainData.sensors.size());
 
     SensorId sensorId = m_mainData.sensors[index].id;
@@ -1360,8 +1619,6 @@ void DB::removeSensor(size_t index)
         auto it = m_mainData.measurements.find(sensorId);
         if (it != m_mainData.measurements.end())
         {
-            emit measurementsWillBeRemoved(sensorId);
-
             for (StoredMeasurement const& sm: it->second)
             {
                 MeasurementId id = computeMeasurementId(sensorId, sm);
@@ -1390,7 +1647,6 @@ void DB::removeSensor(size_t index)
 
     s_logger.logInfo(QString("Removing sensor '%1'").arg(m_mainData.sensors[index].descriptor.name.c_str()));
 
-    emit sensorWillBeRemoved(sensorId);
     m_mainData.sensors.erase(m_mainData.sensors.begin() + index);
     emit sensorRemoved(sensorId);
 
@@ -1409,6 +1665,8 @@ void DB::removeSensor(size_t index)
 
 int32_t DB::findSensorIndexByName(std::string const& name) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [&name](Sensor const& sensor) { return sensor.descriptor.name == name; });
     if (it == m_mainData.sensors.end())
     {
@@ -1421,6 +1679,8 @@ int32_t DB::findSensorIndexByName(std::string const& name) const
 
 int32_t DB::findSensorIndexById(SensorId id) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [&id](Sensor const& sensor) { return sensor.id == id; });
     if (it == m_mainData.sensors.end())
     {
@@ -1433,6 +1693,8 @@ int32_t DB::findSensorIndexById(SensorId id) const
 
 int32_t DB::findSensorIndexByAddress(SensorAddress address) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [&address](Sensor const& sensor) { return sensor.address == address; });
     if (it == m_mainData.sensors.end())
     {
@@ -1445,6 +1707,8 @@ int32_t DB::findSensorIndexByAddress(SensorAddress address) const
 
 int32_t DB::findSensorIndexBySerialNumber(SensorSerialNumber serialNumber) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [&serialNumber](Sensor const& sensor) { return sensor.serialNumber == serialNumber; });
     if (it == m_mainData.sensors.end())
     {
@@ -1457,6 +1721,8 @@ int32_t DB::findSensorIndexBySerialNumber(SensorSerialNumber serialNumber) const
 
 int32_t DB::findUnboundSensorIndex() const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [](Sensor const& sensor) { return sensor.state == Sensor::State::Unbound; });
     if (it == m_mainData.sensors.end())
     {
@@ -1469,6 +1735,8 @@ int32_t DB::findUnboundSensorIndex() const
 
 size_t DB::getAlarmCount() const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     return m_mainData.alarms.size();
 }
 
@@ -1476,6 +1744,8 @@ size_t DB::getAlarmCount() const
 
 DB::Alarm const& DB::getAlarm(size_t index) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     assert(index < m_mainData.alarms.size());
     return m_mainData.alarms[index];
 }
@@ -1484,6 +1754,8 @@ DB::Alarm const& DB::getAlarm(size_t index) const
 
 Result<void> DB::addAlarm(AlarmDescriptor const& descriptor)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     if (findAlarmIndexByName(descriptor.name) >= 0)
     {
         return Error("Name '" + descriptor.name + "' already in use");
@@ -1498,7 +1770,6 @@ Result<void> DB::addAlarm(AlarmDescriptor const& descriptor)
 
     alarm.id = ++m_mainData.lastAlarmId;
 
-    emit alarmWillBeAdded(alarm.id);
     m_mainData.alarms.push_back(alarm);
     emit alarmAdded(alarm.id);
 
@@ -1513,6 +1784,8 @@ Result<void> DB::addAlarm(AlarmDescriptor const& descriptor)
 
 Result<void> DB::setAlarm(AlarmId id, AlarmDescriptor const& descriptor)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     int32_t _index = findAlarmIndexByName(descriptor.name);
     if (_index >= 0 && getAlarm(static_cast<size_t>(_index)).id != id)
     {
@@ -1540,12 +1813,13 @@ Result<void> DB::setAlarm(AlarmId id, AlarmDescriptor const& descriptor)
 
 void DB::removeAlarm(size_t index)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     assert(index < m_mainData.alarms.size());
     AlarmId id = m_mainData.alarms[index].id;
 
     s_logger.logInfo(QString("Removed alarm '%1'").arg(m_mainData.alarms[index].descriptor.name.c_str()));
 
-    emit alarmWillBeRemoved(id);
     m_mainData.alarms.erase(m_mainData.alarms.begin() + index);
     emit alarmRemoved(id);
 
@@ -1556,6 +1830,8 @@ void DB::removeAlarm(size_t index)
 
 int32_t DB::findAlarmIndexByName(std::string const& name) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     auto it = std::find_if(m_mainData.alarms.begin(), m_mainData.alarms.end(), [&name](Alarm const& alarm) { return alarm.descriptor.name == name; });
     if (it == m_mainData.alarms.end())
     {
@@ -1568,6 +1844,8 @@ int32_t DB::findAlarmIndexByName(std::string const& name) const
 
 int32_t DB::findAlarmIndexById(AlarmId id) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     auto it = std::find_if(m_mainData.alarms.begin(), m_mainData.alarms.end(), [id](Alarm const& alarm) { return alarm.id == id; });
     if (it == m_mainData.alarms.end())
     {
@@ -1580,6 +1858,8 @@ int32_t DB::findAlarmIndexById(AlarmId id) const
 
 uint8_t DB::computeAlarmTriggers(Measurement const& m)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     uint8_t allTriggers = 0;
 
     for (Alarm& alarm: m_mainData.alarms)
@@ -1595,6 +1875,8 @@ uint8_t DB::computeAlarmTriggers(Measurement const& m)
 
 uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     AlarmDescriptor const& ad = alarm.descriptor;
     if (ad.filterSensors)
     {
@@ -1676,6 +1958,8 @@ uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
 
 size_t DB::getReportCount() const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     return m_mainData.reports.size();
 }
 
@@ -1683,6 +1967,8 @@ size_t DB::getReportCount() const
 
 DB::Report const& DB::getReport(size_t index) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     assert(index < m_mainData.reports.size());
     return m_mainData.reports[index];
 }
@@ -1691,6 +1977,8 @@ DB::Report const& DB::getReport(size_t index) const
 
 Result<void> DB::addReport(ReportDescriptor const& descriptor)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     if (findReportIndexByName(descriptor.name) >= 0)
     {
         return Error("Name '" + descriptor.name + "' already in use");
@@ -1705,7 +1993,6 @@ Result<void> DB::addReport(ReportDescriptor const& descriptor)
 
     report.id = ++m_mainData.lastReportId;
 
-    emit reportWillBeAdded(report.id);
     m_mainData.reports.push_back(report);
     emit reportAdded(report.id);
 
@@ -1720,6 +2007,8 @@ Result<void> DB::addReport(ReportDescriptor const& descriptor)
 
 Result<void> DB::setReport(ReportId id, ReportDescriptor const& descriptor)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     int32_t _index = findReportIndexByName(descriptor.name);
     if (_index >= 0 && getReport(static_cast<size_t>(_index)).id != id)
     {
@@ -1747,12 +2036,13 @@ Result<void> DB::setReport(ReportId id, ReportDescriptor const& descriptor)
 
 void DB::removeReport(size_t index)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     assert(index < m_mainData.reports.size());
     ReportId id = m_mainData.reports[index].id;
 
     s_logger.logInfo(QString("Removed report '%1'").arg(m_mainData.reports[index].descriptor.name.c_str()));
 
-    emit reportWillBeRemoved(id);
     m_mainData.reports.erase(m_mainData.reports.begin() + index);
     emit reportRemoved(id);
 
@@ -1763,6 +2053,8 @@ void DB::removeReport(size_t index)
 
 int32_t DB::findReportIndexByName(std::string const& name) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     auto it = std::find_if(m_mainData.reports.begin(), m_mainData.reports.end(), [&name](Report const& report) { return report.descriptor.name == name; });
     if (it == m_mainData.reports.end())
     {
@@ -1775,6 +2067,8 @@ int32_t DB::findReportIndexByName(std::string const& name) const
 
 int32_t DB::findReportIndexById(ReportId id) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     auto it = std::find_if(m_mainData.reports.begin(), m_mainData.reports.end(), [id](Report const& report) { return report.id == id; });
     if (it == m_mainData.reports.end())
     {
@@ -1787,6 +2081,8 @@ int32_t DB::findReportIndexById(ReportId id) const
 
 bool DB::isReportTriggered(ReportId id) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     int32_t _index = findReportIndexById(id);
     if (_index < 0)
     {
@@ -1843,6 +2139,8 @@ bool DB::isReportTriggered(ReportId id) const
 
 void DB::setReportExecuted(ReportId id)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     int32_t _index = findReportIndexById(id);
     if (_index < 0)
     {
@@ -1860,6 +2158,8 @@ void DB::setReportExecuted(ReportId id)
 
 bool DB::addMeasurement(MeasurementDescriptor const& md)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     return _addMeasurements(md.sensorId, {md});
 }
 
@@ -1867,6 +2167,8 @@ bool DB::addMeasurement(MeasurementDescriptor const& md)
 
 bool DB::addMeasurements(std::vector<MeasurementDescriptor> const& mds)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     std::map<SensorId, std::vector<MeasurementDescriptor>> mdPerSensor;
     for (MeasurementDescriptor const& md: mds)
     {
@@ -1885,6 +2187,8 @@ bool DB::addMeasurements(std::vector<MeasurementDescriptor> const& mds)
 
 bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> mds)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     int32_t _sensorIndex = findSensorIndexById(sensorId);
     if (_sensorIndex < 0)
     {
@@ -1904,10 +2208,6 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
     {
         return true;
     }
-
-    sensor.isLastMeasurementValid = true;
-
-    emit measurementsWillBeAdded(sensorId);
 
     uint32_t minIndex = std::numeric_limits<uint32_t>::max();
     uint32_t maxIndex = std::numeric_limits<uint32_t>::lowest();
@@ -1952,7 +2252,13 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
         }
         minIndex = std::min(minIndex, md.index);
         maxIndex = std::max(maxIndex, md.index);
-        sensor.lastMeasurement = measurement;
+        if (!sensor.isMeasurementValid)
+        {
+            sensor.isMeasurementValid = true;
+            sensor.measurementTemperature = measurement.descriptor.temperature;
+            sensor.measurementHumidity = measurement.descriptor.humidity;
+            sensor.measurementVcc = measurement.descriptor.vcc;
+        }
     }
     s_logger.logVerbose(QString("Added measurement indices %1 to %2, sensor '%3'").arg(minIndex).arg(maxIndex).arg(sensor.descriptor.name.c_str()));
 
@@ -1972,6 +2278,8 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
 
 DB::Clock::time_point DB::computeMeasurementTimepoint(MeasurementDescriptor const& md) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     SensorsConfig const& config = findSensorsConfigForMeasurementIndex(md.index);
     uint32_t index = md.index >= config.baselineMeasurementIndex ? md.index - config.baselineMeasurementIndex : 0;
     Clock::time_point tp = config.baselineMeasurementTimePoint + config.descriptor.measurementPeriod * index;
@@ -1982,6 +2290,8 @@ DB::Clock::time_point DB::computeMeasurementTimepoint(MeasurementDescriptor cons
 
 std::vector<DB::Measurement> DB::getAllMeasurements() const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     std::vector<DB::Measurement> result;
     result.reserve(8192);
 
@@ -1999,6 +2309,8 @@ std::vector<DB::Measurement> DB::getAllMeasurements() const
 
 size_t DB::getAllMeasurementCount() const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     size_t count = 0;
     for (auto const& pair : m_mainData.measurements)
     {
@@ -2011,6 +2323,8 @@ size_t DB::getAllMeasurementCount() const
 
 std::vector<DB::Measurement> DB::getFilteredMeasurements(Filter const& filter) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     std::vector<DB::Measurement> result;
     result.reserve(8192);
     _getFilteredMeasurements(filter, &result);
@@ -2021,6 +2335,8 @@ std::vector<DB::Measurement> DB::getFilteredMeasurements(Filter const& filter) c
 
 size_t DB::getFilteredMeasurementCount(Filter const& filter) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     return _getFilteredMeasurements(filter, nullptr);
 }
 
@@ -2089,31 +2405,20 @@ size_t DB::_getFilteredMeasurements(Filter const& filter, std::vector<DB::Measur
 
 Result<DB::Measurement> DB::getLastMeasurementForSensor(SensorId sensor_id) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
     auto it = m_mainData.measurements.find(sensor_id);
     if (it == m_mainData.measurements.end())
     {
         return Error("Sensor not found");
     }
 
-    bool found = false;
-    Measurement measurement;
-    Clock::time_point bestTimePoint = Clock::time_point(Clock::duration::zero());
-    for (StoredMeasurement const& sm: it->second)
+    const StoredMeasurements& storedMeasurements = it->second;
+    if (storedMeasurements.empty())
     {
-        Measurement m = unpack(sensor_id, sm);
-        if (m.timePoint > bestTimePoint)
-        {
-            found = true;
-            measurement = m;
-            bestTimePoint = m.timePoint;
-        }
+        return Error("No data");
     }
-
-    if (found)
-    {
-        return measurement;
-    }
-    return Error("Sensor doesn't have any measurements");
+    return unpack(sensor_id, storedMeasurements.back());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -2289,9 +2594,15 @@ void DB::triggerSave()
         m_delayedTriggerSave = false;
     }
 
+    Data data;
+    {
+        std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+        data = m_mainData;
+    }
+
     {
         std::unique_lock<std::mutex> lg(m_storeMutex);
-        m_storeData = m_mainData;
+        m_storeData = std::move(data);
         m_storeThreadTriggered = true;
     }
     m_storeCV.notify_all();
@@ -2356,6 +2667,24 @@ void DB::save(Data const& data) const
 ////            ssj.AddMember("baseline", static_cast<uint64_t>(Clock::to_time_t(data.sensorSettings.baselineTimePoint)), document.GetAllocator());
 //            document.AddMember("sensor_settings", ssj, document.GetAllocator());
 //        }
+
+        {
+            rapidjson::Value bssj;
+            bssj.SetArray();
+            for (BaseStation const& baseStation: data.baseStations)
+            {
+                rapidjson::Value bsj;
+                bsj.SetObject();
+                bsj.AddMember("id", baseStation.id, document.GetAllocator());
+                bsj.AddMember("name", rapidjson::Value(baseStation.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
+                //bsj.AddMember("address", rapidjson::Value(baseStation.descriptor.address.toString().toUtf8().data(), document.GetAllocator()), document.GetAllocator());
+
+                BaseStationDescriptor::Mac const& mac = baseStation.descriptor.mac;
+                bsj.AddMember("mac", rapidjson::Value(getMacStr(mac).c_str(), document.GetAllocator()), document.GetAllocator());
+                bssj.PushBack(bsj, document.GetAllocator());
+            }
+            document.AddMember("base_stations", bssj, document.GetAllocator());
+        }
 
         {
             rapidjson::Value configsj;

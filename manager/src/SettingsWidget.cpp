@@ -85,7 +85,6 @@ void SettingsWidget::init(Comms& comms, Settings& settings)
     m_ui.baseStationsWidget->init(comms, settings);
     m_ui.usersWidget->init(settings);
 
-    setRW();
     m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &SettingsWidget::setRW));
 
     m_uiConnections.push_back(connect(m_ui.sensorsPower, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
@@ -112,7 +111,13 @@ void SettingsWidget::init(Comms& comms, Settings& settings)
     }));
     m_ui.list->setCurrentItem(m_ui.list->topLevelItem(0));
 
-    m_ui.sensorsPage->setEnabled(m_settings->getActiveBaseStationId() != 0);
+    m_db = &m_settings->getDB();
+    m_ui.reportsWidget->init(*m_settings);
+
+    setSensorsConfig(m_db->getLastSensorsConfig());
+    m_dbConnections.push_back(connect(m_db, &DB::sensorsConfigChanged, [this]() { if (m_db) setSensorsConfig(m_db->getLastSensorsConfig()); }));
+
+    setRW();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -131,45 +136,6 @@ void SettingsWidget::shutdown()
 
 //    m_ui.baseStationsWidget->shutdown();
     m_ui.usersWidget->shutdown();
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void SettingsWidget::initBaseStation(Settings::BaseStationId id)
-{
-    int32_t _index = m_settings->findBaseStationIndexById(id);
-    if (_index < 0)
-    {
-        assert(false);
-        return;
-    }
-
-    for (const QMetaObject::Connection& connection: m_dbConnections)
-    {
-        QObject::disconnect(connection);
-    }
-    m_dbConnections.clear();
-
-    //Settings::BaseStation const& bs = m_settings->getBaseStation(index);
-    size_t index = static_cast<size_t>(_index);
-    DB& db = m_settings->getBaseStationDB(index);
-    m_db = &db;
-    m_ui.reportsWidget->init(*m_settings, db);
-
-    setSensorsConfig(m_db->getLastSensorsConfig());
-    m_dbConnections.push_back(connect(&db, &DB::sensorsConfigChanged, [this]() { if (m_db) setSensorsConfig(m_db->getLastSensorsConfig()); }));
-
-    setRW();
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void SettingsWidget::shutdownBaseStation(Settings::BaseStationId /*id*/)
-{
-    m_db = nullptr;
-    m_ui.reportsWidget->shutdown();
-    m_ui.reportsWidget->setEnabled(false);
-    m_ui.sensorsPage->setEnabled(false);
 }
 
 //////////////////////////////////////////////////////////////////////////

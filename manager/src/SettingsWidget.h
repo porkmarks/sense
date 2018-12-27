@@ -20,9 +20,6 @@ public:
     void init(Comms& comms, Settings& settings);
     void shutdown();
 
-    void initBaseStation(Settings::BaseStationId id);
-    void shutdownBaseStation(Settings::BaseStationId id);
-
 signals:
 
 private slots:

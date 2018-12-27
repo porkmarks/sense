@@ -20,7 +20,7 @@ Logger s_logger;
 
 extern std::string k_passwordHashReferenceText;
 
-std::string getMacStr(Settings::BaseStationDescriptor::Mac const& mac)
+std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac)
 {
     char macStr[128];
     sprintf(macStr, "%X:%X:%X:%X:%X:%X", mac[0]&0xFF, mac[1]&0xFF, mac[2]&0xFF, mac[3]&0xFF, mac[4]&0xFF, mac[5]&0xFF);
@@ -57,6 +57,15 @@ Manager::Manager(QWidget *parent)
     m_ui.settingsWidget->init(m_comms, m_settings);
     m_ui.logsWidget->init();
 
+    m_ui.sensorsWidget->init(m_settings);
+    m_ui.measurementsWidget->init(m_settings.getDB());
+    m_ui.plotWidget->init(m_settings.getDB());
+    m_ui.alarmsWidget->init(m_settings);
+
+    m_ui.actionEmailSettings->setEnabled(true);
+    m_ui.actionFtpSettings->setEnabled(true);
+    m_ui.actionSensorSettings->setEnabled(true);
+
     //m_ui.baseStationsWidget->init(m_comms);
 
     auto* timer = new QTimer(this);
@@ -64,8 +73,6 @@ Manager::Manager(QWidget *parent)
     timer->start(1);
     connect(timer, &QTimer::timeout, this, &Manager::process, Qt::QueuedConnection);
 
-    connect(&m_settings, &Settings::baseStationActivated, this, &Manager::activateBaseStation);
-    connect(&m_settings, &Settings::baseStationDeactivated, this, &Manager::deactivateBaseStation);
     connect(m_ui.actionExit, &QAction::triggered, this, &Manager::exitAction);
     connect(m_ui.actionAbout, &QAction::triggered, this, &Manager::showAbout);
     connect(m_ui.actionLogout, &QAction::triggered, this, &Manager::logout);
@@ -82,11 +89,6 @@ Manager::Manager(QWidget *parent)
     checkIfAdminExists();
 
     login();
-
-    if (m_settings.getActiveBaseStationId() != 0)
-    {
-        activateBaseStation(m_settings.getActiveBaseStationId());
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -286,69 +288,6 @@ void Manager::tabChanged()
     }
 
     m_currentTabIndex = m_ui.tabWidget->currentIndex();
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Manager::activateBaseStation(Settings::BaseStationId id)
-{
-    int32_t _index = m_settings.findBaseStationIndexById(id);
-    if (_index < 0)
-    {
-        s_logger.logCritical("Tried to activate an inexisting base station");
-        assert(false);
-        return;
-    }
-
-    size_t index = static_cast<size_t>(_index);
-    Settings::BaseStation const& bs = m_settings.getBaseStation(index);
-    DB& db = m_settings.getBaseStationDB(index);
-
-    s_logger.logInfo(QString("Activated base station '%1' / %2").arg(bs.descriptor.name.c_str()).arg(getMacStr(bs.descriptor.mac).c_str()).toUtf8().data());
-
-    m_ui.sensorsWidget->init(m_settings, db);
-    m_ui.measurementsWidget->init(db);
-    m_ui.plotWidget->init(db);
-    m_ui.alarmsWidget->init(m_settings, db);
-    m_ui.settingsWidget->initBaseStation(id);
-
-    m_ui.actionEmailSettings->setEnabled(true);
-    m_ui.actionFtpSettings->setEnabled(true);
-    m_ui.actionSensorSettings->setEnabled(true);
-
-    m_activeDB = &db;
-
-    //db.test();
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Manager::deactivateBaseStation(Settings::BaseStationId id)
-{
-    int32_t _index = m_settings.findBaseStationIndexById(id);
-    if (_index < 0)
-    {
-        s_logger.logCritical("Tried to deactivate an inexisting base station");
-        assert(false);
-    }
-    else
-    {
-        size_t index = static_cast<size_t>(_index);
-        Settings::BaseStation const& bs = m_settings.getBaseStation(index);
-        s_logger.logInfo(QString("Deactivated base station '%1' / %2").arg(bs.descriptor.name.c_str()).arg(getMacStr(bs.descriptor.mac).c_str()).toUtf8().data());
-    }
-
-    m_ui.sensorsWidget->shutdown();
-    m_ui.measurementsWidget->shutdown();
-    m_ui.plotWidget->shutdown();
-    m_ui.alarmsWidget->shutdown();
-    m_ui.settingsWidget->shutdownBaseStation(id);
-
-    m_ui.actionEmailSettings->setEnabled(false);
-    m_ui.actionFtpSettings->setEnabled(false);
-    m_ui.actionSensorSettings->setEnabled(false);
-
-    m_activeDB = nullptr;
 }
 
 //////////////////////////////////////////////////////////////////////////

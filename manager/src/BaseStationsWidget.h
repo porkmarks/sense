@@ -28,7 +28,7 @@ private slots:
     void baseStationConnected(Comms::BaseStationDescriptor const& bs);
     void baseStationDisconnected(Comms::BaseStationDescriptor const& bs);
     void activateBaseStation(QModelIndex const& index);
-    void showDisconnectionMessageBox(Settings::BaseStation const& bs, const QHostAddress& address);
+    void showDisconnectionMessageBox(DB::BaseStation const& bs, const QHostAddress& address);
 
 private:
     void setName(size_t row, std::string const& name);
@@ -41,7 +41,7 @@ private:
     Settings* m_settings = nullptr;
     QStandardItemModel m_model;
 
-    std::vector<Settings::BaseStationDescriptor> m_baseStationDescriptors;
+    std::vector<DB::BaseStationDescriptor> m_baseStationDescriptors;
     std::vector<QMetaObject::Connection> m_uiConnections;
 };
 

@@ -33,7 +33,6 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
     DB::SensorDescriptor descriptor = m_sensor.descriptor;
 
     DB::SensorsConfig config = m_db.getLastSensorsConfig();
-    Result<DB::Measurement> lastMeasurementResult = m_db.getLastMeasurementForSensor(m_sensor.id);
 
     m_ui.name->setText(descriptor.name.c_str());
     m_ui.serialNumber->setText(QString("%1").arg(sensor.serialNumber, 8, 16, QChar('0')));
@@ -51,15 +50,7 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
 
         auto pair = computeRelativeTimePointString(m_sensor.sleepStateTimePoint);
         std::string str = pair.first;
-        if (pair.second > 0)
-        {
-            str = "In " + str;
-        }
-        else
-        {
-            str = str + " ago";
-        }
-
+        str = (pair.second > 0) ? "In " + str : str + " ago";
         m_ui.sleepState->setText(QString("(sleeping since %1, %2)").arg(dt.toString("dd-MM-yyyy HH:mm")).arg(str.c_str()));
     }
     else if (m_sensor.state == DB::Sensor::State::Active)
@@ -67,9 +58,9 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
         m_ui.sleepState->setText(QString("(scheduled to sleep)"));
     }
 
-    if (lastMeasurementResult == success)
+    if (sensor.isMeasurementValid)
     {
-        float vcc = lastMeasurementResult.payload().descriptor.vcc;
+        float vcc = sensor.measurementVcc;
         m_ui.battery->setText(QString("%1% (%2V)").arg(static_cast<int>(getBatteryLevel(vcc) * 100.f)).arg(vcc, 0, 'f', 1));
         m_ui.batteryIcon->setPixmap(getBatteryIcon(vcc).pixmap(24, 24));
 
@@ -103,7 +94,11 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
     {
         QDateTime dt;
         dt.setTime_t(DB::Clock::to_time_t(m_sensor.lastCommsTimePoint));
-        m_ui.lastComms->setText(QString("%1 (%2)").arg(dt.toString("dd-MM-yyyy HH:mm")).arg(computeRelativeTimePointString(m_sensor.lastCommsTimePoint).first.c_str()));
+
+        auto pair = computeRelativeTimePointString(m_sensor.lastCommsTimePoint);
+        std::string str = pair.first;
+        str = (pair.second > 0) ? "In " + str : str + " ago";
+        m_ui.lastComms->setText(QString("%1 (%2)").arg(dt.toString("dd-MM-yyyy HH:mm")).arg(str.c_str()));
     }
     else
     {

@@ -28,7 +28,7 @@ ReportsWidget::~ReportsWidget()
 
 //////////////////////////////////////////////////////////////////////////
 
-void ReportsWidget::init(Settings& settings, DB& db)
+void ReportsWidget::init(Settings& settings)
 {
     for (const QMetaObject::Connection& connection: m_uiConnections)
     {
@@ -39,9 +39,9 @@ void ReportsWidget::init(Settings& settings, DB& db)
     setEnabled(true);
 
     m_settings = &settings;
-    m_db = &db;
+    m_db = &m_settings->getDB();
 
-    m_model.reset(new ReportsModel(db));
+    m_model.reset(new ReportsModel(*m_db));
     m_ui.list->setModel(m_model.get());
     m_ui.list->setUniformRowHeights(true);
 

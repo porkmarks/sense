@@ -14,8 +14,8 @@ public:
     ~Manager();
 
 private slots:
-    void activateBaseStation(Settings::BaseStationId id);
-    void deactivateBaseStation(Settings::BaseStationId id);
+    void activateBaseStation(DB::BaseStationId id);
+    void deactivateBaseStation(DB::BaseStationId id);
     void showAbout();
     void exitAction();
     void logout();
@@ -36,7 +36,6 @@ private:
 
     Comms m_comms;
     Settings m_settings;
-    DB* m_activeDB = nullptr;
 
     Ui::Manager m_ui;
     int m_currentTabIndex = 0;

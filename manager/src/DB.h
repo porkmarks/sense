@@ -25,8 +25,35 @@ public:
     void test();
 
     void process();
-    Result<void> create(std::string const& name);
-    Result<void> load(std::string const& name);
+    Result<void> create();
+    Result<void> load();
+
+    ////////////////////////////////////////////////////////////////////////////
+
+    struct BaseStationDescriptor
+    {
+        typedef std::array<uint8_t, 6> Mac;
+
+        std::string name;
+        Mac mac;
+        //QHostAddress address;
+    };
+
+    typedef uint32_t BaseStationId;
+    struct BaseStation
+    {
+        BaseStationDescriptor descriptor;
+        BaseStationId id;
+    };
+
+    size_t getBaseStationCount() const;
+    BaseStation const& getBaseStation(size_t index) const;
+    int32_t findBaseStationIndexByName(std::string const& name) const;
+    int32_t findBaseStationIndexById(BaseStationId id) const;
+    int32_t findBaseStationIndexByMac(BaseStationDescriptor::Mac const& mac) const;
+    bool addBaseStation(BaseStationDescriptor const& descriptor);
+    bool setBaseStation(BaseStationId id, BaseStationDescriptor const& descriptor);
+    void removeBaseStation(size_t index);
 
     ////////////////////////////////////////////////////////////////////////////
 
@@ -160,8 +187,10 @@ public:
         SignalStrength averageSignalStrength;
         int8_t averageCombinedSignalStrength = 0; //dBm
 
-        bool isLastMeasurementValid = false;
-        Measurement lastMeasurement;
+        bool isMeasurementValid = false;
+        float measurementTemperature = 0;
+        float measurementHumidity = 0;
+        float measurementVcc = 0;
     };
 
     size_t getSensorCount() const;
@@ -175,6 +204,11 @@ public:
     struct SensorInputDetails
     {
         SensorId id;
+
+        bool hasMeasurement = false;
+        float measurementTemperature = 0;
+        float measurementHumidity = 0;
+        float measurementVcc = 0;
 
         bool hasStoredData = false;
         uint32_t firstStoredMeasurementIndex = 0;
@@ -372,35 +406,28 @@ public:
     ////////////////////////////////////////////////////////////////////////////
 
 signals:
-    void sensorsConfigWillBeAdded();
-    void sensorsConfigAdded();
+    void baseStationAdded(BaseStationId id);
+    void baseStationRemoved(BaseStationId id);
+    void baseStationChanged(BaseStationId id);
 
-    void sensorsConfigWillBeChanged();
+    void sensorsConfigAdded();
     void sensorsConfigChanged();
 
-    void sensorWillBeAdded(SensorId id);
     void sensorAdded(SensorId id);
     void sensorBound(SensorId id);
-    void sensorWillBeRemoved(SensorId id);
     void sensorRemoved(SensorId id);
     void sensorChanged(SensorId id);
     void sensorDataChanged(SensorId id);
 
-    void alarmWillBeAdded(AlarmId id);
     void alarmAdded(AlarmId id);
-    void alarmWillBeRemoved(AlarmId id);
     void alarmRemoved(AlarmId id);
     void alarmChanged(AlarmId id);
 
-    void reportWillBeAdded(ReportId id);
     void reportAdded(ReportId id);
-    void reportWillBeRemoved(ReportId id);
     void reportRemoved(ReportId id);
     void reportChanged(ReportId id);
 
-    void measurementsWillBeAdded(SensorId id);
     void measurementsAdded(SensorId id);
-    void measurementsWillBeRemoved(SensorId id);
     void measurementsRemoved(SensorId id);
 
    void alarmTriggersChanged(AlarmId alarmId, Measurement const& m, uint8_t oldTriggers, uint8_t newTriggers, uint8_t addedTriggers, uint8_t removedTriggers);
@@ -445,12 +472,14 @@ private:
 
     struct Data
     {
+        std::vector<BaseStation> baseStations;
         std::vector<SensorsConfig> sensorsConfigs;
         std::vector<Sensor> sensors;
         std::vector<Alarm> alarms;
         std::vector<Report> reports;
         std::map<SensorId, StoredMeasurements> measurements;
         std::vector<MeasurementId> sortedMeasurementIds;
+        BaseStationId lastBaseStationId = 0;
         SensorId lastSensorId = 0;
         AlarmId lastAlarmId = 0;
         ReportId lastReportId = 0;
@@ -458,6 +487,7 @@ private:
         uint32_t lastSensorAddress = Sensor_Comms::SLAVE_ADDRESS_BEGIN;
     };
 
+    mutable std::recursive_mutex m_mainDataMutex;
     Data m_mainData;
 
     SignalStrength computeAverageSignalStrength(SensorId sensorId, Data const& data) const;

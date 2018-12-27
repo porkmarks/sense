@@ -32,7 +32,7 @@ SensorsWidget::~SensorsWidget()
 
 //////////////////////////////////////////////////////////////////////////
 
-void SensorsWidget::init(Settings& settings, DB& db)
+void SensorsWidget::init(Settings& settings)
 {
     for (const QMetaObject::Connection& connection: m_uiConnections)
     {
@@ -43,8 +43,8 @@ void SensorsWidget::init(Settings& settings, DB& db)
     setEnabled(true);
 
     m_settings = &settings;
-    m_db = &db;
-    m_model.reset(new SensorsModel(db));
+    m_db = &m_settings->getDB();
+    m_model.reset(new SensorsModel(*m_db));
     m_sortingModel.setSourceModel(m_model.get());
     m_delegate.reset(new SensorsDelegate(m_sortingModel));
 
@@ -65,6 +65,7 @@ void SensorsWidget::init(Settings& settings, DB& db)
 
     setRW();
     m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &SensorsWidget::setRW));
+    m_uiConnections.push_back(connect(m_db, &DB::baseStationAdded, this, &SensorsWidget::setRW));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -83,7 +84,7 @@ void SensorsWidget::shutdown()
 
 void SensorsWidget::setRW()
 {
-    m_ui.add->setEnabled(m_settings->isLoggedInAsAdmin());
+    m_ui.add->setEnabled(m_settings->isLoggedInAsAdmin() && m_db->getBaseStationCount() > 0);
     m_ui.remove->setEnabled(m_settings->isLoggedInAsAdmin());
 }
 

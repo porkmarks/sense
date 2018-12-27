@@ -16,7 +16,7 @@ class AlarmsWidget : public QWidget
 public:
     explicit AlarmsWidget(QWidget *parent = 0);
     ~AlarmsWidget();
-    void init(Settings& settings, DB& db);
+    void init(Settings& settings);
     void shutdown();
 
 signals:

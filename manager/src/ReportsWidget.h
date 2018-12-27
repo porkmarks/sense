@@ -16,7 +16,7 @@ class ReportsWidget : public QWidget
 public:
     explicit ReportsWidget(QWidget *parent = 0);
     ~ReportsWidget();
-    void init(Settings& settings, DB& db);
+    void init(Settings& settings);
     void shutdown();
 
 signals:

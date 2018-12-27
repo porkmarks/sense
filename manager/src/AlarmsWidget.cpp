@@ -29,7 +29,7 @@ AlarmsWidget::~AlarmsWidget()
 
 //////////////////////////////////////////////////////////////////////////
 
-void AlarmsWidget::init(Settings& settings, DB& db)
+void AlarmsWidget::init(Settings& settings)
 {
     for (const QMetaObject::Connection& connection: m_uiConnections)
     {
@@ -39,10 +39,10 @@ void AlarmsWidget::init(Settings& settings, DB& db)
 
     setEnabled(true);
 
-    m_db = &db;
     m_settings = &settings;
+    m_db = &m_settings->getDB();
 
-    m_model.reset(new AlarmsModel(db));
+    m_model.reset(new AlarmsModel(*m_db));
     m_ui.list->setModel(m_model.get());
     m_ui.list->setUniformRowHeights(true);
 

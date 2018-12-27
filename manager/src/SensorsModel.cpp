@@ -50,16 +50,6 @@ std::pair<std::string, int32_t> computeDurationString(DB::Clock::duration d)
     }
 
     std::string str(buf);
-
-    if (totalSeconds > 0)
-    {
-        str = "In " + str;
-    }
-    else
-    {
-        str = str + " ago";
-    }
-
     return std::make_pair(str, totalSeconds);
 }
 
@@ -409,11 +399,11 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         }
         else
         {
-            if (sensor.isLastMeasurementValid)
+            if (sensor.isMeasurementValid)
             {
                 if (column == Column::Battery)
                 {
-                    return getBatteryIcon(sensor.lastMeasurement.descriptor.vcc);
+                    return getBatteryIcon(sensor.measurementVcc);
                 }
                 else if (column == Column::Signal)
                 {
@@ -462,14 +452,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                 {
                     auto p = computeRelativeTimePointString(sensor.lastCommsTimePoint + m_db.getLastSensorsConfig().computedCommsPeriod);
                     std::string str = p.first;
-                    if (p.second > 0)
-                    {
-                        str = "In " + str;
-                    }
-                    else
-                    {
-                        str = str + " ago";
-                    }
+                    str = (p.second > 0) ? "In " + str : str + " ago";
                     if (p.second < k_imminentMaxSecond && p.second > k_imminentMinSecond)
                     {
                         return "Imminent";
@@ -484,7 +467,8 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Alarms)
         {
-            return sensor.isLastMeasurementValid ? sensor.lastMeasurement.alarmTriggers : -1;
+            Result<DB::Measurement> res = m_db.getLastMeasurementForSensor(sensor.id);
+            return (res == success) ? res.payload().alarmTriggers : -1;
         }
 //        else if (column == Column::SensorErrors)
 //        {
@@ -492,19 +476,19 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
 //        }
         else
         {
-            if (sensor.isLastMeasurementValid)
+            if (sensor.isMeasurementValid)
             {
                 if (column == Column::Temperature)
                 {
-                    return QString("%1 °C").arg(sensor.lastMeasurement.descriptor.temperature, 0, 'f', 1);
+                    return QString("%1 °C").arg(sensor.measurementTemperature, 0, 'f', 1);
                 }
                 else if (column == Column::Humidity)
                 {
-                    return QString("%1 %RH").arg(sensor.lastMeasurement.descriptor.humidity, 0, 'f', 1);
+                    return QString("%1 %RH").arg(sensor.measurementHumidity, 0, 'f', 1);
                 }
                 else if (column == Column::Battery)
                 {
-                    return QString("%1 %").arg(static_cast<int>(getBatteryLevel(sensor.lastMeasurement.descriptor.vcc) * 100.f));
+                    return QString("%1 %").arg(static_cast<int>(getBatteryLevel(sensor.measurementVcc) * 100.f));
                 }
                 else if (column == Column::Signal)
                 {

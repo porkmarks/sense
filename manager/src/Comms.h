@@ -10,6 +10,7 @@
 #include "Data_Defs.h"
 #include "Channel.h"
 #include "QTcpSocketAdapter.h"
+#include "Sensor_Comms.h"
 
 class Comms : public QObject
 {
@@ -87,13 +88,15 @@ private:
         uint32_t reqId = 0;
         int8_t signalS2B = 0;
         uint8_t type = 0;
-        uint32_t address = 0;
+        Sensor_Comms::Address address = 0;
         std::vector<uint8_t> payload;
     };
 
     void sendEmptySensorResponse(InitializedBaseStation& cbs, SensorRequest const& request);
     template <typename T>
-    void sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Type type, uint32_t address, T const& payload);
+    void sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Type type, Sensor_Comms::Address address, T const& payload);
+
+    DB::SensorInputDetails createSensorInputDetails(DB::Sensor const& sensor, data::sensor::Config_Request const& configRequest) const;
 
     void sendPing(InitializedBaseStation& cbs);
     void processPong(InitializedBaseStation& cbs);

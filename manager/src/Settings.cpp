@@ -36,8 +36,6 @@ constexpr uint64_t k_fileEncryptionKey = 32455153254365ULL;
 constexpr uint64_t k_emailEncryptionKey = 1735271834639209ULL;
 constexpr uint64_t k_ftpEncryptionKey = 45235321231234ULL;
 
-extern std::string getMacStr(Settings::BaseStationDescriptor::Mac const& mac);
-
 //////////////////////////////////////////////////////////////////////////
 
 Settings::Settings()
@@ -62,10 +60,7 @@ Settings::~Settings()
 
 void Settings::process()
 {
-    for (std::unique_ptr<DB>& db: m_dbs)
-    {
-        db->process();
-    }
+    m_db->process();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -333,106 +328,19 @@ bool Settings::load(std::string const& name)
                 data.users.push_back(user);
             }
         }
-
-        it = document.FindMember("base_stations");
-        if (it == document.MemberEnd() || !it->value.IsArray())
-        {
-            s_logger.logCritical(QString("Failed to load '%1': Bad or missing base_stations array").arg(dataFilename.c_str()));
-            return false;
-        }
-
-        {
-            rapidjson::Value const& bssj = it->value;
-            for (size_t i = 0; i < bssj.Size(); i++)
-            {
-                BaseStation bs;
-                rapidjson::Value const& bsj = bssj[i];
-                auto it = bsj.FindMember("name");
-                if (it == bsj.MemberEnd() || !it->value.IsString())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing base station name").arg(dataFilename.c_str()));
-                    return false;
-                }
-                bs.descriptor.name = it->value.GetString();
-
-//                it = bsj.FindMember("address");
-//                if (it == bsj.MemberEnd() || !it->value.IsString())
-//                {
-//                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing base station address").arg(dataFilename.c_str()));
-//                    return false;
-//                }
-//                bs.descriptor.address = QHostAddress(it->value.GetString());
-
-                it = bsj.FindMember("id");
-                if (it == bsj.MemberEnd() || !it->value.IsUint())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing base station id").arg(dataFilename.c_str()));
-                    return false;
-                }
-                bs.id = it->value.GetUint();
-
-                it = bsj.FindMember("mac");
-                if (it == bsj.MemberEnd() || !it->value.IsString())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing base station mac").arg(dataFilename.c_str()));
-                    return false;
-                }
-
-                int m0, m1, m2, m3, m4, m5;
-                if (sscanf(it->value.GetString(), "%X:%X:%X:%X:%X:%X", &m0, &m1, &m2, &m3, &m4, &m5) != 6)
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad base station mac").arg(dataFilename.c_str()));
-                    return false;
-                }
-                bs.descriptor.mac = { static_cast<uint8_t>(m0&0xFF), static_cast<uint8_t>(m1&0xFF), static_cast<uint8_t>(m2&0xFF),
-                            static_cast<uint8_t>(m3&0xFF), static_cast<uint8_t>(m4&0xFF), static_cast<uint8_t>(m5&0xFF) };
-
-                data.lastBaseStationId = std::max(data.lastBaseStationId, bs.id);
-                data.baseStations.push_back(bs);
-            }
-        }
-
-
-        it = document.FindMember("active_base_station");
-        if (it == document.MemberEnd() || !it->value.IsUint())
-        {
-            s_logger.logCritical(QString("Failed to load '%1': Bad or missing active_base_station").arg(dataFilename.c_str()));
-            return false;
-        }
-        BaseStationId id = it->value.GetUint();
-        if (id != 0)
-        {
-            auto it = std::find_if(data.baseStations.begin(), data.baseStations.end(), [id](BaseStation const& baseStation) { return baseStation.id == id; });
-            if (it == data.baseStations.end())
-            {
-                s_logger.logWarning(QString("Cannot find active base station id %1. No base station will be active").arg(id));
-                id = 0;
-            }
-        }
-        data.activeBaseStationId = id;
     }
 
-    //load the databases
-    m_dbs.clear();
-    for (BaseStation& bs: data.baseStations)
+    std::unique_ptr<DB> db(new DB());
+    if (db->load() != success)
     {
-        BaseStationDescriptor::Mac& mac = bs.descriptor.mac;
-        char macStr[128];
-        sprintf(macStr, "%X_%X_%X_%X_%X_%X", mac[0]&0xFF, mac[1]&0xFF, mac[2]&0xFF, mac[3]&0xFF, mac[4]&0xFF, mac[5]&0xFF);
-        std::string dbName = macStr;
-
-        std::unique_ptr<DB> db(new DB());
-        if (db->load(dbName) != success)
+        if (db->create() != success)
         {
-            if (db->create(dbName) != success)
-            {
-                s_logger.logCritical(QString("Cannot open nor create a DB for Base Station '%1' / %2").arg(bs.descriptor.name.c_str()).arg(macStr).toUtf8().data());
-                return false;
-            }
+            s_logger.logCritical(QString("Cannot open nor create the DB"));
+            return false;
         }
-        m_dbs.push_back(std::move(db));
-        m_emailers.emplace_back(new Emailer(*this, *m_dbs.back()));
     }
+    m_db = std::move(db);
+    m_emailer.reset(new Emailer(*this, *m_db));
 
     //initialize backups
     std::pair<std::string, time_t> bkf = getMostRecentBackup(dataFilename, s_dataFolder + "/backups/daily");
@@ -461,6 +369,20 @@ bool Settings::load(std::string const& name)
     s_logger.logVerbose(QString("Done loading settings from '%1'. Time: %2s").arg(m_dataName.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()));
 
     return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+DB const& Settings::getDB() const
+{
+    return *m_db;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+DB& Settings::getDB()
+{
+    return *m_db;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -745,205 +667,6 @@ bool Settings::isLoggedInAsAdmin() const
 
 //////////////////////////////////////////////////////////////////////////
 
-size_t Settings::getBaseStationCount() const
-{
-    return m_mainData.baseStations.size();
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-Settings::BaseStation const& Settings::getBaseStation(size_t index) const
-{
-    assert(index < m_mainData.baseStations.size());
-    return m_mainData.baseStations[index];
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-bool Settings::addBaseStation(BaseStationDescriptor const& descriptor)
-{
-    if (findBaseStationIndexByName(descriptor.name) >= 0)
-    {
-        return false;
-    }
-    if (findBaseStationIndexByMac(descriptor.mac) >= 0)
-    {
-        return false;
-    }
-
-    BaseStationDescriptor::Mac const& mac = descriptor.mac;
-    char macStr[128];
-    sprintf(macStr, "%X_%X_%X_%X_%X_%X", mac[0]&0xFF, mac[1]&0xFF, mac[2]&0xFF, mac[3]&0xFF, mac[4]&0xFF, mac[5]&0xFF);
-    std::string dbName = macStr;
-
-    std::unique_ptr<DB> db(new DB());
-    if (db->load(dbName) != success)
-    {
-        if (db->create(dbName) != success)
-        {
-            s_logger.logCritical(QString("Cannot open nor create a DB for Base Station '%1' / %2").arg(descriptor.name.c_str()).arg(macStr).toUtf8().data());
-            return false;
-        }
-    }
-
-    s_logger.logInfo(QString("Adding base station '%1' / %2").arg(descriptor.name.c_str()).arg(getMacStr(descriptor.mac).c_str()));
-
-    BaseStation baseStation;
-    baseStation.descriptor = descriptor;
-    baseStation.id = ++m_mainData.lastBaseStationId;
-
-    emit baseStationWillBeAdded(baseStation.id);
-    m_mainData.baseStations.push_back(baseStation);
-    m_dbs.push_back(std::move(db));
-    m_emailers.emplace_back(new Emailer(*this, *m_dbs.back()));
-    emit baseStationAdded(baseStation.id);
-
-    triggerSave();
-
-    return true;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-bool Settings::setBaseStation(BaseStationId id, BaseStationDescriptor const& descriptor)
-{
-    int32_t _index = findBaseStationIndexByName(descriptor.name);
-    if (_index >= 0 && getBaseStation(static_cast<size_t>(_index)).id != id)
-    {
-        return false;
-    }
-    _index = findBaseStationIndexByMac(descriptor.mac);
-    if (_index >= 0 && getBaseStation(static_cast<size_t>(_index)).id != id)
-    {
-        return false;
-    }
-
-    _index = findBaseStationIndexById(id);
-    if (_index < 0)
-    {
-        return false;
-    }
-
-    size_t index = static_cast<size_t>(_index);
-
-    s_logger.logInfo(QString("Changing base station '%1' / %2").arg(descriptor.name.c_str()).arg(getMacStr(descriptor.mac).c_str()));
-
-    m_mainData.baseStations[index].descriptor = descriptor;
-    emit baseStationChanged(id);
-
-    triggerSave();
-
-    return true;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Settings::removeBaseStation(size_t index)
-{
-    assert(index < m_mainData.baseStations.size());
-    BaseStationId id = m_mainData.baseStations[index].id;
-
-    BaseStationDescriptor const& descriptor = m_mainData.baseStations[index].descriptor;
-    s_logger.logInfo(QString("Removing base station '%1' / %2").arg(descriptor.name.c_str()).arg(getMacStr(descriptor.mac).c_str()));
-
-    emit baseStationWillBeRemoved(id);
-    m_mainData.baseStations.erase(m_mainData.baseStations.begin() + index);
-    m_dbs.erase(m_dbs.begin() + index);
-    m_emailers.erase(m_emailers.begin() + index);
-    emit baseStationRemoved(id);
-
-    triggerSave();
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-int32_t Settings::findBaseStationIndexByName(std::string const& name) const
-{
-    auto it = std::find_if(m_mainData.baseStations.begin(), m_mainData.baseStations.end(), [&name](BaseStation const& baseStation) { return baseStation.descriptor.name == name; });
-    if (it == m_mainData.baseStations.end())
-    {
-        return -1;
-    }
-    return std::distance(m_mainData.baseStations.begin(), it);
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-int32_t Settings::findBaseStationIndexById(BaseStationId id) const
-{
-    auto it = std::find_if(m_mainData.baseStations.begin(), m_mainData.baseStations.end(), [id](BaseStation const& baseStation) { return baseStation.id == id; });
-    if (it == m_mainData.baseStations.end())
-    {
-        return -1;
-    }
-    return std::distance(m_mainData.baseStations.begin(), it);
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-int32_t Settings::findBaseStationIndexByMac(BaseStationDescriptor::Mac const& mac) const
-{
-    auto it = std::find_if(m_mainData.baseStations.begin(), m_mainData.baseStations.end(), [&mac](BaseStation const& baseStation) { return baseStation.descriptor.mac == mac; });
-    if (it == m_mainData.baseStations.end())
-    {
-        return -1;
-    }
-    return std::distance(m_mainData.baseStations.begin(), it);
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-DB const& Settings::getBaseStationDB(size_t index) const
-{
-    return *m_dbs[index];
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-DB& Settings::getBaseStationDB(size_t index)
-{
-    return *m_dbs[index];
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Settings::setActiveBaseStationId(BaseStationId id)
-{
-    if (m_mainData.activeBaseStationId > 0)
-    {
-        emit baseStationDeactivated(m_mainData.activeBaseStationId);
-    }
-
-    int32_t index = findBaseStationIndexById(id);
-    if (index >= 0)
-    {
-        BaseStationDescriptor const& descriptor = m_mainData.baseStations[static_cast<size_t>(index)].descriptor;
-        s_logger.logInfo(QString("Activating base station '%1' / %2").arg(descriptor.name.c_str()).arg(getMacStr(descriptor.mac).c_str()));
-
-        m_mainData.activeBaseStationId = id;
-    }
-    else
-    {
-        m_mainData.activeBaseStationId = 0;
-    }
-
-    if (m_mainData.activeBaseStationId > 0)
-    {
-        emit baseStationActivated(m_mainData.activeBaseStationId);
-    }
-
-    triggerSave();
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-Settings::BaseStationId Settings::getActiveBaseStationId() const
-{
-    return m_mainData.activeBaseStationId;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
 void Settings::triggerSave()
 {
     {
@@ -1039,25 +762,6 @@ void Settings::save(Data const& data) const
             }
             document.AddMember("users", usersj, document.GetAllocator());
         }
-
-        {
-            rapidjson::Value bssj;
-            bssj.SetArray();
-            for (BaseStation const& baseStation: data.baseStations)
-            {
-                rapidjson::Value bsj;
-                bsj.SetObject();
-                bsj.AddMember("id", baseStation.id, document.GetAllocator());
-                bsj.AddMember("name", rapidjson::Value(baseStation.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
-                //bsj.AddMember("address", rapidjson::Value(baseStation.descriptor.address.toString().toUtf8().data(), document.GetAllocator()), document.GetAllocator());
-
-                BaseStationDescriptor::Mac const& mac = baseStation.descriptor.mac;
-                bsj.AddMember("mac", rapidjson::Value(getMacStr(mac).c_str(), document.GetAllocator()), document.GetAllocator());
-                bssj.PushBack(bsj, document.GetAllocator());
-            }
-            document.AddMember("base_stations", bssj, document.GetAllocator());
-        }
-        document.AddMember("active_base_station", rapidjson::Value(data.activeBaseStationId), document.GetAllocator());
 
         rapidjson::StringBuffer buffer;
         rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);

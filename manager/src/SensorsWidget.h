@@ -16,7 +16,7 @@ class SensorsWidget : public QWidget
 public:
     explicit SensorsWidget(QWidget *parent = 0);
     ~SensorsWidget();
-    void init(Settings& settings, DB& dm);
+    void init(Settings& settings);
     void shutdown();
 
 signals:

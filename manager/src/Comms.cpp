@@ -11,7 +11,7 @@
 #include "Logger.h"
 #include "Settings.h"
 
-extern std::string getMacStr(Settings::BaseStationDescriptor::Mac const& mac);
+extern std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac);
 extern Logger s_logger;
 
 
@@ -250,7 +250,7 @@ void Comms::sendPing(Comms::InitializedBaseStation& cbs)
 //////////////////////////////////////////////////////////////////////////
 
 template <typename T>
-void Comms::sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Type type, uint32_t address, T const& payload)
+void Comms::sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Type type, Sensor_Comms::Address address, T const& payload)
 {
     std::array<uint8_t, 1024> buffer;
     size_t offset = 0;
@@ -258,7 +258,7 @@ void Comms::sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const&
     pack(buffer, true, offset);
     pack(buffer, type, offset);
     pack(buffer, address, offset);
-    pack(buffer, static_cast<uint32_t>(sizeof(payload)), offset);
+    pack(buffer, static_cast<uint32_t>(sizeof(T)), offset);
     pack(buffer, payload, offset);
 
     cbs.channel.send(data::Server_Message::SENSOR_RES, buffer.data(), offset);
@@ -402,12 +402,47 @@ void Comms::processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, Senso
         d.sensorId = sensor.id;
         d.signalStrength.b2s = sensor.lastSignalStrengthB2S;
         d.signalStrength.s2b = request.signalS2B;
-        measurementBatch.unpack(d.vcc);
+        d.vcc = data::sensor::unpack_qvcc(measurementBatch.qvcc);
         m.unpack(d.humidity, d.temperature);
         measurements.push_back(d);
     }
 
     cbs.db.addMeasurements(measurements);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+DB::SensorInputDetails Comms::createSensorInputDetails(DB::Sensor const& sensor, data::sensor::Config_Request const& configRequest) const
+{
+    DB::SensorInputDetails details;
+    details.id = sensor.id;
+
+    details.hasStoredData = true;
+    details.firstStoredMeasurementIndex = configRequest.first_measurement_index;
+    details.storedMeasurementCount = configRequest.measurement_count;
+
+    details.hasSignalStrength = true;
+    details.signalStrengthB2S = configRequest.b2s_input_dBm;
+
+    details.hasSleepingData = true;
+    details.sleeping = configRequest.sleeping;
+
+    details.hasLastCommsTimePoint = true;
+    details.lastCommsTimePoint = Clock::now();
+
+    details.hasMeasurement = true;
+    configRequest.measurement.unpack(details.measurementHumidity, details.measurementTemperature);
+    details.measurementVcc = data::sensor::unpack_qvcc(configRequest.qvcc);
+
+    details.hasErrorCountersDelta = true;
+    details.errorCountersDelta.comms = configRequest.comms_errors;
+    details.errorCountersDelta.resetReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_RESET)) ? 1 : 0;
+    details.errorCountersDelta.unknownReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_UNKNOWN)) ? 1 : 0;
+    details.errorCountersDelta.brownoutReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_BROWNOUT)) ? 1 : 0;
+    details.errorCountersDelta.powerOnReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_POWER_ON)) ? 1 : 0;
+    details.errorCountersDelta.watchdogReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_WATCHDOG)) ? 1 : 0;
+
+    return details;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -424,26 +459,7 @@ void Comms::processSensorReq_ConfigRequest(InitializedBaseStation& cbs, SensorRe
 
     DB::Sensor const& sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
 
-    DB::SensorInputDetails details;
-    details.id = sensor.id;
-    details.hasStoredData = true;
-    details.firstStoredMeasurementIndex = configRequest.first_measurement_index;
-    details.storedMeasurementCount = configRequest.measurement_count;
-    details.hasSignalStrength = true;
-    details.signalStrengthB2S = configRequest.b2s_input_dBm;
-    details.hasSleepingData = true;
-    details.sleeping = configRequest.sleeping;
-    details.hasLastCommsTimePoint = true;
-    details.lastCommsTimePoint = Clock::now();
-
-    details.hasErrorCountersDelta = true;
-    details.errorCountersDelta.comms = configRequest.comms_errors;
-    details.errorCountersDelta.resetReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_RESET)) ? 1 : 0;
-    details.errorCountersDelta.unknownReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_UNKNOWN)) ? 1 : 0;
-    details.errorCountersDelta.brownoutReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_BROWNOUT)) ? 1 : 0;
-    details.errorCountersDelta.powerOnReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_POWER_ON)) ? 1 : 0;
-    details.errorCountersDelta.watchdogReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_WATCHDOG)) ? 1 : 0;
-
+    DB::SensorInputDetails details = createSensorInputDetails(sensor, configRequest);
     cbs.db.setSensorInputDetails(details);
 
     DB::SensorsConfig const& sensorsConfig = cbs.db.getLastSensorsConfig();
@@ -480,8 +496,8 @@ void Comms::processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, Sen
         response.first_measurement_index = outputDetails.nextRealTimeMeasurementIndex; //since this sensor just booted, it cannot have measurements older than now
     }
 
-    DB::SensorInputDetails details;
-    details.id = sensor.id;
+    DB::SensorInputDetails details = createSensorInputDetails(sensor, firstConfigRequest);
+    //being the first request, we know the sensor doesn't store anything, so reset the firstStoredMeasurementIndex to the real time one
     details.hasStoredData = true;
     details.firstStoredMeasurementIndex = response.first_measurement_index;
     details.storedMeasurementCount = 0;

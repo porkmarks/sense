@@ -6,7 +6,7 @@
 #include <QInputDialog>
 #include <QDateTime>
 
-extern std::string getMacStr(Settings::BaseStationDescriptor::Mac const& mac);
+extern std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac);
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -67,9 +67,10 @@ void BaseStationsWidget::init(Comms& comms, Settings& settings)
     m_uiConnections.push_back(connect(m_comms, &Comms::baseStationConnected, this, &BaseStationsWidget::baseStationConnected));
     m_uiConnections.push_back(connect(m_comms, &Comms::baseStationDisconnected, this, &BaseStationsWidget::baseStationDisconnected));
 
-    for (size_t i = 0; i < settings.getBaseStationCount(); i++)
+    DB& db = settings.getDB();
+    for (size_t i = 0; i < db.getBaseStationCount(); i++)
     {
-        Settings::BaseStation const& bs = settings.getBaseStation(i);
+        DB::BaseStation const& bs = db.getBaseStation(i);
 
         QStandardItem* nameItem = new QStandardItem();
         QStandardItem* macItem = new QStandardItem();
@@ -83,7 +84,7 @@ void BaseStationsWidget::init(Comms& comms, Settings& settings)
         }
 
         {
-            Settings::BaseStationDescriptor::Mac mac = bs.descriptor.mac;
+            DB::BaseStationDescriptor::Mac mac = bs.descriptor.mac;
             macItem->setText(QString("   %1   ").arg(getMacStr(mac).c_str()));
             macItem->setEditable(false);
         }
@@ -95,15 +96,8 @@ void BaseStationsWidget::init(Comms& comms, Settings& settings)
         QHostAddress address = m_comms->getBaseStationAddress(bs.descriptor.mac);
         setAddress(i, address);
 
-        bool connected = m_comms->connectToBaseStation(m_settings->getBaseStationDB(i), bs.descriptor.mac);
-        if (settings.getActiveBaseStationId() == bs.id)
-        {
-            setStatus(i, connected ? "Active / Connected" : "Active / Disconnected");
-        }
-        else
-        {
-            setStatus(i, connected ? "Added / Connected" : "Added / Disconnected");
-        }
+        bool connected = m_comms->connectToBaseStation(db, bs.descriptor.mac);
+        setStatus(i, connected ? "Added / Connected" : "Added / Disconnected");
 
         m_baseStationDescriptors.push_back(bs.descriptor);
     }
@@ -164,19 +158,14 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
         return;
     }
 
-    Settings::BaseStationDescriptor descriptor = m_baseStationDescriptors[indexRow];
+    DB::BaseStationDescriptor descriptor = m_baseStationDescriptors[indexRow];
 
-    int32_t _bsIndex = m_settings->findBaseStationIndexByMac(descriptor.mac);
+    DB& db = m_settings->getDB();
+    int32_t _bsIndex = db.findBaseStationIndexByMac(descriptor.mac);
     if (_bsIndex >= 0)
     {
-        size_t bsIndex = static_cast<size_t>(_bsIndex);
-        Settings::BaseStation const& bs = m_settings->getBaseStation(bsIndex);
-        m_settings->setActiveBaseStationId(bs.id);
-        bool connected = m_comms->isBaseStationConnected(bs.descriptor.mac);
-        setStatus(static_cast<size_t>(bsIndex), connected ? "Active / Connected" : "Active / Disconnected");
         return;
     }
-
 
     QString qname = QInputDialog::getText(this, "Base Station Name", "Name");
     if (qname.isEmpty())
@@ -185,13 +174,13 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
     }
 
     descriptor.name = qname.toUtf8().data();
-    if (m_settings->addBaseStation(descriptor))
+    if (db.addBaseStation(descriptor))
     {
-        _bsIndex = m_settings->findBaseStationIndexByMac(descriptor.mac);
+        _bsIndex = db.findBaseStationIndexByMac(descriptor.mac);
         if (_bsIndex >= 0)
         {
             size_t bsIndex = static_cast<size_t>(_bsIndex);
-            bool connected = m_comms->connectToBaseStation(m_settings->getBaseStationDB(bsIndex), descriptor.mac);
+            bool connected = m_comms->connectToBaseStation(db, descriptor.mac);
             setStatus(bsIndex, connected ? "Added / Connected" : "Added / Disconnected");
             setName(bsIndex, descriptor.name);
         }
@@ -210,21 +199,13 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
 
 void BaseStationsWidget::baseStationConnected(Comms::BaseStationDescriptor const& commsBS)
 {
-    int32_t _bsIndex = m_settings->findBaseStationIndexByMac(commsBS.mac);
+    DB const& db = m_settings->getDB();
+    int32_t _bsIndex = db.findBaseStationIndexByMac(commsBS.mac);
     if (_bsIndex >= 0)
     {
         size_t bsIndex = static_cast<size_t>(_bsIndex);
-        Settings::BaseStation const& bs = m_settings->getBaseStation(bsIndex);
-
-        if (m_settings->getActiveBaseStationId() == bs.id)
-        {
-            setStatus(bsIndex, "Active / Connected");
-        }
-        else
-        {
-            setStatus(bsIndex, "Added / Connected");
-        }
-
+        DB::BaseStation const& bs = db.getBaseStation(bsIndex);
+        setStatus(bsIndex, "Added / Connected");
         setAddress(bsIndex, commsBS.address);
         return;
     }
@@ -234,32 +215,22 @@ void BaseStationsWidget::baseStationConnected(Comms::BaseStationDescriptor const
 
 void BaseStationsWidget::baseStationDisconnected(Comms::BaseStationDescriptor const& commsBS)
 {
-    int32_t _bsIndex = m_settings->findBaseStationIndexByMac(commsBS.mac);
+    DB const& db = m_settings->getDB();
+    int32_t _bsIndex = db.findBaseStationIndexByMac(commsBS.mac);
     if (_bsIndex >= 0)
     {
         size_t bsIndex = static_cast<size_t>(_bsIndex);
-        Settings::BaseStation const& bs = m_settings->getBaseStation(bsIndex);
-
-        if (m_settings->getActiveBaseStationId() == bs.id)
-        {
-            setStatus(bsIndex, "Active / Disconnected");
-        }
-        else
-        {
-            setStatus(bsIndex, "Added / Disconnected");
-        }
-
+        DB::BaseStation const& bs = db.getBaseStation(bsIndex);
+        setStatus(bsIndex, "Added / Disconnected");
         setAddress(bsIndex, commsBS.address);
-
         showDisconnectionMessageBox(bs, commsBS.address);
-
         return;
     }
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void BaseStationsWidget::showDisconnectionMessageBox(Settings::BaseStation const& bs, const QHostAddress& address)
+void BaseStationsWidget::showDisconnectionMessageBox(DB::BaseStation const& bs, const QHostAddress& address)
 {
     //can't do this modal thing here!!
 //    QMessageBox::critical(this, "Error", QString("Base Station %1, %2 has disconnected at %3")
@@ -272,18 +243,19 @@ void BaseStationsWidget::showDisconnectionMessageBox(Settings::BaseStation const
 
 void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor const& commsBS)
 {
-    int32_t _bsIndex = m_settings->findBaseStationIndexByMac(commsBS.mac);
+    DB& db = m_settings->getDB();
+    int32_t _bsIndex = db.findBaseStationIndexByMac(commsBS.mac);
     if (_bsIndex >= 0)
     {
         size_t bsIndex = static_cast<size_t>(_bsIndex);
-        Settings::BaseStation const& bs = m_settings->getBaseStation(static_cast<size_t>(bsIndex));
+        DB::BaseStation const& bs = db.getBaseStation(static_cast<size_t>(bsIndex));
 
-        bool connected = m_comms->connectToBaseStation(m_settings->getBaseStationDB(static_cast<size_t>(bsIndex)), bs.descriptor.mac);
-        if (m_settings->getActiveBaseStationId() == bs.id)
-        {
-            setStatus(bsIndex, connected ? "Active / Connected" : "Active / Disconnected");
-        }
-        else
+        bool connected = m_comms->connectToBaseStation(db, bs.descriptor.mac);
+//        if (m_settings->getActiveBaseStationId() == bs.id)
+//        {
+//            setStatus(bsIndex, connected ? "Active / Connected" : "Active / Disconnected");
+//        }
+//        else
         {
             setStatus(bsIndex, connected ? "Added / Connected" : "Added / Disconnected");
         }
@@ -293,12 +265,12 @@ void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor cons
         return;
     }
 
-    auto it = std::find_if(m_baseStationDescriptors.begin(), m_baseStationDescriptors.end(), [&commsBS](Settings::BaseStationDescriptor const& descriptor) { return descriptor.mac == commsBS.mac; });
+    auto it = std::find_if(m_baseStationDescriptors.begin(), m_baseStationDescriptors.end(), [&commsBS](DB::BaseStationDescriptor const& descriptor) { return descriptor.mac == commsBS.mac; });
     if (it != m_baseStationDescriptors.end())
     {
         return;
     }
-    Settings::BaseStationDescriptor descriptor;
+    DB::BaseStationDescriptor descriptor;
     descriptor.mac = commsBS.mac;
     m_baseStationDescriptors.push_back(descriptor);
 

@@ -28,37 +28,8 @@ public:
     bool create(std::string const& name);
     bool load(std::string const& name);
 
-    ////////////////////////////////////////////////////////////////////////////
-
-    struct BaseStationDescriptor
-    {
-        typedef std::array<uint8_t, 6> Mac;
-
-        std::string name;
-        Mac mac;
-        //QHostAddress address;
-    };
-
-    typedef uint32_t BaseStationId;
-    struct BaseStation
-    {
-        BaseStationDescriptor descriptor;
-        BaseStationId id;
-    };
-
-    size_t getBaseStationCount() const;
-    BaseStation const& getBaseStation(size_t index) const;
-    int32_t findBaseStationIndexByName(std::string const& name) const;
-    int32_t findBaseStationIndexById(BaseStationId id) const;
-    int32_t findBaseStationIndexByMac(BaseStationDescriptor::Mac const& mac) const;
-    bool addBaseStation(BaseStationDescriptor const& descriptor);
-    bool setBaseStation(BaseStationId id, BaseStationDescriptor const& descriptor);
-    void removeBaseStation(size_t index);
-    DB const& getBaseStationDB(size_t index) const;
-    DB& getBaseStationDB(size_t index);
-
-    void setActiveBaseStationId(BaseStationId id);
-    BaseStationId getActiveBaseStationId() const;
+    DB const& getDB() const;
+    DB& getDB();
 
     ////////////////////////////////////////////////////////////////////////////
 
@@ -121,14 +92,6 @@ public:
     ////////////////////////////////////////////////////////////////////////////
 
 signals:
-    void baseStationWillBeAdded(BaseStationId id);
-    void baseStationAdded(BaseStationId id);
-    void baseStationWillBeRemoved(BaseStationId id);
-    void baseStationRemoved(BaseStationId id);
-    void baseStationChanged(BaseStationId id);
-    void baseStationActivated(BaseStationId id);
-    void baseStationDeactivated(BaseStationId id);
-
     void emailSettingsWillBeChanged();
     void emailSettingsChanged();
 
@@ -144,18 +107,15 @@ signals:
 
 private:
 
-    std::vector<std::unique_ptr<DB>> m_dbs;
-    std::vector<std::unique_ptr<Emailer>> m_emailers;
+    std::unique_ptr<DB> m_db;
+    std::unique_ptr<Emailer> m_emailer;
 
     struct Data
     {
         EmailSettings emailSettings;
         FtpSettings ftpSettings;
-        std::vector<BaseStation> baseStations;
         std::vector<User> users;
-        BaseStationId lastBaseStationId = 0;
         UserId lastUserId = 0;
-        BaseStationId activeBaseStationId = 0;
     };
 
     Data m_mainData;
