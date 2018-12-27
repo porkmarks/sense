@@ -120,7 +120,17 @@ void SensorsWidget::bindSensor()
             continue;
         }
 
-        return;
+        //remove the sensor if not bounded after 30 seconds
+        QTimer::singleShot(30 * 1000, [this]()
+        {
+           int32_t index = m_db->findUnboundSensorIndex();
+           if (index >= 0)
+           {
+               m_db->removeSensor(static_cast<size_t>(index));
+           }
+        });
+
+        break;
     }
 }
 

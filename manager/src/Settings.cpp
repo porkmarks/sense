@@ -796,7 +796,8 @@ void Settings::save(Data const& data) const
         }
     }
 
-    s_logger.logVerbose(QString("Done saving settings to '%1'. Time: %2s").arg(dataFilename.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()));
+    std::cout << QString("Done saving settings to '%1'. Time: %2s").arg(dataFilename.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()).toUtf8().data();
+    std::cout.flush();
 
     if (dailyBackup)
     {

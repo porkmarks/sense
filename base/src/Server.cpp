@@ -416,6 +416,26 @@ void Server::process_ping()
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
+void Server::process_change_state_req()
+{
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
+    size_t max_size = 0;
+    std::array<uint8_t, 1024> buffer;
+    bool ok = m_channel.unpack_fixed(buffer, max_size) == Channel::Unpack_Result::OK;
+
+    data::Server_State new_state;
+    size_t offset = 0;
+
+    ok &= unpack(buffer, new_state, offset);
+    if (ok)
+    {
+        on_state_requested(new_state);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
 void Server::process_message(data::Server_Message message)
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
@@ -424,6 +444,9 @@ void Server::process_message(data::Server_Message message)
     {
     case data::Server_Message::PING:
         process_ping();
+        break;
+    case data::Server_Message::CHANGE_STATE_REQ:
+        process_change_state_req();
         break;
     default:
         LOGE << "Invalid message received: " << int(message) << std::endl;

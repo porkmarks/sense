@@ -52,10 +52,10 @@ enum class Led_Blink
     Fast_Yellow,
 };
 
-Led_Color s_led_color = Led_Color::None;
-std::atomic<Led_Blink> s_led_blink;
-std::chrono::system_clock::time_point s_led_blink_time_point;
-volatile bool s_led_thread_on = true;
+static Led_Color s_led_color = Led_Color::None;
+static std::atomic<Led_Blink> s_led_blink;
+static std::chrono::system_clock::time_point s_led_blink_time_point;
+static volatile bool s_led_thread_on = true;
 
 constexpr int k_red_pwm = 30;
 
@@ -179,6 +179,42 @@ void fatal_error()
     }
 }
 
+static data::Server_State s_state = data::Server_State::NORMAL;
+static std::chrono::system_clock::time_point s_revert_state_to_normal_tp = std::chrono::system_clock::now();
+data::Server_State set_state(data::Server_State new_state)
+{
+    if (s_state == new_state)
+    {
+        return s_state;
+    }
+    LOGI << "Changing state to " << (int)new_state << std::endl;
+    s_state = new_state;
+
+    if (s_state == data::Server_State::PAIRING)
+    {
+        s_sensor_comms.stop_async_receive();
+        s_sensor_comms.set_frequency(869.f);
+    }
+    else
+    {
+        s_sensor_comms.stop_async_receive();
+        s_sensor_comms.set_frequency(868.f);
+    }
+    s_revert_state_to_normal_tp = std::chrono::system_clock::now() + std::chrono::seconds(180);
+    return s_state;
+}
+
+void process_state()
+{
+    if (s_state != data::Server_State::PAIRING)
+    {
+        if (std::chrono::system_clock::now() >= s_revert_state_to_normal_tp)
+        {
+            set_state(data::Server_State::NORMAL);
+        }
+    }
+}
+
 int main(int, const char**)
 {
     LOGI << "Starting..." << std::endl;
@@ -278,6 +314,8 @@ int main(int, const char**)
 
     set_led_color(Led_Color::Green);
 
+    s_server.on_state_requested = &set_state;
+
     Server::Sensor_Request request;
     Server::Sensor_Response response;
     while (true)
@@ -291,8 +329,10 @@ int main(int, const char**)
             set_led_blink(Led_Blink::Slow_Green, std::chrono::seconds(10));
         }
 
+        s_sensor_comms.start_async_receive();
+
         uint8_t size = Sensor_Comms::MAX_USER_DATA_SIZE;
-        uint8_t* packet_data = s_sensor_comms.receive_packet(raw_packet_data.data(), size, chrono::millis(1000));
+        uint8_t* packet_data = s_sensor_comms.async_receive_packet(raw_packet_data.data(), size);
         if (packet_data)
         {
             set_led_color(Led_Color::Yellow);
@@ -306,11 +346,11 @@ int main(int, const char**)
                  << ", address " << (int)request.address
                  << ", signal strength " << (int)request.signal_s2b << "dBm. Sending to manager..." << std::endl;
 
-//            if (request.address != 1004 && request.address >= 1000)
-//            {
-//                //XXXYYY
-//                continue;
-//            }
+            //            if (request.address != 1004 && request.address >= 1000)
+            //            {
+            //                //XXXYYY
+            //                continue;
+            //            }
 
             //TODO - add a marker in the request in indicate if the sensor waits for a response.
             //Like this I can avoid the RTT time for measurement batches, since they don't need a response
@@ -347,11 +387,12 @@ int main(int, const char**)
                 set_led_blink(Led_Blink::Fast_Red, std::chrono::seconds(1), true);
                 LOGE << "\tfailed: " << int(result) << std::endl;
             }
+
+            //start again
+            s_sensor_comms.start_async_receive();
         }
-        else
-        {
-            s_server.process();
-        }
+
+        s_server.process();
     }
 
     s_led_thread_on = false;

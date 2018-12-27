@@ -167,13 +167,19 @@ static_assert(sizeof(Pair_Response) == 4, "");
 #endif
 }
 
-enum class Server_Message
+enum class Server_Message : uint8_t
 {
     SENSOR_REQ,         //manager
     SENSOR_RES,         //base station
     PING,               //manager
     PONG,               //base station
+    CHANGE_STATE_REQ,   //manager
 };
 
+enum class Server_State : uint8_t
+{
+    NORMAL,
+    PAIRING
+};
 
 }

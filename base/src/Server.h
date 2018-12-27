@@ -51,6 +51,8 @@ public:
     Result send_sensor_message(Sensor_Request const& request, Sensor_Response& response);
     void process();
 
+    std::function<void(data::Server_State)> on_state_requested;
+
 private:
     void init_broadcast();
     void broadcast_thread_func();
@@ -61,6 +63,7 @@ private:
     bool wait_for_message(data::Server_Message expected_message, Clock::duration timeout);
     void process_message(data::Server_Message message);
 
+    void process_change_state_req();
     void process_ping();
 
     std::string compute_sensor_details_response() const;
@@ -93,5 +96,6 @@ private:
     Clock::time_point m_last_talk_tp = Clock::time_point(Clock::duration::zero());
 
     std::atomic_bool m_exit = { false };
+    data::Server_State m_state = data::Server_State::NORMAL;
 };
 

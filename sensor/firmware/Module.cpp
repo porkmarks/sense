@@ -11,17 +11,20 @@
 #   define max(a,b) ((a)>(b)?(a):(b))
 #endif
 
-Module::Module(int cs, int int0, int int1) {
+Module::Module(int cs, int int0, int int1)
+{
     _cs = cs;
     _int0 = int0;
     _int1 = int1;
 }
 
 
-void Module::init(uint8_t interface, uint8_t gpio) {
+void Module::init(uint8_t interface, uint8_t gpio)
+{
     DEBUG_PRINTLN("");
 
-    switch(interface) {
+    switch(interface)
+    {
     case USE_SPI:
 #ifdef __AVR__
         pinModeFast(_cs, OUTPUT);
@@ -36,7 +39,8 @@ void Module::init(uint8_t interface, uint8_t gpio) {
         break;
     }
 
-    switch(gpio) {
+    switch(gpio)
+    {
     case INT_NONE:
         break;
     case INT_0:
@@ -53,8 +57,10 @@ void Module::init(uint8_t interface, uint8_t gpio) {
 }
 
 
-uint8_t Module::SPIgetRegValue(uint8_t reg, uint8_t msb, uint8_t lsb) {
-    if((msb > 7) || (lsb > 7) || (lsb > msb)) {
+uint8_t Module::SPIgetRegValue(uint8_t reg, uint8_t msb, uint8_t lsb)
+{
+    if((msb > 7) || (lsb > 7) || (lsb > msb))
+    {
         return(ERR_INVALID_BIT_RANGE);
     }
 
@@ -134,7 +140,8 @@ int8_t Module::SPIsetRegValueChecked(uint8_t reg, uint8_t value, uint8_t msb, ui
 }
 
 
-void Module::SPIreadRegisterBurst(uint8_t reg, uint8_t numBytes, uint8_t* inBytes) {
+void Module::SPIreadRegisterBurst(uint8_t reg, uint8_t numBytes, uint8_t* inBytes)
+{
 #ifdef __AVR__
     SPI2.beginTransaction(SPI2Settings(2000000, MSBFIRST, SPI_MODE0));
     digitalWriteFast(_cs, LOW);
@@ -152,7 +159,8 @@ void Module::SPIreadRegisterBurst(uint8_t reg, uint8_t numBytes, uint8_t* inByte
 }
 
 
-uint8_t Module::SPIreadRegister(uint8_t reg) {
+uint8_t Module::SPIreadRegister(uint8_t reg)
+{
 #ifdef __AVR__
     uint8_t inByte;
     SPI2.beginTransaction(SPI2Settings(2000000, MSBFIRST, SPI_MODE0));
@@ -170,7 +178,8 @@ uint8_t Module::SPIreadRegister(uint8_t reg) {
 }
 
 
-void Module::SPIwriteRegisterBurst(uint8_t reg, uint8_t* data, uint8_t numBytes) {
+void Module::SPIwriteRegisterBurst(uint8_t reg, uint8_t* data, uint8_t numBytes)
+{
 #ifdef __AVR__
     SPI2.beginTransaction(SPI2Settings(2000000, MSBFIRST, SPI_MODE0));
     digitalWriteFast(_cs, LOW);
@@ -187,7 +196,8 @@ void Module::SPIwriteRegisterBurst(uint8_t reg, uint8_t* data, uint8_t numBytes)
 }
 
 
-void Module::SPIwriteRegister(uint8_t reg, uint8_t data) {
+void Module::SPIwriteRegister(uint8_t reg, uint8_t data)
+{
 #ifdef __AVR__
     SPI2.beginTransaction(SPI2Settings(2000000, MSBFIRST, SPI_MODE0));
     digitalWriteFast(_cs, LOW);

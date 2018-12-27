@@ -79,9 +79,12 @@ private slots:
     void broadcastReceived();
     void connectedToBaseStation(InitializedBaseStation* cbs);
     void disconnectedFromBaseStation(InitializedBaseStation* cbs);
+    void sensorAdded(InitializedBaseStation& cbs, DB::SensorId id);
+    void sensorRemoved(InitializedBaseStation& cbs, DB::SensorId id);
 
 private:
     void reconnectToBaseStation(InitializedBaseStation* cbs);
+    void changeToState(InitializedBaseStation& cbs, data::Server_State state);
 
     struct SensorRequest
     {

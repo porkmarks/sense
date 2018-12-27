@@ -598,7 +598,7 @@ static bool request_config()
       
         uint8_t size = sizeof(data::sensor::Config_Response);
         uint8_t raw_buffer[packet_raw_size(size)];
-        uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, chrono::millis(500));
+        uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, chrono::millis(2000));
         s_comms.sleep_mode();
         if (buffer)
         {
@@ -629,6 +629,7 @@ static void pair_state()
     Sensor_Comms::Address addr = Sensor_Comms::PAIR_ADDRESS_BEGIN + random() % (Sensor_Comms::PAIR_ADDRESS_END - Sensor_Comms::PAIR_ADDRESS_BEGIN);
     s_comms.set_address(addr);
     s_comms.set_destination_address(Sensor_Comms::BASE_ADDRESS);
+    s_comms.set_frequency(869.f);
 
     s_comms.sleep_mode();
 
@@ -736,6 +737,7 @@ static void pair_state()
         }
     }
 
+    s_comms.set_frequency(868.f);
     s_comms.sleep_mode();
 
     blink_led(Blink_Led::Green, 3, chrono::millis(500));
@@ -926,7 +928,7 @@ static bool request_first_config()
     {
         uint8_t size = sizeof(data::sensor::First_Config_Response);
         uint8_t raw_buffer[packet_raw_size(size)];
-        uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, chrono::millis(500));
+        uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, chrono::millis(2000));
         s_comms.sleep_mode();
         if (buffer)
         {

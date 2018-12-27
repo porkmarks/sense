@@ -20,7 +20,7 @@ uint8_t packet_raw_size(uint8_t payload_size)
 }
 
 constexpr chrono::millis k_ack_jitter(30);
-constexpr chrono::millis k_minimum_duration_before_sending(100);
+constexpr chrono::millis k_minimum_duration_before_sending(200);
 
 Sensor_Comms::Sensor_Comms()
 #ifdef __AVR__
@@ -72,6 +72,11 @@ bool Sensor_Comms::init(uint8_t retries, int8_t power_dBm)
     sleep_mode();
 
     return true;
+}
+
+void Sensor_Comms::set_frequency(float freq)
+{
+    m_lora.setFrequency(freq);
 }
 
 void Sensor_Comms::set_transmission_power(int8_t power_dBm)
@@ -301,6 +306,59 @@ uint8_t* Sensor_Comms::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size,
 
     m_last_receive_time_point = chrono::now();
     return nullptr;
+}
+
+bool Sensor_Comms::start_async_receive()
+{
+    return m_lora.startReceiving() == ERR_NONE;
+}
+
+uint8_t* Sensor_Comms::async_receive_packet(uint8_t* raw_buffer, uint8_t& packet_size)
+{
+    bool gotIt = false;
+    uint8_t size = sizeof(Header) + packet_size;
+    int8_t state = m_lora.getReceivedPackage(raw_buffer, size, gotIt);
+    if (state != ERR_NONE)
+    {
+        LOG(PSTR("rxerr %d\n"), (int)state);
+        return nullptr;
+    }
+
+    if (!gotIt)
+    {
+        return nullptr;
+    }
+
+    chrono::time_ms receive_tp = chrono::now();
+    Header* header_ptr = reinterpret_cast<Header*>(raw_buffer);
+    if (validate_packet(raw_buffer, size, 0))
+    {
+//                LOG(PSTR("RP re done\n"));
+        if (get_rx_packet_type(raw_buffer) != static_cast<uint8_t>(data::sensor::Type::ACK)) //ignore protocol packets
+        {
+            chrono::delay(k_ack_jitter - (chrono::now() - receive_tp)); //to allow the sender to go in receive mode
+
+//                    LOG(PSTR("RP se\n"));
+            send_ack(*header_ptr);
+//                    LOG(PSTR("RP se done\n"));
+
+            m_last_receive_time_point = chrono::now();
+            packet_size = size - sizeof(Header);
+            stop_async_receive();
+            return raw_buffer;
+        }
+    }
+    else
+    {
+//                LOG(PSTR("RP re fail\n"));
+    }
+
+    return nullptr;
+}
+
+void Sensor_Comms::stop_async_receive()
+{
+    m_lora.stopReceiving();
 }
 
 uint8_t Sensor_Comms::get_rx_packet_type(uint8_t* received_buffer) const

@@ -42,6 +42,7 @@ public:
 
     bool init(uint8_t retries, int8_t power_dBm);
 
+    void set_frequency(float freq);
     void set_transmission_power(int8_t power_dBm);
 
     Address get_address() const;
@@ -60,6 +61,10 @@ public:
     bool send_packet(uint8_t* raw_buffer, uint8_t packet_size, bool wait_minimum_time);
 
     uint8_t* receive_packet(uint8_t* raw_buffer, uint8_t& packet_size, chrono::millis timeout);
+
+    bool start_async_receive();
+    uint8_t* async_receive_packet(uint8_t* raw_buffer, uint8_t& packet_size);
+    void stop_async_receive();
 
     int8_t get_input_dBm();
     Address get_rx_packet_source_address(uint8_t* received_buffer) const;

@@ -140,6 +140,9 @@ bool Comms::connectToBaseStation(DB& db, Mac const& mac)
     cbsPtr->isConnecting = true;
     cbsPtr->socketAdapter.getSocket().connectToHost(it->address, 4444);
 
+    cbsPtr->connections.push_back(connect(&db, &DB::sensorAdded, [this, cbsPtr](DB::SensorId id) { sensorAdded(*cbsPtr, id); }));
+    cbsPtr->connections.push_back(connect(&db, &DB::sensorRemoved, [this, cbsPtr](DB::SensorId id) { sensorRemoved(*cbsPtr, id); }));
+
     return true;
 }
 
@@ -171,6 +174,15 @@ void Comms::connectedToBaseStation(InitializedBaseStation* cbs)
 
         emit baseStationConnected(cbs->descriptor);
         cbs->socketAdapter.start();
+
+        if (cbs->db.findUnboundSensorIndex() >= 0)
+        {
+            changeToState(*cbs, data::Server_State::PAIRING);
+        }
+        else
+        {
+            changeToState(*cbs, data::Server_State::NORMAL);
+        }
     }
 }
 
@@ -270,6 +282,34 @@ void Comms::processPong(InitializedBaseStation& cbs)
 {
     cbs.lastTalkTP = DB::Clock::now(); //this represents communication so reset the pong
     //std::cout << "PONG" << std::endl;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Comms::sensorAdded(InitializedBaseStation& cbs, DB::SensorId id)
+{
+    changeToState(cbs, data::Server_State::PAIRING);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Comms::sensorRemoved(InitializedBaseStation& cbs, DB::SensorId id)
+{
+    int32_t unboundIndex = cbs.db.findUnboundSensorIndex();
+    if (unboundIndex == cbs.db.findSensorIndexById(id) || unboundIndex < 0)
+    {
+        changeToState(cbs, data::Server_State::NORMAL);
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Comms::changeToState(InitializedBaseStation& cbs, data::Server_State state)
+{
+    std::array<uint8_t, 1024> buffer;
+    size_t offset = 0;
+    pack(buffer, state, offset);
+    cbs.channel.send(data::Server_Message::CHANGE_STATE_REQ, buffer.data(), offset);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -549,6 +589,9 @@ void Comms::processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequ
     data::sensor::Pair_Response response;
     response.address = sensor.address;
     sendSensorResponse(cbs, request, data::sensor::Type::PAIR_RESPONSE, request.address, response);
+
+    //switch back to normal state
+    changeToState(cbs, data::Server_State::NORMAL);
 
     std::cout << "Received Pair Request" << std::endl;
 }

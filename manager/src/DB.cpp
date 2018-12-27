@@ -2708,26 +2708,29 @@ void DB::save(Data const& data) const
             sensorsj.SetArray();
             for (Sensor const& sensor: data.sensors)
             {
-                rapidjson::Value sensorj;
-                sensorj.SetObject();
-                sensorj.AddMember("name", rapidjson::Value(sensor.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
-                sensorj.AddMember("id", sensor.id, document.GetAllocator());
-                sensorj.AddMember("address", sensor.address, document.GetAllocator());
-                sensorj.AddMember("state", static_cast<int>(sensor.state), document.GetAllocator());
-                sensorj.AddMember("should_sleep", sensor.shouldSleep, document.GetAllocator());
-                sensorj.AddMember("sleep_state_tp", static_cast<uint64_t>(Clock::to_time_t(sensor.sleepStateTimePoint)), document.GetAllocator());
-                sensorj.AddMember("last_comms", static_cast<uint64_t>(Clock::to_time_t(sensor.lastCommsTimePoint)), document.GetAllocator());
-                sensorj.AddMember("temperature_bias", sensor.calibration.temperatureBias, document.GetAllocator());
-                sensorj.AddMember("humidity_bias", sensor.calibration.humidityBias, document.GetAllocator());
-                sensorj.AddMember("serial_number", sensor.serialNumber, document.GetAllocator());
-                sensorj.AddMember("last_confirmed_measurement_index", sensor.lastConfirmedMeasurementIndex, document.GetAllocator());
-                sensorj.AddMember("error_counter_comms", sensor.errorCounters.comms, document.GetAllocator());
-                sensorj.AddMember("error_counter_reboot_unknown", sensor.errorCounters.unknownReboots, document.GetAllocator());
-                sensorj.AddMember("error_counter_reboot_power_on", sensor.errorCounters.powerOnReboots, document.GetAllocator());
-                sensorj.AddMember("error_counter_reboot_reset", sensor.errorCounters.resetReboots, document.GetAllocator());
-                sensorj.AddMember("error_counter_reboot_brownout", sensor.errorCounters.brownoutReboots, document.GetAllocator());
-                sensorj.AddMember("error_counter_reboot_watchdog", sensor.errorCounters.watchdogReboots, document.GetAllocator());
-                sensorsj.PushBack(sensorj, document.GetAllocator());
+                if (sensor.state != Sensor::State::Unbound) //never save unbound sensors
+                {
+                    rapidjson::Value sensorj;
+                    sensorj.SetObject();
+                    sensorj.AddMember("name", rapidjson::Value(sensor.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
+                    sensorj.AddMember("id", sensor.id, document.GetAllocator());
+                    sensorj.AddMember("address", sensor.address, document.GetAllocator());
+                    sensorj.AddMember("state", static_cast<int>(sensor.state), document.GetAllocator());
+                    sensorj.AddMember("should_sleep", sensor.shouldSleep, document.GetAllocator());
+                    sensorj.AddMember("sleep_state_tp", static_cast<uint64_t>(Clock::to_time_t(sensor.sleepStateTimePoint)), document.GetAllocator());
+                    sensorj.AddMember("last_comms", static_cast<uint64_t>(Clock::to_time_t(sensor.lastCommsTimePoint)), document.GetAllocator());
+                    sensorj.AddMember("temperature_bias", sensor.calibration.temperatureBias, document.GetAllocator());
+                    sensorj.AddMember("humidity_bias", sensor.calibration.humidityBias, document.GetAllocator());
+                    sensorj.AddMember("serial_number", sensor.serialNumber, document.GetAllocator());
+                    sensorj.AddMember("last_confirmed_measurement_index", sensor.lastConfirmedMeasurementIndex, document.GetAllocator());
+                    sensorj.AddMember("error_counter_comms", sensor.errorCounters.comms, document.GetAllocator());
+                    sensorj.AddMember("error_counter_reboot_unknown", sensor.errorCounters.unknownReboots, document.GetAllocator());
+                    sensorj.AddMember("error_counter_reboot_power_on", sensor.errorCounters.powerOnReboots, document.GetAllocator());
+                    sensorj.AddMember("error_counter_reboot_reset", sensor.errorCounters.resetReboots, document.GetAllocator());
+                    sensorj.AddMember("error_counter_reboot_brownout", sensor.errorCounters.brownoutReboots, document.GetAllocator());
+                    sensorj.AddMember("error_counter_reboot_watchdog", sensor.errorCounters.watchdogReboots, document.GetAllocator());
+                    sensorsj.PushBack(sensorj, document.GetAllocator());
+                }
             }
             document.AddMember("sensors", sensorsj, document.GetAllocator());
         }
@@ -2898,7 +2901,8 @@ void DB::save(Data const& data) const
         }
     }
 
-    s_logger.logVerbose(QString("Done saving DB to '%1' & '%2'. Time: %3s").arg(m_dataName.c_str()).arg(m_dbName.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()));
+    std::cout << QString("Done saving DB to '%1' & '%2'. Time: %3s\n").arg(m_dataName.c_str()).arg(m_dbName.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()).toUtf8().data();
+    std::cout.flush();
 
     if (dailyBackup)
     {

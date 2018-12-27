@@ -20,7 +20,11 @@ public:
     int8_t transmit(uint8_t* data, uint8_t len);
     int8_t receive(uint8_t* data, uint8_t& len);
     int8_t receive(uint8_t* data, uint8_t& len, chrono::millis timeout);
-    int8_t scanChannel();
+
+    int8_t startReceiving();
+    int8_t getReceivedPackage(uint8_t* data, uint8_t& len, bool& gotIt);
+    int8_t stopReceiving();
+
     int8_t sleep();
     int8_t standby();
 
@@ -34,7 +38,6 @@ public:
     int8_t setCodingRate(uint8_t cr);
     int8_t setOutputPower(int8_t power);
     int8_t setGain(uint8_t gain);
-    float getFrequencyError(bool autoCorrect = false);
     int8_t getRSSI();
     float getSNR();
     int8_t setBitRate(float br);
@@ -54,6 +57,7 @@ protected:
     uint8_t _cr;
     uint16_t _preambleLength;
     bool _sleeping = false;
+    bool _isReceivingPacket = false;
 
     struct TC
     {
