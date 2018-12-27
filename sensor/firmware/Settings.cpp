@@ -6,9 +6,7 @@
 static constexpr uint8_t SETTINGS_VERSION = 7;
 
 static uint8_t  EEMEM eeprom_settings_version;
-static uint32_t EEMEM eeprom_settings_address;
-static uint16_t EEMEM eeprom_settings_temperature_bias;
-static uint16_t EEMEM eeprom_settings_humidity_bias;
+static Sensor_Comms::Address EEMEM eeprom_settings_address;
 static uint32_t EEMEM eeprom_settings_crc;
 
 void reset_settings()
@@ -26,7 +24,7 @@ void save_settings(Settings const& settings)
     eeprom_write_byte(&eeprom_settings_version, SETTINGS_VERSION);
     hash_combine(crc, SETTINGS_VERSION);
 
-    eeprom_write_dword(&eeprom_settings_address, settings.address);
+    eeprom_write_word(&eeprom_settings_address, settings.address);
     hash_combine(crc, settings.address);
 
     eeprom_write_dword(&eeprom_settings_crc, crc);
@@ -41,7 +39,7 @@ bool load_settings(Settings& settings)
         uint32_t crc = 123456789ULL;
         hash_combine(crc, SETTINGS_VERSION);
 
-        settings.address = eeprom_read_dword(&eeprom_settings_address);
+        settings.address = eeprom_read_word(&eeprom_settings_address);
         hash_combine(crc, settings.address);
 
         uint32_t stored_crc = eeprom_read_dword(&eeprom_settings_crc);

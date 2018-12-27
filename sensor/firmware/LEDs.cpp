@@ -34,13 +34,13 @@ void set_led(Led led)
 {
     if (led == Led::Green)
     {
-      TCCR0B &= ~0x3;
+      TCCR0B &= ~(bit(CS01) | bit(CS00));
       digitalWriteFast(GREEN_LED_PIN, HIGH);
       digitalWriteFast(RED_LED_PIN, LOW);
     }
     else if (led == Led::Red)
     {
-      TCCR0B &= ~0x3;
+      TCCR0B &= ~(bit(CS01) | bit(CS00));
       digitalWriteFast(GREEN_LED_PIN, LOW);
       digitalWriteFast(RED_LED_PIN, HIGH);
     }
@@ -48,13 +48,13 @@ void set_led(Led led)
     {
       TCNT0 = 0;
       OCR0A = k_red_led_time_table[0];
-      TCCR0B |= bit(CS01) | bit(CS00);
+      TCCR0B |= (bit(CS01) | bit(CS00));
       digitalWriteFast(RED_LED_PIN, LOW);
       digitalWriteFast(GREEN_LED_PIN, HIGH);
     }
     else
     {
-      TCCR0B &= ~0x3;
+      TCCR0B &= ~(bit(CS01) | bit(CS00));
       digitalWriteFast(GREEN_LED_PIN, LOW);
       digitalWriteFast(RED_LED_PIN, LOW);
     }
@@ -73,4 +73,3 @@ void blink_led(Blink_Led blink_led, uint8_t times, chrono::millis period)
     }
     set_led(Led::None);
 }
-

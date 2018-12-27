@@ -42,11 +42,11 @@ namespace chrono
 
 void delay_us(micros us)
 {
+#ifdef __AVR__
     if (us.count <= 3)
     {
       return;
     }
-#ifdef __AVR__
     constexpr uint8_t cycles_per_us = F_CPU / 1000000ULL;
 //    delayMicroseconds(us.count);
     uint64_t cycles = (us.count * cycles_per_us) >> 2; //the _delay_loop_2 executes 4 cycles per iteration
@@ -57,6 +57,10 @@ void delay_us(micros us)
         cycles -= c;
     }
 #else
+    if (us.count <= 0)
+    {
+      return;
+    }
     std::this_thread::sleep_for(std::chrono::microseconds(us.count));
 #endif
 }

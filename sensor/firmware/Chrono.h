@@ -134,13 +134,6 @@ void delay(D duration)
     delay_us(micros(duration));
 }
 
-#ifdef __AVR__
-static constexpr micros k_period(31250ULL);
-#else
-static constexpr micros k_period(1ULL);
-#endif
-
-
 time_ms now();
 time_us now_us();
 void init_clock(uint32_t freq);

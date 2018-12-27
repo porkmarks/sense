@@ -2,10 +2,11 @@
 
 #include "Arduino_Compat.h"
 #include "Data_Defs.h"
+#include "Sensor_Comms.h"
 
 struct Settings
 {
-    uint32_t address = 0;
+    Sensor_Comms::Address address = 0;
 };
 
 struct Stable_Settings
@@ -22,4 +23,3 @@ bool load_settings(Settings& settings);
 void reset_stable_settings();
 void save_stable_settings(Stable_Settings const& settings);
 bool load_stable_settings(Stable_Settings& settings);
-
