@@ -30,13 +30,13 @@ static bool check_equal(const Storage& storage, const std::vector<Storage::Data>
         const Storage::Data& data = it.data;
         const Storage::Data& ref_data = ref_datas[data_idx];
 
-        float temperature_delta = std::abs<float>(data.temperature - ref_data.temperature);
+        float temperature_delta = fabs(data.temperature - ref_data.temperature);
         if (temperature_delta > TEMPERATURE_ACCURACY)
         {
             //std::cout << data_idx << ": Temperature delta too big: " << temperature_delta << ".\n";
             return false;
         }
-        float humidity_delta = std::abs<float>(data.humidity - ref_data.humidity);
+        float humidity_delta = fabs(data.humidity - ref_data.humidity);
         if (humidity_delta > HUMIDITY_ACCURACY)
         {
             //std::cout << data_idx << ": Humidity delta too big: " << humidity_delta << ".\n";
