@@ -521,13 +521,13 @@ RFM95::RFM95(Module* mod)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
-int16_t RFM95::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t syncWord, int8_t power, uint8_t currentLimit, uint16_t preambleLength, uint8_t gain)
+int8_t RFM95::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t syncWord, int8_t power, uint8_t currentLimit, uint16_t preambleLength, uint8_t gain)
 {
     // set module properties
     _mod->init(USE_SPI, INT_BOTH);
 
     // try to find the SX127x chip
-    if(!findChip(SX1278_CHIP_VERSION)) {
+    if (!findChip(SX1278_CHIP_VERSION)) {
         DEBUG_PRINTLN_STR("No SX127x found!");
 #ifdef __AVR__
         SPI2.end();
@@ -538,99 +538,103 @@ int16_t RFM95::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t syncW
     }
 
     // check active modem
-    int16_t state;
-    if(getActiveModem() != SX127X_LORA) {
+    int8_t state;
+    if (getActiveModem() != SX127X_LORA) {
         // set LoRa mode
         state = setActiveModem(SX127X_LORA);
-        if(state != ERR_NONE) {
+        if (state != ERR_NONE) {
             return(state);
         }
     }
 
     // set LoRa sync word
     state = setSyncWord(syncWord);
-    if(state != ERR_NONE) {
+    if (state != ERR_NONE) {
         return(state);
     }
 
     // set over current protection
     state = setCurrentLimit(currentLimit);
-    if(state != ERR_NONE) {
+    if (state != ERR_NONE) {
         return(state);
     }
 
     // set preamble length
     state = setPreambleLength(preambleLength);
-    if(state != ERR_NONE) {
+    if (state != ERR_NONE) {
         return(state);
     }
 
     // initalize internal variables
-    _dataRate = 0.0;
 
     // turn off frequency hopping
     state = _mod->SPIsetRegValue(SX127X_REG_HOP_PERIOD, SX127X_HOP_PERIOD_OFF);
     //state |= _mod->SPIsetRegValue(SX127X_REG_SYMB_TIMEOUT_LSB, 255);
-    if(state != ERR_NONE) {
+    if (state != ERR_NONE) {
         return(state);
     }
 
     state = setBandwidth(bw);
-    if(state != ERR_NONE) {
+    if (state != ERR_NONE) {
         return(state);
     }
 
     state = setSpreadingFactor(sf);
-    if(state != ERR_NONE) {
+    if (state != ERR_NONE) {
         return(state);
     }
 
     state = setCodingRate(cr);
-    if(state != ERR_NONE) {
+    if (state != ERR_NONE) {
         return(state);
     }
 
     // configure publicly accessible settings
     state = setFrequency(freq);
-    if(state != ERR_NONE) {
+    if (state != ERR_NONE) {
         return(state);
     }
 
     state = setOutputPower(power);
-    if(state != ERR_NONE) {
+    if (state != ERR_NONE) {
         return(state);
     }
 
     state = setGain(gain);
-    if(state != ERR_NONE) {
+    if (state != ERR_NONE) {
         return(state);
     }
+
+    state |= _mod->SPIsetRegValue(SX127X_REG_FIFO_TX_BASE_ADDR, SX127X_FIFO_TX_BASE_ADDR_MAX);
+    state |= _mod->SPIsetRegValue(SX127X_REG_FIFO_RX_BASE_ADDR, SX127X_FIFO_RX_BASE_ADDR_MAX);
+
+    refreshTimeoutConstants();
 
     return(state);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
-int16_t RFM95::setFrequency(float freq) {
+int8_t RFM95::setFrequency(float freq) {
     // check frequency range
-    if((freq < 137.0) || (freq > 1020.0)) {
+    if ((freq < 137.0) || (freq > 1020.0)) {
         return(ERR_INVALID_FREQUENCY);
     }
 
     // sensitivity optimization for 500kHz bandwidth
     // see SX1276/77/78 Errata, section 2.1 for details
-    if(fabs(_bw - 500.0) <= 0.001) {
-        if((freq >= 862.0) && (freq <= 1020.0)) {
+    if (fabs(_bw - 500.0) <= 0.001) {
+        if ((freq >= 862.0) && (freq <= 1020.0)) {
             _mod->SPIwriteRegister(0x36, 0x02);
             _mod->SPIwriteRegister(0x3a, 0x64);
-        } else if((freq >= 410.0) && (freq <= 525.0)) {
+        } else if ((freq >= 410.0) && (freq <= 525.0)) {
             _mod->SPIwriteRegister(0x36, 0x02);
             _mod->SPIwriteRegister(0x3a, 0x7F);
         }
     }
 
     // set frequency
-    int16_t state = setFrequencyRaw(freq);
+    int8_t state = setFrequencyRaw(freq);
     if (state != ERR_NONE) {
         return state;
     }
@@ -638,49 +642,49 @@ int16_t RFM95::setFrequency(float freq) {
 
     // mitigation of receiver spurious response
     // see SX1276/77/78 Errata, section 2.3 for details
-    if(fabs(_bw - 7.8) <= 0.001) {
+    if (fabs(_bw - 7.8) <= 0.001) {
         _mod->SPIsetRegValue(0x31, 0b0000000, 7, 7);
         _mod->SPIsetRegValue(0x2F, 0x48);
         _mod->SPIsetRegValue(0x30, 0x00);
         freq += 7.8;
-    } else if(fabs(_bw - 10.4) <= 0.001) {
+    } else if (fabs(_bw - 10.4) <= 0.001) {
         _mod->SPIsetRegValue(0x31, 0b0000000, 7, 7);
         _mod->SPIsetRegValue(0x2F, 0x44);
         _mod->SPIsetRegValue(0x30, 0x00);
         freq += 10.4;
-    } else if(fabs(_bw - 15.6) <= 0.001) {
+    } else if (fabs(_bw - 15.6) <= 0.001) {
         _mod->SPIsetRegValue(0x31, 0b0000000, 7, 7);
         _mod->SPIsetRegValue(0x2F, 0x44);
         _mod->SPIsetRegValue(0x30, 0x00);
         freq += 15.6;
-    } else if(fabs(_bw - 20.8) <= 0.001) {
+    } else if (fabs(_bw - 20.8) <= 0.001) {
         _mod->SPIsetRegValue(0x31, 0b0000000, 7, 7);
         _mod->SPIsetRegValue(0x2F, 0x44);
         _mod->SPIsetRegValue(0x30, 0x00);
         freq += 20.8;
-    } else if(fabs(_bw - 31.25) <= 0.001) {
+    } else if (fabs(_bw - 31.25) <= 0.001) {
         _mod->SPIsetRegValue(0x31, 0b0000000, 7, 7);
         _mod->SPIsetRegValue(0x2F, 0x44);
         _mod->SPIsetRegValue(0x30, 0x00);
         freq += 31.25;
-    } else if(fabs(_bw - 41.7) <= 0.001) {
+    } else if (fabs(_bw - 41.7) <= 0.001) {
         _mod->SPIsetRegValue(0x31, 0b0000000, 7, 7);
         _mod->SPIsetRegValue(0x2F, 0x44);
         _mod->SPIsetRegValue(0x30, 0x00);
         freq += 41.7;
-    } else if(fabs(_bw - 62.5) <= 0.001) {
+    } else if (fabs(_bw - 62.5) <= 0.001) {
         _mod->SPIsetRegValue(0x31, 0b0000000, 7, 7);
         _mod->SPIsetRegValue(0x2F, 0x40);
         _mod->SPIsetRegValue(0x30, 0x00);
-    } else if(fabs(_bw - 125.0) <= 0.001) {
+    } else if (fabs(_bw - 125.0) <= 0.001) {
         _mod->SPIsetRegValue(0x31, 0b0000000, 7, 7);
         _mod->SPIsetRegValue(0x2F, 0x40);
         _mod->SPIsetRegValue(0x30, 0x00);
-    } else if(fabs(_bw - 250.0) <= 0.001) {
+    } else if (fabs(_bw - 250.0) <= 0.001) {
         _mod->SPIsetRegValue(0x31, 0b0000000, 7, 7);
         _mod->SPIsetRegValue(0x2F, 0x40);
         _mod->SPIsetRegValue(0x30, 0x00);
-    } else if(fabs(_bw - 500.0) <= 0.001) {
+    } else if (fabs(_bw - 500.0) <= 0.001) {
         _mod->SPIsetRegValue(0x31, 0b1000000, 7, 7);
     }
 
@@ -689,136 +693,137 @@ int16_t RFM95::setFrequency(float freq) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
-int16_t RFM95::setFrequencyRaw(float newFreq)
+int8_t RFM95::setFrequencyRaw(float newFreq)
 {
-  // set mode to standby
-  int16_t state = setMode(SX127X_STANDBY);
+    // set mode to standby
+    int8_t state = standby();
 
-  // calculate register values
-  uint64_t fmhz = uint64_t(newFreq * 1000000.0);
-  uint64_t FRF = (fmhz << 19) / 32000000ULL;
+    // calculate register values
+    uint64_t fmhz = uint64_t(newFreq * 1000000.0);
+    uint64_t FRF = (fmhz << 19) / 32000000ULL;
 
-  DEBUG_PRINT("FRF 1, 2, 3: = ");
-  DEBUG_PRINT_DEC((FRF & 0xFF0000) >> 16);
-  DEBUG_PRINT(" ");
-  DEBUG_PRINT_DEC((FRF & 0x00FF00) >> 8);
-  DEBUG_PRINT(" ");
-  DEBUG_PRINTLN_DEC(FRF & 0x0000FF);
+    DEBUG_PRINT("FRF 1, 2, 3: = ");
+    DEBUG_PRINT_DEC((FRF & 0xFF0000) >> 16);
+    DEBUG_PRINT(" ");
+    DEBUG_PRINT_DEC((FRF & 0x00FF00) >> 8);
+    DEBUG_PRINT(" ");
+    DEBUG_PRINTLN_DEC(FRF & 0x0000FF);
 
-  // write registers
-  state |= _mod->SPIsetRegValue(SX127X_REG_FRF_MSB, (FRF & 0xFF0000) >> 16);
-  state |= _mod->SPIsetRegValue(SX127X_REG_FRF_MID, (FRF & 0x00FF00) >> 8);
-  state |= _mod->SPIsetRegValue(SX127X_REG_FRF_LSB, FRF & 0x0000FF);
-  return(state);
+    // write registers
+    state |= _mod->SPIsetRegValue(SX127X_REG_FRF_MSB, (FRF & 0xFF0000) >> 16);
+    state |= _mod->SPIsetRegValue(SX127X_REG_FRF_MID, (FRF & 0x00FF00) >> 8);
+    state |= _mod->SPIsetRegValue(SX127X_REG_FRF_LSB, FRF & 0x0000FF);
+    return(state);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
-int16_t RFM95::setBandwidth(float bw) {
-  uint8_t newBandwidth;
+int8_t RFM95::setBandwidth(float bw) {
+    uint8_t newBandwidth;
 
-  // check alowed bandwidth values
-  if(fabs(bw - 7.8) <= 0.001) {
-    newBandwidth = SX1278_BW_7_80_KHZ;
-  } else if(fabs(bw - 10.4) <= 0.001) {
-    newBandwidth = SX1278_BW_10_40_KHZ;
-  } else if(fabs(bw - 15.6) <= 0.001) {
-    newBandwidth = SX1278_BW_15_60_KHZ;
-  } else if(fabs(bw - 20.8) <= 0.001) {
-    newBandwidth = SX1278_BW_20_80_KHZ;
-  } else if(fabs(bw - 31.25) <= 0.001) {
-    newBandwidth = SX1278_BW_31_25_KHZ;
-  } else if(fabs(bw - 41.7) <= 0.001) {
-    newBandwidth = SX1278_BW_41_70_KHZ;
-  } else if(fabs(bw - 62.5) <= 0.001) {
-    newBandwidth = SX1278_BW_62_50_KHZ;
-  } else if(fabs(bw - 125.0) <= 0.001) {
-    newBandwidth = SX1278_BW_125_00_KHZ;
-  } else if(fabs(bw - 250.0) <= 0.001) {
-    newBandwidth = SX1278_BW_250_00_KHZ;
-  } else if(fabs(bw - 500.0) <= 0.001) {
-    newBandwidth = SX1278_BW_500_00_KHZ;
-  } else {
-    return(ERR_INVALID_BANDWIDTH);
-  }
+    // check alowed bandwidth values
+    if (fabs(bw - 7.8) <= 0.001) {
+        newBandwidth = SX1278_BW_7_80_KHZ;
+    } else if (fabs(bw - 10.4) <= 0.001) {
+        newBandwidth = SX1278_BW_10_40_KHZ;
+    } else if (fabs(bw - 15.6) <= 0.001) {
+        newBandwidth = SX1278_BW_15_60_KHZ;
+    } else if (fabs(bw - 20.8) <= 0.001) {
+        newBandwidth = SX1278_BW_20_80_KHZ;
+    } else if (fabs(bw - 31.25) <= 0.001) {
+        newBandwidth = SX1278_BW_31_25_KHZ;
+    } else if (fabs(bw - 41.7) <= 0.001) {
+        newBandwidth = SX1278_BW_41_70_KHZ;
+    } else if (fabs(bw - 62.5) <= 0.001) {
+        newBandwidth = SX1278_BW_62_50_KHZ;
+    } else if (fabs(bw - 125.0) <= 0.001) {
+        newBandwidth = SX1278_BW_125_00_KHZ;
+    } else if (fabs(bw - 250.0) <= 0.001) {
+        newBandwidth = SX1278_BW_250_00_KHZ;
+    } else if (fabs(bw - 500.0) <= 0.001) {
+        newBandwidth = SX1278_BW_500_00_KHZ;
+    } else {
+        return(ERR_INVALID_BANDWIDTH);
+    }
 
-  // set bandwidth and if successful, save the new setting
-  int16_t state = setBandwidthRaw(newBandwidth);
-  if(state == ERR_NONE) {
-    _bw = bw;
-  }
-  return(state);
+    // set bandwidth and if successful, save the new setting
+    int8_t state = setBandwidthRaw(newBandwidth);
+    if (state == ERR_NONE) {
+        _bw = bw;
+    }
+
+    return(state);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
-int16_t RFM95::setSpreadingFactor(uint8_t sf) {
-  uint8_t newSpreadingFactor;
+int8_t RFM95::setSpreadingFactor(uint8_t sf) {
+    uint8_t newSpreadingFactor;
 
-  // check allowed spreading factor values
-  switch(sf) {
+    // check allowed spreading factor values
+    switch(sf) {
     case 6:
-      newSpreadingFactor = SX127X_SF_6;
-      break;
+        newSpreadingFactor = SX127X_SF_6;
+        break;
     case 7:
-      newSpreadingFactor = SX127X_SF_7;
-      break;
+        newSpreadingFactor = SX127X_SF_7;
+        break;
     case 8:
-      newSpreadingFactor = SX127X_SF_8;
-      break;
+        newSpreadingFactor = SX127X_SF_8;
+        break;
     case 9:
-      newSpreadingFactor = SX127X_SF_9;
-      break;
+        newSpreadingFactor = SX127X_SF_9;
+        break;
     case 10:
-      newSpreadingFactor = SX127X_SF_10;
-      break;
+        newSpreadingFactor = SX127X_SF_10;
+        break;
     case 11:
-      newSpreadingFactor = SX127X_SF_11;
-      break;
+        newSpreadingFactor = SX127X_SF_11;
+        break;
     case 12:
-      newSpreadingFactor = SX127X_SF_12;
-      break;
+        newSpreadingFactor = SX127X_SF_12;
+        break;
     default:
-      return(ERR_INVALID_SPREADING_FACTOR);
-  }
+        return(ERR_INVALID_SPREADING_FACTOR);
+    }
 
-  // set spreading factor and if successful, save the new setting
-  int16_t state = setSpreadingFactorRaw(newSpreadingFactor);
-  if(state == ERR_NONE) {
-    _sf = sf;
-  }
-  return(state);
+    // set spreading factor and if successful, save the new setting
+    int8_t state = setSpreadingFactorRaw(newSpreadingFactor);
+    if (state == ERR_NONE) {
+        _sf = sf;
+    }
+    return(state);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
-int16_t RFM95::setCodingRate(uint8_t cr) {
-  uint8_t newCodingRate;
+int8_t RFM95::setCodingRate(uint8_t cr) {
+    uint8_t newCodingRate;
 
-  // check allowed coding rate values
-  switch(cr) {
+    // check allowed coding rate values
+    switch(cr) {
     case 5:
-      newCodingRate = SX1278_CR_4_5;
-      break;
+        newCodingRate = SX1278_CR_4_5;
+        break;
     case 6:
-      newCodingRate = SX1278_CR_4_6;
-      break;
+        newCodingRate = SX1278_CR_4_6;
+        break;
     case 7:
-      newCodingRate = SX1278_CR_4_7;
-      break;
+        newCodingRate = SX1278_CR_4_7;
+        break;
     case 8:
-      newCodingRate = SX1278_CR_4_8;
-      break;
+        newCodingRate = SX1278_CR_4_8;
+        break;
     default:
-      return(ERR_INVALID_CODING_RATE);
-  }
+        return(ERR_INVALID_CODING_RATE);
+    }
 
-  // set coding rate and if successful, save the new setting
-  int16_t state = setCodingRateRaw(newCodingRate);
-  if(state == ERR_NONE) {
-    _cr = cr;
-  }
-  return(state);
+    // set coding rate and if successful, save the new setting
+    int8_t state = setCodingRateRaw(newCodingRate);
+    if (state == ERR_NONE) {
+        _cr = cr;
+    }
+    return(state);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -838,538 +843,575 @@ int16_t RFM95::setCodingRate(uint8_t cr) {
 #define SX1278_LOW_POWER                              0b00100000  //  6     4
 */
 
-int16_t RFM95::setOutputPower(int8_t power) {
-  if (power < 2)
-  {
-     power = 2;
-  }
-  if (power > 17)
-  {
-     power = 17;
-  }
-
-  // set mode to standby
-  int16_t state = standby();
-
-  // set output power
-
-  //RFO is not connected on RFM95!!!
-/*  if(power < 2) {
-    // power is less than 2 dBm, enable PA on RFO
-    state |= _mod->SPIsetRegValue(SX127X_REG_PA_CONFIG, SX127X_PA_SELECT_RFO, 7, 7);
-    state |= _mod->SPIsetRegValue(SX127X_REG_PA_CONFIG, SX1278_LOW_POWER | (power + 3), 6, 0);
-    state |= _mod->SPIsetRegValue(SX1278_REG_PA_DAC, SX127X_PA_BOOST_OFF, 2, 0);
-  } else 
-  */
-  if((power >= 2) && (power <= 17)) {
-    // power is 2 - 17 dBm, enable PA1 + PA2 on PA_BOOST
-    state |= _mod->SPIsetRegValue(SX127X_REG_PA_CONFIG, SX127X_PA_SELECT_BOOST, 7, 7);
-    state |= _mod->SPIsetRegValue(SX127X_REG_PA_CONFIG, SX1278_MAX_POWER | (power - 2), 6, 0);
-    state |= _mod->SPIsetRegValue(SX1278_REG_PA_DAC, SX127X_PA_BOOST_OFF, 2, 0);
-  } else if(power == 20) {
-    // power is 20 dBm, enable PA1 + PA2 on PA_BOOST and enable high power mode
-    state |= _mod->SPIsetRegValue(SX127X_REG_PA_CONFIG, SX127X_PA_SELECT_BOOST, 7, 7);
-    state |= _mod->SPIsetRegValue(SX127X_REG_PA_CONFIG, SX1278_MAX_POWER | (power - 5), 6, 0);
-    state |= _mod->SPIsetRegValue(SX1278_REG_PA_DAC, SX127X_PA_BOOST_ON, 2, 0);
-  }
-  return(state);
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-
-int16_t RFM95::setGain(uint8_t gain) {
-  // check allowed range
-  if(gain > 6) {
-    return(ERR_INVALID_GAIN);
-  }
-
-  // set mode to standby
-  int16_t state = standby();
-
-  // set gain
-  if(gain == 0) {
-    // gain set to 0, enable AGC loop
-    state |= _mod->SPIsetRegValue(SX1278_REG_MODEM_CONFIG_3, SX1278_AGC_AUTO_ON, 2, 2);
-  } else {
-    state |= _mod->SPIsetRegValue(SX1278_REG_MODEM_CONFIG_3, SX1278_AGC_AUTO_OFF, 2, 2);
-    state |= _mod->SPIsetRegValue(SX127X_REG_LNA, (gain << 5) | SX127X_LNA_BOOST_ON);
-  }
-  return(state);
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-
-int16_t RFM95::setBandwidthRaw(uint8_t newBandwidth) {
-  // set mode to standby
-  int16_t state = standby();
-
-  DEBUG_PRINT("BW: = ");
-  DEBUG_PRINTLN_DEC(newBandwidth);
-
-  // write register
-  state |= _mod->SPIsetRegValue(SX127X_REG_MODEM_CONFIG_1, newBandwidth, 7, 4);
-  return(state);
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-
-int16_t RFM95::setSpreadingFactorRaw(uint8_t newSpreadingFactor) {
-  // set mode to standby
-  int16_t state = standby();
-
-  DEBUG_PRINT("SF: = ");
-  DEBUG_PRINTLN_DEC(newSpreadingFactor);
-
-  // write registers
-  if(newSpreadingFactor == SX127X_SF_6) {
-    state |= _mod->SPIsetRegValue(SX127X_REG_MODEM_CONFIG_1, SX1278_HEADER_IMPL_MODE, 0, 0);
-    state |= _mod->SPIsetRegValue(SX127X_REG_MODEM_CONFIG_2, SX127X_SF_6 | SX127X_TX_MODE_SINGLE | SX1278_RX_CRC_MODE_OFF, 7, 2);
-    state |= _mod->SPIsetRegValue(SX127X_REG_DETECT_OPTIMIZE, SX127X_DETECT_OPTIMIZE_SF_6, 2, 0);
-    state |= _mod->SPIsetRegValue(SX127X_REG_DETECTION_THRESHOLD, SX127X_DETECTION_THRESHOLD_SF_6);
-  } else {
-    state |= _mod->SPIsetRegValue(SX127X_REG_MODEM_CONFIG_1, SX1278_HEADER_EXPL_MODE, 0, 0);
-    state |= _mod->SPIsetRegValue(SX127X_REG_MODEM_CONFIG_2, newSpreadingFactor | SX127X_TX_MODE_SINGLE | SX1278_RX_CRC_MODE_OFF, 7, 2);
-    state |= _mod->SPIsetRegValue(SX127X_REG_DETECT_OPTIMIZE, SX127X_DETECT_OPTIMIZE_SF_7_12, 2, 0);
-    state |= _mod->SPIsetRegValue(SX127X_REG_DETECTION_THRESHOLD, SX127X_DETECTION_THRESHOLD_SF_7_12);
-  }
-  return(state);
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-
-int16_t RFM95::setCodingRateRaw(uint8_t newCodingRate) {
-  // set mode to standby
-  int16_t state = standby();
-
-  DEBUG_PRINT("CR: = ");
-  DEBUG_PRINTLN_DEC(newCodingRate);
-
-  // write register
-  state |= _mod->SPIsetRegValue(SX127X_REG_MODEM_CONFIG_1, newCodingRate, 3, 1);
-  return(state);
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-
-int16_t RFM95::transmit(uint8_t* data, size_t len) {
-  // set mode to standby
-  int16_t state = setMode(SX127X_STANDBY);
-
-  // check packet length
-  if(len >= 256) {
-    return(ERR_PACKET_TOO_LONG);
-  }
-
-  // calculate timeout
-  uint16_t base = 1;
-  float symbolLength = (float)(base << _sf) / (float)_bw;
-  float de = 0;
-  if(symbolLength >= 16.0) {
-    de = 1;
-  }
-  float ih = (float)_mod->SPIgetRegValue(SX127X_REG_MODEM_CONFIG_1, 0, 0);
-  float crc = (float)(_mod->SPIgetRegValue(SX127X_REG_MODEM_CONFIG_2, 2, 2) >> 2);
-  float n_pre = (float)_preambleLength;
-  float n_pay = 8.0 + max(ceil((8.0 * (float)len - 4.0 * (float)_sf + 28.0 + 16.0 * crc - 20.0 * ih)/(4.0 * (float)_sf - 8.0 * de)) * (float)_cr, 0.0);
-  auto timeout = chrono::millis(ceil(symbolLength * (n_pre + n_pay + 4.25) * 1.5));
-  timeout = max(timeout, chrono::millis(chrono::k_period * 2));
-
-  // set DIO mapping
-  _mod->SPIsetRegValue(SX127X_REG_DIO_MAPPING_1, SX127X_DIO0_TX_DONE, 7, 6);
-
-  // clear interrupt flags
-  clearIRQFlags();
-
-  // set packet length
-  state |= _mod->SPIsetRegValue(SX127X_REG_PAYLOAD_LENGTH, len);
-
-  // set FIFO pointers
-  state |= _mod->SPIsetRegValue(SX127X_REG_FIFO_TX_BASE_ADDR, SX127X_FIFO_TX_BASE_ADDR_MAX);
-  state |= _mod->SPIsetRegValue(SX127X_REG_FIFO_ADDR_PTR, SX127X_FIFO_TX_BASE_ADDR_MAX);
-
-  // write packet to FIFO
-  _mod->SPIwriteRegisterBurst(SX127X_REG_FIFO, data, len);
-
-  // start transmission
-  state |= setMode(SX127X_TX);
-  if(state != ERR_NONE) {
-    return(state);
-  }
-
-  // wait for packet transmission or timeout
-  auto start = chrono::now();
-  while(!digitalReadFast(_mod->int0())) {
-    if(chrono::now() - start > timeout) {
-      clearIRQFlags();
-      return(ERR_TX_TIMEOUT);
+int8_t RFM95::setOutputPower(int8_t power) {
+    if (power < 2)
+    {
+        power = 2;
     }
-  }
-  uint32_t elapsed = (chrono::now() - start).count;
-  elapsed = max(elapsed, 1);
+    if (power > 17)
+    {
+        power = 17;
+    }
 
-  // update data rate
-  _dataRate = (len*8.0)/((float)elapsed/1000.0);
+    // set mode to standby
+    int8_t state = standby();
 
-  // clear interrupt flags
-  clearIRQFlags();
+    // set output power
 
-  return(ERR_NONE);
+    //RFO is not connected on RFM95!!!
+    /*  if (power < 2) {
+    // power is less than 2 dBm, enable PA on RFO
+    state |= _mod->SPIsetRegValueUnchecked(SX127X_REG_PA_CONFIG, SX127X_PA_SELECT_RFO, 7, 7);
+    state |= _mod->SPIsetRegValueUnchecked(SX127X_REG_PA_CONFIG, SX1278_LOW_POWER | (power + 3), 6, 0);
+    state |= _mod->SPIsetRegValueUnchecked(SX1278_REG_PA_DAC, SX127X_PA_BOOST_OFF, 2, 0);
+  } else
+  */
+    if ((power >= 2) && (power <= 17)) {
+        // power is 2 - 17 dBm, enable PA1 + PA2 on PA_BOOST
+        state |= _mod->SPIsetRegValue(SX127X_REG_PA_CONFIG, SX127X_PA_SELECT_BOOST, 7, 7);
+        state |= _mod->SPIsetRegValue(SX127X_REG_PA_CONFIG, SX1278_MAX_POWER | (power - 2), 6, 0);
+        state |= _mod->SPIsetRegValue(SX1278_REG_PA_DAC, SX127X_PA_BOOST_OFF, 2, 0);
+    } else if (power == 20) {
+        // power is 20 dBm, enable PA1 + PA2 on PA_BOOST and enable high power mode
+        state |= _mod->SPIsetRegValue(SX127X_REG_PA_CONFIG, SX127X_PA_SELECT_BOOST, 7, 7);
+        state |= _mod->SPIsetRegValue(SX127X_REG_PA_CONFIG, SX1278_MAX_POWER | (power - 5), 6, 0);
+        state |= _mod->SPIsetRegValue(SX1278_REG_PA_DAC, SX127X_PA_BOOST_ON, 2, 0);
+    }
+    return(state);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
-int16_t RFM95::receive(uint8_t* data, size_t& len) {
-  // set mode to standby
-  int16_t state = setMode(SX127X_STANDBY);
+int8_t RFM95::setGain(uint8_t gain) {
+    // check allowed range
+    if (gain > 6) {
+        return(ERR_INVALID_GAIN);
+    }
 
-  // set DIO pin mapping
-  state |= _mod->SPIsetRegValue(SX127X_REG_DIO_MAPPING_1, SX127X_DIO0_RX_DONE | SX127X_DIO1_RX_TIMEOUT, 7, 4);
+    // set mode to standby
+    int8_t state = standby();
 
-  // clear interrupt flags
-  clearIRQFlags();
-
-  // set FIFO pointers
-  state |= _mod->SPIsetRegValue(SX127X_REG_FIFO_RX_BASE_ADDR, SX127X_FIFO_RX_BASE_ADDR_MAX);
-  state |= _mod->SPIsetRegValue(SX127X_REG_FIFO_ADDR_PTR, SX127X_FIFO_RX_BASE_ADDR_MAX);
-
-  // set mode to receive
-  state |= setMode(SX127X_RXSINGLE);
-  if(state != ERR_NONE) {
+    // set gain
+    if (gain == 0) {
+        // gain set to 0, enable AGC loop
+        state |= _mod->SPIsetRegValue(SX1278_REG_MODEM_CONFIG_3, SX1278_AGC_AUTO_ON, 2, 2);
+    } else {
+        state |= _mod->SPIsetRegValue(SX1278_REG_MODEM_CONFIG_3, SX1278_AGC_AUTO_OFF, 2, 2);
+        state |= _mod->SPIsetRegValue(SX127X_REG_LNA, (gain << 5) | SX127X_LNA_BOOST_ON);
+    }
     return(state);
-  }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+int8_t RFM95::setBandwidthRaw(uint8_t newBandwidth) {
+    // set mode to standby
+    int8_t state = standby();
+
+    DEBUG_PRINT("BW: = ");
+    DEBUG_PRINTLN_DEC(newBandwidth);
+
+    // write register
+    state |= _mod->SPIsetRegValue(SX127X_REG_MODEM_CONFIG_1, newBandwidth, 7, 4);
+
+    refreshTimeoutConstants();
+
+    return(state);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+int8_t RFM95::setSpreadingFactorRaw(uint8_t newSpreadingFactor) {
+    // set mode to standby
+    int8_t state = standby();
+
+    DEBUG_PRINT("SF: = ");
+    DEBUG_PRINTLN_DEC(newSpreadingFactor);
+
+    // write registers
+    if (newSpreadingFactor == SX127X_SF_6) {
+        state |= _mod->SPIsetRegValue(SX127X_REG_MODEM_CONFIG_1, SX1278_HEADER_IMPL_MODE, 0, 0);
+        state |= _mod->SPIsetRegValue(SX127X_REG_MODEM_CONFIG_2, SX127X_SF_6 | SX127X_TX_MODE_SINGLE | SX1278_RX_CRC_MODE_OFF, 7, 2);
+        state |= _mod->SPIsetRegValue(SX127X_REG_DETECT_OPTIMIZE, SX127X_DETECT_OPTIMIZE_SF_6, 2, 0);
+        state |= _mod->SPIsetRegValue(SX127X_REG_DETECTION_THRESHOLD, SX127X_DETECTION_THRESHOLD_SF_6);
+    } else {
+        state |= _mod->SPIsetRegValue(SX127X_REG_MODEM_CONFIG_1, SX1278_HEADER_EXPL_MODE, 0, 0);
+        state |= _mod->SPIsetRegValue(SX127X_REG_MODEM_CONFIG_2, newSpreadingFactor | SX127X_TX_MODE_SINGLE | SX1278_RX_CRC_MODE_OFF, 7, 2);
+        state |= _mod->SPIsetRegValue(SX127X_REG_DETECT_OPTIMIZE, SX127X_DETECT_OPTIMIZE_SF_7_12, 2, 0);
+        state |= _mod->SPIsetRegValue(SX127X_REG_DETECTION_THRESHOLD, SX127X_DETECTION_THRESHOLD_SF_7_12);
+    }
+
+    refreshTimeoutConstants();
+
+    return(state);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+int8_t RFM95::setCodingRateRaw(uint8_t newCodingRate) {
+    // set mode to standby
+    int8_t state = standby();
+
+    DEBUG_PRINT("CR: = ");
+    DEBUG_PRINTLN_DEC(newCodingRate);
+
+    // write register
+    state |= _mod->SPIsetRegValue(SX127X_REG_MODEM_CONFIG_1, newCodingRate, 3, 1);
+
+    refreshTimeoutConstants();
+
+    return(state);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+void RFM95::refreshTimeoutConstants()
+{
+    _tc.symbolLengthUS = (1 << _sf) * 1000ULL / _bw;
+    int16_t de = 0;
+    if (_tc.symbolLengthUS >= 16000)
+    {
+        de = 1;
+    }
+    int16_t ih = _mod->SPIgetRegValue(SX127X_REG_MODEM_CONFIG_1, 0, 0);
+    int16_t crc = _mod->SPIgetRegValue(SX127X_REG_MODEM_CONFIG_2, 2, 2) >> 2;
+    _tc.t1 = -4 * _sf + 28 + 16 * crc - 20 * ih;
+    _tc.t2 = 4 * _sf - 8 * de;
+
+    _tc.rxTimeoutSymbols = _mod->SPIgetRegValue(SX127X_REG_SYMB_TIMEOUT_LSB, 7, 0);
+    _tc.rxTimeoutMS = int16_t((_tc.symbolLengthUS * (_tc.rxTimeoutSymbols + 4.25f) * 1.5f) / 1000.f);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+chrono::millis RFM95::computeAirTimeUpperBound(uint8_t length)
+{
+    // calculate timeout
+    int16_t n_pay = ((8 * length + _tc.t1) * _cr) / _tc.t2;
+    n_pay = 8 + max(n_pay, 0);
+
+    return chrono::millis((_tc.symbolLengthUS * int32_t(_preambleLength + 5 + n_pay) * 3) / 1000);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+int8_t RFM95::transmit(uint8_t* data, uint8_t length) {
+    // set mode to standby
+    int8_t state = standby();
+
+    //the unit is microseconds
 
     // calculate timeout
-  uint16_t base = 1;
-  float symbolLength = (float)(base << _sf) / (float)_bw;
+    chrono::millis timeout = computeAirTimeUpperBound(length);
 
-  float n_pre = (float)_mod->SPIgetRegValue(SX127X_REG_SYMB_TIMEOUT_LSB, 7, 0);
-  auto timeout = chrono::millis(ceil(symbolLength * (n_pre + 4.25) * 1.5));
-  timeout = max(timeout, chrono::millis(chrono::k_period * 2));
+    // set DIO mapping
+    state |= _mod->SPIsetRegValue(SX127X_REG_DIO_MAPPING_1, SX127X_DIO0_TX_DONE, 7, 6);
 
-  auto start = chrono::now();
-  // wait for packet reception or timeout
-  while(!digitalReadFast(_mod->int0())) {
-    if(digitalReadFast(_mod->int1()) || chrono::now() - start > timeout) {
-      clearIRQFlags();
-      return(ERR_RX_TIMEOUT);
-    }
-  }
+    // clear interrupt flags
+    clearIRQFlags();
 
-  // check integrity CRC
-  if(_mod->SPIgetRegValue(SX127X_REG_IRQ_FLAGS, 5, 5) == SX127X_CLEAR_IRQ_FLAG_PAYLOAD_CRC_ERROR) {
-    return(ERR_CRC_MISMATCH);
-  }
+    // set packet length
+    state |= _mod->SPIsetRegValue(SX127X_REG_PAYLOAD_LENGTH, length);
 
-  // get packet length
-  if(_sf != 6) {
-    size_t rlen = _mod->SPIgetRegValue(SX127X_REG_RX_NB_BYTES);
-    if (rlen < len)
+    // set FIFO pointers
+    //state |= _mod->SPIsetRegValueUnchecked(SX127X_REG_FIFO_TX_BASE_ADDR, SX127X_FIFO_TX_BASE_ADDR_MAX);
+    state |= _mod->SPIsetRegValue(SX127X_REG_FIFO_ADDR_PTR, SX127X_FIFO_TX_BASE_ADDR_MAX);
+
+    // write packet to FIFO
+    _mod->SPIwriteRegisterBurst(SX127X_REG_FIFO, data, length);
+
+    // start transmission
+    state |= setMode(SX127X_TX, false);
+    if (state != ERR_NONE)
     {
-        len = rlen;
+        return(state);
     }
-  }
 
-  if (len > 0)
-  {
-    _mod->SPIreadRegisterBurst(SX127X_REG_FIFO, len, data);
-  }
+    // wait for packet transmission or timeout
+    auto start = chrono::now();
+    while(!digitalReadFast(_mod->int0()))
+    {
+        if (chrono::now() - start > timeout)
+        {
+            clearIRQFlags();
+            return(ERR_TX_TIMEOUT);
+        }
+    }
 
-  // clear interrupt flags
-  clearIRQFlags();
+    // clear interrupt flags
+    clearIRQFlags();
 
-  return(ERR_NONE);
+    return(ERR_NONE);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
-int16_t RFM95::receive(uint8_t* data, size_t& len, chrono::millis timeout) {
+int8_t RFM95::receive(uint8_t* data, uint8_t& len) {
+    // set mode to standby
+    int8_t state = standby();
+
+    // set DIO pin mapping
+    state |= _mod->SPIsetRegValue(SX127X_REG_DIO_MAPPING_1, SX127X_DIO0_RX_DONE | SX127X_DIO1_RX_TIMEOUT, 7, 4);
+
+    // clear interrupt flags
+    clearIRQFlags();
+
+    // set FIFO pointers
+    //state |= _mod->SPIsetRegValueUnchecked(SX127X_REG_FIFO_RX_BASE_ADDR, SX127X_FIFO_RX_BASE_ADDR_MAX);
+    state |= _mod->SPIsetRegValue(SX127X_REG_FIFO_ADDR_PTR, SX127X_FIFO_RX_BASE_ADDR_MAX);
+
+    // set mode to receive
+    state |= setMode(SX127X_RXSINGLE, false);
+    if (state != ERR_NONE)
+    {
+        return(state);
+    }
+
+    chrono::millis timeout(_tc.rxTimeoutMS);
+    chrono::time_ms start = chrono::now();
+    // wait for packet reception or timeout
+    while(!digitalReadFast(_mod->int0()))
+    {
+        if (digitalReadFast(_mod->int1()) || chrono::now() - start > timeout)
+        {
+            clearIRQFlags();
+            return(ERR_RX_TIMEOUT);
+        }
+    }
+
+    // check integrity CRC
+//    if (_mod->SPIgetRegValue(SX127X_REG_IRQ_FLAGS, 5, 5) == SX127X_CLEAR_IRQ_FLAG_PAYLOAD_CRC_ERROR)
+//    {
+//        return(ERR_CRC_MISMATCH);
+//    }
+
+    // get packet length
+    if (_sf != 6)
+    {
+        uint8_t rlen = _mod->SPIgetRegValue(SX127X_REG_RX_NB_BYTES);
+        if (rlen < len)
+        {
+            len = rlen;
+        }
+    }
+
+    if (len > 0)
+    {
+        _mod->SPIreadRegisterBurst(SX127X_REG_FIFO, len, data);
+    }
+
+    // clear interrupt flags
+    clearIRQFlags();
+
+    return(ERR_NONE);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+int8_t RFM95::receive(uint8_t* data, uint8_t& len, chrono::millis timeout) {
     if (timeout.count <= 0)
     {
         return(ERR_RX_TIMEOUT);
     }
-  // set mode to standby
-  int16_t state = setMode(SX127X_STANDBY);
+    // set mode to standby
+    int8_t state = standby();
 
-  // set DIO pin mapping
-  state |= _mod->SPIsetRegValue(SX127X_REG_DIO_MAPPING_1, SX127X_DIO0_RX_DONE | SX127X_DIO1_RX_TIMEOUT, 7, 4);
+    // set DIO pin mapping
+    state |= _mod->SPIsetRegValue(SX127X_REG_DIO_MAPPING_1, SX127X_DIO0_RX_DONE | SX127X_DIO1_RX_TIMEOUT, 7, 4);
 
-  // clear interrupt flags
-  clearIRQFlags();
+    // clear interrupt flags
+    clearIRQFlags();
 
-  // set FIFO pointers
-  state |= _mod->SPIsetRegValue(SX127X_REG_FIFO_RX_BASE_ADDR, SX127X_FIFO_RX_BASE_ADDR_MAX);
-  state |= _mod->SPIsetRegValue(SX127X_REG_FIFO_ADDR_PTR, SX127X_FIFO_RX_BASE_ADDR_MAX);
+    // set FIFO pointers
+    //state |= _mod->SPIsetRegValueUnchecked(SX127X_REG_FIFO_RX_BASE_ADDR, SX127X_FIFO_RX_BASE_ADDR_MAX);
+    state |= _mod->SPIsetRegValue(SX127X_REG_FIFO_ADDR_PTR, SX127X_FIFO_RX_BASE_ADDR_MAX);
 
-  // set mode to receive
-  state |= setMode(SX127X_RXCONTINUOUS);
-  if(state != ERR_NONE) {
-    setMode(SX127X_STANDBY);
-    return(state);
-  }
-
-  auto start = chrono::now();
-  // wait for packet reception or timeout
-  while(!digitalReadFast(_mod->int0())) {
-    if(chrono::now() - start > timeout) {
-      clearIRQFlags();
-      setMode(SX127X_STANDBY);
-      return(ERR_RX_TIMEOUT);
+    // set mode to receive
+    state |= setMode(SX127X_RXCONTINUOUS, false);
+    if (state != ERR_NONE) {
+        setMode(SX127X_STANDBY);
+        return(state);
     }
-  }
 
-  // check integrity CRC
-  if(_mod->SPIgetRegValue(SX127X_REG_IRQ_FLAGS, 5, 5) == SX127X_CLEAR_IRQ_FLAG_PAYLOAD_CRC_ERROR) {
-    return(ERR_CRC_MISMATCH);
-  }
+    chrono::time_ms start = chrono::now();
+    // wait for packet reception or timeout
+    while(!digitalReadFast(_mod->int0())) {
+        if (chrono::now() - start > timeout) {
+            clearIRQFlags();
+            setMode(SX127X_STANDBY);
+            return(ERR_RX_TIMEOUT);
+        }
+    }
 
-  // get packet length
-  if(_sf != 6) {
-    size_t rlen = _mod->SPIgetRegValue(SX127X_REG_RX_NB_BYTES);
-    if (rlen < len)
+    // check integrity CRC
+    if (_mod->SPIgetRegValue(SX127X_REG_IRQ_FLAGS, 5, 5) == SX127X_CLEAR_IRQ_FLAG_PAYLOAD_CRC_ERROR) {
+        return(ERR_CRC_MISMATCH);
+    }
+
+    // get packet length
+    if (_sf != 6) {
+        uint8_t rlen = _mod->SPIgetRegValue(SX127X_REG_RX_NB_BYTES);
+        if (rlen < len)
+        {
+            len = rlen;
+        }
+    }
+
+    if (len > 0)
     {
-        len = rlen;
+        _mod->SPIreadRegisterBurst(SX127X_REG_FIFO, len, data);
     }
-  }
 
-  if (len > 0)
-  {
-    _mod->SPIreadRegisterBurst(SX127X_REG_FIFO, len, data);
-  }
+    // clear interrupt flags
+    clearIRQFlags();
+    setMode(SX127X_STANDBY);
 
-  // clear interrupt flags
-  clearIRQFlags();
-  setMode(SX127X_STANDBY);
-
-  return(ERR_NONE);
+    return(ERR_NONE);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
-int16_t RFM95::scanChannel() {
-  // set mode to standby
-  int16_t state = setMode(SX127X_STANDBY);
+int8_t RFM95::scanChannel() {
+    // set mode to standby
+    int8_t state = standby();
 
-  // set DIO pin mapping
-  state |= _mod->SPIsetRegValue(SX127X_REG_DIO_MAPPING_1, SX127X_DIO0_CAD_DONE | SX127X_DIO1_CAD_DETECTED, 7, 4);
+    // set DIO pin mapping
+    state |= _mod->SPIsetRegValue(SX127X_REG_DIO_MAPPING_1, SX127X_DIO0_CAD_DONE | SX127X_DIO1_CAD_DETECTED, 7, 4);
 
-  // clear interrupt flags
-  clearIRQFlags();
+    // clear interrupt flags
+    clearIRQFlags();
 
-  // set mode to CAD
-  state |= setMode(SX127X_CAD);
-  if(state != ERR_NONE) {
+    // set mode to CAD
+    state |= setMode(SX127X_CAD);
+    if (state != ERR_NONE) {
+        return(state);
+    }
+
+    // wait for channel activity detected or timeout
+    while(!digitalReadFast(_mod->int0())) {
+        if (digitalReadFast(_mod->int1())) {
+            clearIRQFlags();
+            return(PREAMBLE_DETECTED);
+        }
+    }
+
+    // clear interrupt flags
+    clearIRQFlags();
+
+    return(CHANNEL_FREE);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+int8_t RFM95::sleep() {
+    // set mode to sleep
+    int8_t state = ERR_NONE;
+    if (!_sleeping)
+    {
+        state = setMode(SX127X_SLEEP);
+        if (state == ERR_NONE)
+        {
+            _sleeping = true;
+        }
+    }
+    return state;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+int8_t RFM95::standby() {
+    // set mode to standby
+    int8_t state = ERR_NONE;
+    if (_sleeping)
+    {
+        state = setMode(SX127X_STANDBY);
+        if (state == ERR_NONE)
+        {
+            _sleeping = false;
+        }
+    }
+    return state;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+int8_t RFM95::setSyncWord(uint8_t syncWord) {
+    // set mode to standby
+    standby();
+
+    // write register
+    return(_mod->SPIsetRegValue(SX127X_REG_SYNC_WORD, syncWord));
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+int8_t RFM95::setCurrentLimit(uint8_t currentLimit) {
+    // check allowed range
+    if (!(((currentLimit >= 45) && (currentLimit <= 240)) || (currentLimit == 0))) {
+        return(ERR_INVALID_CURRENT_LIMIT);
+    }
+
+    // set mode to standby
+    int8_t state = standby();
+
+    // set OCP limit
+    uint8_t raw;
+    if (currentLimit == 0) {
+        // limit set to 0, disable OCP
+        state |= _mod->SPIsetRegValue(SX127X_REG_OCP, SX127X_OCP_OFF, 5, 5);
+    } else if (currentLimit <= 120) {
+        raw = (currentLimit - 45) / 5;
+        state |= _mod->SPIsetRegValue(SX127X_REG_OCP, SX127X_OCP_ON | raw, 5, 0);
+    } else if (currentLimit <= 240) {
+        raw = (currentLimit + 30) / 10;
+        state |= _mod->SPIsetRegValue(SX127X_REG_OCP, SX127X_OCP_ON | raw, 5, 0);
+    }
     return(state);
-  }
+}
 
-  // wait for channel activity detected or timeout
-  while(!digitalReadFast(_mod->int0())) {
-    if(digitalReadFast(_mod->int1())) {
-      clearIRQFlags();
-      return(PREAMBLE_DETECTED);
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+int8_t RFM95::setPreambleLength(uint16_t preambleLength) {
+    // check allowed range
+    if (preambleLength < 6) {
+        return(ERR_INVALID_PREAMBLE_LENGTH);
     }
-  }
 
-  // clear interrupt flags
-  clearIRQFlags();
+    // set mode to standby
+    int8_t state = standby();
 
-  return(CHANNEL_FREE);
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-
-int16_t RFM95::sleep() {
-  // set mode to sleep
-  return(setMode(SX127X_SLEEP));
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-
-int16_t RFM95::standby() {
-  // set mode to standby
-  return(setMode(SX127X_STANDBY));
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-
-int16_t RFM95::setSyncWord(uint8_t syncWord) {
-  // set mode to standby
-  setMode(SX127X_STANDBY);
-
-  // write register
-  return(_mod->SPIsetRegValue(SX127X_REG_SYNC_WORD, syncWord));
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-
-int16_t RFM95::setCurrentLimit(uint8_t currentLimit) {
-  // check allowed range
-  if(!(((currentLimit >= 45) && (currentLimit <= 240)) || (currentLimit == 0))) {
-    return(ERR_INVALID_CURRENT_LIMIT);
-  }
-
-  // set mode to standby
-  int16_t state = setMode(SX127X_STANDBY);
-
-  // set OCP limit
-  uint8_t raw;
-  if(currentLimit == 0) {
-    // limit set to 0, disable OCP
-    state |= _mod->SPIsetRegValue(SX127X_REG_OCP, SX127X_OCP_OFF, 5, 5);
-  } else if(currentLimit <= 120) {
-    raw = (currentLimit - 45) / 5;
-    state |= _mod->SPIsetRegValue(SX127X_REG_OCP, SX127X_OCP_ON | raw, 5, 0);
-  } else if(currentLimit <= 240) {
-    raw = (currentLimit + 30) / 10;
-    state |= _mod->SPIsetRegValue(SX127X_REG_OCP, SX127X_OCP_ON | raw, 5, 0);
-  }
-  return(state);
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-
-int16_t RFM95::setPreambleLength(uint16_t preambleLength) {
-  // check allowed range
-  if(preambleLength < 6) {
-    return(ERR_INVALID_PREAMBLE_LENGTH);
-  }
-
-  // set mode to standby
-  int16_t state = setMode(SX127X_STANDBY);
-
-  // set preamble length
-  state |= _mod->SPIsetRegValue(SX127X_REG_PREAMBLE_MSB, (preambleLength & 0xFF00) >> 8);
-  state |= _mod->SPIsetRegValue(SX127X_REG_PREAMBLE_LSB, preambleLength & 0x00FF);
-  if (state == ERR_NONE)
-  {
-    _preambleLength = preambleLength;
-  }
-  return(state);
+    // set preamble length
+    state |= _mod->SPIsetRegValue(SX127X_REG_PREAMBLE_MSB, (preambleLength & 0xFF00) >> 8);
+    state |= _mod->SPIsetRegValue(SX127X_REG_PREAMBLE_LSB, preambleLength & 0x00FF);
+    if (state == ERR_NONE)
+    {
+        _preambleLength = preambleLength;
+        refreshTimeoutConstants();
+    }
+    return(state);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 float RFM95::getFrequencyError(bool autoCorrect) {
-  // get raw frequency error
-  uint32_t raw = (uint32_t)_mod->SPIgetRegValue(SX127X_REG_FEI_MSB, 3, 0) << 16;
-  raw |= _mod->SPIgetRegValue(SX127X_REG_FEI_MID) << 8;
-  raw |= _mod->SPIgetRegValue(SX127X_REG_FEI_LSB);
+    // get raw frequency error
+    uint32_t raw = uint32_t(_mod->SPIgetRegValue(SX127X_REG_FEI_MSB, 3, 0)) << 16;
+    raw |= uint32_t(_mod->SPIgetRegValue(SX127X_REG_FEI_MID)) << 8;
+    raw |= uint32_t(_mod->SPIgetRegValue(SX127X_REG_FEI_LSB));
 
-  uint32_t base = (uint32_t)2 << 23;
-  float error;
+    uint32_t base = (uint32_t)2 << 23;
+    float error;
 
-  // check the first bit
-  if(raw & 0x80000) {
-    // frequency error is negative
-    raw |= (uint32_t)0xFFF00000;
-    raw = ~raw + 1;
-    error = (((float)raw * (float)base)/32000000.0) * (_bw/500.0) * -1.0;
-  } else {
-    error = (((float)raw * (float)base)/32000000.0) * (_bw/500.0);
-  }
+    // check the first bit
+    if (raw & 0x80000) {
+        // frequency error is negative
+        raw |= (uint32_t)0xFFF00000;
+        raw = ~raw + 1;
+        error = (((float)raw * (float)base)/32000000.0) * (_bw/500.0) * -1.0;
+    } else {
+        error = (((float)raw * (float)base)/32000000.0) * (_bw/500.0);
+    }
 
-  if(autoCorrect) {
-    // adjust LoRa modem data rate
-    float ppmOffset = 0.95 * (error/32.0);
-    _mod->SPIwriteRegister(0x27, (uint8_t)ppmOffset);
-  }
+    if (autoCorrect) {
+        // adjust LoRa modem data rate
+        float ppmOffset = 0.95 * (error/32.0);
+        _mod->SPIwriteRegister(0x27, (uint8_t)ppmOffset);
+    }
 
-  return(error);
+    return(error);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 int8_t RFM95::getRSSI() {
-  int8_t lastPacketRSSI;
+    int8_t lastPacketRSSI;
 
-  // RSSI calculation uses different constant for low-frequency and high-frequency ports
-  if(_freq < 868.0) {
-    lastPacketRSSI = -164 + _mod->SPIgetRegValue(SX127X_REG_PKT_RSSI_VALUE);
-  } else {
-    lastPacketRSSI = -157 + _mod->SPIgetRegValue(SX127X_REG_PKT_RSSI_VALUE);
-  }
+    // RSSI calculation uses different constant for low-frequency and high-frequency ports
+    if (_freq < 868.0) {
+        lastPacketRSSI = -164 + int16_t(_mod->SPIgetRegValue(SX127X_REG_PKT_RSSI_VALUE));
+    } else {
+        lastPacketRSSI = -157 + int16_t(_mod->SPIgetRegValue(SX127X_REG_PKT_RSSI_VALUE));
+    }
 
-  // spread-spectrum modulation signal can be received below noise floor
-  // check last packet SNR and if it's less than 0, add it to reported RSSI to get the correct value
-  float lastPacketSNR = RFM95::getSNR();
-  if(lastPacketSNR < 0.0) {
-    lastPacketRSSI += lastPacketSNR;
-  }
+    // spread-spectrum modulation signal can be received below noise floor
+    // check last packet SNR and if it's less than 0, add it to reported RSSI to get the correct value
+    float lastPacketSNR = RFM95::getSNR();
+    if (lastPacketSNR < 0.0) {
+        lastPacketRSSI += lastPacketSNR;
+    }
 
-  return(lastPacketRSSI);
+    return(lastPacketRSSI);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 float RFM95::getSNR() {
-  // get SNR value
-  int8_t rawSNR = (int8_t)_mod->SPIgetRegValue(SX127X_REG_PKT_SNR_VALUE);
-  return(rawSNR / 4.0);
-}
-
-
-float RFM95::getDataRate() {
-  return(_dataRate);
+    // get SNR value
+    int8_t rawSNR = (int8_t)_mod->SPIgetRegValue(SX127X_REG_PKT_SNR_VALUE);
+    return float(rawSNR >> 2);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 bool RFM95::findChip(uint8_t ver) {
-  uint8_t i = 0;
-  bool flagFound = false;
-  while((i < 10) && !flagFound) {
-    uint8_t version = _mod->SPIreadRegister(SX127X_REG_VERSION);
-    if(version == ver) {
-      flagFound = true;
-    } else {
-      #ifdef KITELIB_DEBUG
-        DEBUG_PRINT("SX127x not found! (");
-        DEBUG_PRINT_DEC(i + 1);
-        DEBUG_PRINT(" of 10 tries) SX127X_REG_VERSION == ");
+    uint8_t i = 0;
+    bool flagFound = false;
+    while((i < 10) && !flagFound) {
+        uint8_t version = _mod->SPIreadRegister(SX127X_REG_VERSION);
+        if (version == ver) {
+            flagFound = true;
+        } else {
+#ifdef KITELIB_DEBUG
+            DEBUG_PRINT("SX127x not found! (");
+            DEBUG_PRINT_DEC(i + 1);
+            DEBUG_PRINT(" of 10 tries) SX127X_REG_VERSION == ");
 
-        char buffHex[5];
-        sprintf(buffHex, "0x%02X", version);
-        DEBUG_PRINT(buffHex);
-        DEBUG_PRINT(", expected 0x00");
-        DEBUG_PRINTLN_HEX(ver);
-      #endif
-      chrono::delay(1000);
-      i++;
+            char buffHex[5];
+            sprintf(buffHex, "0x%02X", version);
+            DEBUG_PRINT(buffHex);
+            DEBUG_PRINT(", expected 0x00");
+            DEBUG_PRINTLN_HEX(ver);
+#endif
+            chrono::delay(1000);
+            i++;
+        }
     }
-  }
 
-  return(flagFound);
+    return(flagFound);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
-int16_t RFM95::setMode(uint8_t mode) {
-  return(_mod->SPIsetRegValue(SX127X_REG_OP_MODE, mode, 2, 0, 5));
+int8_t RFM95::setMode(uint8_t mode, bool checked) {
+    return checked
+            ? _mod->SPIsetRegValueChecked(SX127X_REG_OP_MODE, mode, 2, 0, 5)
+            : _mod->SPIsetRegValue(SX127X_REG_OP_MODE, mode, 2, 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
-int16_t RFM95::getActiveModem() {
-  return(_mod->SPIgetRegValue(SX127X_REG_OP_MODE, 7, 7));
+uint8_t RFM95::getActiveModem() {
+    return (_mod->SPIgetRegValue(SX127X_REG_OP_MODE, 7, 7));
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
-int16_t RFM95::setActiveModem(uint8_t modem) {
-  // set mode to SLEEP
-  int16_t state = setMode(SX127X_SLEEP);
+int8_t RFM95::setActiveModem(uint8_t modem) {
+    // set mode to SLEEP
+    int8_t state = setMode(SX127X_SLEEP);
 
-  // set LoRa mode
-  state |= _mod->SPIsetRegValue(SX127X_REG_OP_MODE, modem, 7, 7, 5);
+    // set LoRa mode
+    state |= _mod->SPIsetRegValueChecked(SX127X_REG_OP_MODE, modem, 7, 7, 5);
 
-  // set mode to STANDBY
-  state |= setMode(SX127X_STANDBY);
-  return(state);
+    // set mode to STANDBY
+    state |= setMode(SX127X_STANDBY);
+    return(state);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 void RFM95::clearIRQFlags() {
-  _mod->SPIwriteRegister(SX127X_REG_IRQ_FLAGS, 0b11111111);
+    _mod->SPIwriteRegister(SX127X_REG_IRQ_FLAGS, 0b11111111);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -1377,25 +1419,25 @@ void RFM95::clearIRQFlags() {
 #ifdef KITELIB_DEBUG
 
 void RFM95::regDump() {
-  DEBUG_PRINTLN("");
-  DEBUG_PRINTLN("ADDR\tVALUE");
-  for(uint16_t addr = 0x01; addr <= 0x70; addr++) {
-    if(addr <= 0x0F) {
-      DEBUG_PRINT("0x0");
-    } else {
-      DEBUG_PRINT("0x");
+    DEBUG_PRINTLN("");
+    DEBUG_PRINTLN("ADDR\tVALUE");
+    for(uint16_t addr = 0x01; addr <= 0x70; addr++) {
+        if (addr <= 0x0F) {
+            DEBUG_PRINT("0x0");
+        } else {
+            DEBUG_PRINT("0x");
+        }
+        DEBUG_PRINT_HEX(addr);
+        DEBUG_PRINT("\t");
+        uint8_t val = _mod->SPIreadRegister(addr);
+        if (val <= 0x0F) {
+            DEBUG_PRINT("0x0");
+        } else {
+            DEBUG_PRINT("0x");
+        }
+        DEBUG_PRINTLN_HEX(val);
+        chrono::delay(50);
     }
-    DEBUG_PRINT_HEX(addr);
-    DEBUG_PRINT("\t");
-    uint8_t val = _mod->SPIreadRegister(addr);
-    if(val <= 0x0F) {
-      DEBUG_PRINT("0x0");
-    } else {
-      DEBUG_PRINT("0x");
-    }
-    DEBUG_PRINTLN_HEX(val);
-    chrono::delay(50);
-  }
 }
 
 #endif

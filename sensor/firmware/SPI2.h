@@ -216,7 +216,6 @@ public:
      * about 10% more speed, even if it seems counter-intuitive. At lower
      * speeds it is unnoticed.
      */
-    asm volatile("nop");
     while (!(SPSR0 & _BV(SPIF))) ; // wait
     return SPDR0;
   }
@@ -225,40 +224,45 @@ public:
     in.val = data;
     if (!(SPCR0 & _BV(DORD))) {
       SPDR0 = in.msb;
-      asm volatile("nop"); // See transfer(uint8_t) function
       while (!(SPSR0 & _BV(SPIF))) ;
       out.msb = SPDR0;
       SPDR0 = in.lsb;
-      asm volatile("nop");
       while (!(SPSR0 & _BV(SPIF))) ;
       out.lsb = SPDR0;
     } else {
       SPDR0 = in.lsb;
-      asm volatile("nop");
       while (!(SPSR0 & _BV(SPIF))) ;
       out.lsb = SPDR0;
       SPDR0 = in.msb;
-      asm volatile("nop");
       while (!(SPSR0 & _BV(SPIF))) ;
       out.msb = SPDR0;
     }
     return out.val;
   }
-  inline static void transfer(void *buf, size_t count) {
+  inline static void read(void *buf, size_t count) {
     if (count == 0) return;
     uint8_t *p = (uint8_t *)buf;
-    SPDR0 = *p;
+    SPDR0 = 0xFF;
     while (--count > 0) {
-      uint8_t out = *(p + 1);
       while (!(SPSR0 & _BV(SPIF))) ;
-      uint8_t in = SPDR0;
-      SPDR0 = out;
-      *p++ = in;
+      *p++ = SPDR0;
+      SPDR0 = 0xFF;
     }
     while (!(SPSR0 & _BV(SPIF))) ;
     *p = SPDR0;
   }
-  // After performing a group of transfers and releasing the chip select
+  inline static void write(void *buf, size_t count) {
+    if (count == 0) return;
+    uint8_t *p = (uint8_t *)buf;
+    SPDR0 = *p;
+    while (--count > 0) {
+      while (!(SPSR0 & _BV(SPIF))) ;
+      uint8_t in = SPDR0;
+      SPDR0 = *++p;
+    }
+    while (!(SPSR0 & _BV(SPIF))) ;
+    uint8_t in = SPDR0;
+  }  // After performing a group of transfers and releasing the chip select
   // signal, this function allows others to access the SPI bus
   inline static void endTransaction(void) {
     #ifdef SPI_TRANSACTION_MISMATCH_LED
