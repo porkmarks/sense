@@ -40,6 +40,13 @@ inline void operator delete[](void* p) { free(p); }
 inline void* operator new(size_t size_, void *ptr_) { return ptr_; }
 */
 
+
+// TIMER0 - LEDs
+// TIMER1 - Clock
+// TIMER2 - Sleep
+// TIMER3 - Battery
+
+
 //////////////////////////////////////////////////////////////////////////////////////////
 
 enum class State : uint8_t
@@ -71,6 +78,7 @@ static chrono::time_ms s_next_comms_time_point;
 static chrono::millis s_comms_period;
 
 static int8_t s_last_input_dBm = 0;
+static float s_last_batery_vcc_during_comms = 0;
 
 static Storage s_storage;
 static bool s_sensor_sleeping = false;
@@ -266,6 +274,8 @@ static void setup()
 
     LOG(PSTR("Stack: %d -> %d\n"), initial_stack_size(), stack_size());
 
+    
+
     ///////////////////////////////////////////////
     //initialize the bus and sensors
     while (!i2c_init())
@@ -286,7 +296,7 @@ static void setup()
     }
     chrono::delay(chrono::millis(50));
 
-    init_adc();
+    init_battery();
 
     //init sensor
     while (true)
@@ -295,7 +305,8 @@ static void setup()
         float h;
         s_sht.GetHumidity(h);
         s_sht.GetTemperature(t);
-        float vcc = read_vcc(s_stable_settings.vref / 100.f);
+        float vcc = read_battery(s_stable_settings.vref);
+        s_last_batery_vcc_during_comms = vcc;
         LOG(PSTR("VCC: %dmV\n"), (int)(vcc*1000.f));
         LOG(PSTR("T: %dm'C\n"), (int)(t*1000.f));
         LOG(PSTR("H: %d%%\n"), (int)h);
@@ -331,7 +342,7 @@ static void setup()
         {
             s_sht.GetHumidity(h);
             s_sht.GetTemperature(t);
-            float vcc = read_vcc(s_stable_settings.vref / 100.f);
+            float vcc = read_battery(s_stable_settings.vref);
             hash_combine(rnd_seed, *(uint32_t*)&vcc);
             hash_combine(rnd_seed, *(uint32_t*)&t);
             hash_combine(rnd_seed, *(uint32_t*)&h);
@@ -359,6 +370,38 @@ static void setup()
     }
     s_comms.sleep_mode();
 
+/* 
+    //comms testing
+    {
+        uint8_t raw_packet_data[packet_raw_size(Sensor_Comms::MAX_USER_DATA_SIZE)];
+        s_comms.set_destination_address(Sensor_Comms::BROADCAST_ADDRESS);
+        char data[20];
+        memset(data, 0, 20);
+        LOG(PSTR("Stack: %d -> %d\n"), initial_stack_size(), stack_size());
+
+        while (true)
+        {
+            LOG(PSTR("Receiving...\n"));
+            uint8_t size = Sensor_Comms::MAX_USER_DATA_SIZE;
+            uint8_t* packet_data = s_comms.receive_packet(raw_packet_data, size, chrono::millis(1000000ULL));
+            if (packet_data)
+            {
+                uint32_t rcounter = *((uint32_t*)s_comms.get_rx_packet_payload(packet_data));
+                LOG(PSTR("\t\tdone: %ld. Sending...\n"), rcounter);
+                s_comms.begin_packet(raw_packet_data, 1, true);
+                s_comms.pack(raw_packet_data, &rcounter, sizeof(rcounter));
+                s_comms.pack(raw_packet_data, data, 20);
+                bool ok = s_comms.send_packed_packet(raw_packet_data, true);
+                LOG(PSTR("\t\t\t%s.\n"), (ok ? "done" : "failed"));
+            }
+            else
+            {
+                LOG(PSTR("\t\ttimeout\n"));
+            }
+        }
+    }
+//*/
+    
     /*
     //send some test garbage for frequency measurements
     {
@@ -409,7 +452,7 @@ static void setup()
       do
       {
         constexpr float k_calibration_voltage = 3.5f;
-        float vcc = read_vcc(vref);
+        float vcc = read_battery(vref);
         if (vcc >= k_calibration_voltage - 0.2f)
         {
             float x = vref * 1024.f / vcc;
@@ -435,13 +478,13 @@ static void setup()
 
     ///////////////////////////////////////////////
     //battery guard
-    battery_guard(s_stable_settings.vref / 100.f);
+    battery_guard_auto(s_stable_settings.vref);
 
     LOG(PSTR("Type: %d\n"), SENSOR_TYPE);
     LOG(PSTR("HW Ver: %d\n"), HARDWARE_VERSION);
     LOG(PSTR("SW Ver: %d\n"), SOFTWARE_VERSION);
     LOG(PSTR("SN: %lx\n"), s_stable_settings.serial_number);
-    LOG(PSTR("Addr: %lu\n"), s_settings.address);
+    LOG(PSTR("Addr: %u\n"), s_settings.address);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -503,21 +546,48 @@ static bool apply_config(const data::sensor::Config_Response& config)
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
+static void fill_config_request(data::sensor::Config_Request& request)
+{
+    request.reboot_flags = s_reboot_flags;
+    request.comms_errors = s_comms_errors;
+    request.first_measurement_index = s_first_stored_measurement_index;
+    request.measurement_count = s_storage.get_data_count();
+    request.b2s_input_dBm = s_last_input_dBm;
+    request.calibration = s_stable_settings.calibration;
+    request.sleeping = s_sensor_sleeping;
+    
+    Storage::iterator it;
+    if (s_storage.unpack_next(it) == true)
+    {
+        request.measurement.pack(it.data.humidity, it.data.temperature);
+    }
+    else
+    {
+        float temperature = 0;
+        float humidity = 0;
+        if (s_sht.GetTemperature(temperature) && s_sht.GetHumidity(humidity))
+        {
+            temperature += static_cast<float>(s_stable_settings.calibration.temperature_bias) * 0.01f;
+            humidity += static_cast<float>(s_stable_settings.calibration.humidity_bias) * 0.01f;
+        }
+        request.measurement.pack(humidity, temperature);
+    }
+    request.qvcc = data::sensor::pack_qvcc(s_last_batery_vcc_during_comms);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
 static bool request_config()
 {
+    Battery_Monitor bm(s_stable_settings.vref, s_last_batery_vcc_during_comms);
+  
     bool send_successful = false;
     {
         uint8_t raw_buffer[packet_raw_size(sizeof(data::sensor::Config_Request))];
         s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::CONFIG_REQUEST), true);
-        data::sensor::Config_Request req;
-        req.reboot_flags = s_reboot_flags;
-        req.comms_errors = s_comms_errors;
-        req.first_measurement_index = s_first_stored_measurement_index;
-        req.measurement_count = s_storage.get_data_count();
-        req.b2s_input_dBm = s_last_input_dBm;
-        req.calibration = s_stable_settings.calibration;
-        req.sleeping = s_sensor_sleeping;
-        s_comms.pack(raw_buffer, &req, sizeof(req));
+        data::sensor::Config_Request request;
+        fill_config_request(request);
+        s_comms.pack(raw_buffer, &request, sizeof(request));
         send_successful = s_comms.send_packed_packet(raw_buffer, true);
     }
 
@@ -556,7 +626,7 @@ static void pair_state()
 {
     LOG(PSTR(">>> pair\n"));
     
-    uint32_t addr = Sensor_Comms::PAIR_ADDRESS_BEGIN + random() % (Sensor_Comms::PAIR_ADDRESS_END - Sensor_Comms::PAIR_ADDRESS_BEGIN);
+    Sensor_Comms::Address addr = Sensor_Comms::PAIR_ADDRESS_BEGIN + random() % (Sensor_Comms::PAIR_ADDRESS_END - Sensor_Comms::PAIR_ADDRESS_BEGIN);
     s_comms.set_address(addr);
     s_comms.set_destination_address(Sensor_Comms::BASE_ADDRESS);
 
@@ -578,6 +648,8 @@ static void pair_state()
                 //wait for the user to release the button
                 wait_for_release(Button::BUTTON1);
 
+                Battery_Monitor bm(s_stable_settings.vref, s_last_batery_vcc_during_comms);
+                
                 LOG(PSTR("Send req..."));
 
                 bool send_successful = false;
@@ -611,7 +683,7 @@ static void pair_state()
                         const data::sensor::Pair_Response* response_ptr = reinterpret_cast<const data::sensor::Pair_Response*>(s_comms.get_rx_packet_payload(buffer));
                         s_comms.set_address(response_ptr->address);
 
-                        LOG(PSTR("done. Addr %lu\n"), response_ptr->address);
+                        LOG(PSTR("done. Addr %u\n"), response_ptr->address);
 
                         s_settings.address = response_ptr->address;
                         save_settings(s_settings);
@@ -660,7 +732,7 @@ static void pair_state()
             //we probably woken up because the user pressed the button - wait for him to release it
             wait_for_release(Button::BUTTON1);
 
-            battery_guard(s_stable_settings.vref / 100.f);
+            battery_guard_auto(s_stable_settings.vref);
         }
     }
 
@@ -735,8 +807,6 @@ static void do_comms()
         const chrono::millis COMMS_SLOT_DURATION = chrono::millis(7000);
         chrono::time_ms start_tp = chrono::now();
 
-        float vcc = read_vcc(s_stable_settings.vref / 100.f);
-
         uint8_t raw_buffer_size = packet_raw_size(sizeof(data::sensor::Measurement_Batch_Request));
         uint8_t raw_buffer[raw_buffer_size];
         memset(raw_buffer, 0, raw_buffer_size);
@@ -761,13 +831,12 @@ static void do_comms()
                 if (it.data.humidity < MIN_VALID_HUMIDITY)
                 {
                     item.pack(0.f, 0.f);
-                    batch.pack(vcc);
                 }
                 else
                 {
                     item.pack(it.data.humidity, it.data.temperature);
-                    batch.pack(vcc);
                 }
+                batch.qvcc = data::sensor::pack_qvcc(s_last_batery_vcc_during_comms);
             }
 
             if (batch.count >= data::sensor::Measurement_Batch_Request::MAX_COUNT)
@@ -784,6 +853,8 @@ static void do_comms()
 
             if (send && batch.count > 0)
             {
+                Battery_Monitor bm(s_stable_settings.vref, s_last_batery_vcc_during_comms);
+                
                 batch.last_batch = done ? 1 : 0;
                 LOG(PSTR("Send batch of %d..."), (int)batch.count);
                 s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::MEASUREMENT_BATCH_REQUEST), false);
@@ -833,15 +904,20 @@ static bool apply_first_config(const data::sensor::First_Config_Response& first_
 
 static bool request_first_config()
 {
+    Battery_Monitor bm(s_stable_settings.vref, s_last_batery_vcc_during_comms);
+    
     bool send_successful = false;
     {
         uint8_t raw_buffer[packet_raw_size(sizeof(data::sensor::First_Config_Request))];
         s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::FIRST_CONFIG_REQUEST), true);
         data::sensor::First_Config_Request request;
+        fill_config_request(request);
+        
         request.descriptor.sensor_type = SENSOR_TYPE;
         request.descriptor.hardware_version = HARDWARE_VERSION;
         request.descriptor.software_version = SOFTWARE_VERSION;
         request.descriptor.serial_number = s_stable_settings.serial_number;
+        
         s_comms.pack(raw_buffer, &request, sizeof(request));
         send_successful = s_comms.send_packed_packet(raw_buffer, true);
     }
@@ -993,7 +1069,7 @@ static void measurement_loop_state()
             LOG(PSTR("Sleep..."));
             sleep(true);
         }
-        battery_guard(s_stable_settings.vref / 100.f);
+        
         chrono::calibrate();
         LOG(PSTR("done\n"));
     }
@@ -1031,13 +1107,14 @@ static void sleep_loop_state()
             set_led(Led::Yellow);
             chrono::delay(chrono::millis(100));
             set_led(Led::None);
-            
+
             request_config();
         }
 
         if (s_sensor_sleeping == false)
         {
             s_state = State::MEASUREMENT_LOOP;
+
             blink_led(Blink_Led::Yellow, 8, chrono::millis(50));
             request_config(); //report back the sleeping status
             break;
@@ -1045,7 +1122,7 @@ static void sleep_loop_state()
 
         LOG(PSTR("Sleeping..."));
         sleep(true);
-        battery_guard(s_stable_settings.vref / 100.f);
+        battery_guard_manual(s_stable_settings.vref);
         chrono::calibrate();
         LOG(PSTR("done\n"));
     }
@@ -1081,8 +1158,6 @@ int main()
         {
             blink_led(Blink_Led::Red, 2, chrono::millis(50));
             sleep(true);
-            battery_guard(s_stable_settings.vref / 100.f);
         }      
     }
 }
-
