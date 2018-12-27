@@ -55,8 +55,6 @@ LIBS += -lpthread
 HEADERS += \
     ../src/command.h \
     ../src/pigpio.h \
-    ../src/Scheduler.h \
-    ../src/Sensors.h \
     ../src/Server.h \
     ../../sensor/firmware/Sensor_Comms.h \
     ../../sensor/firmware/CRC.h \
@@ -69,8 +67,6 @@ HEADERS += \
 
 SOURCES += \
     ../src/main.cpp \
-    ../src/Scheduler.cpp \
-    ../src/Sensors.cpp \
     ../src/Server.cpp \
     ../src/tests.cpp \
     ../src/command.c \
