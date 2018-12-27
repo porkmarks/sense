@@ -7,17 +7,19 @@
 class Sensor_Comms
 {
 public:
+    typedef uint16_t Address;
+
 #ifndef __AVR__
 #   pragma pack(push, 1) // exact fit - no padding
 #endif
     struct Header
     {
-        uint32_t crc;
-        uint32_t source_address = BROADCAST_ADDRESS;
-        uint32_t destination_address = BROADCAST_ADDRESS;
+        uint8_t type = 0;
         uint16_t req_id : 15;
         uint16_t needs_response : 1;
-        uint8_t type = 0;
+        Address source_address = BROADCAST_ADDRESS;
+        Address destination_address = BROADCAST_ADDRESS;
+        uint32_t crc;
     };
 
 #ifndef __AVR__
@@ -26,14 +28,14 @@ public:
 
     Sensor_Comms();
 
-    static constexpr uint32_t BROADCAST_ADDRESS = 0;
-    static constexpr uint32_t BASE_ADDRESS = 0xFFFFFFFFULL;
+    static constexpr Address BROADCAST_ADDRESS = 0;
+    static constexpr Address BASE_ADDRESS = 0xFFFFUL;
 
-    static constexpr uint32_t PAIR_ADDRESS_BEGIN = BROADCAST_ADDRESS + 1;
-    static constexpr uint32_t PAIR_ADDRESS_END = PAIR_ADDRESS_BEGIN + 1000;
+    static constexpr Address PAIR_ADDRESS_BEGIN = BROADCAST_ADDRESS + 1;
+    static constexpr Address PAIR_ADDRESS_END = PAIR_ADDRESS_BEGIN + 1000;
 
-    static constexpr uint32_t SLAVE_ADDRESS_BEGIN = PAIR_ADDRESS_END + 1;
-    static constexpr uint32_t SLAVE_ADDRESS_END = BASE_ADDRESS - 1;
+    static constexpr Address SLAVE_ADDRESS_BEGIN = PAIR_ADDRESS_END + 1;
+    static constexpr Address SLAVE_ADDRESS_END = BASE_ADDRESS - 1;
 
     static constexpr uint8_t MAX_USER_DATA_SIZE = 128 - sizeof(Sensor_Comms::Header);
 
@@ -42,9 +44,9 @@ public:
 
     void set_transmission_power(int8_t power_dBm);
 
-    uint32_t get_address() const;
-    void set_address(uint32_t address);
-    void set_destination_address(uint32_t address);
+    Address get_address() const;
+    void set_address(Address address);
+    void set_destination_address(Address address);
 
     void sleep_mode();
 
@@ -60,7 +62,7 @@ public:
     uint8_t* receive_packet(uint8_t* raw_buffer, uint8_t& packet_size, chrono::millis timeout);
 
     int8_t get_input_dBm();
-    uint32_t get_rx_packet_source_address(uint8_t* received_buffer) const;
+    Address get_rx_packet_source_address(uint8_t* received_buffer) const;
     uint8_t get_rx_packet_type(uint8_t* received_buffer) const;
     bool get_rx_packet_needs_response(uint8_t* received_buffer) const;
     const void* get_rx_packet_payload(uint8_t* received_buffer) const;
@@ -69,8 +71,8 @@ private:
     Module m_module;
     RFM95  m_lora;
 
-    uint32_t m_address = BROADCAST_ADDRESS;
-    uint32_t m_destination_address = BROADCAST_ADDRESS;
+    Address m_address = BROADCAST_ADDRESS;
+    Address m_destination_address = BROADCAST_ADDRESS;
     uint16_t m_last_req_id = 0;
 
     void wait_minimum_time() const;
