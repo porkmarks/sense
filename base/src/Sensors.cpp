@@ -50,12 +50,12 @@ std::string time_point_to_string(std::chrono::system_clock::time_point tp)
     char date_time_format[] = "%Y-%m-%d %H:%M:%S";
 
     char time_str[256];
-
     strftime(time_str, sizeof(time_str), date_time_format, ttm);
-
     string result(time_str);
-    result.append(".");
-    result.append(to_string(ms.count()));
+
+    char ms_str[256];
+    sprintf(ms_str, ".%03d", ms.count());
+    result.append(ms_str);
 
     return result;
 }
