@@ -2,36 +2,83 @@
 
 #ifdef __AVR__
 #   include <avr/pgmspace.h>
+#   include <util/crc16.h>
 #else
-#   define PROGMEM
-#   define pgm_read_dword_near(x) (*(x))
 #endif
 
-static const PROGMEM uint32_t crc_table[16] =
+uint32_t crc32(const void* data, uint8_t size)
 {
-    0x00000000, 0x1db71064, 0x3b6e20c8, 0x26d930ac,
-    0x76dc4190, 0x6b6b51f4, 0x4db26158, 0x5005713c,
-    0xedb88320, 0xf00f9344, 0xd6d6a3e8, 0xcb61b38c,
-    0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c
-};
+    constexpr uint32_t Polynomial = 0xEDB88320;
+    uint32_t crc = ~uint32_t(~0L);
+    const uint8_t* p = reinterpret_cast<const uint8_t*>(data);
+    while (size--)
+    {
+        crc ^= *p++;
 
-uint32_t crc_update(uint32_t crc, uint8_t data)
-{
-    uint8_t tbl_idx = uint8_t(crc ^ (data >> (0 * 4)));
-    crc = pgm_read_dword_near(crc_table + (tbl_idx & 0x0f)) ^ (crc >> 4);
-    tbl_idx = uint8_t(crc ^ (data >> (1 * 4)));
-    crc = pgm_read_dword_near(crc_table + (tbl_idx & 0x0f)) ^ (crc >> 4);
-    return crc;
+        uint8_t lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+    }
+    return ~crc;
 }
 
-uint32_t crc32(const void* _data, size_t size)
+#ifndef __AVR__
+uint16_t _crc16_update(uint16_t crc, uint8_t a)
 {
-    const uint8_t* data = reinterpret_cast<const uint8_t*>(_data);
-    uint32_t crc = uint32_t(~0L);
+    crc ^= a;
+    for (uint8_t i = 0; i < 8; ++i)
+    {
+        if (crc & 1)
+        {
+            crc = (crc >> 1) ^ 0xA001;
+        }
+        else
+        {
+            crc = (crc >> 1);
+        }
+    }
+
+    return crc;
+}
+#endif
+
+uint16_t crc16(const void* data, uint8_t size)
+{
+    const uint8_t* p = reinterpret_cast<const uint8_t*>(data);
+    uint16_t crc = uint16_t(~0L);
     while (size-- > 0)
     {
-        crc = crc_update(crc, *data++);
+        crc = _crc16_update(crc, *p++);
     }
     crc = ~crc;
     return crc;
 }
+
