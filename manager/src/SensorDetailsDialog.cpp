@@ -1,6 +1,7 @@
 #include "SensorDetailsDialog.h"
 #include <QMessageBox>
 #include <QDateTime>
+#include <QSettings>
 
 extern float getBatteryLevel(float vcc);
 extern QIcon getBatteryIcon(float vcc);
@@ -16,6 +17,35 @@ SensorDetailsDialog::SensorDetailsDialog(DB& db, QWidget* parent)
     , m_db(db)
 {
     m_ui.setupUi(this);
+    adjustSize();
+    loadSettings();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SensorDetailsDialog::loadSettings()
+{
+    QSettings settings;
+    resize(settings.value("SensorDetailsDialog/size", size()).toSize());
+    QPoint defaultPos = parentWidget()->mapToGlobal(parentWidget()->rect().center()) - QPoint(width() / 2, height() / 2);
+    move(settings.value("SensorDetailsDialog/pos", defaultPos).toPoint());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SensorDetailsDialog::saveSettings()
+{
+    QSettings settings;
+    settings.setValue("SensorDetailsDialog/size", size());
+    settings.setValue("SensorDetailsDialog/pos", pos());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SensorDetailsDialog::closeEvent(QCloseEvent* event)
+{
+    saveSettings();
+    QDialog::closeEvent(event);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -119,6 +149,14 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
     m_ui.watchdogReboots->setText(QString("%1").arg(m_sensor.errorCounters.watchdogReboots));
     m_ui.resets->setText(QString("%1").arg(m_sensor.errorCounters.resetReboots));
     m_ui.powerOnReboots->setText(QString("%1").arg(m_sensor.errorCounters.powerOnReboots));
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SensorDetailsDialog::done(int result)
+{
+    saveSettings();
+    QDialog::done(result);
 }
 
 //////////////////////////////////////////////////////////////////////////

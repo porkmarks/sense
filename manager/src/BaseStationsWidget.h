@@ -43,6 +43,7 @@ private:
 
     std::vector<DB::BaseStationDescriptor> m_baseStationDescriptors;
     std::vector<QMetaObject::Connection> m_uiConnections;
+    bool m_sectionSaveScheduled = false;
 };
 
 

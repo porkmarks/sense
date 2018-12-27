@@ -81,5 +81,6 @@ private:
     QTimer* m_refreshTimer = nullptr;
 
     std::vector<bool> m_columnsVisible;
+    size_t m_columnsVisibleCount = 0;
     std::vector<Column> m_visibleColumnToRealColumn;
 };

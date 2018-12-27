@@ -47,8 +47,16 @@ void LogsWidget::init()
 
     connect(m_ui.list->header(), &QHeaderView::sectionResized, [this]()
     {
-        QSettings settings;
-        settings.setValue("logs/list/state", m_ui.list->header()->saveState());
+        if (!m_sectionSaveScheduled)
+        {
+            m_sectionSaveScheduled = true;
+            QTimer::singleShot(500, [this]()
+            {
+                m_sectionSaveScheduled = false;
+                QSettings settings;
+                settings.setValue("logs/list/state", m_ui.list->header()->saveState());
+            });
+        }
     });
 
     {

@@ -26,7 +26,7 @@ private:
     void checkIfAdminExists();
     void login();
 
-    void closeEvent(QCloseEvent* event);
+    void closeEvent(QCloseEvent* event) override;
 
     void readSettings();
 

@@ -25,4 +25,5 @@ private:
     std::unique_ptr<QSortFilterProxyModel> m_sortingModel;
     std::unique_ptr<SensorsDelegate> m_delegate;
     Ui::SensorsFilterWidget m_ui;
+    bool m_sectionSaveScheduled = false;
 };

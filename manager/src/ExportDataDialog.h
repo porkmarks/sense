@@ -13,6 +13,7 @@ public:
 
 private slots:
     void accept() override;
+    void done(int result) override;
 
 private:
     void loadSettings();

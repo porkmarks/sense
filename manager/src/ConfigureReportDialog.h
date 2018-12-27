@@ -20,8 +20,12 @@ public:
 private slots:
     void sendReportNow();
     void accept() override;
+    void done(int result) override;
 
 private:
+    void loadSettings();
+    void saveSettings();
+
     bool getDescriptor(DB::ReportDescriptor& descriptor);
 
     Ui::ConfigureReportDialog m_ui;

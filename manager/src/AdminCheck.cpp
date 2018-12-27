@@ -24,6 +24,7 @@ bool adminCheck(Settings& settings, QWidget* parent)
     Ui::LoginDialog ui;
     ui.setupUi(&dialog);
     dialog.setWindowTitle("Admin credentials needed");
+    dialog.adjustSize();
 
     int result = dialog.exec();
     if (result == QDialog::Accepted)

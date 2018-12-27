@@ -120,6 +120,10 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationDomain("sense.com");
     QCoreApplication::setApplicationName("Sense");
 
+    QSettings::setDefaultFormat(QSettings::Format::IniFormat);
+    QSettings settings;
+    qDebug() << settings.fileName();
+
     QLocale::setDefault(QLocale(QLocale::English, QLocale::Romania));
 
     qDebug() << QStyleFactory::keys();

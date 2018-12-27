@@ -16,8 +16,12 @@ public:
 
 private slots:
     void accept() override;
+    void done(int result) override;
 
 private:
+    void loadSettings();
+    void saveSettings();
+
     Ui::ConfigureAlarmDialog m_ui;
 
     DB& m_db;

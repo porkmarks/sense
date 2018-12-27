@@ -4,6 +4,7 @@
 #include <QFileDialog>
 #include <QSettings>
 #include <QProgressDialog>
+#include <QSettings>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -21,6 +22,8 @@ ExportDataDialog::ExportDataDialog(DB& db, MeasurementsModel& model, QWidget* pa
     , m_model(model)
 {
     m_ui.setupUi(this);
+
+    adjustSize();
 
     connect(m_ui.dateFormat, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &ExportDataDialog::refreshPreview);
     connect(m_ui.exportId, &QCheckBox::stateChanged, this, &ExportDataDialog::refreshPreview);
@@ -57,20 +60,23 @@ void ExportDataDialog::refreshPreview()
 void ExportDataDialog::loadSettings()
 {
     QSettings settings;
-    m_ui.dateFormat->setCurrentIndex(settings.value("exportData/dateFormat", 0).toInt());
-    m_ui.exportId->setChecked(settings.value("exportData/exportId", true).toBool());
-    m_ui.exportIndex->setChecked(settings.value("exportData/exportIndex", true).toBool());
-    m_ui.exportSensorName->setChecked(settings.value("exportData/exportSensorName", true).toBool());
-    m_ui.exportSensorSN->setChecked(settings.value("exportData/exportSensorSN", true).toBool());
-    m_ui.exportTimePoint->setChecked(settings.value("exportData/exportTimePoint", true).toBool());
-    m_ui.exportTemperature->setChecked(settings.value("exportData/exportTemperature", true).toBool());
-    m_ui.exportHumidity->setChecked(settings.value("exportData/exportHumidity", true).toBool());
-    m_ui.exportBattery->setChecked(settings.value("exportData/exportBattery", false).toBool());
-    m_ui.exportSignal->setChecked(settings.value("exportData/exportSignal", false).toBool());
-    m_ui.units->setCurrentIndex(settings.value("exportData/units", 1).toInt());
-    m_ui.decimalPlaces->setValue(settings.value("exportData/decimalPlaces", 2).toInt());
-    m_ui.separator->setText(settings.value("exportData/separator", ";").toString());
-    m_ui.tabSeparator->setChecked(settings.value("exportData/tabSeparator", false).toBool());
+    m_ui.dateFormat->setCurrentIndex(settings.value("ExportDataDialog/dateFormat", 0).toInt());
+    m_ui.exportId->setChecked(settings.value("ExportDataDialog/exportId", true).toBool());
+    m_ui.exportIndex->setChecked(settings.value("ExportDataDialog/exportIndex", true).toBool());
+    m_ui.exportSensorName->setChecked(settings.value("ExportDataDialog/exportSensorName", true).toBool());
+    m_ui.exportSensorSN->setChecked(settings.value("ExportDataDialog/exportSensorSN", true).toBool());
+    m_ui.exportTimePoint->setChecked(settings.value("ExportDataDialog/exportTimePoint", true).toBool());
+    m_ui.exportTemperature->setChecked(settings.value("ExportDataDialog/exportTemperature", true).toBool());
+    m_ui.exportHumidity->setChecked(settings.value("ExportDataDialog/exportHumidity", true).toBool());
+    m_ui.exportBattery->setChecked(settings.value("ExportDataDialog/exportBattery", false).toBool());
+    m_ui.exportSignal->setChecked(settings.value("ExportDataDialog/exportSignal", false).toBool());
+    m_ui.units->setCurrentIndex(settings.value("ExportDataDialog/units", 1).toInt());
+    m_ui.decimalPlaces->setValue(settings.value("ExportDataDialog/decimalPlaces", 2).toInt());
+    m_ui.separator->setText(settings.value("ExportDataDialog/separator", ";").toString());
+    m_ui.tabSeparator->setChecked(settings.value("ExportDataDialog/tabSeparator", false).toBool());
+    resize(settings.value("ExportDataDialog/size", size()).toSize());
+    QPoint defaultPos = parentWidget()->mapToGlobal(parentWidget()->rect().center()) - QPoint(width() / 2, height() / 2);
+    move(settings.value("ExportDataDialog/pos", defaultPos).toPoint());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -78,28 +84,36 @@ void ExportDataDialog::loadSettings()
 void ExportDataDialog::saveSettings()
 {
     QSettings settings;
-    settings.setValue("exportData/dateFormat", m_ui.dateFormat->currentIndex());
-    settings.setValue("exportData/exportId", m_ui.exportId->isChecked());
-    settings.setValue("exportData/exportIndex", m_ui.exportIndex->isChecked());
-    settings.setValue("exportData/exportSensorName", m_ui.exportSensorName->isChecked());
-    settings.setValue("exportData/exportSensorSN", m_ui.exportSensorSN->isChecked());
-    settings.setValue("exportData/exportTimePoint", m_ui.exportTimePoint->isChecked());
-    settings.setValue("exportData/exportTemperature", m_ui.exportTemperature->isChecked());
-    settings.setValue("exportData/exportHumidity", m_ui.exportHumidity->isChecked());
-    settings.setValue("exportData/exportBattery", m_ui.exportBattery->isChecked());
-    settings.setValue("exportData/exportSignal", m_ui.exportSignal->isChecked());
-    settings.setValue("exportData/units", m_ui.units->currentIndex());
-    settings.setValue("exportData/decimalPlaces", m_ui.decimalPlaces->value());
-    settings.setValue("exportData/separator", m_ui.separator->text());
-    settings.setValue("exportData/tabSeparator", m_ui.tabSeparator->isChecked());
+    settings.setValue("ExportDataDialog/dateFormat", m_ui.dateFormat->currentIndex());
+    settings.setValue("ExportDataDialog/exportId", m_ui.exportId->isChecked());
+    settings.setValue("ExportDataDialog/exportIndex", m_ui.exportIndex->isChecked());
+    settings.setValue("ExportDataDialog/exportSensorName", m_ui.exportSensorName->isChecked());
+    settings.setValue("ExportDataDialog/exportSensorSN", m_ui.exportSensorSN->isChecked());
+    settings.setValue("ExportDataDialog/exportTimePoint", m_ui.exportTimePoint->isChecked());
+    settings.setValue("ExportDataDialog/exportTemperature", m_ui.exportTemperature->isChecked());
+    settings.setValue("ExportDataDialog/exportHumidity", m_ui.exportHumidity->isChecked());
+    settings.setValue("ExportDataDialog/exportBattery", m_ui.exportBattery->isChecked());
+    settings.setValue("ExportDataDialog/exportSignal", m_ui.exportSignal->isChecked());
+    settings.setValue("ExportDataDialog/units", m_ui.units->currentIndex());
+    settings.setValue("ExportDataDialog/decimalPlaces", m_ui.decimalPlaces->value());
+    settings.setValue("ExportDataDialog/separator", m_ui.separator->text());
+    settings.setValue("ExportDataDialog/tabSeparator", m_ui.tabSeparator->isChecked());
+    settings.setValue("ExportDataDialog/size", size());
+    settings.setValue("ExportDataDialog/pos", pos());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void ExportDataDialog::done(int result)
+{
+    saveSettings();
+    QDialog::done(result);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void ExportDataDialog::accept()
 {
-    saveSettings();
-
     QString extension = "Export Files (*.csv)";
 
     QString fileName = QFileDialog::getSaveFileName(this, "Select export file", QString(), extension);

@@ -2,6 +2,7 @@
 #include <QSettings>
 #include <QAbstractItemModel>
 #include <QCheckBox>
+#include <QTimer>
 
 SensorsFilterWidget::SensorsFilterWidget(QWidget *parent) : QWidget(parent)
 {
@@ -42,8 +43,16 @@ void SensorsFilterWidget::init(DB& db)
 
     connect(m_ui.list->header(), &QHeaderView::sectionResized, [this]()
     {
-        QSettings settings;
-        settings.setValue("sensorFilter/list/state", m_ui.list->header()->saveState());
+        if (!m_sectionSaveScheduled)
+        {
+            m_sectionSaveScheduled = true;
+            QTimer::singleShot(500, [this]()
+            {
+                m_sectionSaveScheduled = false;
+                QSettings settings;
+                settings.setValue("sensorFilter/list/state", m_ui.list->header()->saveState());
+            });
+        }
     });
 
     {

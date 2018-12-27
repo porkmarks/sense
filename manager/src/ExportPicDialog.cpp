@@ -15,7 +15,7 @@ ExportPicDialog::ExportPicDialog(PlotWidget& plotWidget, QWidget* parent)
     , m_plotWidget(plotWidget)
 {
     m_ui.setupUi(this);
-
+    adjustSize();
     loadSettings();
 }
 
@@ -24,8 +24,11 @@ ExportPicDialog::ExportPicDialog(PlotWidget& plotWidget, QWidget* parent)
 void ExportPicDialog::loadSettings()
 {
     QSettings settings;
-    m_ui.legend->setChecked(settings.value("exportPic/legend", true).toBool());
-    m_ui.annotations->setChecked(settings.value("exportPic/annotations", true).toBool());
+    m_ui.legend->setChecked(settings.value("ExportPicDialog/legend", true).toBool());
+    m_ui.annotations->setChecked(settings.value("ExportPicDialog/annotations", true).toBool());
+    resize(settings.value("ExportPicDialog/size", size()).toSize());
+    QPoint defaultPos = parentWidget()->mapToGlobal(parentWidget()->rect().center()) - QPoint(width() / 2, height() / 2);
+    move(settings.value("ExportPicDialog/pos", defaultPos).toPoint());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -33,16 +36,24 @@ void ExportPicDialog::loadSettings()
 void ExportPicDialog::saveSettings()
 {
     QSettings settings;
-    settings.setValue("exportPic/legend", m_ui.legend->isChecked());
-    settings.setValue("exportPic/annotations", m_ui.annotations->isChecked());
+    settings.setValue("ExportPicDialog/legend", m_ui.legend->isChecked());
+    settings.setValue("ExportPicDialog/annotations", m_ui.annotations->isChecked());
+    settings.setValue("ExportPicDialog/size", size());
+    settings.setValue("ExportPicDialog/pos", pos());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void ExportPicDialog::done(int result)
+{
+    saveSettings();
+    QDialog::done(result);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void ExportPicDialog::accept()
 {
-    saveSettings();
-
     QString extension = "Image (*.png)";
 
     QString fileName = QFileDialog::getSaveFileName(this, "Select export file", QString(), extension);

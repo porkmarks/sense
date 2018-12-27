@@ -4,6 +4,7 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QProgressDialog>
+#include <QSettings>
 
 #include <fstream>
 #include <iostream>
@@ -22,6 +23,8 @@ ExportLogsDialog::ExportLogsDialog(LogsModel& model, QWidget* parent)
 {
     m_ui.setupUi(this);
 
+    adjustSize();
+
     connect(m_ui.dateFormat, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &ExportLogsDialog::refreshPreview);
     connect(m_ui.exportIndex, &QCheckBox::stateChanged, this, &ExportLogsDialog::refreshPreview);
     connect(m_ui.exportTimePoint, &QCheckBox::stateChanged, this, &ExportLogsDialog::refreshPreview);
@@ -39,13 +42,16 @@ ExportLogsDialog::ExportLogsDialog(LogsModel& model, QWidget* parent)
 void ExportLogsDialog::loadSettings()
 {
     QSettings settings;
-    m_ui.dateFormat->setCurrentIndex(settings.value("exportLogs/dateFormat", 0).toInt());
-    m_ui.exportIndex->setChecked(settings.value("exportLogs/exportIndex", true).toBool());
-    m_ui.exportTimePoint->setChecked(settings.value("exportLogs/exportTimePoint", true).toBool());
-    m_ui.exportType->setChecked(settings.value("exportLogs/exportType", true).toBool());
-    m_ui.exportMessage->setChecked(settings.value("exportLogs/exportMessage", true).toBool());
-    m_ui.separator->setText(settings.value("exportLogs/separator", ";").toString());
-    m_ui.tabSeparator->setChecked(settings.value("exportLogs/tabSeparator", false).toBool());
+    m_ui.dateFormat->setCurrentIndex(settings.value("ExportLogsDialog/dateFormat", 0).toInt());
+    m_ui.exportIndex->setChecked(settings.value("ExportLogsDialog/exportIndex", true).toBool());
+    m_ui.exportTimePoint->setChecked(settings.value("ExportLogsDialog/exportTimePoint", true).toBool());
+    m_ui.exportType->setChecked(settings.value("ExportLogsDialog/exportType", true).toBool());
+    m_ui.exportMessage->setChecked(settings.value("ExportLogsDialog/exportMessage", true).toBool());
+    m_ui.separator->setText(settings.value("ExportLogsDialog/separator", ";").toString());
+    m_ui.tabSeparator->setChecked(settings.value("ExportLogsDialog/tabSeparator", false).toBool());
+    resize(settings.value("ExportLogsDialog/size", size()).toSize());
+    QPoint defaultPos = parentWidget()->mapToGlobal(parentWidget()->rect().center()) - QPoint(width() / 2, height() / 2);
+    move(settings.value("ExportLogsDialog/pos", defaultPos).toPoint());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -53,13 +59,15 @@ void ExportLogsDialog::loadSettings()
 void ExportLogsDialog::saveSettings()
 {
     QSettings settings;
-    settings.setValue("exportLogs/dateFormat", m_ui.dateFormat->currentIndex());
-    settings.setValue("exportLogs/exportIndex", m_ui.exportIndex->isChecked());
-    settings.setValue("exportLogs/exportTimePoint", m_ui.exportTimePoint->isChecked());
-    settings.setValue("exportLogs/exportType", m_ui.exportType->isChecked());
-    settings.setValue("exportLogs/exportMessage", m_ui.exportMessage->isChecked());
-    settings.setValue("exportLogs/separator", m_ui.separator->text());
-    settings.setValue("exportLogs/tabSeparator", m_ui.tabSeparator->isChecked());
+    settings.setValue("ExportLogsDialog/dateFormat", m_ui.dateFormat->currentIndex());
+    settings.setValue("ExportLogsDialog/exportIndex", m_ui.exportIndex->isChecked());
+    settings.setValue("ExportLogsDialog/exportTimePoint", m_ui.exportTimePoint->isChecked());
+    settings.setValue("ExportLogsDialog/exportType", m_ui.exportType->isChecked());
+    settings.setValue("ExportLogsDialog/exportMessage", m_ui.exportMessage->isChecked());
+    settings.setValue("ExportLogsDialog/separator", m_ui.separator->text());
+    settings.setValue("ExportLogsDialog/tabSeparator", m_ui.tabSeparator->isChecked());
+    settings.setValue("ExportLogsDialog/size", size());
+    settings.setValue("ExportLogsDialog/pos", pos());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -74,10 +82,16 @@ void ExportLogsDialog::refreshPreview()
 
 //////////////////////////////////////////////////////////////////////////
 
-void ExportLogsDialog::accept()
+void ExportLogsDialog::done(int result)
 {
     saveSettings();
+    QDialog::done(result);
+}
 
+//////////////////////////////////////////////////////////////////////////
+
+void ExportLogsDialog::accept()
+{
     QString extension = "Export Files (*.csv)";
 
     QString fileName = QFileDialog::getSaveFileName(this, "Select export file", QString(), extension);

@@ -13,10 +13,12 @@ public:
 
 private slots:
     void accept() override;
+    void done(int result) override;
 
 private:
     void loadSettings();
     void saveSettings();
+
     void refreshPreview();
     bool exportTo(std::ostream& stream, size_t maxCount, bool showProgress);
 

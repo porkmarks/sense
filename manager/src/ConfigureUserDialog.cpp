@@ -1,6 +1,7 @@
 #include "ConfigureUserDialog.h"
 #include "Crypt.h"
 #include <QMessageBox>
+#include <QSettings>
 
 std::string k_passwordHashReferenceText = "Cannot open file.";
 
@@ -11,6 +12,28 @@ ConfigureUserDialog::ConfigureUserDialog(Settings& settings, QWidget* parent)
     , m_settings(settings)
 {
     m_ui.setupUi(this);
+
+    adjustSize();
+    loadSettings();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void ConfigureUserDialog::loadSettings()
+{
+    QSettings settings;
+    resize(settings.value("ConfigureUserDialog/size", size()).toSize());
+    QPoint defaultPos = parentWidget()->mapToGlobal(parentWidget()->rect().center()) - QPoint(width() / 2, height() / 2);
+    move(settings.value("ConfigureUserDialog/pos", defaultPos).toPoint());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void ConfigureUserDialog::saveSettings()
+{
+    QSettings settings;
+    settings.setValue("ConfigureUserDialog/size", size());
+    settings.setValue("ConfigureUserDialog/pos", pos());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -40,6 +63,14 @@ void ConfigureUserDialog::setForcedType(Settings::UserDescriptor::Type type)
 {
     m_ui.administrator->setChecked(type == Settings::UserDescriptor::Type::Admin);
     m_ui.administrator->setEnabled(false);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void ConfigureUserDialog::done(int result)
+{
+    saveSettings();
+    QDialog::done(result);
 }
 
 //////////////////////////////////////////////////////////////////////////

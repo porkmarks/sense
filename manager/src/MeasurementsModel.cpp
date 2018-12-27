@@ -123,7 +123,7 @@ int MeasurementsModel::rowCount(QModelIndex const& index) const
 
 int MeasurementsModel::columnCount(QModelIndex const& /*index*/) const
 {
-    int cc = static_cast<int>(std::count(m_columnsVisible.begin(), m_columnsVisible.end(), true));
+    int cc = static_cast<int>(m_columnsVisibleCount);
     return cc;
 }
 
@@ -139,6 +139,7 @@ void MeasurementsModel::refreshVisibleColumnToRealColumn()
             m_visibleColumnToRealColumn.push_back(static_cast<Column>(i));
         }
     }
+    m_columnsVisibleCount = std::count(m_columnsVisible.begin(), m_columnsVisible.end(), true);
 }
 
 //////////////////////////////////////////////////////////////////////////

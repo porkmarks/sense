@@ -1,5 +1,6 @@
 #include "ConfigureAlarmDialog.h"
 #include <QMessageBox>
+#include <QSettings>
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -9,6 +10,28 @@ ConfigureAlarmDialog::ConfigureAlarmDialog(DB& db, QWidget* parent)
 {
     m_ui.setupUi(this);
     m_ui.sensorFilter->init(db);
+
+    adjustSize();
+    loadSettings();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void ConfigureAlarmDialog::loadSettings()
+{
+    QSettings settings;
+    resize(settings.value("ConfigureAlarmDialog/size", size()).toSize());
+    QPoint defaultPos = parentWidget()->mapToGlobal(parentWidget()->rect().center()) - QPoint(width() / 2, height() / 2);
+    move(settings.value("ConfigureAlarmDialog/pos", defaultPos).toPoint());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void ConfigureAlarmDialog::saveSettings()
+{
+    QSettings settings;
+    settings.setValue("ConfigureAlarmDialog/size", size());
+    settings.setValue("ConfigureAlarmDialog/pos", pos());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -72,6 +95,14 @@ void ConfigureAlarmDialog::setAlarm(DB::Alarm const& alarm)
 
     m_ui.sendEmailAction->setChecked(descriptor.sendEmailAction);
 //    m_ui.emailRecipient->setText(descriptor.emailRecipient.c_str());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void ConfigureAlarmDialog::done(int result)
+{
+    saveSettings();
+    QDialog::done(result);
 }
 
 //////////////////////////////////////////////////////////////////////////

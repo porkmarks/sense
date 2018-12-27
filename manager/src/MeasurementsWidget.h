@@ -52,5 +52,6 @@ private:
     std::set<DB::SensorId> m_selectedSensorIds;
 
     std::vector<QMetaObject::Connection> m_uiConnections;
+    bool m_sectionSaveScheduled = false;
 };
 

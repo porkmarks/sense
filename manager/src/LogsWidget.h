@@ -32,5 +32,6 @@ private:
     std::unique_ptr<LogsModel> m_model;
     QSortFilterProxyModel m_sortingModel;
     std::vector<QMetaObject::Connection> m_uiConnections;
+    bool m_sectionSaveScheduled = false;
 };
 

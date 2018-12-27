@@ -1,6 +1,7 @@
 #include "ConfigureReportDialog.h"
 #include "Emailer.h"
 #include <QMessageBox>
+#include <QSettings>
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -12,7 +13,29 @@ ConfigureReportDialog::ConfigureReportDialog(Settings& settings, DB& db, QWidget
     m_ui.setupUi(this);
     m_ui.sensorFilter->init(db);
 
+    adjustSize();
+    loadSettings();
+
     connect(m_ui.sendNow, &QPushButton::released, this, &ConfigureReportDialog::sendReportNow);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void ConfigureReportDialog::loadSettings()
+{
+    QSettings settings;
+    resize(settings.value("ConfigureReportDialog/size", size()).toSize());
+    QPoint defaultPos = parentWidget()->mapToGlobal(parentWidget()->rect().center()) - QPoint(width() / 2, height() / 2);
+    move(settings.value("ConfigureReportDialog/pos", defaultPos).toPoint());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void ConfigureReportDialog::saveSettings()
+{
+    QSettings settings;
+    settings.setValue("ConfigureReportDialog/size", size());
+    settings.setValue("ConfigureReportDialog/pos", pos());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -151,6 +174,14 @@ bool ConfigureReportDialog::getDescriptor(DB::ReportDescriptor& descriptor)
     }
 
     return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void ConfigureReportDialog::done(int result)
+{
+    saveSettings();
+    QDialog::done(result);
 }
 
 //////////////////////////////////////////////////////////////////////////
