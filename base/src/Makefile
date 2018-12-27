@@ -3,8 +3,6 @@ BIN := base
 
 SRCS	:= ../src/main.cpp \
 	../src/tests.cpp \
-	../src/Scheduler.cpp \
-	../src/Sensors.cpp \
 	../src/Server.cpp \
 	../../sensor/firmware/Module.cpp \
 	../../sensor/firmware/RFM95.cpp \

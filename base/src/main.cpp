@@ -25,8 +25,58 @@ static Server s_server;
 typedef std::chrono::system_clock Clock;
 
 extern void run_tests();
-extern std::chrono::system_clock::time_point string_to_time_point(const std::string& str);
-extern std::string time_point_to_string(std::chrono::system_clock::time_point tp);
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+std::chrono::system_clock::time_point string_to_time_point(std::string const& str)
+{
+    using namespace std;
+    using namespace std::chrono;
+
+    int yyyy, mm, dd, HH, MM, SS;
+
+    sscanf(str.c_str(), "%4d-%2d-%2d %2d:%2d:%2d", &yyyy, &mm, &dd, &HH, &MM, &SS);
+
+    tm ttm = tm();
+    ttm.tm_year = yyyy - 1900; // Year since 1900
+    ttm.tm_mon = mm - 1; // Month since January
+    ttm.tm_mday = dd; // Day of the month [1-31]
+    ttm.tm_hour = HH; // Hour of the day [00-23]
+    ttm.tm_min = MM;
+    ttm.tm_sec = SS;
+
+    time_t ttime_t = mktime(&ttm);
+
+    system_clock::time_point time_point_result = std::chrono::system_clock::from_time_t(ttime_t);
+
+    return time_point_result;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+std::string time_point_to_string(std::chrono::system_clock::time_point tp)
+{
+    using namespace std;
+    using namespace std::chrono;
+
+    auto ttime_t = system_clock::to_time_t(tp);
+    auto tp_sec = system_clock::from_time_t(ttime_t);
+    milliseconds ms = duration_cast<milliseconds>(tp - tp_sec);
+
+    std::tm * ttm = localtime(&ttime_t);
+
+    char date_time_format[] = "%Y-%m-%d %H:%M:%S";
+
+    char time_str[256];
+    strftime(time_str, sizeof(time_str), date_time_format, ttm);
+    string result(time_str);
+
+    char ms_str[256];
+    sprintf(ms_str, ".%03d", ms.count());
+    result.append(ms_str);
+
+    return result;
+}
 
 ////////////////////////////////////////////////////////////////////////
 

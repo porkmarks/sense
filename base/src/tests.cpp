@@ -1,10 +1,11 @@
 #include "Storage.h"
 #include <vector>
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <limits>
 #include <iostream>
 #include <algorithm>
+#include <cmath>
 
 #define CHECK(x) \
 do \
