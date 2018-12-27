@@ -1316,6 +1316,7 @@ int8_t RFM95::getReceivedPackage(uint8_t* data, uint8_t& len, bool& gotIt)
     // check integrity CRC
     if (_mod->SPIgetRegValue(SX127X_REG_IRQ_FLAGS, 5, 5) == SX127X_CLEAR_IRQ_FLAG_PAYLOAD_CRC_ERROR)
     {
+    	stopReceiving();
         return ERR_CRC_MISMATCH;
     }
 

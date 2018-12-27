@@ -103,7 +103,7 @@ Result<void> DB::create()
     remove((dataFilename).c_str());
 
     m_mainData = Data();
-    addSensorsConfig(SensorsConfigDescriptor());
+    addSensorsConfig(SensorsConfigDescriptor()).ignore();
     save(m_mainData);
 
     s_logger.logVerbose(QString("Creating DB files: '%1' & '%2'").arg(m_dataName.c_str()).arg(m_dbName.c_str()));
@@ -2209,6 +2209,7 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
         return true;
     }
 
+    bool added = false;
     uint32_t minIndex = std::numeric_limits<uint32_t>::max();
     uint32_t maxIndex = std::numeric_limits<uint32_t>::lowest();
     for (MeasurementDescriptor const& md: mds)
@@ -2252,6 +2253,7 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
         }
         minIndex = std::min(minIndex, md.index);
         maxIndex = std::max(maxIndex, md.index);
+        added = true;
         if (!sensor.isMeasurementValid)
         {
             sensor.isMeasurementValid = true;
@@ -2259,6 +2261,11 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
             sensor.measurementHumidity = measurement.descriptor.humidity;
             sensor.measurementVcc = measurement.descriptor.vcc;
         }
+    }
+
+    if (!added)
+    {
+        return true;
     }
     s_logger.logVerbose(QString("Added measurement indices %1 to %2, sensor '%3'").arg(minIndex).arg(maxIndex).arg(sensor.descriptor.name.c_str()));
 

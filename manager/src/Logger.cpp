@@ -210,6 +210,7 @@ bool Logger::load(std::string const& name)
     {
         std::lock_guard<std::mutex> lg(m_mainDataMutex);
         m_mainDataLastLineIndex = lastLineIndex;
+        m_mainData = std::move(data);
     }
 
     std::cout << "Time to load logs:" << std::chrono::duration<float>(Clock::now() - start).count() << "s\n";
