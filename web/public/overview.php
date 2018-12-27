@@ -31,6 +31,14 @@
 <head><title>Overview</title></head>
 <?php
 	include('includes.php');
+
+    function compute_percent($x, $min, $max)
+    {
+        $x = (($x - $min) / ($max - $min)) * 100.0;
+        $x = min(max($x, 0.0), 100.0);
+        return $x;
+    }
+
 ?>
 <link href= "css/overview.css" rel="stylesheet" type ="text/css"/>
 
@@ -45,50 +53,71 @@
 	</div>
 
 	<div id="Content">
-		<?php
-			include('mainSideBar.php');
-		?>
+        <div id ="ContentLeft">
+    		<?php
+    			include('mainSideBar.php');
+    		?>
+        </div>
 		<div id="ContentRight">
-			<h2>Overview</h2>
 
-            <table style="width:100%">
-              <tr>
-                <th>Id</td>
-                <th>Name</td> 
-                <th>Date/Time</td>
-                <th>Temperature</td>
-                <th>Humidity</td>
-                <th>Battery</td>
-                <th>Errors</td>
-                <th>Base Signal</td>
-                <th>Sensor Signal</td>
+        <table id ="overviewTable" style="width:80%">
+
         <?php
+        
 	        while ($row = mysqli_fetch_array($result, MYSQLI_ASSOC))
             {
+                $battery_percent = compute_percent($row["vcc"], 2.0, 3.4);
+                if ($battery_percent <= 25)
+                {
+                    $battery_image = "assets/battery25.png";
+                }
+                else if ($battery_percent <= 50)
+                {
+                    $battery_image = "assets/battery50.png";
+                }
+                else if ($battery_percent <= 75)
+                {
+                    $battery_image = "assets/battery75.png";
+                }
+                else
+                {
+                    $battery_image = "assets/battery100.png";
+                }
+
+                $upload_signal_percent = compute_percent($row["b2s_input_dBm"], -110.0, -50.0);
+                $download_signal_percent = compute_percent($row["s2b_input_dBm"], -110.0, -50.0);
+
+                $reading_time = $row["timestamp"];    
+                $elapsed_time = time() - $reading_time;
+
+                $elapsed_text = gmdate('H:i:s', $elapsed_time);
+
                 echo "<tr>";
 
-                echo "<td>".$row["id"]."</td>".
+                echo 
                     "<td>".$row["name"]."</td>".
-                    "<td>".$row["timestamp"]."</td>".
-                    "<td>".$row["temperature"]."°</td>".
-                    "<td>".$row["humidity"]."%</td>".
-                    "<td>".$row["vcc"]."V</td>".
+                    "<td><div align=\"right\"><img src=\"assets/thermometer.png\" width=\"32\"/></td>".
+                    "<td><div align=\"left\">Temperature<br>".$elapsed_text."</td>".
+                    "<td><div align=\"left\">".$row["temperature"]."°C</td>".
+                    "<td><div align=\"right\"><img src=\"assets/humidity.png\" width=\"32\"/></td>".
+                    "<td><div align=\"left\">Humidity<br>".$elapsed_text."</td>".
+                    "<td><div align=\"left\">".number_format($row["humidity"], 0)."%</td>".
+                    "<td><div align=\"right\"><img src=\"".$battery_image."\" width=\"32\"/></td>".
+                    "<td><div align=\"left\">".number_format($battery_percent, 0)."%</td>".
                     "<td>".($row["flags"] == 1 ? "Bad Sensor" : "None")."</td>".
-                    "<td>".$row["b2s_input_dBm"]."dBm</td>".
-                    "<td>".$row["s2b_input_dBm"]."dBm</td>";
+                    "<td><div align=\"right\"><img src=\"assets/upload_signal.png\" width=\"32\"/></td>".
+                    "<td><div align=\"left\">".number_format($upload_signal_percent, 0)."%</td>".
+                    "<td><div align=\"right\"><img src=\"assets/download_signal.png\" width=\"32\"/></td>".
+                    "<td><div align=\"left\">".number_format($download_signal_percent, 0)."%</td>";
 
-                echo "</tr>";
+                echo "</tr>\n";
             }
         ?>
 
             </table>
-			<div class="alert warning">
-				<p class ="subtler">
-				You have new
-				<a href="alarms.php">alarm notifications</a>
-				</p>
-		</div>
+		
 	</div>
+    </div>
 
 </body>
 </html>

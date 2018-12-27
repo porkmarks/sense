@@ -26,3 +26,8 @@ input.submit{
     font-size: 16;
     color: #007acc;
 }
+h5{
+    font-size: 13;
+    color: #AA3939;
+    font-weight: lighter;
+}

@@ -11,19 +11,25 @@
 
 <body>
 	<header>
+		
+	<div id="Holder">
 		<?php
 			include('mainTopBar.php');
 		?>
+	</div>
     </header>
 
+
 <div id="Content">
-		<?php
-			include('settingsSideBar.php');
-		?>
-		<div id="ContentRight">
+     <div id ="ContentLeft">
+    	<?php
+    		include('mainSideBar.php');
+    	?>
+    </div>
+	<div id="ContentRight">
 			Alarms!!!!!
-		</div>
 	</div>
+</div>
 
 
 </body>

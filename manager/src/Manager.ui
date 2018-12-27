@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Manager</class>
+ <widget class="QMainWindow" name="Manager">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1094</width>
+    <height>934</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Sense Manager</string>
+  </property>
+  <property name="unifiedTitleAndToolBarOnMac">
+   <bool>true</bool>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <property name="spacing">
+     <number>0</number>
+    </property>
+    <property name="leftMargin">
+     <number>0</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
+    <property name="bottomMargin">
+     <number>0</number>
+    </property>
+    <item>
+     <widget class="QTabWidget" name="tabWidget">
+      <property name="tabShape">
+       <enum>QTabWidget::Rounded</enum>
+      </property>
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <widget class="SensorsWidget" name="sensorsWidget">
+       <attribute name="icon">
+        <iconset resource="../res/res.qrc">
+         <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
+       </attribute>
+       <attribute name="title">
+        <string>Sensors</string>
+       </attribute>
+      </widget>
+      <widget class="MeasurementsWidget" name="measurementsWidget">
+       <attribute name="icon">
+        <iconset resource="../res/res.qrc">
+         <normaloff>:/icons/ui/measurements.png</normaloff>:/icons/ui/measurements.png</iconset>
+       </attribute>
+       <attribute name="title">
+        <string>Reports</string>
+       </attribute>
+      </widget>
+      <widget class="PlotWidget" name="plotWidget">
+       <attribute name="icon">
+        <iconset resource="../res/res.qrc">
+         <normaloff>:/icons/ui/graph.png</normaloff>:/icons/ui/graph.png</iconset>
+       </attribute>
+       <attribute name="title">
+        <string>Graphs</string>
+       </attribute>
+      </widget>
+      <widget class="AlarmsWidget" name="alarmsWidget">
+       <attribute name="icon">
+        <iconset resource="../res/res.qrc">
+         <normaloff>:/icons/ui/alarm.png</normaloff>:/icons/ui/alarm.png</iconset>
+       </attribute>
+       <attribute name="title">
+        <string>Alarms</string>
+       </attribute>
+      </widget>
+      <widget class="SettingsWidget" name="settingsWidget">
+       <attribute name="icon">
+        <iconset resource="../res/res.qrc">
+         <normaloff>:/icons/ui/setup.png</normaloff>:/icons/ui/setup.png</iconset>
+       </attribute>
+       <attribute name="title">
+        <string>Settings</string>
+       </attribute>
+      </widget>
+      <widget class="LogsWidget" name="logsWidget">
+       <attribute name="icon">
+        <iconset resource="../res/res.qrc">
+         <normaloff>:/icons/ui/info.png</normaloff>:/icons/ui/info.png</iconset>
+       </attribute>
+       <attribute name="title">
+        <string>Logs</string>
+       </attribute>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <widget class="QMenuBar" name="menuBar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1094</width>
+     <height>26</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>File</string>
+    </property>
+    <addaction name="actionLogout"/>
+    <addaction name="separator"/>
+    <addaction name="actionExit"/>
+   </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>Help</string>
+    </property>
+    <addaction name="actionAbout"/>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuHelp"/>
+  </widget>
+  <action name="action_connect">
+   <property name="icon">
+    <iconset resource="../res/res.qrc">
+     <normaloff>:/icons/ui/wifi.png</normaloff>:/icons/ui/wifi.png</iconset>
+   </property>
+   <property name="text">
+    <string>Connect</string>
+   </property>
+  </action>
+  <action name="actionEmailSettings">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../res/res.qrc">
+     <normaloff>:/icons/ui/email.png</normaloff>:/icons/ui/email.png</iconset>
+   </property>
+   <property name="text">
+    <string>Email Settings</string>
+   </property>
+  </action>
+  <action name="actionFtpSettings">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../res/res.qrc">
+     <normaloff>:/icons/ui/ftp.png</normaloff>:/icons/ui/ftp.png</iconset>
+   </property>
+   <property name="text">
+    <string>FTP Settings</string>
+   </property>
+  </action>
+  <action name="actionSensorSettings">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../res/res.qrc">
+     <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
+   </property>
+   <property name="text">
+    <string>Sensor Settings</string>
+   </property>
+  </action>
+  <action name="actionLogout">
+   <property name="text">
+    <string>Logout</string>
+   </property>
+  </action>
+  <action name="actionExit">
+   <property name="text">
+    <string>Exit</string>
+   </property>
+  </action>
+  <action name="actionAbout">
+   <property name="text">
+    <string>About</string>
+   </property>
+  </action>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>MeasurementsWidget</class>
+   <extends>QWidget</extends>
+   <header>MeasurementsWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>AlarmsWidget</class>
+   <extends>QWidget</extends>
+   <header>AlarmsWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>SensorsWidget</class>
+   <extends>QWidget</extends>
+   <header>SensorsWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>PlotWidget</class>
+   <extends>QWidget</extends>
+   <header>PlotWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>SettingsWidget</class>
+   <extends>QWidget</extends>
+   <header>SettingsWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>LogsWidget</class>
+   <extends>QWidget</extends>
+   <header>LogsWidget.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
+ <resources>
+  <include location="../res/res.qrc"/>
+ </resources>
+ <connections/>
+</ui>

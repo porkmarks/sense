@@ -44,10 +44,6 @@ body{
   min-width:1200px;
   background-image:-webkit-linear-gradient(left, white , #f5f5f5);
 }
-
-#MainNav{
-  padding-right: 10px;
-}
 #MainNav ul li{
   text-decoration: none;
   list-style-type:none; 
@@ -62,13 +58,23 @@ body{
   clear:both;
   overflow:auto;
 }
+
+.SideMenu {
+  float:left;
+  line-height:30px;
+  min-height: 400px;
+  background-image: -webkit-linear-gradient(bottom, white, #f5f5f5);
+  margin-left: 5px;
+  width:120px;
+  padding:8px; 
+  font-family: 'Open Sans', sans-serif;
+}
+
+
 #Footer{
   height:100px;
 }
-#ContentLeft{
-  width:280px;
-  float:left;
-}
+
 #PageHeading{
   height:auto;
   padding:11px;
@@ -76,13 +82,12 @@ body{
 #ContentLeft{
   width:180px;
   float: left;
-  padding-top: 11px;
-  padding-left: 11px;
+  height:auto;
 } 
 #ContentRight{
-  width:auto;
+  
   height:auto;
-  float:left;
+  margin-left: 130px;
   border:none;
 }
 h1{
@@ -97,21 +102,25 @@ h2{
   font-weight: lighter;
 }
 h3{
-  margin:0;
+  margin:10;
   font-family: 'Open Sans', sans-serif;
-  color:#444;
+  color:grey;
   font-size:12px;
   font-weight: lighter;
 }
-
-p{
-	color:grey;
-	font-size: 14;
+h4{
+    font-size: 17;
+    color: #007acc;
+    font-weight: lighter;
 }
 
-input {
-   -webkit-appearance: none;
+label{
+  font-family: 'Open Sans', sans-serif;
+  font-weight: lighter;
+  
+  font-size: 14px;
 }
+
 
 select,
 textarea,
@@ -134,10 +143,6 @@ td textarea {
   color: #888;
 }
 
-input.number {
-  max-width: 100px;
-}
-
 input[type=datetime-local] {
   width: auto;
 }
@@ -156,14 +161,14 @@ select.narrow {
 
 input[type="checkbox"] {
     display:inline-block;
-    width:19px;
-    height:19px;
+    width:14px;
+    height:14px;
     margin:-1px 4px 0 0;
     vertical-align:middle;
     cursor:pointer;
 }
 
-input[type=submit],
+
 a.button {
   color: #888;
   background-color: white;
@@ -176,35 +181,8 @@ a.button {
   
 }
 
-path {
-    stroke-width: 1.5;
-    fill: none;
-}
-
-.axis path,
-.axis line {
-    fill: none;
-    stroke: grey;
-    stroke-width: 1.2;
-    shape-rendering: crispEdges;
-}
 
 
-.SideMenu {
-  background-image: -webkit-linear-gradient(bottom, white, #bdbdbd);
-  float:left;
-  line-height:30px;
-	min-height: 400px;
-	background-image: -ms-linear-gradient(bottom, white, #f5f5f5);
-	background-image: -webkit-linear-gradient(bottom, white, #f5f5f5);
-	background-image: -moz-linear-gradient(bottom, white, #f5f5f5);
-	margin-left: 5px;
-  height:800px;
-  width:120px;
-  float:left;
-  padding:8px; 
-  font-family: 'Open Sans', sans-serif;
-}
 a:link {
     color: #837E7C;
 }
@@ -217,74 +195,8 @@ nav a.current {
   color:#007acc;
 }
 
-#datePkr {
-	font-size: 14px;
-	position:fixed; top:100px; left: 150px;
-	width: 1000px;
-	height: 60px;
-	margin-left: 20px;
-	margin-right: 20px;
-	margin-top: 20px;
-	margin-bottom: 20px; 
-	
-}
 
-.checkboxList {
-	list-style-type:none;
 
-}
-
-.checkboxListScroll {
-	float: right;
-	position:relative;
-	margin-left: 40px;
-	margin-right: 80px;
-	margin-top: 20px;
-	margin-bottom: 20px; 
-	width: 200px;
-	height:800px;
-	overflow: scroll;
-	overflow-x: hidden;
-	
-}
-
-#graphContainer {
-    float: left;
-    width: auto;
-    height:340px;
-    margin-top: 100px;
-	margin-left: 20px;
-	margin-right: 20px;
-	
-
-}
-.itemList{
-	font-size: 14px;
-	margin-top: 4px;
-	margin-bottom: 4px;
-	
-}
-#checkboxes{
-	
-	float: left;
-    width: 500px;
-    height:30px;
-    margin-top: 20px;
-	margin-left: 20px;
-	margin-right: 20px;
-	font-size: 14px; 
-	letter-spacing: 1px;
-	color: grey;
-}
-#option{
-	position:fixed; top:140px; left: 150px;
-	width: 600px;
-	height: 30px;
-	margin-left: 20px;
-	margin-right: 20px;
-	margin-top: 20px;
-	margin-bottom: 20px;
-}
 #container{
 	float: left;
 	margin-left: 20px;
@@ -304,8 +216,15 @@ p{
 }
 p.subtle{
 	color: darkgrey;
-	font-size: 14;
+	font-size: 8;
 }
+p.message{
+  color: darkgrey;
+  font-size: 14;
+
+}
+
+
 /* Row. */
 
 .row {

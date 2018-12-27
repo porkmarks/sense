@@ -1,4 +1,3 @@
-<div id="MainSideBar">
 	<nav class ="SideMenu">
 
 		<a href="overview.php" style="text-decoration: none">Overview</a><br>
@@ -16,4 +15,3 @@
 		});
 	</script>
 	</nav>
-</div>

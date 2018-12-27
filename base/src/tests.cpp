@@ -1,12 +1,11 @@
 #include "Storage.h"
-#include "Sensors_DB.h"
+#include "Sensors.h"
 #include <vector>
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits>
 #include <iostream>
 #include <algorithm>
-
 
 #define CHECK(x) \
 do \
@@ -26,7 +25,6 @@ static bool check_equal(const Storage& storage, const std::vector<Storage::Data>
 
     constexpr float TEMPERATURE_ACCURACY = 0.25f;
     constexpr float HUMIDITY_ACCURACY = 0.5f;
-    constexpr float VCC_ACCURACY = 0.1f;
 
     while (storage.unpack_next(it))
     {
@@ -43,12 +41,6 @@ static bool check_equal(const Storage& storage, const std::vector<Storage::Data>
         if (humidity_delta > HUMIDITY_ACCURACY)
         {
             //std::cout << data_idx << ": Humidity delta too big: " << humidity_delta << ".\n";
-            return false;
-        }
-        float vcc_delta = std::abs(data.vcc - ref_data.vcc);
-        if (it.offset == 0 && vcc_delta > VCC_ACCURACY)
-        {
-            //std::cout << data_idx << ": VCC delta too big: " << vcc_delta << ".\n";
             return false;
         }
 
@@ -104,7 +96,6 @@ static void test_storage_operations()
     Storage::Data data;
     data.temperature = 50.f;
     data.humidity = 50.f;
-    data.vcc = 4.2f;
 
     //add one group
     storage.push_back(data);
@@ -157,7 +148,6 @@ static void test_storage_accuracy()
     Data last_data;
     last_data.temperature = randposf() * 80.f;
     last_data.humidity = randposf() * 100.f;
-    last_data.vcc = randposf() * 4.2f;
 
     size_t min_items = std::numeric_limits<size_t>::max();
     size_t max_items = std::numeric_limits<size_t>::lowest();
@@ -165,7 +155,6 @@ static void test_storage_accuracy()
 
     constexpr float MAX_TEMPERATURE_VARIATION = 1.f;
     constexpr float MAX_HUMIDITY_VARIATION = 10.f;
-    constexpr float MAX_VCC_VARIATION = 0.1f;
 
     for (size_t i = 0; i < 100000; i++)
     {
@@ -176,9 +165,6 @@ static void test_storage_accuracy()
 
             last_data.humidity += randf() * MAX_HUMIDITY_VARIATION;
             last_data.humidity = std::min(std::max(last_data.humidity, 0.f), 100.f);
-
-            last_data.vcc += randf() * MAX_VCC_VARIATION;
-            last_data.vcc = std::min(std::max(last_data.vcc, 2.f), 4.5f);
 
             bool ok = storage.push_back(last_data);
             if (ok)
@@ -212,213 +198,248 @@ void test_storage()
 
 ////////////////////////////////////////////////////////////////////////////
 
-static bool equal(Sensors_DB::Clock::duration d1, Sensors_DB::Clock::duration d2, Sensors_DB::Clock::duration epsilon)
-{
-    return std::abs(d2 - d1) <= epsilon;
-}
+//static bool equal(Sensors::Clock::duration d1, Sensors::Clock::duration d2, Sensors::Clock::duration epsilon)
+//{
+//    return std::abs(d2 - d1) <= epsilon;
+//}
 
 void test_sensor_operations()
 {
-    //---------------------
+//    //---------------------
 
-    static const std::string db_server = "192.168.1.44";
-    static const std::string db_db = "sensor-test";
-    static const std::string db_username = "admin";
-    static const std::string db_password = "admin";
-    static const uint16_t port = 0;
+//    {
+//        Settings settings;
+//        if (!settings.init("test_settings.json"))
+//        {
+//            std::cerr << "Cannot load to settings\n";
+//            return;
+//        }
 
-
-    {
-        Sensors_DB sensors;
-        if (!sensors.init(db_server, db_db, db_username, db_password, port))
-        {
-            std::cerr << "DB init failed\n";
-            return;
-        }
+//        Sensors sensors(settings);
+//        if (!sensors.init())
+//        {
+//            std::cerr << "DB init failed\n";
+//            return;
+//        }
 
 //        sensors.set_measurement_period(std::chrono::minutes(1));
-        CHECK(sensors.get_measurement_period() == std::chrono::minutes(1));
+//        CHECK(sensors.get_measurement_period() == std::chrono::minutes(1));
 
 //        sensors.set_measurement_period(std::chrono::minutes(10));
-        CHECK(sensors.get_measurement_period() == std::chrono::minutes(10));
-    }
+//        CHECK(sensors.get_measurement_period() == std::chrono::minutes(10));
+//    }
 
-    //---------------------
+//    //---------------------
 
-    {
-        Sensors_DB sensors;
-        if (!sensors.init(db_server, db_db, db_username, db_password, port))
-        {
-            std::cerr << "DB init failed\n";
-            return;
-        }
+//    {
+//        Settings settings;
+//        if (!settings.init("test_settings.json"))
+//        {
+//            std::cerr << "Cannot load to system DB\n";
+//            return;
+//        }
+
+//        Sensors sensors(settings);
+//        if (!sensors.init())
+//        {
+//            std::cerr << "DB init failed\n";
+//            return;
+//        }
 
 //        sensors.set_measurement_period(std::chrono::minutes(10));
 //        sensors.set_comms_period(std::chrono::minutes(10));
-        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(10), Sensors_DB::MEASUREMENT_JITTER));
+//        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(10), Sensors::MEASUREMENT_JITTER));
 
 //        sensors.set_comms_period(std::chrono::minutes(1));
-        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(10), Sensors_DB::MEASUREMENT_JITTER));
+//        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(10), Sensors::MEASUREMENT_JITTER));
 
 //        sensors.set_measurement_period(std::chrono::minutes(20));
 //        sensors.set_comms_period(std::chrono::minutes(10));
-        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(20), Sensors_DB::MEASUREMENT_JITTER));
+//        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(20), Sensors::MEASUREMENT_JITTER));
 
 //        sensors.set_comms_period(std::chrono::minutes(1));
-        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(20), Sensors_DB::MEASUREMENT_JITTER));
+//        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(20), Sensors::MEASUREMENT_JITTER));
 
 //        sensors.set_measurement_period(std::chrono::minutes(1));
 //        sensors.set_comms_period(std::chrono::minutes(10));
-        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(10), Sensors_DB::MEASUREMENT_JITTER));
+//        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(10), Sensors::MEASUREMENT_JITTER));
 
 //        sensors.set_comms_period(std::chrono::minutes(1));
-        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(1), Sensors_DB::MEASUREMENT_JITTER));
-    }
+//        CHECK(equal(sensors.compute_comms_period(), std::chrono::minutes(1), Sensors::MEASUREMENT_JITTER));
+//    }
 
-    //---------------------
+//    //---------------------
 
-    for (size_t sensor_count = 0; sensor_count < 100; sensor_count++)
-    {
-        std::cout << "Sensor count: " << sensor_count << "\n";
+//    for (size_t sensor_count = 0; sensor_count < 100; sensor_count++)
+//    {
+//        std::cout << "Sensor count: " << sensor_count << "\n";
 
-        Sensors_DB sensors;
-        if (!sensors.init(db_server, db_db, db_username, db_password, port))
-        {
-            std::cerr << "DB init failed\n";
-            return;
-        }
+//        Settings settings;
+//        if (!settings.init("test_settings.json"))
+//        {
+//            std::cerr << "Cannot load to settings\n";
+//            return;
+//        }
 
-        for (size_t i = 0; i < sensor_count; i++)
-        {
-            sensors.add_sensor("s");
-        }
+//        Sensors sensors(settings);
+//        if (!sensors.init())
+//        {
+//            std::cerr << "DB init failed\n";
+//            return;
+//        }
 
-        Sensors_DB::Clock::duration total_comms_duration = Sensors_DB::COMMS_DURATION * sensor_count;
+//        for (size_t i = 0; i < sensor_count; i++)
+//        {
+//            sensors.add_sensor("s", i);
+//        }
+
+//        Sensors::Clock::duration total_comms_duration = Sensors::COMMS_DURATION * sensor_count;
 
 //        sensors.set_measurement_period(std::chrono::minutes(10));
 //        sensors.set_comms_period(std::chrono::minutes(10));
-        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors_DB::MEASUREMENT_JITTER));
+//        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors::MEASUREMENT_JITTER));
 
 //        sensors.set_comms_period(std::chrono::minutes(1));
-        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors_DB::MEASUREMENT_JITTER));
+//        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors::MEASUREMENT_JITTER));
 
 //        sensors.set_measurement_period(std::chrono::minutes(20));
 //        sensors.set_comms_period(std::chrono::minutes(10));
-        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors_DB::MEASUREMENT_JITTER));
+//        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors::MEASUREMENT_JITTER));
 
 //        sensors.set_comms_period(std::chrono::minutes(1));
-        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors_DB::MEASUREMENT_JITTER));
+//        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors::MEASUREMENT_JITTER));
 
 //        sensors.set_measurement_period(std::chrono::minutes(1));
 //        sensors.set_comms_period(std::chrono::minutes(10));
-        CHECK(equal(sensors.compute_comms_period(), std::max(Sensors_DB::Clock::duration(std::chrono::minutes(10)), std::max(total_comms_duration, sensors.get_measurement_period())), Sensors_DB::MEASUREMENT_JITTER));
+//        CHECK(equal(sensors.compute_comms_period(), std::max(Sensors::Clock::duration(std::chrono::minutes(10)), std::max(total_comms_duration, sensors.get_measurement_period())), Sensors::MEASUREMENT_JITTER));
 
 //        sensors.set_comms_period(std::chrono::minutes(1));
-        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors_DB::MEASUREMENT_JITTER));
-    }
+//        CHECK(equal(sensors.compute_comms_period(), std::max(total_comms_duration, sensors.get_measurement_period()), Sensors::MEASUREMENT_JITTER));
+//    }
 
-    //---------------------
+//    //---------------------
 
-    {
-        Sensors_DB sensors;
-        if (!sensors.init(db_server, db_db, db_username, db_password, port))
-        {
-            std::cerr << "DB init failed\n";
-            return;
-        }
+//    {
+//        Settings settings;
+//        if (!settings.init("test_settings.json"))
+//        {
+//            std::cerr << "Cannot load to settings\n";
+//            return;
+//        }
 
-        const Sensors_DB::Sensor* sensor = sensors.find_sensor_by_id(Sensors_DB::Sensor_Id(7));
-        CHECK(sensor == nullptr);
-        Sensors_DB::Sensor_Id id = sensor->id;
+//        Sensors sensors(settings);
+//        if (!sensors.init())
+//        {
+//            std::cerr << "DB init failed\n";
+//            return;
+//        }
 
-        sensor = sensors.add_sensor("s1");
-        CHECK(sensor);
-        sensor = sensors.find_sensor_by_id(id);
-        CHECK(sensor != nullptr);
-        CHECK(sensor->name == "s1");
-        CHECK(sensor->id == id);
-        sensors.remove_sensor(id);
-        sensor = sensors.find_sensor_by_id(id);
-        CHECK(sensor == nullptr);
-    }
+//        const Sensors::Sensor* sensor = sensors.find_sensor_by_id(Sensors::Sensor_Id(7));
+//        CHECK(sensor == nullptr);
+//        Sensors::Sensor_Id id = sensor->id;
 
-    //---------------------
+//        sensor = sensors.add_sensor("s1", 0);
+//        CHECK(sensor);
+//        sensor = sensors.find_sensor_by_id(id);
+//        CHECK(sensor != nullptr);
+//        CHECK(sensor->name == "s1");
+//        CHECK(sensor->id == id);
+//        sensors.remove_sensor(id);
+//        sensor = sensors.find_sensor_by_id(id);
+//        CHECK(sensor == nullptr);
+//    }
 
-    {
-        Sensors_DB sensors;
-        if (!sensors.init(db_server, db_db, db_username, db_password, port))
-        {
-            std::cerr << "DB init failed\n";
-            return;
-        }
+//    //---------------------
 
-        Sensors_DB::Sensor const* sensor = sensors.add_sensor("s1");
-        CHECK(sensor);
-        Sensors_DB::Sensor_Id id1 = sensor->id;
-        sensor = sensors.add_sensor("s2");
-        CHECK(sensor);
-        Sensors_DB::Sensor_Id id2 = sensor->id;
+//    {
+//        Settings settings;
+//        if (!settings.init("test_settings.json"))
+//        {
+//            std::cerr << "Cannot load to settings\n";
+//            return;
+//        }
 
-        const Sensors_DB::Sensor* sensor1 = sensors.find_sensor_by_id(id1);
-        CHECK(sensor1 != nullptr);
-        CHECK(sensor1->name == "s1");
-        CHECK(sensor1->id == id1);
-        const Sensors_DB::Sensor* sensor2 = sensors.find_sensor_by_id(id2);
-        CHECK(sensor2 != nullptr);
-        CHECK(sensor2->name == "s2");
-        CHECK(sensor2->id == id2);
+//        Sensors sensors(settings);
+//        if (!sensors.init())
+//        {
+//            std::cerr << "DB init failed\n";
+//            return;
+//        }
 
-        sensors.remove_sensor(id1);
-        sensor1 = sensors.find_sensor_by_id(id1);
-        CHECK(sensor1 == nullptr);
-        sensor2 = sensors.find_sensor_by_id(id2);
-        CHECK(sensor2 != nullptr);
-        CHECK(sensor2->name == "s2");
-        CHECK(sensor2->id == id2);
+//        Sensors::Sensor const* sensor = sensors.add_sensor("s1", 1);
+//        CHECK(sensor);
+//        Sensors::Sensor_Id id1 = sensor->id;
+//        sensor = sensors.add_sensor("s2", 2);
+//        CHECK(sensor);
+//        Sensors::Sensor_Id id2 = sensor->id;
 
-        sensors.remove_sensor(id2);
-        sensor2 = sensors.find_sensor_by_id(id2);
-        CHECK(sensor2 == nullptr);
-    }
+//        const Sensors::Sensor* sensor1 = sensors.find_sensor_by_id(id1);
+//        CHECK(sensor1 != nullptr);
+//        CHECK(sensor1->name == "s1");
+//        CHECK(sensor1->id == id1);
+//        const Sensors::Sensor* sensor2 = sensors.find_sensor_by_id(id2);
+//        CHECK(sensor2 != nullptr);
+//        CHECK(sensor2->name == "s2");
+//        CHECK(sensor2->id == id2);
 
-    //---------------------
+//        sensors.remove_sensor(id1);
+//        sensor1 = sensors.find_sensor_by_id(id1);
+//        CHECK(sensor1 == nullptr);
+//        sensor2 = sensors.find_sensor_by_id(id2);
+//        CHECK(sensor2 != nullptr);
+//        CHECK(sensor2->name == "s2");
+//        CHECK(sensor2->id == id2);
 
-    {
-        Sensors_DB sensors;
-        if (!sensors.init(db_server, db_db, db_username, db_password, port))
-        {
-            std::cerr << "DB init failed\n";
-            return;
-        }
+//        sensors.remove_sensor(id2);
+//        sensor2 = sensors.find_sensor_by_id(id2);
+//        CHECK(sensor2 == nullptr);
+//    }
 
-        Sensors_DB::Sensor const* sensor = sensors.add_sensor("s1");
-        CHECK(sensor);
-        Sensors_DB::Sensor_Id id1 = sensor->id;
-        sensor = sensors.add_sensor("s2");
-        CHECK(sensor);
-        Sensors_DB::Sensor_Id id2 = sensor->id;
+//    //---------------------
 
-        const Sensors_DB::Sensor* sensor1 = sensors.find_sensor_by_id(id1);
-        CHECK(sensor1 != nullptr);
-        CHECK(sensor1->name == "s1");
-        CHECK(sensor1->id == id1);
-        const Sensors_DB::Sensor* sensor2 = sensors.find_sensor_by_id(id2);
-        CHECK(sensor2 != nullptr);
-        CHECK(sensor2->name == "s2");
-        CHECK(sensor2->id == id2);
+//    {
+//        Settings settings;
+//        if (!settings.init("test_settings.json"))
+//        {
+//            std::cerr << "Cannot load to settings\n";
+//            return;
+//        }
 
-        sensors.remove_sensor(id2);
-        sensor2 = sensors.find_sensor_by_id(id2);
-        CHECK(sensor2 == nullptr);
-        sensor1 = sensors.find_sensor_by_id(id1);
-        CHECK(sensor1 != nullptr);
-        CHECK(sensor1->name == "s1");
-        CHECK(sensor1->id == id1);
+//        Sensors sensors(settings);
+//        if (!sensors.init())
+//        {
+//            std::cerr << "DB init failed\n";
+//            return;
+//        }
 
-        sensors.remove_sensor(id1);
-        sensor1 = sensors.find_sensor_by_id(id1);
-        CHECK(sensor1 == nullptr);
-    }
+//        Sensors::Sensor const* sensor = sensors.add_sensor("s1", 1);
+//        CHECK(sensor);
+//        Sensors::Sensor_Id id1 = sensor->id;
+//        sensor = sensors.add_sensor("s2", 2);
+//        CHECK(sensor);
+//        Sensors::Sensor_Id id2 = sensor->id;
+
+//        const Sensors::Sensor* sensor1 = sensors.find_sensor_by_id(id1);
+//        CHECK(sensor1 != nullptr);
+//        CHECK(sensor1->name == "s1");
+//        CHECK(sensor1->id == id1);
+//        const Sensors::Sensor* sensor2 = sensors.find_sensor_by_id(id2);
+//        CHECK(sensor2 != nullptr);
+//        CHECK(sensor2->name == "s2");
+//        CHECK(sensor2->id == id2);
+
+//        sensors.remove_sensor(id2);
+//        sensor2 = sensors.find_sensor_by_id(id2);
+//        CHECK(sensor2 == nullptr);
+//        sensor1 = sensors.find_sensor_by_id(id1);
+//        CHECK(sensor1 != nullptr);
+//        CHECK(sensor1->name == "s1");
+//        CHECK(sensor1->id == id1);
+
+//        sensors.remove_sensor(id1);
+//        sensor1 = sensors.find_sensor_by_id(id1);
+//        CHECK(sensor1 == nullptr);
+//    }
 
 }
 

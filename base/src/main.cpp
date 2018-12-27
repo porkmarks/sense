@@ -12,342 +12,390 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
-#include <boost/thread.hpp>
-
-#include "CRC.h"
-#include "DB.h"
-#include "Comms.h"
-#include "Storage.h"
-#include "Sensors_DB.h"
-#include "Scheduler.h"
-#include "Admin.h"
-
-#include "DB.h"
-
-#include "rfm22b/rfm22b.h"
 #include <pigpio.h>
 
+#include "CRC.h"
+#include "Sensor_Comms.h"
+#include "Server.h"
+#include "Log.h"
 
-#define LOG(x) std::cout << x
-#define LOG_LN(x) std::cout << x << std::endl
+static Sensor_Comms s_sensor_comms;
+static Server s_server;
 
-static Sensors_DB s_sensors_db;
-static Admin s_admin(s_sensors_db);
-
-static Comms s_comms;
-
-typedef std::chrono::high_resolution_clock Clock;
+typedef std::chrono::system_clock Clock;
 
 extern void run_tests();
-extern std::chrono::high_resolution_clock::time_point string_to_time_point(const std::string& str);
-extern std::string time_point_to_string(std::chrono::high_resolution_clock::time_point tp);
-
-
-///////////////////////////////////////////////////////////////////
-
-std::chrono::microseconds PIGPIO_PERIOD(5);
-
-static bool initialize_pigpio()
-{
-    static bool initialized = false;
-    if (initialized)
-    {
-        return true;
-    }
-
-    LOG_LN("Initializing pigpio");
-    if (gpioCfgClock(PIGPIO_PERIOD.count(), 1, 0) < 0 ||
-            gpioCfgPermissions(static_cast<uint64_t>(-1)))
-    {
-        LOG_LN("Cannot configure pigpio");
-        return false;
-    }
-    if (gpioInitialise() < 0)
-    {
-        LOG_LN("Cannot initialize pigpio");
-        return false;
-    }
-
-    initialized = true;
-    return true;
-}
-
-static bool shutdown_pigpio()
-{
-    gpioTerminate();
-    return true;
-}
+extern std::chrono::system_clock::time_point string_to_time_point(const std::string& str);
+extern std::string time_point_to_string(std::chrono::system_clock::time_point tp);
 
 ////////////////////////////////////////////////////////////////////////
 
-static bool powerup_rf()
+constexpr uint32_t RED_LED_PIN = 4;
+constexpr uint32_t GREEN_LED_PIN = 17;
+
+enum class Led_Color
 {
-    int sdn_gpio = 6;
+    None,
+    Green,
+    Red,
+    Yellow,
+};
 
-    //configure the GPIOs
+enum class Led_Blink
+{
+    None,
+    Slow_Green,
+    Slow_Red,
+    Slow_Yellow,
+    Fast_Green,
+    Fast_Red,
+    Fast_Yellow,
+};
 
-    int sdn_gpio_mode = gpioGetMode(sdn_gpio);
-    if (sdn_gpio_mode == PI_BAD_GPIO)
-    {
-        LOG_LN("The SDN GPIO is bad");
-        return false;
-    }
-    int res = gpioSetMode(sdn_gpio, PI_OUTPUT);
-    if (res != 0)
-    {
-        LOG_LN("The SDN GPIO is bad");
-        goto error;
-    }
-    //power on procedure
-    res = gpioWrite(sdn_gpio, 1);
-    if (res != 0)
-    {
-        LOG_LN("Failed to set SDN");
-        goto error;
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(2));
-    res = gpioWrite(sdn_gpio, 0);
-    if (res != 0)
-    {
-        LOG_LN("Failed to set SDN");
-        goto error;
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+static Led_Color s_led_color = Led_Color::None;
+static std::atomic<Led_Blink> s_led_blink;
+static std::chrono::system_clock::time_point s_led_blink_time_point;
+static volatile bool s_led_thread_on = true;
 
-    return true;
+constexpr int k_red_pwm = 30;
 
-error:
-    gpioSetMode(sdn_gpio, sdn_gpio_mode);
-    return false;
+void set_led_color(Led_Color color)
+{
+    gpioPWM(RED_LED_PIN, 0);
+    gpioWrite(RED_LED_PIN, 0);
+    gpioWrite(GREEN_LED_PIN, 0);
+
+    if (color == Led_Color::Green)
+    {
+        gpioWrite(RED_LED_PIN, 0);
+        gpioWrite(GREEN_LED_PIN, 1);
+    }
+    else if (color == Led_Color::Red)
+    {
+        gpioWrite(RED_LED_PIN, 1);
+        gpioWrite(GREEN_LED_PIN, 0);
+    }
+    else if (color == Led_Color::Yellow)
+    {
+        gpioPWM(RED_LED_PIN, k_red_pwm);
+        gpioWrite(GREEN_LED_PIN, 1);
+    }
+    s_led_color = color;
 }
 
-////////////////////////////////////////////////////////////////////////
-
-void fill_config_packet(data::Config& packet, Sensors_DB::Sensor const& sensor)
+void led_thread_func()
 {
-    packet.base_time_point = chrono::time_s(Clock::to_time_t(Clock::now()));
-    packet.measurement_period = chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(s_sensors_db.get_measurement_period()).count());
-    packet.next_measurement_time_point = chrono::time_s(Clock::to_time_t(s_sensors_db.compute_next_measurement().first));
-    packet.comms_period = chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(s_sensors_db.compute_comms_period()).count());
-    packet.next_comms_time_point = chrono::time_s(Clock::to_time_t(s_sensors_db.compute_next_comms_time_point(sensor.id)));
-    packet.last_confirmed_measurement_index = s_sensors_db.compute_last_confirmed_measurement_index(sensor.id);
+    gpioSetMode(RED_LED_PIN, PI_OUTPUT);
+    gpioSetMode(GREEN_LED_PIN, PI_OUTPUT);
+    gpioWrite(RED_LED_PIN, 0);
+    gpioWrite(GREEN_LED_PIN, 0);
 
-    std::cout << "\tConfig for id: " << sensor.id
-              << "\n\tbase time point: " << packet.base_time_point.ticks
-              << "\n\tmeasurement period: " << packet.measurement_period.count
-              << "\n\tnext measurement time point: " << packet.next_measurement_time_point.ticks
-              << "\n\tcomms period: " << packet.comms_period.count
-              << "\n\tnext comms time point: " << packet.next_comms_time_point.ticks
-              << "\n\tlast confirmed measurement index: " << packet.last_confirmed_measurement_index
-              << "\n";
+    while (s_led_thread_on)
+    {
+        auto now = std::chrono::system_clock::now();
+        if (s_led_blink_time_point > now && s_led_blink != Led_Blink::None)
+        {
+            gpioPWM(RED_LED_PIN, 0);
+            gpioWrite(RED_LED_PIN, 0);
+            gpioWrite(GREEN_LED_PIN, 0);
+
+            if (s_led_blink == Led_Blink::Slow_Red)
+            {
+                gpioWrite(RED_LED_PIN, 0);
+                gpioWrite(GREEN_LED_PIN, 0);
+                chrono::delay(chrono::millis(200));
+                gpioWrite(RED_LED_PIN, 1);
+                gpioWrite(GREEN_LED_PIN, 0);
+                chrono::delay(chrono::millis(200));
+            }
+            else if (s_led_blink == Led_Blink::Slow_Green)
+            {
+                gpioWrite(RED_LED_PIN, 0);
+                gpioWrite(GREEN_LED_PIN, 0);
+                chrono::delay(chrono::millis(200));
+                gpioWrite(RED_LED_PIN, 0);
+                gpioWrite(GREEN_LED_PIN, 1);
+                chrono::delay(chrono::millis(200));
+            }
+            else if (s_led_blink == Led_Blink::Slow_Yellow)
+            {
+                gpioPWM(RED_LED_PIN, 0);
+                gpioWrite(GREEN_LED_PIN, 0);
+                chrono::delay(chrono::millis(200));
+                gpioPWM(RED_LED_PIN, k_red_pwm);
+                gpioWrite(GREEN_LED_PIN, 1);
+                chrono::delay(chrono::millis(200));
+            }
+            else if (s_led_blink == Led_Blink::Fast_Red)
+            {
+                gpioWrite(RED_LED_PIN, 0);
+                gpioWrite(GREEN_LED_PIN, 0);
+                chrono::delay(chrono::millis(50));
+                gpioWrite(RED_LED_PIN, 1);
+                gpioWrite(GREEN_LED_PIN, 0);
+                chrono::delay(chrono::millis(50));
+            }
+            else if (s_led_blink == Led_Blink::Fast_Green)
+            {
+                gpioWrite(RED_LED_PIN, 0);
+                gpioWrite(GREEN_LED_PIN, 0);
+                chrono::delay(chrono::millis(50));
+                gpioWrite(RED_LED_PIN, 0);
+                gpioWrite(GREEN_LED_PIN, 1);
+                chrono::delay(chrono::millis(50));
+            }
+            else if (s_led_blink == Led_Blink::Fast_Yellow)
+            {
+                gpioPWM(RED_LED_PIN, 0);
+                gpioWrite(GREEN_LED_PIN, 0);
+                chrono::delay(chrono::millis(50));
+                gpioPWM(RED_LED_PIN, k_red_pwm);
+                gpioWrite(GREEN_LED_PIN, 1);
+                chrono::delay(chrono::millis(50));
+            }
+        }
+        else
+        {
+            set_led_color(s_led_color);
+            chrono::delay(chrono::millis(10));
+        }
+    }
 }
 
-////////////////////////////////////////////////////////////////////////
+void set_led_blink(Led_Blink blink, std::chrono::system_clock::duration duration, bool force = false)
+{
+    auto now = std::chrono::system_clock::now();
+    if (now >= s_led_blink_time_point || s_led_blink == Led_Blink::None || force)
+    {
+        s_led_blink = blink;
+        s_led_blink_time_point = std::chrono::system_clock::now() + duration;
+    }
+}
 
-//static bool apply_config(std::string& error)
-//{
-//    if (!s_sensors.init(s_admin.get_db_server(), s_admin.get_db_name(), s_admin.get_db_username(), s_admin.get_db_password(), s_admin.get_db_port()))
-//    {
-//        error = "Sensors init failed";
-//        return false;
-//    }
+void fatal_error()
+{
+    while (true)
+    {
+    }
+}
 
-//    return true;
-//}
+static data::Server_State s_state = data::Server_State::NORMAL;
+static std::chrono::system_clock::time_point s_revert_state_to_normal_tp = std::chrono::system_clock::now();
+data::Server_State set_state(data::Server_State new_state)
+{
+    if (s_state == new_state)
+    {
+        return s_state;
+    }
+    LOGI << "Changing state to " << (int)new_state << std::endl;
+    s_state = new_state;
 
-////////////////////////////////////////////////////////////////////////
+    if (s_state == data::Server_State::PAIRING)
+    {
+        s_sensor_comms.stop_async_receive();
+        s_sensor_comms.set_frequency(869.f);
+    }
+    else
+    {
+        s_sensor_comms.stop_async_receive();
+        s_sensor_comms.set_frequency(868.f);
+    }
+    s_revert_state_to_normal_tp = std::chrono::system_clock::now() + std::chrono::seconds(180);
+    return s_state;
+}
+
+void process_state()
+{
+    if (s_state != data::Server_State::PAIRING)
+    {
+        if (std::chrono::system_clock::now() >= s_revert_state_to_normal_tp)
+        {
+            set_state(data::Server_State::NORMAL);
+        }
+    }
+}
 
 int main(int, const char**)
 {
-    std::cout << "Starting...\n";
+    LOGI << "Starting..." << std::endl;
 
     srand(time(nullptr));
 
-    if (!initialize_pigpio())
+    if (gpioInitialise() < 0)
     {
-        LOG_LN("Cannot initialize PIGPIO");
-        exit(1);
+        LOGE << "GPIO init failed." << std::endl;
+        s_led_thread_on = false;
+        return EXIT_FAILURE;
     }
 
-    if (!powerup_rf())
-    {
-        LOG_LN("Cannot power on the RF chip");
-        exit(1);
-    }
+    std::thread led_thread(&led_thread_func);
 
     size_t tries = 0;
-
-    //    run_tests();
-
-    if (!s_admin.init())
-    {
-        std::cerr << "Admin init failed\n";
-        return -1;
-    }
-
-    tries = 0;
-    while (!s_comms.init(1))
+    while (!s_sensor_comms.init(10, 20))
     {
         tries++;
-        std::cerr << "comms init failed. Trying again: " << tries << "\n";
+        LOGE << "Comms init failed. Trying again: " << tries << std::endl;
+        set_led_blink(Led_Blink::Fast_Red, std::chrono::hours(24 * 1000), true);
         std::this_thread::sleep_for(std::chrono::seconds(1));
+        if (tries > 10)
+        {
+            s_led_thread_on = false;
+            return EXIT_FAILURE;
+        }
     }
 
-    s_comms.set_source_address(Comms::BASE_ADDRESS);
-    s_comms.set_destination_address(Comms::BROADCAST_ADDRESS);
+    s_sensor_comms.set_address(Sensor_Comms::BASE_ADDRESS);
 
+    std::vector<uint8_t> raw_packet_data(packet_raw_size(Sensor_Comms::MAX_USER_DATA_SIZE));
+
+
+    /*
+    //comms testing
+    {
+        s_sensor_comms.set_destination_address(Sensor_Comms::BROADCAST_ADDRESS);
+        constexpr size_t sz = 10;
+        char data[sz];
+        memset(data, 0, sz);
+
+        uint32_t counter = 0;
+        while (true)
+        {
+            LOGI << "Sending " << counter << " ..." << std::endl;
+            std::cout.flush();
+
+            s_sensor_comms.begin_packet(raw_packet_data.data(), 1, true);
+            s_sensor_comms.pack(raw_packet_data.data(), &counter, sizeof(counter));
+            s_sensor_comms.pack(raw_packet_data.data(), data, sz);
+            bool ok = s_sensor_comms.send_packed_packet(raw_packet_data.data(), true);
+            LOGI << "\t\t" << (ok ? "done" : "failed") << ". RX ..." << std::endl;
+            std::cout.flush();
+
+            uint8_t size = Sensor_Comms::MAX_USER_DATA_SIZE;
+            uint8_t* packet_data = s_sensor_comms.receive_packet(raw_packet_data.data(), size, chrono::millis(500));
+            if (packet_data)
+            {
+                uint32_t rcounter = *((uint32_t*)s_sensor_comms.get_rx_packet_payload(packet_data));
+                LOGI << "\t\t" << "done: " << rcounter << std::endl;
+                std::cout.flush();
+            }
+            else
+            {
+                LOGI << "\t\t" << "timeout " << std::endl;
+                std::cout.flush();
+            }
+
+            counter++;
+        }
+    }
+//*/
+
+    /*
+    //send some test garbage for frequency measurements
+    {
+        s_sensor_comms.set_destination_address(Sensor_Comms::BROADCAST_ADDRESS);
+        s_sensor_comms.begin_packet(raw_packet_data.data(), 0, false);
+        s_sensor_comms.send_packed_packet(raw_packet_data.data(), true);
+    }
+    */
+
+    tries = 0;
+    while (!s_server.init(4444, 5555))
+    {
+        tries++;
+        LOGE << "Server init failed. Trying again: " << tries << std::endl;
+        set_led_blink(Led_Blink::Fast_Yellow, std::chrono::hours(24 * 1000), true);
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        if (tries > 10)
+        {
+            s_led_thread_on = false;
+            return EXIT_FAILURE;
+        }
+    }
+
+    set_led_color(Led_Color::Green);
+
+    s_server.on_state_requested = &set_state;
+
+    Server::Sensor_Request request;
+    Server::Sensor_Response response;
     while (true)
     {
-        //std::string cmd = read_fifo();
-        //process_command(cmd);
-        //client.process();
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-
-        uint8_t size = s_comms.receive_packet(1000);
-        if (size > 0)
+        if (s_server.is_connected())
         {
-            data::Type type = s_comms.get_packet_type();
-            //LOG_LN("Received packed of " << (int)size << " bytes. Type: "<< (int)type);
-            if (type == data::Type::PAIR_REQUEST && size == sizeof(data::Pair_Request))
-            {
-                Sensors_DB::Sensor const* sensor = s_sensors_db.add_expected_sensor();
-                if (sensor)
-                {
-                    std::cout << "Adding sensor " << sensor->name << ", id " << sensor->id << ", address " << sensor->address << "\n";
-
-                    data::Pair_Response packet;
-                    packet.address = sensor->address;
-                    //sprintf(packet.name, "sensor %d", packet.address);
-
-                    s_comms.set_destination_address(Comms::BROADCAST_ADDRESS);
-                    s_comms.begin_packet(data::Type::PAIR_RESPONSE);
-                    s_comms.pack(packet);
-                    if (s_comms.send_packet(1))
-                    {
-                        std::cout << "Pair successful\n";
-                    }
-                    else
-                    {
-                        s_sensors_db.revert_to_expected_sensor(sensor->id);
-                        std::cerr << "Pair failed (comms)\n";
-                    }
-                    std::cout << "\n";
-                }
-                else
-                {
-                    std::cerr << "Pairing failed (db)\n";
-                }
-            }
-            else if (type == data::Type::MEASUREMENT_BATCH && size >= data::MEASUREMENT_BATCH_PACKET_MIN_SIZE)
-            {
-                Sensors_DB::Sensor_Address address = s_comms.get_packet_source_address();
-                const Sensors_DB::Sensor* sensor = s_sensors_db.find_sensor_by_address(address);
-                if (sensor)
-                {
-                    std::cout << "Measurement batch reported by " << sensor->id << "\n";
-
-                    data::Measurement_Batch batch;
-                    memcpy(&batch, s_comms.get_packet_payload(), size);
-                    if (size == data::MEASUREMENT_BATCH_PACKET_MIN_SIZE + batch.count * sizeof(data::Measurement))
-                    {
-                        std::cout << "\tIndices: " << batch.index << " - " << batch.index + batch.count - 1 << "\n";
-
-                        Sensors_DB::Measurement m;
-                        size_t count = std::min<size_t>(batch.count, data::Measurement_Batch::MAX_COUNT);
-                        for (size_t i = 0; i < count; i++)
-                        {
-                            m.index = batch.index + i;
-                            m.flags = batch.measurements[i].flags;
-                            m.s2b_input_dBm = s_comms.get_input_dBm();
-                            batch.measurements[i].unpack(m.vcc, m.humidity, m.temperature);
-
-                            s_sensors_db.add_measurement(sensor->id, m);
-                        }
-                    }
-                    else
-                    {
-                        std::cerr << "\tMalformed measurement batch data!\n";
-                    }
-                    std::cout << "\n";
-                }
-                else
-                {
-                    std::cerr << "\tSensor not found!\n";
-                }
-            }
-            else if (type == data::Type::FIRST_CONFIG_REQUEST && size == sizeof(data::First_Config_Request))
-            {
-                Sensors_DB::Sensor_Address address = s_comms.get_packet_source_address();
-                const Sensors_DB::Sensor* sensor = s_sensors_db.find_sensor_by_address(address);
-                if (sensor)
-                {
-                    std::cout << "First config requested by " << sensor->id << "\n";
-
-                    data::First_Config packet;
-                    packet.first_measurement_index = s_sensors_db.compute_next_measurement().second;
-                    s_sensors_db.set_sensor_measurement_range(sensor->id, packet.first_measurement_index, 0);
-                    fill_config_packet(packet.config, *sensor);
-
-                    s_comms.set_destination_address(address);
-                    s_comms.begin_packet(data::Type::FIRST_CONFIG);
-                    s_comms.pack(packet);
-                    if (s_comms.send_packet(1))
-                    {
-                        std::cout << "\tFirst Config successful\n";
-                    }
-                    else
-                    {
-                        std::cerr << "\tFirst Config failed\n";
-                    }
-                    std::cout << "\n";
-                }
-                else
-                {
-                    std::cerr << "\tSensor not found!\n";
-                }
-            }
-            else if (type == data::Type::CONFIG_REQUEST && size == sizeof(data::Config_Request))
-            {
-                data::Config_Request const& config_request = *reinterpret_cast<data::Config_Request const*>(s_comms.get_packet_payload());
-
-                Sensors_DB::Sensor_Address address = s_comms.get_packet_source_address();
-                const Sensors_DB::Sensor* sensor = s_sensors_db.find_sensor_by_address(address);
-                if (sensor)
-                {
-                    std::cout << "Config requested by " << sensor->id << "\n";
-                    std::cout << "\tStored range: " << config_request.first_measurement_index << " to " << config_request.first_measurement_index + config_request.measurement_count << " (" << config_request.measurement_count << " measurements) \n";
-
-                    s_sensors_db.set_sensor_measurement_range(sensor->id, config_request.first_measurement_index, config_request.measurement_count);
-                    s_sensors_db.set_sensor_b2s_input_dBm(sensor->id, config_request.b2s_input_dBm);
-
-                    data::Config packet;
-                    fill_config_packet(packet, *sensor);
-
-                    s_comms.set_destination_address(address);
-                    s_comms.begin_packet(data::Type::CONFIG);
-                    s_comms.pack(packet);
-                    if (s_comms.send_packet(1))
-                    {
-                        std::cout << "\tSchedule successful\n";
-                    }
-                    else
-                    {
-                        std::cerr << "\tSchedule failed\n";
-                    }
-                    std::cout << "\n";
-                }
-                else
-                {
-                    std::cerr << "\tSensor not found!\n";
-                }
-            }
+            set_led_color(Led_Color::Green);
         }
-        std::cout << std::flush;
+        else
+        {
+            set_led_blink(Led_Blink::Slow_Green, std::chrono::seconds(10));
+        }
+
+        s_sensor_comms.start_async_receive();
+
+        uint8_t size = Sensor_Comms::MAX_USER_DATA_SIZE;
+        uint8_t* packet_data = s_sensor_comms.async_receive_packet(raw_packet_data.data(), size);
+        if (packet_data)
+        {
+            set_led_color(Led_Color::Yellow);
+
+            request.type = s_sensor_comms.get_rx_packet_type(packet_data);
+            request.signal_s2b = s_sensor_comms.get_input_dBm();
+            request.address = s_sensor_comms.get_rx_packet_source_address(packet_data);
+            request.needs_response = s_sensor_comms.get_rx_packet_needs_response(packet_data);
+            LOGI << "Incoming type " << (int)request.type
+                 << ", size " << (int)size
+                 << ", address " << (int)request.address
+                 << ", signal strength " << (int)request.signal_s2b << "dBm. Sending to manager..." << std::endl;
+
+            //            if (request.address != 1004 && request.address >= 1000)
+            //            {
+            //                //XXXYYY
+            //                continue;
+            //            }
+
+            //TODO - add a marker in the request in indicate if the sensor waits for a response.
+            //Like this I can avoid the RTT time for measurement batches, since they don't need a response
+
+            request.payload.resize(size);
+            if (size > 0)
+            {
+                memcpy(request.payload.data(), s_sensor_comms.get_rx_packet_payload(packet_data), size);
+            }
+            Server::Result result = s_server.send_sensor_message(request, response);
+            if (result == Server::Result::Has_Response)
+            {
+                LOGI << "\tdone. Sending response back..." << std::endl;
+                s_sensor_comms.set_destination_address(response.address);
+                s_sensor_comms.begin_packet(raw_packet_data.data(), response.type, false);
+                if (!response.payload.empty())
+                {
+                    s_sensor_comms.pack(raw_packet_data.data(), response.payload.data(), static_cast<uint8_t>(response.payload.size()));
+                }
+
+                if (s_sensor_comms.send_packed_packet(raw_packet_data.data(), true))
+                {
+                    set_led_blink(Led_Blink::Fast_Yellow, std::chrono::seconds(1), true);
+                    LOGI << "\tdone" << std::endl;
+                }
+                else
+                {
+                    set_led_blink(Led_Blink::Fast_Red, std::chrono::seconds(1), true);
+                    LOGE << "\tfailed" << std::endl;
+                }
+            }
+            else if (result != Server::Result::Ok)
+            {
+                set_led_blink(Led_Blink::Fast_Red, std::chrono::seconds(1), true);
+                LOGE << "\tfailed: " << int(result) << std::endl;
+            }
+
+            //start again
+            s_sensor_comms.start_async_receive();
+        }
+
+        s_server.process();
     }
 
-    shutdown_pigpio();
-
-    return 0;
+    s_led_thread_on = false;
+    return EXIT_SUCCESS;
 }
 

@@ -1,0 +1,65 @@
+#include "AdminCheck.h"
+#include "Settings.h"
+#include "Logger.h"
+#include "Crypt.h"
+#include "ui_LoginDialog.h"
+
+#include <QDialog>
+#include <QMessageBox>
+
+extern Logger s_logger;
+extern std::string k_passwordHashReferenceText;
+
+bool adminCheck(Settings& settings, QWidget* parent)
+{
+    Settings::User const* user = settings.getLoggedInUser();
+    if (user && user->descriptor.type == Settings::UserDescriptor::Type::Admin)
+    {
+        return true;
+    }
+
+    s_logger.logInfo("Asking the user to log in");
+
+    QDialog dialog(parent);
+    Ui::LoginDialog ui;
+    ui.setupUi(&dialog);
+    dialog.setWindowTitle("Admin credentials needed");
+
+    int result = dialog.exec();
+    if (result == QDialog::Accepted)
+    {
+        int32_t _userIndex = settings.findUserIndexByName(ui.username->text().toUtf8().data());
+        if (_userIndex < 0)
+        {
+            s_logger.logCritical(QString("Invalid login credentials (user '%1' not found)").arg(ui.username->text()).toUtf8().data());
+            QMessageBox::critical(&dialog, "Error", QString("Invalid username '%1'.").arg(ui.username->text()));
+            return false;
+        }
+
+        size_t userIndex = static_cast<size_t>(_userIndex);
+        Settings::User const& user = settings.getUser(userIndex);
+        if (user.descriptor.type != Settings::UserDescriptor::Type::Admin)
+        {
+            s_logger.logCritical(QString("Invalid login credentials (user '%1' not admin)").arg(ui.username->text()).toUtf8().data());
+            QMessageBox::critical(&dialog, "Error", QString("Invalid user '%1': not admin.").arg(ui.username->text()));
+            return false;
+        }
+
+        Crypt crypt;
+        crypt.setAddRandomSalt(false);
+        crypt.setIntegrityProtectionMode(Crypt::ProtectionHash);
+        crypt.setCompressionMode(Crypt::CompressionAlways);
+        crypt.setKey(ui.password->text());
+        std::string passwordHash = crypt.encryptToString(QString(k_passwordHashReferenceText.c_str())).toUtf8().data();
+        if (user.descriptor.passwordHash != passwordHash)
+        {
+            s_logger.logCritical(QString("Invalid login credentials (wrong password)").toUtf8().data());
+            QMessageBox::critical(&dialog, "Error", "Invalid username/password.");
+            return false;
+        }
+
+        return true;
+    }
+    s_logger.logCritical("User adming check cancelled");
+    return false;
+}

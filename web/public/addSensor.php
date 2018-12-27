@@ -10,17 +10,19 @@
 ?>
 
 <body>
-	<header>
-		<?php
-			include('mainTopBar.php');
-		?>
-    </header>
+	<div id="Holder">
+	    <?php
+	      	include('mainTopBar.php');
+	    ?>
+  	</div>
 
-<div id="Content">
-		<?php
-			include('settingsSideBar.php');
-		?>
-		<div id="ContentRight">
+    <div id="Content">
+	    <div id ="ContentLeft">
+    	    <?php
+        		  include('settingsSideBar.php');
+        	?>
+    </div>
+    	<div id="ContentRight">
 			Add Sensor!!!!!
 		</div>
 	</div>
