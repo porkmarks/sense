@@ -9,12 +9,14 @@
 #include "ASIO_Socket_Adapter.h"
 #include "Channel.h"
 #include "Data_Defs.h"
-#include "Sensor_Comms.h"
+#include "Radio.h"
+#include "Queue.h"
+#include "LEDs.h"
 
 class Server
 {
 public:
-    Server();
+    Server(Radio& sensor_comms, LEDs& leds);
     ~Server();
 
     using Clock = std::chrono::system_clock;
@@ -27,22 +29,22 @@ public:
     {
         uint8_t type = 0;
         int8_t signal_s2b = 0;
-        Sensor_Comms::Address address = 0;
+        Radio::Address address = 0;
         bool needs_response = true;
         std::vector<uint8_t> payload;
     };
 
     struct Sensor_Response
     {
+        bool is_valid = false;
         uint8_t type = 0;
-        Sensor_Comms::Address address = 0;
+        Radio::Address address = 0;
         std::vector<uint8_t> payload;
     };
 
     enum class Result
     {
         Ok,
-        Has_Response,
         Data_Error,
         Timeout_Error,
         Connection_Error
@@ -51,14 +53,14 @@ public:
     Result send_sensor_message(Sensor_Request const& request, Sensor_Response& response);
     void process();
 
-    std::function<void(data::Server_State)> on_state_requested;
-
 private:
     void init_broadcast();
     void broadcast_thread_func();
 
     void start_accept();
     void accept_func(asio::error_code ec);
+
+    void radio_thread_func();
 
     bool wait_for_message(data::Server_Message expected_message, Clock::duration timeout);
     void process_message(data::Server_Message message);
@@ -68,6 +70,8 @@ private:
 
     std::string compute_sensor_details_response() const;
     std::string compute_configs_response() const;
+
+    LEDs& m_leds;
 
     std::thread m_io_service_thread;
     asio::io_service m_io_service;
@@ -85,6 +89,12 @@ private:
     using Channel = util::comms::Channel<data::Server_Message, Socket_Adapter>;
     Channel m_channel;
 
+    std::mutex m_sensor_comms_mutex;
+    Radio& m_radio;
+    std::thread m_radio_thread;
+    Queue<Sensor_Request> m_radio_requests;
+    Queue<Sensor_Response> m_radio_responses;
+
     uint16_t m_broadcast_port = 0;
     std::thread m_broadcast_thread;
     asio::ip::udp::socket m_broadcast_socket;
@@ -96,6 +106,9 @@ private:
     Clock::time_point m_last_talk_tp = Clock::time_point(Clock::duration::zero());
 
     std::atomic_bool m_exit = { false };
-    data::Server_State m_state = data::Server_State::NORMAL;
+
+    data::Radio_State m_radio_state = data::Radio_State::NORMAL;
+    data::Radio_State m_new_radio_state = m_radio_state;
+    std::chrono::system_clock::time_point m_revert_radio_state_to_normal_tp = std::chrono::system_clock::now();
 };
 

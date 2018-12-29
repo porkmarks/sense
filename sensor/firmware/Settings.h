@@ -2,11 +2,11 @@
 
 #include "Arduino_Compat.h"
 #include "Data_Defs.h"
-#include "Sensor_Comms.h"
+#include "Radio.h"
 
 struct Settings
 {
-    Sensor_Comms::Address address = 0;
+    Radio::Address address = 0;
 };
 
 struct Stable_Settings

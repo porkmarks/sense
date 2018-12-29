@@ -1167,12 +1167,13 @@ int8_t RFM95::receive(uint8_t* data, uint8_t& len)
             return ERR_RX_TIMEOUT;
         }
     }
+    setMode(SX127X_STANDBY);
 
     // check integrity CRC
-//    if (_mod->SPIgetRegValue(SX127X_REG_IRQ_FLAGS, 5, 5) == SX127X_CLEAR_IRQ_FLAG_PAYLOAD_CRC_ERROR)
-//    {
-//        return ERR_CRC_MISMATCH;
-//    }
+    if (_mod->SPIgetRegValue(SX127X_REG_IRQ_FLAGS, 5, 5) == SX127X_CLEAR_IRQ_FLAG_PAYLOAD_CRC_ERROR)
+    {
+        return ERR_CRC_MISMATCH;
+    }
 
     // get packet length
     if (_sf != 6)
@@ -1235,6 +1236,7 @@ int8_t RFM95::receive(uint8_t* data, uint8_t& len, chrono::millis timeout)
             return ERR_RX_TIMEOUT;
         }
     }
+    setMode(SX127X_STANDBY);
 
     // check integrity CRC
     if (_mod->SPIgetRegValue(SX127X_REG_IRQ_FLAGS, 5, 5) == SX127X_CLEAR_IRQ_FLAG_PAYLOAD_CRC_ERROR)
@@ -1259,7 +1261,6 @@ int8_t RFM95::receive(uint8_t* data, uint8_t& len, chrono::millis timeout)
 
     // clear interrupt flags
     clearIRQFlags();
-    setMode(SX127X_STANDBY);
 
     return ERR_NONE;
 }
@@ -1312,11 +1313,11 @@ int8_t RFM95::getReceivedPackage(uint8_t* data, uint8_t& len, bool& gotIt)
     {
         return ERR_NONE;
     }
+    stopReceiving();
 
     // check integrity CRC
     if (_mod->SPIgetRegValue(SX127X_REG_IRQ_FLAGS, 5, 5) == SX127X_CLEAR_IRQ_FLAG_PAYLOAD_CRC_ERROR)
     {
-    	stopReceiving();
         return ERR_CRC_MISMATCH;
     }
 
@@ -1347,8 +1348,6 @@ int8_t RFM95::stopReceiving()
     {
         return ERR_NONE;
     }
-    // clear interrupt flags
-    clearIRQFlags();
     return setMode(SX127X_STANDBY); //this does _isReceivingPacket = false;
 }
 

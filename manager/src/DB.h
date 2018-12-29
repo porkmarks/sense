@@ -11,7 +11,7 @@
 #include <atomic>
 #include <condition_variable>
 #include "Result.h"
-#include "Sensor_Comms.h"
+#include "Radio.h"
 
 class DB : public QObject
 {
@@ -484,7 +484,7 @@ private:
         AlarmId lastAlarmId = 0;
         ReportId lastReportId = 0;
         MeasurementId lastMeasurementId = 0;
-        uint32_t lastSensorAddress = Sensor_Comms::SLAVE_ADDRESS_BEGIN;
+        uint32_t lastSensorAddress = Radio::SLAVE_ADDRESS_BEGIN;
     };
 
     mutable std::recursive_mutex m_mainDataMutex;

@@ -56,14 +56,16 @@ HEADERS += \
     ../src/command.h \
     ../src/pigpio.h \
     ../src/Server.h \
-    ../../sensor/firmware/Sensor_Comms.h \
     ../../sensor/firmware/CRC.h \
     ../../sensor/firmware/Storage.h \
     ../src/Log.h \
     ../../common/src/spi.h \
     ../../sensor/firmware/Module.h \
     ../../sensor/firmware/RFM95.h \
-    ../../sensor/firmware/TypeDef.h
+    ../../sensor/firmware/TypeDef.h \
+    ../../common/src/Queue.h \
+    ../src/LEDs.h \
+    ../../sensor/firmware/Radio.h
 
 SOURCES += \
     ../src/main.cpp \
@@ -71,10 +73,11 @@ SOURCES += \
     ../src/tests.cpp \
     ../src/command.c \
     ../src/pigpio.c \
-    ../../sensor/firmware/Sensor_Comms.cpp \
     ../../sensor/firmware/CRC.cpp \
     ../../sensor/firmware/Storage.cpp \
     ../../common/src/spi.cpp \
     ../../sensor/firmware/Module.cpp \
     ../../sensor/firmware/RFM95.cpp \
-    ../../sensor/firmware/Chrono.cpp
+    ../../sensor/firmware/Chrono.cpp \
+    ../src/LEDs.cpp \
+    ../../sensor/firmware/Radio.cpp

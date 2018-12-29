@@ -50,10 +50,14 @@ bool unpack(C const& c, T& t, size_t& offset)
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-Server::Server()
-    : m_socket(m_io_service)
+Server::Server(Radio& radio, LEDs& leds)
+    : m_leds(leds)
+    , m_socket(m_io_service)
     , m_socket_adapter(m_socket)
     , m_channel(m_socket_adapter)
+    , m_radio(radio)
+    , m_radio_requests(1)
+    , m_radio_responses(1)
     , m_broadcast_socket(m_io_service)
 {
 }
@@ -73,6 +77,13 @@ Server::~Server()
     if (m_broadcast_thread.joinable())
     {
         m_broadcast_thread.join();
+    }
+
+    m_radio_requests.exit();
+    m_radio_responses.exit();
+    if (m_radio_thread.joinable())
+    {
+        m_radio_thread.join();
     }
 }
 
@@ -169,6 +180,13 @@ bool Server::init(uint16_t port, uint16_t broadcast_port)
         LOGE << "Init error: " << e.what() << std::endl;
         return false;
     }
+
+    m_radio_thread = std::thread([this]
+    {
+        LOGI << "Started sensor comms thread." << std::endl;
+        radio_thread_func();
+        LOGI << "Stopping sensor comms thread." << std::endl;
+    });
 
     LOGI << "Server initialized!" << std::endl;
 
@@ -304,9 +322,121 @@ bool Server::is_connected() const
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
+void Server::radio_thread_func()
+{
+    m_radio.set_address(Radio::BASE_ADDRESS);
+    std::vector<uint8_t> raw_packet_data(packet_raw_size(Radio::MAX_USER_DATA_SIZE));
+
+    Server::Sensor_Request request;
+    Server::Sensor_Response response;
+
+    while (!m_exit)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+        {
+            std::lock_guard<std::mutex> lg(m_sensor_comms_mutex);
+            m_radio.start_async_receive();
+
+            uint8_t size = Radio::MAX_USER_DATA_SIZE;
+            uint8_t* packet_data = m_radio.async_receive_packet(raw_packet_data.data(), size);
+            if (packet_data)
+            {
+                m_radio.stop_async_receive();
+                m_leds.set_color(LEDs::Color::Yellow);
+
+                request.type = m_radio.get_rx_packet_type(packet_data);
+                request.signal_s2b = m_radio.get_input_dBm();
+                request.address = m_radio.get_rx_packet_source_address(packet_data);
+                request.needs_response = m_radio.get_rx_packet_needs_response(packet_data);
+                LOGI << "Incoming type " << (int)request.type
+                     << ", size " << (int)size
+                     << ", address " << (int)request.address
+                     << ", signal strength " << (int)request.signal_s2b << "dBm. Sending to manager..." << std::endl;
+
+                //            if (request.address != 1004 && request.address >= 1000)
+                //            {
+                //                //XXXYYY
+                //                continue;
+                //            }
+
+                //TODO - add a marker in the request in indicate if the sensor waits for a response.
+                //Like this I can avoid the RTT time for measurement batches, since they don't need a response
+
+                request.payload.resize(size);
+                if (size > 0)
+                {
+                    memcpy(request.payload.data(), m_radio.get_rx_packet_payload(packet_data), size);
+                }
+                if (m_radio_requests.push_back_timeout(request, std::chrono::seconds(10)) && request.needs_response)
+                {
+                    if (m_radio_responses.pop_front_timeout(response, std::chrono::seconds(10)))
+                    {
+                        if (response.is_valid)
+                        {
+                            LOGI << "\tdone. Sending response back..." << std::endl;
+                            m_radio.set_destination_address(response.address);
+                            m_radio.begin_packet(raw_packet_data.data(), response.type, false);
+                            if (!response.payload.empty())
+                            {
+                                m_radio.pack(raw_packet_data.data(), response.payload.data(), static_cast<uint8_t>(response.payload.size()));
+                            }
+
+                            if (m_radio.send_packed_packet(raw_packet_data.data(), true))
+                            {
+                                m_leds.set_blink(LEDs::Blink::Fast_Yellow, std::chrono::seconds(1), true);
+                                LOGI << "\tdone" << std::endl;
+                            }
+                            else
+                            {
+                                m_leds.set_blink(LEDs::Blink::Fast_Red, std::chrono::seconds(1), true);
+                                LOGE << "\tfailed" << std::endl;
+                            }
+                        }
+                        else
+                        {
+                            m_leds.set_blink(LEDs::Blink::Fast_Red, std::chrono::seconds(1), true);
+                            LOGE << "\tInvalid response received" << std::endl;
+                        }
+                    }
+                }
+            }
+
+            if (m_new_radio_state != m_radio_state)
+            {
+                LOGI << "Changing radio state to " << (int) m_new_radio_state << std::endl;
+                if (m_radio_state == data::Radio_State::PAIRING)
+                {
+                    m_radio.stop_async_receive();
+                    m_radio.set_frequency(869.f);
+                }
+                else
+                {
+                    m_radio.stop_async_receive();
+                    m_radio.set_frequency(868.f);
+                }
+                m_revert_radio_state_to_normal_tp = std::chrono::system_clock::now() + std::chrono::seconds(180);
+                m_radio_state = m_new_radio_state;
+            }
+            if (m_radio_state != data::Radio_State::NORMAL)
+            {
+                if (std::chrono::system_clock::now() >= m_revert_radio_state_to_normal_tp)
+                {
+                    LOGI << "Reverting radio state to NORMAL" << std::endl;
+                    m_new_radio_state = data::Radio_State::NORMAL;
+                }
+            }
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
 Server::Result Server::send_sensor_message(Sensor_Request const& request, Sensor_Response& response)
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
+    response.is_valid = false;
 
     if (!is_connected())
     {
@@ -359,7 +489,8 @@ Server::Result Server::send_sensor_message(Sensor_Request const& request, Sensor
             response.payload.resize(payload_size);
             ok &= unpack(buffer, response.payload.data(), payload_size, offset);
         }
-        return ok ? Result::Has_Response : Result::Data_Error;
+        response.is_valid = true;
+        return ok ? Result::Ok : Result::Data_Error;
     }
     return Result::Timeout_Error;
 }
@@ -424,13 +555,13 @@ void Server::process_change_state_req()
     std::array<uint8_t, 1024> buffer;
     bool ok = m_channel.unpack_fixed(buffer, max_size) == Channel::Unpack_Result::OK;
 
-    data::Server_State new_state;
+    data::Radio_State new_state;
     size_t offset = 0;
 
     ok &= unpack(buffer, new_state, offset);
     if (ok)
     {
-        on_state_requested(new_state);
+        m_new_radio_state = new_state;
     }
 }
 
@@ -445,7 +576,7 @@ void Server::process_message(data::Server_Message message)
     case data::Server_Message::PING:
         process_ping();
         break;
-    case data::Server_Message::CHANGE_STATE_REQ:
+    case data::Server_Message::CHANGE_RADIO_STATE_REQ:
         process_change_state_req();
         break;
     default:
@@ -461,12 +592,23 @@ void Server::process()
 
     if (!m_socket.is_open() || !m_is_connected)
     {
+        m_leds.set_blink(LEDs::Blink::Slow_Green, std::chrono::seconds(10));
+
         if (!m_is_accepting)
         {
             LOGI << "Disconnected. Listening..." << std::endl;
             start_accept();
         }
         return;
+    }
+
+    if (m_radio_state == data::Radio_State::PAIRING)
+    {
+        m_leds.set_blink(LEDs::Blink::Slow_Green_Yellow, std::chrono::seconds(10));
+    }
+    else
+    {
+        m_leds.set_color(LEDs::Color::Green);
     }
 
     if (Clock::now() - m_last_talk_tp > std::chrono::seconds(10))
@@ -476,11 +618,35 @@ void Server::process()
         return;
     }
 
-    data::Server_Message message;
-    while (m_channel.get_next_message(message))
     {
-        m_last_talk_tp = Clock::now();
-        process_message(message);
+        Sensor_Request request;
+        Sensor_Response response;
+        while (m_radio_requests.pop_front(request, false))
+        {
+            Result result = send_sensor_message(request, response);
+            if (result == Result::Ok)
+            {
+                if (request.needs_response)
+                {
+                    LOGI << "\tdone. Sending response back..." << std::endl;
+                    m_radio_responses.push_back(response, true);
+                }
+            }
+            else
+            {
+                m_leds.set_blink(LEDs::Blink::Fast_Red, std::chrono::seconds(1), true);
+                LOGE << "\tfailed: " << int(result) << std::endl;
+            }
+        }
+    }
+
+    {
+        data::Server_Message message;
+        while (m_channel.get_next_message(message))
+        {
+            m_last_talk_tp = Clock::now();
+            process_message(message);
+        }
     }
 }
 

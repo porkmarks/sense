@@ -11,7 +11,7 @@
 #include "LEDs.h"
 #include "Buttons.h"
 #include "Battery.h"
-#include "Sensor_Comms.h"
+#include "Radio.h"
 #include "Data_Defs.h"
 #include "avr_stdio.h"
 #include "Storage.h"
@@ -66,7 +66,7 @@ static uint8_t s_reboot_flags = 0;
 static uint8_t s_comms_errors = 0;
 
 static SHT2x s_sht;
-static Sensor_Comms s_comms;
+static Radio s_radio;
 static FILE s_uart_output;
 
 static uint32_t s_first_stored_measurement_index = 0; //the index of the first measurement in storage
@@ -362,19 +362,19 @@ static void setup()
 
     ///////////////////////////////////////////////
     // Start the RF
-    while (!s_comms.init(5, 0))
+    while (!s_radio.init(5, 0))
     {
         LOG(PSTR("RF F\n"));
         blink_led(Blink_Led::Red, 4, chrono::millis(200));
         sleep(true);
     }
-    s_comms.sleep_mode();
+    s_radio.sleep_mode();
 
 /* 
     //comms testing
     {
-        uint8_t raw_packet_data[packet_raw_size(Sensor_Comms::MAX_USER_DATA_SIZE)];
-        s_comms.set_destination_address(Sensor_Comms::BROADCAST_ADDRESS);
+        uint8_t raw_packet_data[packet_raw_size(Radio::MAX_USER_DATA_SIZE)];
+        s_radio.set_destination_address(Radio::BROADCAST_ADDRESS);
         char data[20];
         memset(data, 0, 20);
         LOG(PSTR("Stack: %d -> %d\n"), initial_stack_size(), stack_size());
@@ -382,16 +382,16 @@ static void setup()
         while (true)
         {
             LOG(PSTR("Receiving...\n"));
-            uint8_t size = Sensor_Comms::MAX_USER_DATA_SIZE;
-            uint8_t* packet_data = s_comms.receive_packet(raw_packet_data, size, chrono::millis(1000000ULL));
+            uint8_t size = Radio::MAX_USER_DATA_SIZE;
+            uint8_t* packet_data = s_radio.receive_packet(raw_packet_data, size, chrono::millis(1000000ULL));
             if (packet_data)
             {
-                uint32_t rcounter = *((uint32_t*)s_comms.get_rx_packet_payload(packet_data));
+                uint32_t rcounter = *((uint32_t*)s_radio.get_rx_packet_payload(packet_data));
                 LOG(PSTR("\t\tdone: %ld. Sending...\n"), rcounter);
-                s_comms.begin_packet(raw_packet_data, 1, true);
-                s_comms.pack(raw_packet_data, &rcounter, sizeof(rcounter));
-                s_comms.pack(raw_packet_data, data, 20);
-                bool ok = s_comms.send_packed_packet(raw_packet_data, true);
+                s_radio.begin_packet(raw_packet_data, 1, true);
+                s_radio.pack(raw_packet_data, &rcounter, sizeof(rcounter));
+                s_radio.pack(raw_packet_data, data, 20);
+                bool ok = s_radio.send_packed_packet(raw_packet_data, true);
                 LOG(PSTR("\t\t\t%s.\n"), (ok ? "done" : "failed"));
             }
             else
@@ -405,12 +405,12 @@ static void setup()
     /*
     //send some test garbage for frequency measurements
     {
-        uint8_t raw_packet_data[packet_raw_size(Sensor_Comms::MAX_USER_DATA_SIZE)];
-        s_comms.set_destination_address(Sensor_Comms::BROADCAST_ADDRESS);
+        uint8_t raw_packet_data[packet_raw_size(Radio::MAX_USER_DATA_SIZE)];
+        s_radio.set_destination_address(Radio::BROADCAST_ADDRESS);
         while (true)
         {
-          s_comms.begin_packet(raw_packet_data, 0, false);
-          s_comms.send_packet(raw_packet_data, Sensor_Comms::MAX_USER_DATA_SIZE, false);
+          s_radio.begin_packet(raw_packet_data, 0, false);
+          s_radio.send_packet(raw_packet_data, Radio::MAX_USER_DATA_SIZE, false);
         }
     }
     */
@@ -430,9 +430,9 @@ static void setup()
             save_stable_settings(s_stable_settings);
         }
 
-        if (ok && s_settings.address >= Sensor_Comms::SLAVE_ADDRESS_BEGIN)
+        if (ok && s_settings.address >= Radio::SLAVE_ADDRESS_BEGIN)
         {
-            s_comms.set_address(s_settings.address);
+            s_radio.set_address(s_settings.address);
             s_state = State::FIRST_CONFIG;
         }
         else
@@ -526,8 +526,8 @@ static bool apply_config(const data::sensor::Config_Response& config)
     uint32_t measurement_count = s_storage.get_data_count();
     s_sensor_sleeping = config.sleeping;
 
-    s_comms.set_transmission_power(config.power);
-    s_comms.sleep_mode();
+    s_radio.set_transmission_power(config.power);
+    s_radio.sleep_mode();
 
     LOG(PSTR("T bias: %d\n"), (int)(s_stable_settings.calibration.temperature_bias));
     LOG(PSTR("H bias: %d\n"), (int)(s_stable_settings.calibration.humidity_bias));
@@ -584,11 +584,11 @@ static bool request_config()
     bool send_successful = false;
     {
         uint8_t raw_buffer[packet_raw_size(sizeof(data::sensor::Config_Request))];
-        s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::CONFIG_REQUEST), true);
+        s_radio.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::CONFIG_REQUEST), true);
         data::sensor::Config_Request request;
         fill_config_request(request);
-        s_comms.pack(raw_buffer, &request, sizeof(request));
-        send_successful = s_comms.send_packed_packet(raw_buffer, true);
+        s_radio.pack(raw_buffer, &request, sizeof(request));
+        send_successful = s_radio.send_packed_packet(raw_buffer, true);
     }
 
     if (send_successful)
@@ -598,15 +598,15 @@ static bool request_config()
       
         uint8_t size = sizeof(data::sensor::Config_Response);
         uint8_t raw_buffer[packet_raw_size(size)];
-        uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, chrono::millis(2000));
-        s_comms.sleep_mode();
+        uint8_t* buffer = s_radio.receive_packet(raw_buffer, size, chrono::millis(2000));
+        s_radio.sleep_mode();
         if (buffer)
         {
-            data::sensor::Type type = static_cast<data::sensor::Type>(s_comms.get_rx_packet_type(buffer));
+            data::sensor::Type type = static_cast<data::sensor::Type>(s_radio.get_rx_packet_type(buffer));
             if (type == data::sensor::Type::CONFIG_RESPONSE && size == sizeof(data::sensor::Config_Response))
             {
-                s_last_input_dBm = s_comms.get_input_dBm();
-                const data::sensor::Config_Response* ptr = reinterpret_cast<const data::sensor::Config_Response*>(s_comms.get_rx_packet_payload(buffer));
+                s_last_input_dBm = s_radio.get_input_dBm();
+                const data::sensor::Config_Response* ptr = reinterpret_cast<const data::sensor::Config_Response*>(s_radio.get_rx_packet_payload(buffer));
                 return apply_config(*ptr);
             }
         }
@@ -616,7 +616,7 @@ static bool request_config()
         s_comms_errors++;
     }
 
-    s_comms.sleep_mode();
+    s_radio.sleep_mode();
     return false;
 }
 
@@ -626,12 +626,12 @@ static void pair_state()
 {
     LOG(PSTR(">>> pair\n"));
     
-    Sensor_Comms::Address addr = Sensor_Comms::PAIR_ADDRESS_BEGIN + random() % (Sensor_Comms::PAIR_ADDRESS_END - Sensor_Comms::PAIR_ADDRESS_BEGIN);
-    s_comms.set_address(addr);
-    s_comms.set_destination_address(Sensor_Comms::BASE_ADDRESS);
-    s_comms.set_frequency(869.f);
+    Radio::Address addr = Radio::PAIR_ADDRESS_BEGIN + random() % (Radio::PAIR_ADDRESS_END - Radio::PAIR_ADDRESS_BEGIN);
+    s_radio.set_address(addr);
+    s_radio.set_destination_address(Radio::BASE_ADDRESS);
+    s_radio.set_frequency(869.f);
 
-    s_comms.sleep_mode();
+    s_radio.sleep_mode();
 
     wait_for_release(Button::BUTTON1);
     bool done = false;
@@ -656,15 +656,15 @@ static void pair_state()
                 bool send_successful = false;
                 {
                     uint8_t raw_buffer[packet_raw_size(sizeof(data::sensor::Pair_Request))];
-                    s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::PAIR_REQUEST), true);
+                    s_radio.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::PAIR_REQUEST), true);
                     data::sensor::Pair_Request request;
                     request.descriptor.sensor_type = SENSOR_TYPE;
                     request.descriptor.hardware_version = HARDWARE_VERSION;
                     request.descriptor.software_version = SOFTWARE_VERSION;
                     request.descriptor.serial_number = s_stable_settings.serial_number;
                     request.calibration = s_stable_settings.calibration;
-                    s_comms.pack(raw_buffer, &request, sizeof(request));
-                    send_successful = s_comms.send_packed_packet(raw_buffer, true);
+                    s_radio.pack(raw_buffer, &request, sizeof(request));
+                    send_successful = s_radio.send_packed_packet(raw_buffer, true);
                 }
 
                 if (send_successful)
@@ -673,16 +673,16 @@ static void pair_state()
 
                     uint8_t size = sizeof(data::sensor::Pair_Response);
                     uint8_t raw_buffer[packet_raw_size(size)];
-                    uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, chrono::millis(2000));
-                    s_comms.sleep_mode();
+                    uint8_t* buffer = s_radio.receive_packet(raw_buffer, size, chrono::millis(2000));
+                    s_radio.sleep_mode();
 
                     if (buffer && size == sizeof(data::sensor::Pair_Response) && 
-                          s_comms.get_rx_packet_type(buffer) == static_cast<uint8_t>(data::sensor::Type::PAIR_RESPONSE))
+                          s_radio.get_rx_packet_type(buffer) == static_cast<uint8_t>(data::sensor::Type::PAIR_RESPONSE))
                     {
-                        s_last_input_dBm = s_comms.get_input_dBm();
+                        s_last_input_dBm = s_radio.get_input_dBm();
 
-                        const data::sensor::Pair_Response* response_ptr = reinterpret_cast<const data::sensor::Pair_Response*>(s_comms.get_rx_packet_payload(buffer));
-                        s_comms.set_address(response_ptr->address);
+                        const data::sensor::Pair_Response* response_ptr = reinterpret_cast<const data::sensor::Pair_Response*>(s_radio.get_rx_packet_payload(buffer));
+                        s_radio.set_address(response_ptr->address);
 
                         LOG(PSTR("done. Addr %u\n"), response_ptr->address);
 
@@ -701,13 +701,13 @@ static void pair_state()
                 }
                 else
                 {
-                    s_comms.sleep_mode();
+                    s_radio.sleep_mode();
                     LOG(PSTR("failed\n"));
                 }
                 blink_led(Blink_Led::Red, 3, chrono::millis(500));
             }
 
-            s_comms.sleep_mode();
+            s_radio.sleep_mode();
 
             blink_led(Blink_Led::Yellow, 3, chrono::millis(100));
             chrono::delay(chrono::millis(1000));
@@ -737,8 +737,8 @@ static void pair_state()
         }
     }
 
-    s_comms.set_frequency(868.f);
-    s_comms.sleep_mode();
+    s_radio.set_frequency(868.f);
+    s_radio.sleep_mode();
 
     blink_led(Blink_Led::Green, 3, chrono::millis(500));
 
@@ -812,7 +812,7 @@ static void do_comms()
         uint8_t raw_buffer_size = packet_raw_size(sizeof(data::sensor::Measurement_Batch_Request));
         uint8_t raw_buffer[raw_buffer_size];
         memset(raw_buffer, 0, raw_buffer_size);
-        data::sensor::Measurement_Batch_Request& batch = *(data::sensor::Measurement_Batch_Request*)s_comms.get_tx_packet_payload(raw_buffer);
+        data::sensor::Measurement_Batch_Request& batch = *(data::sensor::Measurement_Batch_Request*)s_radio.get_tx_packet_payload(raw_buffer);
 
         batch.start_index = s_first_stored_measurement_index;
         batch.count = 0;
@@ -859,8 +859,8 @@ static void do_comms()
                 
                 batch.last_batch = done ? 1 : 0;
                 LOG(PSTR("Send batch of %d..."), (int)batch.count);
-                s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::MEASUREMENT_BATCH_REQUEST), false);
-                if (s_comms.send_packet(raw_buffer, sizeof(data::sensor::Measurement_Batch_Request), true) == true)
+                s_radio.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::MEASUREMENT_BATCH_REQUEST), false);
+                if (s_radio.send_packet(raw_buffer, sizeof(data::sensor::Measurement_Batch_Request), true) == true)
                 {
                     LOG(PSTR("done.\n"));
                 }
@@ -911,7 +911,7 @@ static bool request_first_config()
     bool send_successful = false;
     {
         uint8_t raw_buffer[packet_raw_size(sizeof(data::sensor::First_Config_Request))];
-        s_comms.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::FIRST_CONFIG_REQUEST), true);
+        s_radio.begin_packet(raw_buffer, static_cast<uint8_t>(data::sensor::Type::FIRST_CONFIG_REQUEST), true);
         data::sensor::First_Config_Request request;
         fill_config_request(request);
         
@@ -920,28 +920,28 @@ static bool request_first_config()
         request.descriptor.software_version = SOFTWARE_VERSION;
         request.descriptor.serial_number = s_stable_settings.serial_number;
         
-        s_comms.pack(raw_buffer, &request, sizeof(request));
-        send_successful = s_comms.send_packed_packet(raw_buffer, true);
+        s_radio.pack(raw_buffer, &request, sizeof(request));
+        send_successful = s_radio.send_packed_packet(raw_buffer, true);
     }
 
     if (send_successful)
     {
         uint8_t size = sizeof(data::sensor::First_Config_Response);
         uint8_t raw_buffer[packet_raw_size(size)];
-        uint8_t* buffer = s_comms.receive_packet(raw_buffer, size, chrono::millis(2000));
-        s_comms.sleep_mode();
+        uint8_t* buffer = s_radio.receive_packet(raw_buffer, size, chrono::millis(2000));
+        s_radio.sleep_mode();
         if (buffer)
         {
-            data::sensor::Type type = static_cast<data::sensor::Type>(s_comms.get_rx_packet_type(buffer));
+            data::sensor::Type type = static_cast<data::sensor::Type>(s_radio.get_rx_packet_type(buffer));
             if (type == data::sensor::Type::FIRST_CONFIG_RESPONSE && size == sizeof(data::sensor::First_Config_Response))
             {
-                s_last_input_dBm = s_comms.get_input_dBm();
-                const data::sensor::First_Config_Response* ptr = reinterpret_cast<const data::sensor::First_Config_Response*>(s_comms.get_rx_packet_payload(buffer));
+                s_last_input_dBm = s_radio.get_input_dBm();
+                const data::sensor::First_Config_Response* ptr = reinterpret_cast<const data::sensor::First_Config_Response*>(s_radio.get_rx_packet_payload(buffer));
                 return apply_first_config(*ptr);
             }
         }
     }
-    s_comms.sleep_mode();
+    s_radio.sleep_mode();
     return false;
 }
 

@@ -173,10 +173,10 @@ enum class Server_Message : uint8_t
     SENSOR_RES,         //base station
     PING,               //manager
     PONG,               //base station
-    CHANGE_STATE_REQ,   //manager
+    CHANGE_RADIO_STATE_REQ,   //manager
 };
 
-enum class Server_State : uint8_t
+enum class Radio_State : uint8_t
 {
     NORMAL,
     PAIRING

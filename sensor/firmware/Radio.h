@@ -4,7 +4,7 @@
 #include "Module.h"
 #include "RFM95.h"
 
-class Sensor_Comms
+class Radio
 {
 public:
     typedef uint16_t Address;
@@ -26,7 +26,7 @@ public:
 #   pragma pack(pop)
 #endif
 
-    Sensor_Comms();
+    Radio();
 
     static constexpr Address BROADCAST_ADDRESS = 0;
     static constexpr Address BASE_ADDRESS = 0xFFFFUL;
@@ -37,7 +37,7 @@ public:
     static constexpr Address SLAVE_ADDRESS_BEGIN = PAIR_ADDRESS_END + 1;
     static constexpr Address SLAVE_ADDRESS_END = BASE_ADDRESS - 1;
 
-    static constexpr uint8_t MAX_USER_DATA_SIZE = 128 - sizeof(Sensor_Comms::Header);
+    static constexpr uint8_t MAX_USER_DATA_SIZE = 128 - sizeof(Radio::Header);
 
 
     bool init(uint8_t retries, int8_t power_dBm);

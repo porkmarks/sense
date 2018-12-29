@@ -177,11 +177,11 @@ void Comms::connectedToBaseStation(InitializedBaseStation* cbs)
 
         if (cbs->db.findUnboundSensorIndex() >= 0)
         {
-            changeToState(*cbs, data::Server_State::PAIRING);
+            changeToRadioState(*cbs, data::Radio_State::PAIRING);
         }
         else
         {
-            changeToState(*cbs, data::Server_State::NORMAL);
+            changeToRadioState(*cbs, data::Radio_State::NORMAL);
         }
     }
 }
@@ -262,7 +262,7 @@ void Comms::sendPing(Comms::InitializedBaseStation& cbs)
 //////////////////////////////////////////////////////////////////////////
 
 template <typename T>
-void Comms::sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Type type, Sensor_Comms::Address address, T const& payload)
+void Comms::sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Type type, Radio::Address address, T const& payload)
 {
     std::array<uint8_t, 1024> buffer;
     size_t offset = 0;
@@ -288,7 +288,7 @@ void Comms::processPong(InitializedBaseStation& cbs)
 
 void Comms::sensorAdded(InitializedBaseStation& cbs, DB::SensorId id)
 {
-    changeToState(cbs, data::Server_State::PAIRING);
+    changeToRadioState(cbs, data::Radio_State::PAIRING);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -298,18 +298,18 @@ void Comms::sensorRemoved(InitializedBaseStation& cbs, DB::SensorId id)
     int32_t unboundIndex = cbs.db.findUnboundSensorIndex();
     if (unboundIndex == cbs.db.findSensorIndexById(id) || unboundIndex < 0)
     {
-        changeToState(cbs, data::Server_State::NORMAL);
+        changeToRadioState(cbs, data::Radio_State::NORMAL);
     }
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::changeToState(InitializedBaseStation& cbs, data::Server_State state)
+void Comms::changeToRadioState(InitializedBaseStation& cbs, data::Radio_State state)
 {
     std::array<uint8_t, 1024> buffer;
     size_t offset = 0;
     pack(buffer, state, offset);
-    cbs.channel.send(data::Server_Message::CHANGE_STATE_REQ, buffer.data(), offset);
+    cbs.channel.send(data::Server_Message::CHANGE_RADIO_STATE_REQ, buffer.data(), offset);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -591,7 +591,7 @@ void Comms::processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequ
     sendSensorResponse(cbs, request, data::sensor::Type::PAIR_RESPONSE, request.address, response);
 
     //switch back to normal state
-    changeToState(cbs, data::Server_State::NORMAL);
+    changeToRadioState(cbs, data::Radio_State::NORMAL);
 
     std::cout << "Received Pair Request" << std::endl;
 }

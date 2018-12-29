@@ -6,7 +6,7 @@
 static constexpr uint8_t SETTINGS_VERSION = 7;
 
 static uint8_t  EEMEM eeprom_settings_version;
-static Sensor_Comms::Address EEMEM eeprom_settings_address;
+static Radio::Address EEMEM eeprom_settings_address;
 static uint32_t EEMEM eeprom_settings_crc;
 
 void reset_settings()

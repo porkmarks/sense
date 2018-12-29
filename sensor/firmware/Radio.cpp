@@ -1,4 +1,4 @@
-#include "Sensor_Comms.h"
+#include "Radio.h"
 #include "CRC.h"
 
 #include "Arduino_Compat.h"
@@ -16,13 +16,13 @@
 
 uint8_t packet_raw_size(uint8_t payload_size)
 {
-    return uint8_t(sizeof(Sensor_Comms::Header)) + payload_size;
+    return uint8_t(sizeof(Radio::Header)) + payload_size;
 }
 
 constexpr chrono::millis k_ack_jitter(30);
 constexpr chrono::millis k_minimum_duration_before_sending(200);
 
-Sensor_Comms::Sensor_Comms()
+Radio::Radio()
 #ifdef __AVR__
     : m_module(SS, PD3, PD4)
 #else
@@ -32,7 +32,7 @@ Sensor_Comms::Sensor_Comms()
 {
 }
 
-bool Sensor_Comms::init(uint8_t retries, int8_t power_dBm)
+bool Radio::init(uint8_t retries, int8_t power_dBm)
 {
     if (retries == 0)
     {
@@ -74,35 +74,35 @@ bool Sensor_Comms::init(uint8_t retries, int8_t power_dBm)
     return true;
 }
 
-void Sensor_Comms::set_frequency(float freq)
+void Radio::set_frequency(float freq)
 {
     m_lora.setFrequency(freq);
 }
 
-void Sensor_Comms::set_transmission_power(int8_t power_dBm)
+void Radio::set_transmission_power(int8_t power_dBm)
 {
     m_lora.setOutputPower(power_dBm);
 }
 
-void Sensor_Comms::sleep_mode()
+void Radio::sleep_mode()
 {
     m_lora.sleep();
 }
 
-Sensor_Comms::Address Sensor_Comms::get_address() const
+Radio::Address Radio::get_address() const
 {
     return m_address;
 }
-void Sensor_Comms::set_address(Address address)
+void Radio::set_address(Address address)
 {
     m_address = address;
 }
-void Sensor_Comms::set_destination_address(Address address)
+void Radio::set_destination_address(Address address)
 {
     m_destination_address = address;
 }
 
-uint8_t Sensor_Comms::begin_packet(uint8_t* raw_buffer, uint8_t type, bool needs_response)
+uint8_t Radio::begin_packet(uint8_t* raw_buffer, uint8_t type, bool needs_response)
 {
     Header* header_ptr = reinterpret_cast<Header*>(raw_buffer);
     header_ptr->type = type;
@@ -116,7 +116,7 @@ uint8_t Sensor_Comms::begin_packet(uint8_t* raw_buffer, uint8_t type, bool needs
     return MAX_USER_DATA_SIZE;
 }
 
-uint8_t Sensor_Comms::pack(uint8_t* raw_buffer, const void* data, uint8_t size)
+uint8_t Radio::pack(uint8_t* raw_buffer, const void* data, uint8_t size)
 {
     if (m_offset + size > MAX_USER_DATA_SIZE)
     {
@@ -128,12 +128,12 @@ uint8_t Sensor_Comms::pack(uint8_t* raw_buffer, const void* data, uint8_t size)
     return MAX_USER_DATA_SIZE - m_offset;
 }
 
-bool Sensor_Comms::send_packed_packet(uint8_t* raw_buffer, bool wait_minimum_time)
+bool Radio::send_packed_packet(uint8_t* raw_buffer, bool wait_minimum_time)
 {
     return send_packet(raw_buffer, m_offset, wait_minimum_time);
 }
 
-bool Sensor_Comms::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload_size)
+bool Radio::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload_size)
 {
     if (!data || size <= sizeof(Header))
     {
@@ -175,7 +175,7 @@ bool Sensor_Comms::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_
     return true;
 }
 
-void Sensor_Comms::wait_minimum_time() const
+void Radio::wait_minimum_time() const
 {
     chrono::time_ms now = chrono::now();
     chrono::time_ms last = m_last_send_time_point > m_last_receive_time_point ? m_last_send_time_point : m_last_receive_time_point;
@@ -186,7 +186,7 @@ void Sensor_Comms::wait_minimum_time() const
     }
 }
 
-void Sensor_Comms::send_ack(const Header& header)
+void Radio::send_ack(const Header& header)
 {
     uint8_t ack_buffer[ACK_BUFFER_SIZE];// = { 0 };
     uint8_t* ptr = ack_buffer;
@@ -208,7 +208,7 @@ void Sensor_Comms::send_ack(const Header& header)
     m_lora.transmit(ack_buffer, ACK_BUFFER_SIZE);
 }
 
-bool Sensor_Comms::send_packet(uint8_t* raw_buffer, uint8_t packet_size, bool _wait_minimum_time)
+bool Radio::send_packet(uint8_t* raw_buffer, uint8_t packet_size, bool _wait_minimum_time)
 {
     //LOG(PSTR("SP\n"));
     Header* header_ptr = reinterpret_cast<Header*>(raw_buffer);
@@ -269,7 +269,7 @@ bool Sensor_Comms::send_packet(uint8_t* raw_buffer, uint8_t packet_size, bool _w
     return false;
 }
 
-uint8_t* Sensor_Comms::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size, chrono::millis timeout)
+uint8_t* Radio::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size, chrono::millis timeout)
 {
     auto start = chrono::now();
     do
@@ -308,12 +308,12 @@ uint8_t* Sensor_Comms::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size,
     return nullptr;
 }
 
-bool Sensor_Comms::start_async_receive()
+bool Radio::start_async_receive()
 {
     return m_lora.startReceiving() == ERR_NONE;
 }
 
-uint8_t* Sensor_Comms::async_receive_packet(uint8_t* raw_buffer, uint8_t& packet_size)
+uint8_t* Radio::async_receive_packet(uint8_t* raw_buffer, uint8_t& packet_size)
 {
     bool gotIt = false;
     uint8_t size = sizeof(Header) + packet_size;
@@ -356,37 +356,37 @@ uint8_t* Sensor_Comms::async_receive_packet(uint8_t* raw_buffer, uint8_t& packet
     return nullptr;
 }
 
-void Sensor_Comms::stop_async_receive()
+void Radio::stop_async_receive()
 {
     m_lora.stopReceiving();
 }
 
-uint8_t Sensor_Comms::get_rx_packet_type(uint8_t* received_buffer) const
+uint8_t Radio::get_rx_packet_type(uint8_t* received_buffer) const
 {
     const Header* header_ptr = reinterpret_cast<const Header*>(received_buffer);
     return header_ptr->type;
 }
-bool Sensor_Comms::get_rx_packet_needs_response(uint8_t* received_buffer) const
+bool Radio::get_rx_packet_needs_response(uint8_t* received_buffer) const
 {
     const Header* header_ptr = reinterpret_cast<const Header*>(received_buffer);
     return header_ptr->needs_response ? true : false;
 }
-const void* Sensor_Comms::get_rx_packet_payload(uint8_t* received_buffer) const
+const void* Radio::get_rx_packet_payload(uint8_t* received_buffer) const
 {
     return received_buffer + sizeof(Header);
 }
-void* Sensor_Comms::get_tx_packet_payload(uint8_t* raw_buffer) const
+void* Radio::get_tx_packet_payload(uint8_t* raw_buffer) const
 {
     return raw_buffer + sizeof(Header);
 }
 
-Sensor_Comms::Address Sensor_Comms::get_rx_packet_source_address(uint8_t* received_buffer) const
+Radio::Address Radio::get_rx_packet_source_address(uint8_t* received_buffer) const
 {
     const Header* header_ptr = reinterpret_cast<const Header*>(received_buffer);
     return header_ptr->source_address;
 }
 
-int8_t Sensor_Comms::get_input_dBm()
+int8_t Radio::get_input_dBm()
 {
     return m_lora.getRSSI();
 }
