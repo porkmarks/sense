@@ -399,6 +399,16 @@ void Server::radio_thread_func()
                             LOGE << "\tInvalid response received" << std::endl;
                         }
                     }
+                    else
+                    {
+                        m_leds.set_blink(LEDs::Blink::Fast_Red, std::chrono::seconds(1), true);
+                        LOGE << "\tResponse queue empty (manager unresponsive?)" << std::endl;
+                    }
+                }
+                else
+                {
+                    m_leds.set_blink(LEDs::Blink::Fast_Red, std::chrono::seconds(1), true);
+                    LOGE << "\tRequest queue full (manager unresponsive?)" << std::endl;
                 }
             }
 
