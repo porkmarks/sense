@@ -59,6 +59,7 @@ public:
         }
         m_connections.push_back(connect(m_socket, &QIODevice::readyRead, this, &QTcpSocketAdapter::handleReceive));
         m_connections.push_back(connect(m_socket, &QIODevice::bytesWritten, this, &QTcpSocketAdapter::handleSend));
+        m_isSending.exchange(false);
     }
 
     template<class Container>
