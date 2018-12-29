@@ -41,6 +41,9 @@ constexpr uint64_t k_ftpEncryptionKey = 45235321231234ULL;
 Settings::Settings()
 {
     m_storeThread = std::thread(std::bind(&Settings::storeThreadProc, this));
+
+    m_db = std::unique_ptr<DB>(new DB());
+    m_emailer.reset(new Emailer(*this, *m_db));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -330,17 +333,14 @@ bool Settings::load(std::string const& name)
         }
     }
 
-    std::unique_ptr<DB> db(new DB());
-    if (db->load() != success)
+    if (m_db->load() != success)
     {
-        if (db->create() != success)
+        if (m_db->create() != success)
         {
             s_logger.logCritical(QString("Cannot open nor create the DB"));
             return false;
         }
     }
-    m_db = std::move(db);
-    m_emailer.reset(new Emailer(*this, *m_db));
 
     //initialize backups
     std::pair<std::string, time_t> bkf = getMostRecentBackup(dataFilename, s_dataFolder + "/backups/daily");
