@@ -405,6 +405,9 @@ void Server::radio_thread_func()
             if (m_new_radio_state != m_radio_state)
             {
                 LOGI << "Changing radio state to " << (int) m_new_radio_state << std::endl;
+                m_revert_radio_state_to_normal_tp = std::chrono::system_clock::now() + std::chrono::seconds(180);
+                m_radio_state = m_new_radio_state;
+
                 if (m_radio_state == data::Radio_State::PAIRING)
                 {
                     m_radio.stop_async_receive();
@@ -415,8 +418,6 @@ void Server::radio_thread_func()
                     m_radio.stop_async_receive();
                     m_radio.set_frequency(868.f);
                 }
-                m_revert_radio_state_to_normal_tp = std::chrono::system_clock::now() + std::chrono::seconds(180);
-                m_radio_state = m_new_radio_state;
             }
             if (m_radio_state != data::Radio_State::NORMAL)
             {
