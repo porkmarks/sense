@@ -73,7 +73,8 @@ uint32_t getSensorStorageCapacity(DB::Sensor const& sensor)
 constexpr int32_t k_imminentMaxSecond = 5;
 constexpr int32_t k_imminentMinSecond = -60;
 
-constexpr int32_t k_alertStoredMeasurementCount = 600;
+constexpr int32_t k_alertStoredMeasurementCount = 600; //turn red above this many measurements
+constexpr int32_t k_minStoredMeasurementCount = 10; //don't show stored measurements below this number
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -463,7 +464,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Stored)
         {
-            return sensor.estimatedStoredMeasurementCount;
+            return sensor.estimatedStoredMeasurementCount < k_minStoredMeasurementCount ? 0 : sensor.estimatedStoredMeasurementCount;
         }
         else if (column == Column::Alarms)
         {
