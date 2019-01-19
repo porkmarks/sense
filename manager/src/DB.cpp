@@ -29,8 +29,8 @@ extern Logger s_logger;
 
 extern std::string s_dataFolder;
 
-constexpr float k_alertVcc = 2.2f;
-constexpr int8_t k_alertSignal = -110;
+constexpr float k_alertPercentageVcc = 10.f; //%
+constexpr int8_t k_alertPercentageSignal = 10.f; //%
 
 constexpr uint64_t k_fileEncryptionKey = 4353123543565ULL;
 
@@ -51,6 +51,13 @@ const DB::Clock::duration MEASUREMENT_JITTER = std::chrono::seconds(10);
 const DB::Clock::duration COMMS_DURATION = std::chrono::seconds(10);
 
 extern std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac);
+
+
+constexpr float DB::k_maxBatteryLevel;
+constexpr float DB::k_minBatteryLevel;
+
+constexpr float DB::k_maxSignalLevel;
+constexpr float DB::k_minSignalLevel;
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -1402,7 +1409,7 @@ Result<DB::SensorId> DB::bindSensor(uint32_t serialNumber, uint8_t sensorType, u
     emit sensorBound(sensor.id);
     emit sensorChanged(sensor.id);
 
-    s_logger.logInfo(QString("Sensor '%1' bound").arg(sensor.descriptor.name.c_str()));
+    s_logger.logInfo(QString("Sensor '%1' bound to address %2").arg(sensor.descriptor.name.c_str()).arg(sensor.address));
 
     //refresh computed comms period as new sensors are added
     if (!m_mainData.sensorsConfigs.empty())
@@ -1905,7 +1912,8 @@ uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
         triggers |= AlarmTrigger::Humidity;
     }
 
-    if (ad.lowVccWatch && m.descriptor.vcc <= k_alertVcc)
+    float alertLevelVcc = k_alertPercentageVcc * (k_maxBatteryLevel - k_minBatteryLevel) + k_minBatteryLevel;
+    if (ad.lowVccWatch && m.descriptor.vcc <= alertLevelVcc)
     {
         triggers |= AlarmTrigger::LowVcc;
     }
@@ -1913,7 +1921,9 @@ uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
 //        {
 //            triggers |= AlarmTrigger::SensorErrors;
 //        }
-    if (ad.lowSignalWatch && std::min(m.descriptor.signalStrength.s2b, m.descriptor.signalStrength.b2s) <= k_alertSignal)
+
+    float alertLevelSignal = k_alertPercentageSignal * (k_maxSignalLevel - k_minSignalLevel) + k_minSignalLevel;
+    if (ad.lowSignalWatch && std::min(m.descriptor.signalStrength.s2b, m.descriptor.signalStrength.b2s) <= alertLevelSignal)
     {
         triggers |= AlarmTrigger::LowSignal;
     }

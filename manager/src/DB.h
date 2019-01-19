@@ -82,6 +82,12 @@ public:
     SensorsConfig const& getLastSensorsConfig() const;
     Clock::duration computeActualCommsPeriod(SensorsConfigDescriptor const& descriptor) const;
 
+    static constexpr float k_maxBatteryLevel = 3.2f;
+    static constexpr float k_minBatteryLevel = 2.4f;
+
+    static constexpr float k_maxSignalLevel = -70.f;
+    static constexpr float k_minSignalLevel = -120.f;
+
 
     struct SensorErrors
     {

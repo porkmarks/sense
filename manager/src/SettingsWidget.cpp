@@ -545,7 +545,7 @@ void SettingsWidget::setSensorsConfig(DB::SensorsConfig const& config)
 {
     m_ui.sensorsMeasurementPeriod->setValue(std::chrono::duration<float>(config.descriptor.measurementPeriod).count() / 60.f);
     m_ui.sensorsCommsPeriod->setValue(std::chrono::duration<float>(config.descriptor.commsPeriod).count() / 60.f);
-    m_ui.sensorsComputedCommsPeriod->setText(QString("%1").arg(std::chrono::duration<float>(config.computedCommsPeriod).count() / 60.f));
+    m_ui.sensorsComputedCommsPeriod->setText(QString("%1 minutes").arg(std::chrono::duration<float>(config.computedCommsPeriod).count() / 60.f, 0, 'f', 1));
     m_ui.sensorsPower->setValue(config.descriptor.sensorsPower);
 }
 

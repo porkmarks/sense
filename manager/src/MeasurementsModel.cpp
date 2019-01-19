@@ -14,9 +14,7 @@ static std::array<const char*, 10> s_headerNames = {"Id", "Sensor", "Index", "Ti
 
 float getBatteryLevel(float vcc)
 {
-    constexpr float max = 3.2f;
-    constexpr float min = 2.4f;
-    float level = std::max(std::min(vcc, max) - min, 0.f) / (max - min);
+    float level = std::max(std::min(vcc, DB::k_maxBatteryLevel) - DB::k_minBatteryLevel, 0.f) / (DB::k_maxBatteryLevel - DB::k_minBatteryLevel);
     return level;
 }
 
@@ -42,9 +40,7 @@ float getSignalLevel(int8_t dBm)
     {
         return 0.f;
     }
-    constexpr float max = -70.f;
-    constexpr float min = -120.f;
-    float level = std::max(std::min(static_cast<float>(dBm), max) - min, 0.f) / (max - min);
+    float level = std::max(std::min(static_cast<float>(dBm), DB::k_maxSignalLevel) - DB::k_minSignalLevel, 0.f) / (DB::k_maxSignalLevel - DB::k_minSignalLevel);
     return level;
 }
 

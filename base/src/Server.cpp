@@ -368,44 +368,47 @@ void Server::radio_thread_func()
                 {
                     memcpy(request.payload.data(), m_radio.get_rx_packet_payload(packet_data), size);
                 }
-                if (m_radio_requests.push_back_timeout(request, std::chrono::seconds(10)) && request.needs_response)
+                if (m_radio_requests.push_back_timeout(request, std::chrono::seconds(10)))
                 {
-                    if (m_radio_responses.pop_front_timeout(response, std::chrono::seconds(10)))
+                    if (request.needs_response)
                     {
-                        if (response.is_valid)
+                        if (m_radio_responses.pop_front_timeout(response, std::chrono::seconds(10)))
                         {
-                            LOGI << "\tdone. Sending response back..." << std::endl;
-                            m_radio.set_destination_address(response.address);
-                            m_radio.begin_packet(raw_packet_data.data(), response.type, false);
-                            if (!response.payload.empty())
+                            if (response.is_valid)
                             {
-                                m_radio.pack(raw_packet_data.data(), response.payload.data(), static_cast<uint8_t>(response.payload.size()));
-                            }
+                                LOGI << "\tdone. Sending response back..." << std::endl;
+                                m_radio.set_destination_address(response.address);
+                                m_radio.begin_packet(raw_packet_data.data(), response.type, false);
+                                if (!response.payload.empty())
+                                {
+                                    m_radio.pack(raw_packet_data.data(), response.payload.data(), static_cast<uint8_t>(response.payload.size()));
+                                }
 
-                            if (m_radio.send_packed_packet(raw_packet_data.data(), true))
-                            {
-                                m_leds.set_blink(LEDs::Blink::Fast_Yellow, std::chrono::seconds(1), true);
-                                LOGI << "\tdone" << std::endl;
+                                if (m_radio.send_packed_packet(raw_packet_data.data(), true))
+                                {
+                                    m_leds.set_blink(LEDs::Blink::Fast_Yellow, std::chrono::seconds(1), true);
+                                    LOGI << "\tdone" << std::endl;
+                                }
+                                else
+                                {
+                                    m_leds.set_blink(LEDs::Blink::Fast_Red, std::chrono::seconds(1), true);
+                                    LOGE << "\tfailed" << std::endl;
+                                }
                             }
-                            else
+                            else //response.is_valid
                             {
                                 m_leds.set_blink(LEDs::Blink::Fast_Red, std::chrono::seconds(1), true);
-                                LOGE << "\tfailed" << std::endl;
+                                LOGE << "\tInvalid response received" << std::endl;
                             }
                         }
-                        else
+                        else //responses.pop_front
                         {
                             m_leds.set_blink(LEDs::Blink::Fast_Red, std::chrono::seconds(1), true);
-                            LOGE << "\tInvalid response received" << std::endl;
+                            LOGE << "\tResponse queue empty (manager unresponsive?)" << std::endl;
                         }
-                    }
-                    else
-                    {
-                        m_leds.set_blink(LEDs::Blink::Fast_Red, std::chrono::seconds(1), true);
-                        LOGE << "\tResponse queue empty (manager unresponsive?)" << std::endl;
-                    }
+                    } //if (request.needs_response)
                 }
-                else
+                else //requests.push_back
                 {
                     m_leds.set_blink(LEDs::Blink::Fast_Red, std::chrono::seconds(1), true);
                     LOGE << "\tRequest queue full (manager unresponsive?)" << std::endl;
