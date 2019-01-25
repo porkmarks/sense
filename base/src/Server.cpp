@@ -368,6 +368,7 @@ void Server::radio_thread_func()
                 {
                     memcpy(request.payload.data(), m_radio.get_rx_packet_payload(packet_data), size);
                 }
+                m_radio_responses.clear();
                 if (m_radio_requests.push_back_timeout(request, std::chrono::seconds(10)))
                 {
                     if (request.needs_response)
@@ -407,6 +408,7 @@ void Server::radio_thread_func()
                             LOGE << "\tResponse queue empty (manager unresponsive?)" << std::endl;
                         }
                     } //if (request.needs_response)
+                    m_radio_responses.clear();
                 }
                 else //requests.push_back
                 {

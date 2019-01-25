@@ -16,6 +16,8 @@ public:
 
     void exit();
 
+    void clear();
+
     bool push_back(T const& t, bool block);
     bool push_back_timeout(T const& t, std::chrono::high_resolution_clock::duration timeout);
 
@@ -58,6 +60,13 @@ void Queue<T>::exit()
         m_exit = true;
     }
     m_cv.notify_all();
+}
+
+template<class T>
+void Queue<T>::clear()
+{
+    std::unique_lock<std::mutex> lg(m_mutex);
+    m_queue.clear();
 }
 
 template<class T>

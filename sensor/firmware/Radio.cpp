@@ -166,7 +166,7 @@ bool Radio::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload
     //not addressed to me?
     if (header_ptr->destination_address != m_address && header_ptr->destination_address != BROADCAST_ADDRESS)
     {
-        LOG(PSTR("notForMe\n"));
+        LOG(PSTR("notForMe %d != %d\n"), (int)header_ptr->destination_address, (int)m_address);
         return false;
     }
 
