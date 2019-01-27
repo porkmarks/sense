@@ -636,16 +636,16 @@ Result<void> DB::load()
                             s_logger.logCritical(QString("Failed to load '%1': Bad triggers_per_sensor").arg(dataFilename.c_str()));
                             return Error("Cannot open DB");
                         }
-                        it = alarmj.FindMember("sensor");
-                        if (it == alarmj.MemberEnd() || !it->value.IsUint())
+                        it = elementj.FindMember("sensor");
+                        if (it == elementj.MemberEnd() || !it->value.IsUint())
                         {
                             s_logger.logCritical(QString("Failed to load '%1': Bad or missing triggers_per_sensor->sensor").arg(dataFilename.c_str()));
                             return Error("Cannot open DB");
                         }
                         rapidjson::Value const& sensorj = it->value;
 
-                        it = alarmj.FindMember("triggers");
-                        if (it == alarmj.MemberEnd() || !it->value.IsUint())
+                        it = elementj.FindMember("triggers");
+                        if (it == elementj.MemberEnd() || !it->value.IsUint())
                         {
                             s_logger.logCritical(QString("Failed to load '%1': Bad or missing triggers_per_sensor->triggers").arg(dataFilename.c_str()));
                             return Error("Cannot open DB");
