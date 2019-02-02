@@ -62,7 +62,13 @@ private:
 
     std::atomic_bool m_threadsExit = { false };
 
-    void sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m, uint8_t oldTriggers, uint8_t newTriggers, uint8_t addedTriggers, uint8_t removedTriggers);
+    enum class Action
+    {
+        Trigger,
+        Recovery
+    };
+
+    void sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m, uint8_t oldTriggers, uint8_t newTriggers, uint8_t triggers, Action action);
     void sendAlarmEmail(Email& email, DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m);
     void sendEmail(Email const& email);
     void emailThreadProc();

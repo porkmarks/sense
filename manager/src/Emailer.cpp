@@ -96,13 +96,20 @@ void Emailer::alarmTriggersChanged(DB::AlarmId alarmId, DB::Measurement const& m
 
     if (alarm.descriptor.sendEmailAction)
     {
-        sendAlarmEmail(alarm, sensor, m, oldTriggers, newTriggers, addedTriggers, removedTriggers);
+        if (removedTriggers != 0)
+        {
+            sendAlarmEmail(alarm, sensor, m, oldTriggers, newTriggers, removedTriggers, Action::Recovery);
+        }
+        if (addedTriggers != 0)
+        {
+            sendAlarmEmail(alarm, sensor, m, oldTriggers, newTriggers, addedTriggers, Action::Trigger);
+        }
     }
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m, uint8_t oldTriggers, uint8_t newTriggers, uint8_t addedTriggers, uint8_t removedTriggers)
+void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m, uint8_t oldTriggers, uint8_t newTriggers, uint8_t triggers, Action action)
 {
     auto toString = [](uint8_t triggers)
     {
@@ -118,11 +125,12 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
         }
         return str;
     };
-    auto getColor = [removedTriggers, newTriggers](uint8_t trigger)
+    auto getColor = [action, triggers, oldTriggers](uint8_t trigger)
     {
-        return (newTriggers & trigger) ? "red" : //ond and new triggers
-           (removedTriggers & trigger) ? "green" : //removed triggers
-                                         "black"; //not triggered
+        return (action == Action::Trigger && (triggers & trigger)) ? "red" :
+                (action == Action::Recovery && (triggers & trigger)) ? "green" :
+                (oldTriggers & trigger) ? "orange" :
+                                                                      "black";
     };
 
     //this returns:
@@ -130,12 +138,12 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
     //      "back to normal" when a trigger dies
     //      "" for old triggers
     //      "normal" for untriggered stuff
-    auto getStatus = [addedTriggers, removedTriggers, oldTriggers](uint8_t trigger)
+    auto getStatus = [action, triggers, oldTriggers](uint8_t trigger)
     {
-        return (addedTriggers & trigger) ? "triggered now" :
-             (removedTriggers & trigger) ? "back to normal" :
-             (oldTriggers & trigger) ? "still triggered" :
-                                       "normal";
+        return (action == Action::Trigger && (triggers & trigger)) ? "triggered now" :
+                (action == Action::Recovery && (triggers & trigger)) ? "back to normal" :
+               (oldTriggers & trigger) ? "still triggered" :
+                                         "normal";
     };
 
 
@@ -143,24 +151,18 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
 
     ///////////////////////////////
     // SUBJECT
-    email.subject = "Sensor '" + sensor.descriptor.name + "', alarm '" + alarm.descriptor.name + "': ";
-    if (addedTriggers != 0 && removedTriggers != 0)
+    if (action == Action::Trigger)
     {
-        email.subject += "Triggered " + toString(addedTriggers);
-        email.subject += "; Recovered " + toString(removedTriggers);
+        email.subject = "ALARM - Sensor '" + sensor.descriptor.name + "' triggered alarm '" + alarm.descriptor.name + "': " + toString(triggers);
     }
-    else if (addedTriggers != 0)
+    else
     {
-        email.subject += "Triggered " + toString(addedTriggers);
-    }
-    else if (removedTriggers != 0)
-    {
-        email.subject += "Recovered " + toString(removedTriggers);
+        email.subject = "RECOVERY - Sensor '" + sensor.descriptor.name + "' recovered from alarm '" + alarm.descriptor.name + "': " + toString(triggers);
     }
 
     ///////////////////////////////
     // BODY
-    email.body = "<p>Sensor '<strong>" + sensor.descriptor.name + "</strong>' triggered alarm '<strong>" + alarm.descriptor.name + "</strong>'.</p>";
+    email.body = "<p>Sensor '<strong>" + sensor.descriptor.name + "</strong>' / alarm '<strong>" + alarm.descriptor.name + "</strong>'.</p>";
 
     email.settings = m_settings.getEmailSettings();
 
@@ -175,7 +177,7 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
                           <li><span style="color:%1">Temperature: <strong>%2 &deg;C</strong> (%3)</span></li>
                           <li><span style="color:%4">Humidity: <strong>%5 %RH</strong> (%6)</span></li>
                           <li><span style="color:%7">Battery: <strong>%8 %</strong> (%9)</span></li>
-                          <li><span style="color:%10">Signal: <strong>%11</strong> (%12)</span></li>
+                          <li><span style="color:%10">Signal: <strong>%11 %</strong> (%12)</span></li>
                           </ul>
                           <p>Timestamp: <strong>%13</strong> <span style="font-size: 8pt;"><em>(dd-mm-yyyy hh:mm)</em></span></p>
                           <p>&nbsp;</p>

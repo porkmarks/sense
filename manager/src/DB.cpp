@@ -1923,7 +1923,7 @@ uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
 //        }
 
     float alertLevelSignal = (k_alertPercentageSignal / 100.f) * (k_maxSignalLevel - k_minSignalLevel) + k_minSignalLevel;
-    if (ad.lowSignalWatch && std::min(m.descriptor.signalStrength.s2b, m.descriptor.signalStrength.b2s) <= alertLevelSignal)
+    if (ad.lowSignalWatch && m.combinedSignalStrength <= alertLevelSignal)
     {
         triggers |= AlarmTrigger::LowSignal;
     }
