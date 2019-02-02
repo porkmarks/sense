@@ -1912,7 +1912,7 @@ uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
         triggers |= AlarmTrigger::Humidity;
     }
 
-    float alertLevelVcc = k_alertPercentageVcc * (k_maxBatteryLevel - k_minBatteryLevel) + k_minBatteryLevel;
+    float alertLevelVcc = (k_alertPercentageVcc / 100.f) * (k_maxBatteryLevel - k_minBatteryLevel) + k_minBatteryLevel;
     if (ad.lowVccWatch && m.descriptor.vcc <= alertLevelVcc)
     {
         triggers |= AlarmTrigger::LowVcc;
@@ -1922,7 +1922,7 @@ uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
 //            triggers |= AlarmTrigger::SensorErrors;
 //        }
 
-    float alertLevelSignal = k_alertPercentageSignal * (k_maxSignalLevel - k_minSignalLevel) + k_minSignalLevel;
+    float alertLevelSignal = (k_alertPercentageSignal / 100.f) * (k_maxSignalLevel - k_minSignalLevel) + k_minSignalLevel;
     if (ad.lowSignalWatch && std::min(m.descriptor.signalStrength.s2b, m.descriptor.signalStrength.b2s) <= alertLevelSignal)
     {
         triggers |= AlarmTrigger::LowSignal;
@@ -1948,18 +1948,21 @@ uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
     }
 
     uint8_t diff = oldTriggers ^ triggers;
-    uint8_t removed = diff & oldTriggers;
-    uint8_t added = diff & triggers;
+    if (diff != 0)
+    {
+        uint8_t removed = diff & oldTriggers;
+        uint8_t added = diff & triggers;
 
-    s_logger.logInfo(QString("Alarm '%1' triggers for measurement index %2 have changed: old %3, new %4, added %5, removed %6")
-                     .arg(ad.name.c_str())
-                     .arg(m.descriptor.index)
-                     .arg(oldTriggers)
-                     .arg(triggers)
-                     .arg(added)
-                     .arg(removed));
+        s_logger.logInfo(QString("Alarm '%1' triggers for measurement index %2 have changed: old %3, new %4, added %5, removed %6")
+                         .arg(ad.name.c_str())
+                         .arg(m.descriptor.index)
+                         .arg(oldTriggers)
+                         .arg(triggers)
+                         .arg(added)
+                         .arg(removed));
 
-    emit alarmTriggersChanged(alarm.id, m, oldTriggers, triggers, added, removed);
+        emit alarmTriggersChanged(alarm.id, m, oldTriggers, triggers, added, removed);
+    }
 
     return triggers;
 }
@@ -2243,8 +2246,17 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
         measurement.id = id;
         measurement.descriptor = md;
         measurement.timePoint = computeMeasurementTimepoint(md);
-        measurement.alarmTriggers = computeAlarmTriggers(measurement);
         measurement.combinedSignalStrength = std::min(md.signalStrength.b2s, md.signalStrength.s2b);
+        measurement.alarmTriggers = computeAlarmTriggers(measurement);
+
+        //this is also set in the setSensorInputDetails
+        if (!sensor.isMeasurementValid)
+        {
+            sensor.isMeasurementValid = true;
+            sensor.measurementTemperature = measurement.descriptor.temperature;
+            sensor.measurementHumidity = measurement.descriptor.humidity;
+            sensor.measurementVcc = measurement.descriptor.vcc;
+        }
 
         //insert sorted id
         m_mainData.sortedMeasurementIds.insert(it, id);
@@ -2264,13 +2276,6 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
         minIndex = std::min(minIndex, md.index);
         maxIndex = std::max(maxIndex, md.index);
         added = true;
-        if (!sensor.isMeasurementValid)
-        {
-            sensor.isMeasurementValid = true;
-            sensor.measurementTemperature = measurement.descriptor.temperature;
-            sensor.measurementHumidity = measurement.descriptor.humidity;
-            sensor.measurementVcc = measurement.descriptor.vcc;
-        }
     }
 
     if (!added)

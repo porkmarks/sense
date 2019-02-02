@@ -148,6 +148,11 @@ int SmtpClient::getResponseCode() const
     return responseCode;
 }
 
+const QString & SmtpClient::getResponseMessage() const
+{
+    return responseMessage;
+}
+
 QTcpSocket* SmtpClient::getSocket() {
     return socket;
 }
@@ -362,8 +367,7 @@ bool SmtpClient::sendMail(MimeMessage& email)
         // Send RCPT command for each recipient
         QList<EmailAddress*>::const_iterator it, itEnd;
         // To (primary recipients)
-        for (it = email.getRecipients().begin(), itEnd = email.getRecipients().end();
-             it != itEnd; ++it)
+        for (it = email.getRecipients().begin(), itEnd = email.getRecipients().end(); it != itEnd; ++it)
         {
 
             sendMessage("RCPT TO:<" + (*it)->getAddress() + ">");
@@ -373,8 +377,7 @@ bool SmtpClient::sendMail(MimeMessage& email)
         }
 
         // Cc (carbon copy)
-        for (it = email.getRecipients(MimeMessage::Cc).begin(), itEnd = email.getRecipients(MimeMessage::Cc).end();
-             it != itEnd; ++it)
+        for (it = email.getRecipients(MimeMessage::Cc).begin(), itEnd = email.getRecipients(MimeMessage::Cc).end(); it != itEnd; ++it)
         {
             sendMessage("RCPT TO:<" + (*it)->getAddress() + ">");
             waitForResponse();
@@ -383,8 +386,7 @@ bool SmtpClient::sendMail(MimeMessage& email)
         }
 
         // Bcc (blind carbon copy)
-        for (it = email.getRecipients(MimeMessage::Bcc).begin(), itEnd = email.getRecipients(MimeMessage::Bcc).end();
-             it != itEnd; ++it)
+        for (it = email.getRecipients(MimeMessage::Bcc).begin(), itEnd = email.getRecipients(MimeMessage::Bcc).end(); it != itEnd; ++it)
         {
             sendMessage("RCPT TO: <" + (*it)->getAddress() + ">");
             waitForResponse();
@@ -453,11 +455,12 @@ void SmtpClient::waitForResponse()
 
             // Extract the respose code from the server's responce (first 3 digits)
             responseCode = responseText.left(3).toInt();
+            responseMessage = responseText.mid(3);
 
-            if (responseCode / 100 == 4)
+            int responseCategory = responseCode / 100;
+            if (responseCategory == 4)
                 emit smtpError(ServerError);
-
-            if (responseCode / 100 == 5)
+            if (responseCategory == 5)
                 emit smtpError(ClientError);
 
             if (responseText[3] == ' ') { return; }

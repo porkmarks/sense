@@ -8,7 +8,7 @@
 extern Logger s_logger;
 
 extern float getBatteryLevel(float vcc);
-
+extern float getSignalLevel(int8_t dBm);
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -132,9 +132,9 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
     //      "normal" for untriggered stuff
     auto getStatus = [addedTriggers, removedTriggers, oldTriggers](uint8_t trigger)
     {
-        return (addedTriggers & trigger) ? "triggered" :
+        return (addedTriggers & trigger) ? "triggered now" :
              (removedTriggers & trigger) ? "back to normal" :
-             (oldTriggers & trigger) ? "" :
+             (oldTriggers & trigger) ? "still triggered" :
                                        "normal";
     };
 
@@ -144,17 +144,18 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
     ///////////////////////////////
     // SUBJECT
     email.subject = "Sensor '" + sensor.descriptor.name + "', alarm '" + alarm.descriptor.name + "': ";
-    if (addedTriggers != 0)
+    if (addedTriggers != 0 && removedTriggers != 0)
     {
-        email.subject += toString(addedTriggers) + " triggered";
+        email.subject += "Triggered " + toString(addedTriggers);
+        email.subject += "; Recovered " + toString(removedTriggers);
+    }
+    else if (addedTriggers != 0)
+    {
+        email.subject += "Triggered " + toString(addedTriggers);
     }
     else if (removedTriggers != 0)
     {
-        if (addedTriggers)
-        {
-            email.subject += "; ";
-        }
-        email.subject += toString(removedTriggers) + " back to normal";
+        email.subject += "Recovered " + toString(removedTriggers);
     }
 
     ///////////////////////////////
@@ -171,10 +172,10 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
     email.body += QString(R"X(
                           <p>Measurement:</p>
                           <ul>
-                          <li><span style="color:%1">Temperature: <strong>%2 &deg;C</strong> %3</span></li>
-                          <li><span style="color:%4">Humidity: <strong>%5 %RH</strong> %6</span></li>
-                          <li><span style="color:%7">Battery: <strong>%8 %</strong> %9</span></li>
-                          <li><span style="color:%10">Signal: <strong>%11</strong> %12</span></li>
+                          <li><span style="color:%1">Temperature: <strong>%2 &deg;C</strong> (%3)</span></li>
+                          <li><span style="color:%4">Humidity: <strong>%5 %RH</strong> (%6)</span></li>
+                          <li><span style="color:%7">Battery: <strong>%8 %</strong> (%9)</span></li>
+                          <li><span style="color:%10">Signal: <strong>%11</strong> (%12)</span></li>
                           </ul>
                           <p>Timestamp: <strong>%13</strong> <span style="font-size: 8pt;"><em>(dd-mm-yyyy hh:mm)</em></span></p>
                           <p>&nbsp;</p>
@@ -192,7 +193,7 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
             .arg(getStatus(DB::AlarmTrigger::LowVcc))
 
             .arg(getColor(DB::AlarmTrigger::LowSignal))
-            .arg((newTriggers & DB::AlarmTrigger::LowSignal) ? "Low" : "Normal")
+            .arg(static_cast<int>(getSignalLevel(m.combinedSignalStrength)*100.f))
             .arg(getStatus(DB::AlarmTrigger::LowSignal))
 
             .arg(dt.toString("dd-MM-yyyy HH:mm"))
@@ -443,7 +444,7 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
         SmtpClient smtp(QString::fromUtf8(email.settings.host.c_str()), email.settings.port, connectionType);
 
         std::string errorMsg;
-        connect(&smtp, &SmtpClient::smtpError, [&errorMsg](SmtpClient::SmtpError error)
+        connect(&smtp, &SmtpClient::smtpError, [&errorMsg, &smtp](SmtpClient::SmtpError error)
         {
             switch (error)
             {
@@ -451,8 +452,8 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
             case SmtpClient::ResponseTimeoutError: errorMsg = "Response timeout."; break;
             case SmtpClient::SendDataTimeoutError: errorMsg = "Send data timeout."; break;
             case SmtpClient::AuthenticationFailedError: errorMsg = "Authentication failed."; break;
-            case SmtpClient::ServerError: errorMsg = "Server error."; break;
-            case SmtpClient::ClientError: errorMsg = "Client error."; break;
+            case SmtpClient::ServerError: errorMsg = std::string("Server error: ") + smtp.getResponseMessage().toUtf8().data(); break;
+            case SmtpClient::ClientError: errorMsg = std::string("Client error: ") + smtp.getResponseMessage().toUtf8().data(); break;
             default: errorMsg = "Unknown error."; break;
             }
         });

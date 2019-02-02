@@ -92,6 +92,7 @@ public:
 
     const QString & getResponseText() const;
     int getResponseCode() const;
+    const QString & getResponseMessage() const;
 
     int getConnectionTimeout() const;
     void setConnectionTimeout(int msec);
@@ -144,6 +145,7 @@ protected:
     
     QString responseText;
     int responseCode;
+    QString responseMessage;
 
 
     class ResponseTimeoutException {};

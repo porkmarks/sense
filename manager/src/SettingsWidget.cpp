@@ -297,7 +297,7 @@ void SettingsWidget::sendTestEmail()
 
         step = 0;
 
-        connect(&smtp, &SmtpClient::smtpError, [&errorMessageMutex, &errorMessage, &step](SmtpClient::SmtpError error)
+        connect(&smtp, &SmtpClient::smtpError, [&errorMessageMutex, &errorMessage, &step, &smtp](SmtpClient::SmtpError error)
         {
             switch (error)
             {
@@ -328,13 +328,17 @@ void SettingsWidget::sendTestEmail()
             case SmtpClient::ServerError:
             {
                 std::lock_guard<std::mutex> lg(errorMessageMutex);
-                errorMessage += "Server error.\n";
+                errorMessage += "Server error: ";
+                errorMessage += smtp.getResponseMessage().toUtf8().data();
+                errorMessage += "\n";
             }
                 break;
             case SmtpClient::ClientError:
             {
                 std::lock_guard<std::mutex> lg(errorMessageMutex);
-                errorMessage += "Client error.\n";
+                errorMessage += "Client error: ";
+                errorMessage += smtp.getResponseMessage().toUtf8().data();
+                errorMessage += "\n";
             }
                 break;
             default:

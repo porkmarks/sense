@@ -43,7 +43,7 @@ void LogsWidget::init()
     m_sortingModel.setSortRole(Qt::UserRole + 5);
 
     m_ui.list->setModel(&m_sortingModel);
-    m_ui.list->setUniformRowHeights(true);
+    //m_ui.list->setUniformRowHeights(true);
 
     connect(m_ui.list->header(), &QHeaderView::sectionResized, [this]()
     {
