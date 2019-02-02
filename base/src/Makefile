@@ -4,10 +4,11 @@ BIN := base
 SRCS	:= ../src/main.cpp \
 	../src/tests.cpp \
 	../src/Server.cpp \
+	../src/LEDs.cpp \
 	../../sensor/firmware/Module.cpp \
 	../../sensor/firmware/RFM95.cpp \
 	../../sensor/firmware/Chrono.cpp \
-	../../sensor/firmware/Sensor_Comms.cpp \
+	../../sensor/firmware/Radio.cpp \
 	../../sensor/firmware/Storage.cpp \
 	../../sensor/firmware/CRC.cpp \
 	../../common/src/spi.cpp \
