@@ -305,6 +305,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
 
         struct SensorData
         {
+            bool hasData = false;
             std::string name;
             float minTemperature = std::numeric_limits<float>::max();
             float maxTemperature = std::numeric_limits<float>::lowest();
@@ -330,6 +331,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
                 sensorDatas.resize(sensorIndex + 1);
             }
             SensorData& sd = sensorDatas[sensorIndex];
+            sd.hasData = true;
             sd.name = m_db.getSensor(sensorIndex).descriptor.name;
             sd.maxTemperature = std::max(sd.maxTemperature, m.descriptor.temperature);
             sd.minTemperature = std::min(sd.minTemperature, m.descriptor.temperature);
@@ -340,23 +342,41 @@ void Emailer::sendReportEmail(DB::Report const& report)
 
         for (SensorData const& sd: sensorDatas)
         {
-            email.body += QString(R"X(
-                                  <tr>
+            if (sd.hasData)
+            {
+                email.body += QString(R"X(
+                                      <tr>
                                       <td style="width: 80.6667px;">%1</td>
                                       <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%2 &deg;C</td>
                                       <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%3 &deg;C</td>
                                       <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%4 %RH</td>
                                       <td style="width: 81.3333px; text-align: right; white-space: nowrap;">%5 %RH</td>
                                       <td style="width: 81.3333px; text-align: right; white-space: nowrap;">%6</td>
-                                  </tr>
-                                  )X")
-                    .arg(sd.name.c_str())
-                    .arg(sd.minTemperature, 0, 'f', 1)
-                    .arg(sd.maxTemperature, 0, 'f', 1)
-                    .arg(sd.minHumidity, 0, 'f', 1)
-                    .arg(sd.maxHumidity, 0, 'f', 1)
-                    .arg(sd.alarmTriggers == 0 ? "no" : "yes")
-                    .toUtf8().data();
+                                      </tr>
+                                      )X")
+                        .arg(sd.name.c_str())
+                        .arg(sd.minTemperature, 0, 'f', 1)
+                        .arg(sd.maxTemperature, 0, 'f', 1)
+                        .arg(sd.minHumidity, 0, 'f', 1)
+                        .arg(sd.maxHumidity, 0, 'f', 1)
+                        .arg(sd.alarmTriggers == 0 ? "no" : "yes")
+                        .toUtf8().data();
+            }
+            else
+            {
+                email.body += QString(R"X(
+                                      <tr>
+                                      <td style="width: 80.6667px;">%1</td>
+                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">N/A</td>
+                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">N/A</td>
+                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">N/A</td>
+                                      <td style="width: 81.3333px; text-align: right; white-space: nowrap;">N/A</td>
+                                      <td style="width: 81.3333px; text-align: right; white-space: nowrap;">N/A</td>
+                                      </tr>
+                                      )X")
+                        .arg(sd.name.c_str())
+                        .toUtf8().data();
+            }
         }
 
         email.body += "</tbody>"
