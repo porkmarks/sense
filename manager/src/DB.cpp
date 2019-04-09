@@ -2210,11 +2210,13 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
     size_t sensorIndex = static_cast<size_t>(_sensorIndex);
     Sensor& sensor = m_mainData.sensors[sensorIndex];
 
+    uint32_t rtIndex = computeNextRealTimeMeasurementIndex();
 
-    //first remove past measurements
-    mds.erase(std::remove_if(mds.begin(), mds.end(), [&sensor](MeasurementDescriptor const& d)
+    //first remove already confirmed measurements or future measurements
+    mds.erase(std::remove_if(mds.begin(), mds.end(), [&sensor, rtIndex](MeasurementDescriptor const& d)
     {
-        return d.index < sensor.lastConfirmedMeasurementIndex;
+        //leave some threshold for the RT check, to account for inaccuracies in time keeping
+        return d.index < sensor.lastConfirmedMeasurementIndex || d.index > rtIndex + 5;
     }), mds.end());
 
     if (mds.empty())
