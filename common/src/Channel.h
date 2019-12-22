@@ -11,7 +11,7 @@ namespace comms
 {
 namespace detail
 {
-uint32_t crc32(const void* data, uint8_t size)
+inline uint32_t crc32(const void* data, uint8_t size)
 {
     constexpr uint32_t Polynomial = 0xEDB88320;
     uint32_t crc = ~uint32_t(~0L);
