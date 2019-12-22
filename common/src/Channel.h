@@ -4,12 +4,57 @@
 #include <deque>
 #include <mutex>
 #include <cassert>
-#include "CRC.h"
 
 namespace util
 {
 namespace comms
 {
+namespace detail
+{
+uint32_t crc32(const void* data, uint8_t size)
+{
+    constexpr uint32_t Polynomial = 0xEDB88320;
+    uint32_t crc = ~uint32_t(~0L);
+    const uint8_t* p = reinterpret_cast<const uint8_t*>(data);
+    while (size--)
+    {
+        crc ^= *p++;
+
+        uint8_t lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+    }
+    return ~crc;
+}    
+}
 
 template<class MESSAGE_T, class SOCKET_T>
 class Channel
@@ -193,7 +238,7 @@ private:
 
         //verify header crc
         {
-            Header_Crc_t computed_header_crc = crc32(m_rx_buffer.data(), HEADER_CRC_OFFSET);
+            Header_Crc_t computed_header_crc = detail::crc32(m_rx_buffer.data(), HEADER_CRC_OFFSET);
             if (header_crc != computed_header_crc)
             {
                 m_error_count++;
@@ -217,7 +262,7 @@ private:
 
         //clear crc bytes and compute crc
         set_value_fixed(m_rx_buffer, Data_Crc_t(0), DATA_CRC_OFFSET);
-        Data_Crc_t computed_data_crc = crc32(m_rx_buffer.data(), HEADER_SIZE + size);
+        Data_Crc_t computed_data_crc = detail::crc32(m_rx_buffer.data(), HEADER_SIZE + size);
         if (data_crc != computed_data_crc)
         {
             m_error_count++;
@@ -251,12 +296,12 @@ private:
         set_value_fixed(m_tx_buffer, Header_Crc_t(0), HEADER_CRC_OFFSET);
 
         //header crc
-        Header_Crc_t header_crc = crc32(m_tx_buffer.data(), HEADER_CRC_OFFSET);
+        Header_Crc_t header_crc = detail::crc32(m_tx_buffer.data(), HEADER_CRC_OFFSET);
         set_value_fixed(m_tx_buffer, header_crc, HEADER_CRC_OFFSET);
 
         //data crc
         set_value_fixed(m_tx_buffer, Data_Crc_t(0), DATA_CRC_OFFSET);
-        Data_Crc_t data_crc = crc32(m_tx_buffer.data(), total_size);
+        Data_Crc_t data_crc = detail::crc32(m_tx_buffer.data(), total_size);
         set_value_fixed(m_tx_buffer, data_crc, DATA_CRC_OFFSET);
 
         //send
