@@ -38,6 +38,8 @@ private slots:
     void scheduleSlowRefresh();
     void scheduleFastRefresh();
     void selectSensors();
+	void sensorAdded(DB::SensorId id);
+	void sensorRemoved(DB::SensorId id);
     void exportData();
     void mousePressEvent(QMouseEvent* event);
     void mouseReleaseEvent(QMouseEvent* event);

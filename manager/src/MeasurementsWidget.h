@@ -29,6 +29,8 @@ private slots:
     void refresh();
     void selectSensors();
     void exportData();
+    void sensorAdded(DB::SensorId id);
+    void sensorRemoved(DB::SensorId id);
 
     void minTemperatureChanged();
     void maxTemperatureChanged();
@@ -52,6 +54,5 @@ private:
     std::set<DB::SensorId> m_selectedSensorIds;
 
     std::vector<QMetaObject::Connection> m_uiConnections;
-    bool m_sectionSaveScheduled = false;
 };
 

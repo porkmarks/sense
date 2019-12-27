@@ -2,12 +2,8 @@
 #include <cassert>
 #include <iostream>
 
-#include "rapidjson/document.h"
-#include "rapidjson/prettywriter.h"
-#include "rapidjson/writer.h"
-#include "rapidjson/reader.h"
-#include "rapidjson/stringbuffer.h"
-#include "rapidjson/error/en.h"
+#include "cereal/archives/json.hpp"
+#include "cereal/external/rapidjson/error/en.h"
 #include "Logger.h"
 #include "Settings.h"
 
@@ -36,9 +32,9 @@ void pack(C& c, T const& t, size_t& offset)
 }
 
 template<typename C>
-bool unpack(C const& c, void* data, size_t size, size_t& offset, size_t max_size)
+bool unpack(C const& c, void* data, size_t size, size_t& offset, size_t maxSize)
 {
-    if (offset + size > c.size() || offset + size > max_size)
+    if (offset + size > c.size() || offset + size > maxSize)
     {
         return false;
     }
@@ -48,10 +44,10 @@ bool unpack(C const& c, void* data, size_t size, size_t& offset, size_t max_size
 }
 
 template<typename C, typename T>
-bool unpack(C const& c, T& t, size_t& offset, size_t max_size)
+bool unpack(C const& c, T& t, size_t& offset, size_t maxSize)
 {
     //static_assert(std::is_standard_layout<T>::value, "Only PODs pls");
-    return unpack(c, &t, sizeof(T), offset, max_size);
+    return unpack(c, &t, sizeof(T), offset, maxSize);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -116,6 +112,15 @@ void Comms::broadcastReceived()
 
 bool Comms::connectToBaseStation(DB& db, Mac const& mac)
 {
+	{
+		auto it = std::find_if(m_initializedBaseStations.begin(), m_initializedBaseStations.end(), [&mac](std::unique_ptr<InitializedBaseStation> const& _bs) { return _bs->descriptor.mac == mac; });
+		if (it != m_initializedBaseStations.end())
+		{
+			s_logger.logWarning(QString("Attempting to connect to already connected BS %1.").arg(getMacStr(mac).c_str()));
+			return false;
+		}
+	}
+
     auto it = std::find_if(m_discoveredBaseStations.begin(), m_discoveredBaseStations.end(), [&mac](Comms::BaseStationDescriptor const& _bs) { return _bs.mac == mac; });
     if (it == m_discoveredBaseStations.end())
     {
@@ -316,25 +321,25 @@ void Comms::changeToRadioState(InitializedBaseStation& cbs, data::Radio_State st
 
 void Comms::processSensorReq(InitializedBaseStation& cbs)
 {
-    Clock::time_point start_tp = Clock::now();
+    Clock::time_point startTp = Clock::now();
 
     std::array<uint8_t, 1024> buffer;
-    size_t max_size = 0;
-    bool ok = cbs.channel.unpack_fixed(buffer, max_size) == Channel::Unpack_Result::OK;
+    size_t maxSize = 0;
+    bool ok = cbs.channel.unpack_fixed(buffer, maxSize) == Channel::Unpack_Result::OK;
 
     size_t offset = 0;
     SensorRequest request;
     uint32_t payload_size = 0;
-    ok &= unpack(buffer, request.reqId, offset, max_size);
-    ok &= unpack(buffer, request.signalS2B, offset, max_size);
-    ok &= unpack(buffer, request.type, offset, max_size);
-    ok &= unpack(buffer, request.address, offset, max_size);
-    ok &= unpack(buffer, payload_size, offset, max_size);
+    ok &= unpack(buffer, request.reqId, offset, maxSize);
+    ok &= unpack(buffer, request.signalS2B, offset, maxSize);
+    ok &= unpack(buffer, request.type, offset, maxSize);
+    ok &= unpack(buffer, request.address, offset, maxSize);
+    ok &= unpack(buffer, payload_size, offset, maxSize);
     ok &= payload_size < 1024 * 1024;
     if (ok)
     {
         request.payload.resize(payload_size);
-        ok &= unpack(buffer, request.payload.data(), payload_size, offset, max_size);
+        ok &= unpack(buffer, request.payload.data(), payload_size, offset, maxSize);
     }
 
     if (!ok)
@@ -345,7 +350,7 @@ void Comms::processSensorReq(InitializedBaseStation& cbs)
 
     processSensorReq(cbs, request);
 
-    std::cout << "Duration: " << std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - start_tp).count() << std::endl;
+    std::cout << "Duration: " << std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - startTp).count() << std::endl;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -537,6 +542,11 @@ void Comms::processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, Sen
     }
 
     DB::SensorInputDetails details = createSensorInputDetails(sensor, firstConfigRequest);
+	details.hasDeviceInfo = true;
+    details.deviceInfo.sensorType = firstConfigRequest.descriptor.sensor_type;
+    details.deviceInfo.hardwareVersion = firstConfigRequest.descriptor.hardware_version;
+    details.deviceInfo.softwareVersion = firstConfigRequest.descriptor.software_version;
+
     //being the first request, we know the sensor doesn't store anything, so reset the firstStoredMeasurementIndex to the real time one
     details.hasStoredData = true;
     details.firstStoredMeasurementIndex = response.first_measurement_index;

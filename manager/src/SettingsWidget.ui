@@ -743,7 +743,7 @@
              </font>
             </property>
             <property name="text">
-             <string>Transmission Power severy affects the sensor battery life and range. Max power results in approximately half the battery life, while giving twice the range.</string>
+             <string>Transmission Power severy affects the sensor battery life and range. Every 6 dBm roughly double the line-of-sight range. Walls and obstacles reduce the range significantly.</string>
             </property>
             <property name="wordWrap">
              <bool>true</bool>
@@ -848,7 +848,7 @@
           </font>
          </property>
          <property name="text">
-          <string>Note #2: Check the datasheet of your battery to find out the capacity and enter that value in the box above for more accurate estimations.</string>
+          <string>Note #3: Check the datasheet of your battery to find out the capacity and enter that value in the box above for more accurate estimations.</string>
          </property>
          <property name="wordWrap">
           <bool>true</bool>

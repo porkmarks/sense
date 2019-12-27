@@ -266,15 +266,26 @@ void Manager::userLoggedIn(Settings::UserId id)
 
 void Manager::tabChanged()
 {
-    if (m_currentTabIndex == 1 && m_ui.tabWidget->currentIndex() == 2) //measurements to plots
+    if (m_currentTabIndex == m_ui.tabWidget->currentIndex())
     {
-        m_ui.measurementsWidget->saveSettings();
-        m_ui.plotWidget->loadSettings();
+        return;
     }
-    else if (m_currentTabIndex == 2 && m_ui.tabWidget->currentIndex() == 1) //plots to measurements
+
+	if (m_currentTabIndex == 1) //measurements out
+	{
+		m_ui.measurementsWidget->saveSettings();
+	}
+	if (m_currentTabIndex == 2) //plots out
+	{
+		m_ui.plotWidget->saveSettings();
+	}
+    if (m_ui.tabWidget->currentIndex() == 1) //measurements in
     {
-        m_ui.plotWidget->saveSettings();
-        m_ui.measurementsWidget->loadSettings();
+		m_ui.measurementsWidget->loadSettings();
+    }
+    if (m_ui.tabWidget->currentIndex() == 2) //plots in
+    {
+		m_ui.plotWidget->loadSettings();
     }
 
     if (m_ui.tabWidget->currentWidget() == m_ui.logsWidget)

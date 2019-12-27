@@ -78,12 +78,12 @@ protected:
 
     /* [4] Protected members */
 
-    EmailAddress* sender;
+    EmailAddress* sender = nullptr;
     QList<EmailAddress*> recipientsTo, recipientsCc, recipientsBcc;
     QString subject;
     QString mInReplyTo;
-    MimePart *content;
-    bool autoMimeContentCreated;
+    MimePart *content = nullptr;
+    bool autoMimeContentCreated = false;
     
     MimePart::Encoding hEncoding;
 

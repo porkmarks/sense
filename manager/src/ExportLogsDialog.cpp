@@ -189,7 +189,7 @@ bool ExportLogsDialog::exportTo(std::ostream& stream, size_t maxCount, bool show
     std::unique_ptr<QProgressDialog> progressDialog;
     if (showProgress)
     {
-        progressDialog.reset(new QProgressDialog("Exporting logs...", "Abort", 0, size / 16, this));
+        progressDialog.reset(new QProgressDialog("Exporting logs...", "Abort", 0, (int)size / 16, this));
         progressDialog->setWindowModality(Qt::WindowModal);
         progressDialog->setMinimumDuration(1000);
     }
@@ -198,7 +198,7 @@ bool ExportLogsDialog::exportTo(std::ostream& stream, size_t maxCount, bool show
     {
         if (progressDialog && (i & 0xF) == 0)
         {
-            progressDialog->setValue(i / 16);
+            progressDialog->setValue((int)i / 16);
             if (progressDialog->wasCanceled())
             {
                 return false;

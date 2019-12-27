@@ -15,6 +15,7 @@ static std::array<const char*, 10> s_headerNames = {"Id", "Sensor", "Index", "Ti
 float getBatteryLevel(float vcc)
 {
     float level = std::max(std::min(vcc, DB::k_maxBatteryLevel) - DB::k_minBatteryLevel, 0.f) / (DB::k_maxBatteryLevel - DB::k_minBatteryLevel);
+    level = std::pow(level, 1.f / 6.f); //to revert the battery curve
     return level;
 }
 

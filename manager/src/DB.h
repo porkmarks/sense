@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <array>
 #include <chrono>
 #include <string>
 #include <vector>
@@ -12,6 +13,7 @@
 #include <condition_variable>
 #include "Result.h"
 #include "Radio.h"
+#include "cereal/cereal.hpp"
 
 class DB : public QObject
 {
@@ -35,7 +37,7 @@ public:
         typedef std::array<uint8_t, 6> Mac;
 
         std::string name;
-        Mac mac;
+        Mac mac = {};
         //QHostAddress address;
     };
 
@@ -43,7 +45,7 @@ public:
     struct BaseStation
     {
         BaseStationDescriptor descriptor;
-        BaseStationId id;
+        BaseStationId id = 0;
     };
 
     size_t getBaseStationCount() const;
@@ -121,7 +123,7 @@ public:
     };
     struct Measurement
     {
-        MeasurementId id;
+        MeasurementId id = 0;
         MeasurementDescriptor descriptor;
         Clock::time_point timePoint;
         uint8_t alarmTriggers = 0;
@@ -151,6 +153,13 @@ public:
             float humidityBias = 0.f;
         };
 
+        struct DeviceInfo
+        {
+			uint8_t sensorType = 0;
+			uint8_t hardwareVersion = 0;
+			uint8_t softwareVersion = 0;
+        };
+
         enum class State
         {
             Active,
@@ -161,9 +170,7 @@ public:
         SensorDescriptor descriptor;
         SensorId id = 0;
         SensorAddress address = 0;
-        uint8_t sensorType = 0;
-        uint8_t hardwareVersion = 0;
-        uint8_t softwareVersion = 0;
+        DeviceInfo deviceInfo;
         Calibration calibration;
         SensorSerialNumber serialNumber = 0;
         State state = State::Active; //the current state of the sensor
@@ -209,7 +216,10 @@ public:
 
     struct SensorInputDetails
     {
-        SensorId id;
+        SensorId id = 0;
+
+        bool hasDeviceInfo = false;
+        Sensor::DeviceInfo deviceInfo;
 
         bool hasMeasurement = false;
         float measurementTemperature = 0;
@@ -288,7 +298,7 @@ public:
     struct Alarm
     {
         AlarmDescriptor descriptor;
-        AlarmId id;
+        AlarmId id = 0;
 
         std::map<SensorId, uint8_t> triggersPerSensor;
     };
@@ -348,7 +358,7 @@ public:
     struct Report
     {
         ReportDescriptor descriptor;
-        ReportId id;
+        ReportId id = 0;
         Clock::time_point lastTriggeredTimePoint = Clock::time_point(Clock::duration::zero());
     };
 
@@ -491,6 +501,11 @@ private:
         ReportId lastReportId = 0;
         MeasurementId lastMeasurementId = 0;
         uint32_t lastSensorAddress = Radio::SLAVE_ADDRESS_BEGIN;
+
+		template<class Archive> void serialize(Archive& archive, std::uint32_t const version)
+		{
+			archive(CEREAL_NVP(baseStations), CEREAL_NVP(sensorsConfigs), CEREAL_NVP(sensors), CEREAL_NVP(alarms), CEREAL_NVP(reports));
+		}
     };
 
     mutable std::recursive_mutex m_mainDataMutex;

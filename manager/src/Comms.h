@@ -30,7 +30,7 @@ public:
 
     struct BaseStationDescriptor
     {
-        Mac mac;
+        Mac mac = {};
         QHostAddress address;
         bool operator==(BaseStationDescriptor const& other) const { return mac == other.mac && address == other.address; }
     };

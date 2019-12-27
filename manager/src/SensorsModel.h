@@ -4,6 +4,7 @@
 #include <vector>
 #include <QAbstractItemModel>
 #include <QStyledItemDelegate>
+#include <QTimer>
 
 #include "DB.h"
 
@@ -78,7 +79,7 @@ private:
     struct SensorData
     {
         bool isChecked = false;
-        DB::SensorId sensorId;
+        DB::SensorId sensorId = 0;
     };
 
     QTimer m_timer;

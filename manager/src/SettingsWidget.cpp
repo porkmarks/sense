@@ -272,7 +272,7 @@ void SettingsWidget::sendTestEmail()
 
     std::array<const char*, 5> stepMessages = { "Initializing...", "Connecting...", "Authenticating...", "Sending Email...", "Done" };
 
-    QProgressDialog progress("Sending email...", "Abort", 0, stepMessages.size() - 1, this);
+	QProgressDialog progress("Sending email...", "Abort", 0, (int)stepMessages.size() - 1, this);
     progress.setWindowModality(Qt::WindowModal);
     progress.setAutoClose(false);
     progress.setAutoReset(false);
@@ -283,7 +283,7 @@ void SettingsWidget::sendTestEmail()
     QString errorMessage;
 
     std::atomic_int step = { 0 };
-    std::thread thread([this, &errorMessage, &errorMessageMutex, &step, settings]()
+    std::thread thread([&errorMessage, &errorMessageMutex, &step, settings]()
     {
         SmtpClient::ConnectionType connectionType = SmtpClient::SslConnection;
         switch (settings.connection)

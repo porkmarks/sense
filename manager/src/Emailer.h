@@ -12,6 +12,7 @@
 #include <QTimer>
 
 #include "DB.h"
+#include "cereal/cereal.hpp"
 
 class Settings;
 
@@ -40,6 +41,11 @@ public:
         std::string password;
         std::string from;
         std::vector<std::string> recipients;
+
+		template<class Archive> void serialize(Archive& archive, std::uint32_t const version)
+		{
+			archive(CEREAL_NVP(host), CEREAL_NVP(port), CEREAL_NVP(connection), CEREAL_NVP(username), CEREAL_NVP(password), CEREAL_NVP(from), CEREAL_NVP(recipients));
+		}
     };
 
 private slots:

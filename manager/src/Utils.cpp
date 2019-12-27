@@ -11,6 +11,10 @@
 #include <QDateTime>
 #include "Logger.h"
 
+#ifdef _WIN32
+#   include <windows.h>
+#endif
+
 extern Logger s_logger;
 
 typedef std::pair<std::string, time_t> FD;

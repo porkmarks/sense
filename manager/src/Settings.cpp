@@ -8,19 +8,16 @@
 #include <QDateTime>
 #include <QDir>
 
-#include "rapidjson/document.h"
-#include "rapidjson/prettywriter.h"
-#include "rapidjson/writer.h"
-#include "rapidjson/reader.h"
-#include "rapidjson/stringbuffer.h"
-#include "rapidjson/ostreamwrapper.h"
-#include "rapidjson/istreamwrapper.h"
-#include "rapidjson/error/en.h"
-
 #include "CRC.h"
 #include "Utils.h"
 #include "Crypt.h"
 #include "Logger.h"
+
+#include "cereal/archives/json.hpp"
+#include "cereal/types/vector.hpp"
+#include "cereal/types/string.hpp"
+#include "cereal/types/chrono.hpp"
+#include "cereal/external/rapidjson/error/en.h"
 
 #ifdef _MSC_VER
 //not #if defined(_WIN32) || defined(_WIN64) because we have strncasecmp in mingw
@@ -28,13 +25,19 @@
 #define strcasecmp _stricmp
 #endif
 
+#ifdef NDEBUG
+#   define USE_DATA_ENCRYPTION
+#endif
+
 extern Logger s_logger;
 
 extern std::string s_dataFolder;
 
 constexpr uint64_t k_fileEncryptionKey = 32455153254365ULL;
-constexpr uint64_t k_emailEncryptionKey = 1735271834639209ULL;
-constexpr uint64_t k_ftpEncryptionKey = 45235321231234ULL;
+//constexpr uint64_t k_emailEncryptionKey = 1735271834639209ULL;
+//constexpr uint64_t k_ftpEncryptionKey = 45235321231234ULL;
+
+//CEREAL_CLASS_VERSION(Settings::Data, 1);
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -97,240 +100,40 @@ bool Settings::load(std::string const& name)
 
     Data data;
 
+	std::string streamData;
+	{
+		std::ifstream file(dataFilename, std::ios_base::binary);
+		if (!file.is_open())
+		{
+			s_logger.logCritical(QString("Failed to open '%1': %2").arg(dataFilename.c_str()).arg(std::strerror(errno)));
+			return false;
+		}
+		streamData = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+	}
+
+    try
+	{
+		Crypt crypt;
+		crypt.setKey(k_fileEncryptionKey);
+		QByteArray decryptedData = crypt.decryptToByteArray(QByteArray(streamData.data(), int32_t(streamData.size())));
+
+		std::istringstream stream(std::string(decryptedData.data(), decryptedData.size()));
+		cereal::JSONInputArchive archive(stream);
+        archive(cereal::make_nvp("settings", data));
+	}
+    catch (std::exception e)
     {
-        std::string streamData;
-        {
-            std::ifstream file(dataFilename, std::ios_base::binary);
-            if (!file.is_open())
-            {
-                s_logger.logCritical(QString("Failed to open '%1': %2").arg(dataFilename.c_str()).arg(std::strerror(errno)));
-                return false;
-            }
-
-            streamData = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-        }
-
-        Crypt crypt;
-        crypt.setKey(k_fileEncryptionKey);
-        QByteArray decryptedData = crypt.decryptToByteArray(QByteArray(streamData.data(), int32_t(streamData.size())));
-
-        rapidjson::Document document;
-        document.Parse(decryptedData.data(), decryptedData.size());
-        if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
-        {
-            document.Parse(streamData.data(), streamData.size());
-            if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
-            {
-                s_logger.logCritical(QString("Failed to load '%1': %2").arg(dataFilename.c_str()).arg(rapidjson::GetParseError_En(document.GetParseError())));
-                return false;
-            }
-        }
-        if (!document.IsObject())
-        {
-            s_logger.logCritical(QString("Failed to load '%1': Bad document").arg(dataFilename.c_str()));
-            return false;
-        }
-
-        auto it = document.FindMember("email_settings");
-        if (it == document.MemberEnd() || !it->value.IsObject())
-        {
-            s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings").arg(dataFilename.c_str()));
-            return false;
-        }
-
-        {
-            Crypt crypt;
-            crypt.setKey(k_emailEncryptionKey);
-
-            rapidjson::Value const& esj = it->value;
-            auto it = esj.FindMember("host");
-            if (it == esj.MemberEnd() || !it->value.IsString())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings host").arg(dataFilename.c_str()));
-                return false;
-            }
-            data.emailSettings.host = it->value.GetString();
-
-            it = esj.FindMember("port");
-            if (it == esj.MemberEnd() || !it->value.IsUint())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings port").arg(dataFilename.c_str()));
-                return false;
-            }
-            data.emailSettings.port = static_cast<uint16_t>(it->value.GetUint());
-
-            it = esj.FindMember("connection");
-            if (it == esj.MemberEnd() || !it->value.IsUint())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings connection").arg(dataFilename.c_str()));
-                return false;
-            }
-            data.emailSettings.connection = static_cast<EmailSettings::Connection>(it->value.GetUint());
-
-            it = esj.FindMember("username");
-            if (it == esj.MemberEnd() || !it->value.IsString())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings username").arg(dataFilename.c_str()));
-                return false;
-            }
-            data.emailSettings.username = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
-
-            it = esj.FindMember("password");
-            if (it == esj.MemberEnd() || !it->value.IsString())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings password").arg(dataFilename.c_str()));
-                return false;
-            }
-            data.emailSettings.password = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
-
-            it = esj.FindMember("from");
-            if (it == esj.MemberEnd() || !it->value.IsString())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings from").arg(dataFilename.c_str()));
-                return false;
-            }
-            data.emailSettings.from = it->value.GetString();
-
-            it = esj.FindMember("recipients");
-            if (it == esj.MemberEnd() || !it->value.IsArray())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings recipients").arg(dataFilename.c_str()));
-                return false;
-            }
-
-            {
-                rapidjson::Value const& recipientsj = it->value;
-                for (size_t i = 0; i < recipientsj.Size(); i++)
-                {
-                    rapidjson::Value const& recipientj = recipientsj[i];
-                    if (!recipientj.IsString())
-                    {
-                        s_logger.logCritical(QString("Failed to load '%1': Bad or missing email settings secipient").arg(dataFilename.c_str()));
-                        return false;
-                    }
-                    data.emailSettings.recipients.push_back(recipientj.GetString());
-                }
-            }
-        }
-
-        it = document.FindMember("ftp_settings");
-        if (it == document.MemberEnd() || !it->value.IsObject())
-        {
-            s_logger.logCritical(QString("Failed to load '%1': Bad or missing ftp_settings").arg(dataFilename.c_str()));
-            return false;
-        }
-
-        {
-            Crypt crypt;
-            crypt.setKey(k_ftpEncryptionKey);
-
-            rapidjson::Value const& esj = it->value;
-            auto it = esj.FindMember("host");
-            if (it == esj.MemberEnd() || !it->value.IsString())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing ftp settings host").arg(dataFilename.c_str()));
-                return false;
-            }
-            data.ftpSettings.host = it->value.GetString();
-
-            it = esj.FindMember("port");
-            if (it == esj.MemberEnd() || !it->value.IsUint())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing ftp settings port").arg(dataFilename.c_str()));
-                return false;
-            }
-            data.ftpSettings.port = static_cast<uint16_t>(it->value.GetUint());
-
-            it = esj.FindMember("username");
-            if (it == esj.MemberEnd() || !it->value.IsString())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing ftp settings username").arg(dataFilename.c_str()));
-                return false;
-            }
-            data.ftpSettings.username = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
-
-            it = esj.FindMember("password");
-            if (it == esj.MemberEnd() || !it->value.IsString())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing ftp settings password").arg(dataFilename.c_str()));
-                return false;
-            }
-            data.ftpSettings.password = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
-
-            it = esj.FindMember("folder");
-            if (it == esj.MemberEnd() || !it->value.IsString())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing ftp settings folder").arg(dataFilename.c_str()));
-                return false;
-            }
-            data.ftpSettings.folder = crypt.decryptToString(QString(it->value.GetString())).toUtf8().data();
-
-            it = esj.FindMember("upload_backups");
-            if (it == esj.MemberEnd() || !it->value.IsBool())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing ftp settings upload_backups").arg(dataFilename.c_str()));
-                return false;
-            }
-            data.ftpSettings.uploadBackups = it->value.GetBool();
-
-            it = esj.FindMember("upload_backups_period");
-            if (it == esj.MemberEnd() || !it->value.IsUint64())
-            {
-                s_logger.logCritical(QString("Failed to load '%1': Bad or missing ftp settings upload_backups_period").arg(dataFilename.c_str()));
-                return false;
-            }
-            data.ftpSettings.uploadBackupsPeriod = std::chrono::seconds(it->value.GetUint64());
-        }
-
-        it = document.FindMember("users");
-        if (it == document.MemberEnd() || !it->value.IsArray())
-        {
-            s_logger.logCritical(QString("Failed to load '%1': Bad or missing users array").arg(dataFilename.c_str()));
-            return false;
-        }
-
-        {
-            rapidjson::Value const& usersj = it->value;
-            for (size_t i = 0; i < usersj.Size(); i++)
-            {
-                User user;
-                rapidjson::Value const& userj = usersj[i];
-                auto it = userj.FindMember("name");
-                if (it == userj.MemberEnd() || !it->value.IsString())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing user name").arg(dataFilename.c_str()));
-                    return false;
-                }
-                user.descriptor.name = it->value.GetString();
-
-                it = userj.FindMember("password");
-                if (it == userj.MemberEnd() || !it->value.IsString())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing user password").arg(dataFilename.c_str()));
-                    return false;
-                }
-                user.descriptor.passwordHash = it->value.GetString();
-
-                it = userj.FindMember("id");
-                if (it == userj.MemberEnd() || !it->value.IsUint())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing user id").arg(dataFilename.c_str()));
-                    return false;
-                }
-                user.id = it->value.GetUint();
-
-                it = userj.FindMember("type");
-                if (it == userj.MemberEnd() || !it->value.IsInt())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing user type").arg(dataFilename.c_str()));
-                    return false;
-                }
-                user.descriptor.type = static_cast<UserDescriptor::Type>(it->value.GetInt());
-
-                data.lastUserId = std::max(data.lastUserId, user.id);
-                data.users.push_back(user);
-            }
-        }
+        try
+		{
+			std::istringstream stream(streamData);
+			cereal::JSONInputArchive archive(stream);
+            archive(cereal::make_nvp("settings", data));
+		}
+		catch (std::exception e)
+		{
+			s_logger.logCritical(QString("Failed to load '%1': %2").arg(dataFilename.c_str()).arg(e.what()));
+			return false;
+		}
     }
 
     if (m_db->load() != success)
@@ -699,114 +502,44 @@ void Settings::save(Data const& data) const
 
     std::string dataFilename = (s_dataFolder + "/" + m_dataName);
 
-    Clock::time_point start = now;
+    //Clock::time_point start = now;
 
-    {
-        rapidjson::Document document;
-        document.SetObject();
-        {
-            Crypt crypt;
-            crypt.setKey(k_emailEncryptionKey);
-            rapidjson::Value esj;
-            esj.SetObject();
-            esj.AddMember("host", rapidjson::Value(data.emailSettings.host.c_str(), document.GetAllocator()), document.GetAllocator());
-            esj.AddMember("port", static_cast<uint32_t>(data.emailSettings.port), document.GetAllocator());
-            esj.AddMember("connection", static_cast<uint32_t>(data.emailSettings.connection), document.GetAllocator());
-            QString username(data.emailSettings.username.c_str());
-            esj.AddMember("username", rapidjson::Value(crypt.encryptToString(username).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
-            QString password(data.emailSettings.password.c_str());
-            esj.AddMember("password", rapidjson::Value(crypt.encryptToString(password).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
-            esj.AddMember("from", rapidjson::Value(data.emailSettings.from.c_str(), document.GetAllocator()), document.GetAllocator());
+	std::stringstream jsonString;
+	{
+		cereal::JSONOutputArchive archive(jsonString);
+		archive(cereal::make_nvp("settings", data));
+	}
 
-            {
-                rapidjson::Value recipientsj;
-                recipientsj.SetArray();
-                for (std::string const& recipient: data.emailSettings.recipients)
-                {
-                    recipientsj.PushBack(rapidjson::Value(recipient.c_str(), document.GetAllocator()), document.GetAllocator());
-                }
-                esj.AddMember("recipients", recipientsj, document.GetAllocator());
-            }
+	std::string tempFilename = (s_dataFolder + "/" + m_dataName + "_temp");
+	{
+		std::ofstream file(tempFilename, std::ios_base::binary);
+		if (!file.is_open())
+		{
+			s_logger.logCritical(QString("Failed to open '%1': %2").arg(tempFilename.c_str()).arg(std::strerror(errno)));
+		}
+		else
+		{
+            std::string str = jsonString.str();
+			Crypt crypt;
+			crypt.setCompressionLevel(1);
+			crypt.setKey(k_fileEncryptionKey);
+#ifdef USE_DATA_ENCRYPTION
+			QByteArray dataToWrite = crypt.encryptToByteArray(QByteArray(str.data(), (int)str.size()));
+#else
+			QByteArray dataToWrite = QByteArray(str.data(), (int)str.size());
+#endif
+			file.write(dataToWrite.data(), dataToWrite.size());
+		}
+		file.flush();
+		file.close();
+	}
 
-            document.AddMember("email_settings", esj, document.GetAllocator());
-        }
-        {
-            Crypt crypt;
-            crypt.setKey(k_ftpEncryptionKey);
-            rapidjson::Value fsj;
-            fsj.SetObject();
-            fsj.AddMember("host", rapidjson::Value(data.ftpSettings.host.c_str(), document.GetAllocator()), document.GetAllocator());
-            fsj.AddMember("port", static_cast<uint32_t>(data.ftpSettings.port), document.GetAllocator());
-            QString username(data.ftpSettings.username.c_str());
-            fsj.AddMember("username", rapidjson::Value(crypt.encryptToString(username).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
-            QString password(data.ftpSettings.password.c_str());
-            fsj.AddMember("password", rapidjson::Value(crypt.encryptToString(password).toUtf8().data(), document.GetAllocator()), document.GetAllocator());
-            fsj.AddMember("folder", rapidjson::Value(data.ftpSettings.folder.c_str(), document.GetAllocator()), document.GetAllocator());
-            fsj.AddMember("upload_backups", rapidjson::Value(data.ftpSettings.uploadBackups), document.GetAllocator());
-            fsj.AddMember("upload_backups_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.ftpSettings.uploadBackupsPeriod).count()), document.GetAllocator());
-            document.AddMember("ftp_settings", fsj, document.GetAllocator());
-        }
+	copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/incremental", 50);
 
-        {
-            rapidjson::Value usersj;
-            usersj.SetArray();
-            for (User const& user: data.users)
-            {
-                rapidjson::Value userj;
-                userj.SetObject();
-                userj.AddMember("id", user.id, document.GetAllocator());
-                userj.AddMember("name", rapidjson::Value(user.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
-                userj.AddMember("password", rapidjson::Value(user.descriptor.passwordHash.c_str(), document.GetAllocator()), document.GetAllocator());
-                userj.AddMember("type", static_cast<int>(user.descriptor.type), document.GetAllocator());
-                usersj.PushBack(userj, document.GetAllocator());
-            }
-            document.AddMember("users", usersj, document.GetAllocator());
-        }
-
-        rapidjson::StringBuffer buffer;
-        rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
-        document.Accept(writer);
-
-        Crypt crypt;
-        crypt.setCompressionLevel(1);
-        crypt.setKey(k_fileEncryptionKey);
-        QByteArray encryptedData = crypt.encryptToByteArray(QByteArray(buffer.GetString(), buffer.GetSize()));
-//        QByteArray encryptedData = QByteArray(buffer.GetString(), buffer.GetSize());
-
-        std::string tempFilename = (s_dataFolder + "/" + m_dataName + "_temp");
-        {
-            std::ofstream file(tempFilename, std::ios_base::binary);
-            if (!file.is_open())
-            {
-                s_logger.logCritical(QString("Failed to open '%1': %2").arg(tempFilename.c_str()).arg(std::strerror(errno)));
-            }
-            else
-            {
-                file.write(encryptedData.data(), encryptedData.size());
-            }
-            file.flush();
-            file.close();
-        }
-
-        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/incremental", 50);
-
-        if (!renameFile(tempFilename.c_str(), dataFilename.c_str()))
-        {
-            s_logger.logCritical(QString("Failed to rename file '%1' to '%2': %3").arg(tempFilename.c_str()).arg(dataFilename.c_str()).arg(getLastErrorAsString().c_str()));
-        }
-    }
-
-    std::cout << QString("Done saving settings to '%1'. Time: %2s").arg(dataFilename.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()).toUtf8().data();
-    std::cout.flush();
-
-    if (dailyBackup)
-    {
-        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/daily", 10);
-    }
-    if (weeklyBackup)
-    {
-        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/weekly", 10);
-    }
+	if (!renameFile(tempFilename.c_str(), dataFilename.c_str()))
+	{
+		s_logger.logCritical(QString("Failed to rename file '%1' to '%2': %3").arg(tempFilename.c_str()).arg(dataFilename.c_str()).arg(getLastErrorAsString().c_str()));
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////

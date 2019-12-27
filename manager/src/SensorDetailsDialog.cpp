@@ -91,7 +91,7 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
     if (sensor.isMeasurementValid)
     {
         float vcc = sensor.measurementVcc;
-        m_ui.battery->setText(QString("%1% (%2V)").arg(static_cast<int>(getBatteryLevel(vcc) * 100.f)).arg(vcc, 0, 'f', 1));
+        m_ui.battery->setText(QString("%1% (%2V)").arg(static_cast<int>(getBatteryLevel(vcc) * 100.f)).arg(vcc, 0, 'f', 2));
         m_ui.batteryIcon->setPixmap(getBatteryIcon(vcc).pixmap(24, 24));
 
         int8_t signal = static_cast<int8_t>(getSignalLevel(m_sensor.averageCombinedSignalStrength) * 100.f);
@@ -138,9 +138,9 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
     m_ui.temperatureBias->setValue(m_sensor.calibration.temperatureBias);
     m_ui.humidityBias->setValue(m_sensor.calibration.humidityBias);
 
-    m_ui.sensorType->setText(QString("%1").arg((int)m_sensor.sensorType));
-    m_ui.hardwareVersion->setText(QString("%1").arg((int)m_sensor.hardwareVersion));
-    m_ui.softwareVersion->setText(QString("%1").arg((int)m_sensor.softwareVersion));
+    m_ui.sensorType->setText(QString("%1").arg((int)m_sensor.deviceInfo.sensorType));
+    m_ui.hardwareVersion->setText(QString("%1").arg((int)m_sensor.deviceInfo.hardwareVersion));
+    m_ui.softwareVersion->setText(QString("%1").arg((int)m_sensor.deviceInfo.softwareVersion));
 
     m_ui.commsErrors->setText(QString("%1").arg(m_sensor.errorCounters.comms));
     //m_ui.measurementErrors->setText(QString("%1").arg(m_sensor.errorCounters));

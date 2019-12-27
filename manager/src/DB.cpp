@@ -9,21 +9,23 @@
 #include <QDateTime>
 #include <QDir>
 
-#include "rapidjson/document.h"
-#include "rapidjson/prettywriter.h"
-#include "rapidjson/writer.h"
-#include "rapidjson/reader.h"
-#include "rapidjson/stringbuffer.h"
-#include "rapidjson/ostreamwrapper.h"
-#include "rapidjson/istreamwrapper.h"
-#include "rapidjson/error/en.h"
+#include "cereal/archives/json.hpp"
+#include "cereal/types/vector.hpp"
+#include "cereal/types/string.hpp"
+#include "cereal/types/array.hpp"
+#include "cereal/types/map.hpp"
+#include "cereal/types/set.hpp"
+#include "cereal/types/chrono.hpp"
+#include "cereal/external/rapidjson/error/en.h"
 
 #include "Utils.h"
 #include "Crypt.h"
 #include "Logger.h"
 
-#define USE_DB_ENCRYPTION
-//#define USE_DATA_ENCRYPTION
+#ifdef NDEBUG
+#   define USE_DB_ENCRYPTION
+#   define USE_DATA_ENCRYPTION
+#endif
 
 extern Logger s_logger;
 
@@ -58,6 +60,134 @@ constexpr float DB::k_minBatteryLevel;
 
 constexpr float DB::k_maxSignalLevel;
 constexpr float DB::k_minSignalLevel;
+
+#define NVP(x) cereal::make_nvp(#x, v.x)
+template<class Archive> void save(Archive& archive, const DB::BaseStationDescriptor& v, std::uint32_t const version)
+{
+	char macStr[128];
+	sprintf(macStr, "%X:%X:%X:%X:%X:%X", v.mac[0] & 0xFF, v.mac[1] & 0xFF, v.mac[2] & 0xFF, v.mac[3] & 0xFF, v.mac[4] & 0xFF, v.mac[5] & 0xFF);
+	archive(NVP(name), cereal::make_nvp("mac", std::string(macStr)));
+}
+template<class Archive> void load(Archive& archive, DB::BaseStationDescriptor& v, std::uint32_t const version)
+{
+    std::string macStr;
+	archive(NVP(name), cereal::make_nvp("mac", macStr));
+	int m0, m1, m2, m3, m4, m5;
+	if (sscanf(macStr.c_str(), "%X:%X:%X:%X:%X:%X", &m0, &m1, &m2, &m3, &m4, &m5) != 6)
+	{
+		throw cereal::Exception("Bad base station mac");
+	}
+	v.mac = { static_cast<uint8_t>(m0 & 0xFF), static_cast<uint8_t>(m1 & 0xFF), static_cast<uint8_t>(m2 & 0xFF), static_cast<uint8_t>(m3 & 0xFF), static_cast<uint8_t>(m4 & 0xFF), static_cast<uint8_t>(m5 & 0xFF) };
+}
+template<class Archive> void serialize(Archive& archive, DB::BaseStation& v, std::uint32_t const version)
+{
+	archive(NVP(descriptor), NVP(id));
+}
+template<class Archive> void save(Archive& archive, const DB::SensorsConfigDescriptor& v, std::uint32_t const version)
+{
+	int64_t mp = std::chrono::duration_cast<std::chrono::seconds>(v.measurementPeriod).count();
+    int64_t cp = std::chrono::duration_cast<std::chrono::seconds>(v.commsPeriod).count();
+	archive(NVP(sensorsPower), CEREAL_NVP(mp), CEREAL_NVP(cp));
+}
+template<class Archive> void load(Archive& archive, DB::SensorsConfigDescriptor& v, std::uint32_t const version)
+{
+    int64_t mp;
+    int64_t cp;
+	archive(NVP(sensorsPower), CEREAL_NVP(mp), CEREAL_NVP(cp));
+	v.measurementPeriod = std::chrono::seconds(std::max<int64_t>(mp, 0));
+    v.commsPeriod = std::chrono::seconds(std::max<int64_t>(cp, 0));
+}
+template<class Archive> void save(Archive& archive, const DB::SensorsConfig& v, std::uint32_t const version)
+{
+    int64_t ccp = std::chrono::duration_cast<std::chrono::seconds>(v.computedCommsPeriod).count();
+	uint64_t bmtp = static_cast<uint64_t>(DB::Clock::to_time_t(v.baselineMeasurementTimePoint));
+	archive(NVP(descriptor), CEREAL_NVP(ccp), CEREAL_NVP(bmtp), NVP(baselineMeasurementIndex));
+}
+template<class Archive> void load(Archive& archive, DB::SensorsConfig& v, std::uint32_t const version)
+{
+    int64_t ccp;
+    uint64_t bmtp;
+	archive(NVP(descriptor), CEREAL_NVP(ccp), CEREAL_NVP(bmtp), NVP(baselineMeasurementIndex));
+	v.computedCommsPeriod = std::chrono::seconds(std::max<int64_t>(ccp, 0));
+    v.baselineMeasurementTimePoint = DB::Clock::from_time_t(bmtp);
+}
+template<class Archive> void serialize(Archive& archive, DB::SignalStrength& v, std::uint32_t const version)
+{
+	archive(NVP(s2b), NVP(b2s));
+}
+template<class Archive> void serialize(Archive& archive, DB::ErrorCounters& v, std::uint32_t const version)
+{
+	archive(NVP(comms), NVP(unknownReboots), NVP(powerOnReboots), NVP(resetReboots), NVP(brownoutReboots), NVP(watchdogReboots));
+}
+template<class Archive> void serialize(Archive& archive, DB::SensorDescriptor& v, std::uint32_t const version)
+{
+	archive(NVP(name));
+}
+template<class Archive> void serialize(Archive& archive, DB::Sensor::Calibration& v, std::uint32_t const version)
+{
+	archive(NVP(temperatureBias), NVP(humidityBias));
+}
+template<class Archive> void serialize(Archive& archive, DB::Sensor::DeviceInfo& v, std::uint32_t const version)
+{
+	archive(NVP(sensorType), NVP(softwareVersion), NVP(hardwareVersion));
+}
+template<class Archive> void save(Archive& archive, const DB::Sensor& v, std::uint32_t const version)
+{
+    uint64_t sstp = static_cast<uint64_t>(DB::Clock::to_time_t(v.sleepStateTimePoint));
+    uint64_t lctp = static_cast<uint64_t>(DB::Clock::to_time_t(v.lastCommsTimePoint));
+	archive(NVP(descriptor), NVP(id), NVP(address), NVP(deviceInfo),
+            NVP(calibration), NVP(serialNumber), NVP(state),
+            NVP(shouldSleep), CEREAL_NVP(sstp), NVP(errorCounters),
+			CEREAL_NVP(lctp), NVP(lastConfirmedMeasurementIndex), NVP(firstStoredMeasurementIndex),
+            NVP(storedMeasurementCount), NVP(estimatedStoredMeasurementCount), NVP(lastSignalStrengthB2S),
+            NVP(averageSignalStrength), NVP(averageCombinedSignalStrength),
+            NVP(isMeasurementValid), NVP(measurementTemperature), NVP(measurementHumidity), NVP(measurementVcc));
+}
+template<class Archive> void load(Archive& archive, DB::Sensor& v, std::uint32_t const version)
+{
+    uint64_t sstp;
+    uint64_t lctp;
+	archive(NVP(descriptor), NVP(id), NVP(address), NVP(deviceInfo),
+            NVP(calibration), NVP(serialNumber), NVP(state),
+            NVP(shouldSleep), CEREAL_NVP(sstp), NVP(errorCounters),
+			CEREAL_NVP(lctp), NVP(lastConfirmedMeasurementIndex), NVP(firstStoredMeasurementIndex),
+            NVP(storedMeasurementCount), NVP(estimatedStoredMeasurementCount), NVP(lastSignalStrengthB2S),
+            NVP(averageSignalStrength), NVP(averageCombinedSignalStrength),
+            NVP(isMeasurementValid), NVP(measurementTemperature), NVP(measurementHumidity), NVP(measurementVcc));
+    v.sleepStateTimePoint = DB::Clock::from_time_t(sstp);
+    v.lastCommsTimePoint = DB::Clock::from_time_t(lctp);
+}
+template<class Archive> void serialize(Archive& archive, DB::AlarmDescriptor& v, std::uint32_t const version)
+{
+	archive(NVP(name), NVP(filterSensors), NVP(sensors), NVP(lowTemperatureWatch), NVP(lowTemperature), NVP(highTemperatureWatch), NVP(highTemperature),
+            NVP(lowHumidityWatch), NVP(lowHumidity), NVP(highHumidityWatch), NVP(highHumidity), NVP(lowVccWatch), NVP(lowSignalWatch), NVP(sendEmailAction));
+}
+template<class Archive> void serialize(Archive& archive, DB::Alarm& v, std::uint32_t const version)
+{
+	archive(NVP(descriptor), NVP(id), NVP(triggersPerSensor));
+}
+template<class Archive> void save(Archive& archive, const DB::ReportDescriptor& v, std::uint32_t const version)
+{
+    int64_t cp = std::chrono::duration_cast<std::chrono::seconds>(v.customPeriod).count();
+	archive(NVP(name), NVP(period), CEREAL_NVP(cp), NVP(data), NVP(filterSensors), NVP(sensors));
+}
+template<class Archive> void load(Archive& archive, DB::ReportDescriptor& v, std::uint32_t const version)
+{
+    int64_t cp;
+	archive(NVP(name), NVP(period), CEREAL_NVP(cp), NVP(data), NVP(filterSensors), NVP(sensors));
+    v.customPeriod = std::chrono::seconds(std::max<int64_t>(cp, 0));
+}
+template<class Archive> void save(Archive& archive, const DB::Report& v, std::uint32_t const version)
+{
+    uint64_t lttp = static_cast<uint64_t>(DB::Clock::to_time_t(v.lastTriggeredTimePoint));
+	archive(NVP(descriptor), NVP(id), CEREAL_NVP(lttp));
+}
+template<class Archive> void load(Archive& archive, DB::Report& v, std::uint32_t const version)
+{
+    uint64_t lttp;
+	archive(NVP(descriptor), NVP(id), CEREAL_NVP(lttp));
+    v.lastTriggeredTimePoint = DB::Clock::from_time_t(lttp);
+}
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -151,612 +281,61 @@ Result<void> DB::load()
 
     Data data;
 
-    {
-        std::string streamData;
-        {
-            std::ifstream file(dataFilename, std::ios_base::binary);
-            if (!file.is_open())
-            {
-                s_logger.logCritical(QString("Failed to open '%1': %2").arg(dataFilename.c_str()).arg(std::strerror(errno)));
-                return Error("Cannot open DB");
-            }
-
-            streamData = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-            file.close();
-        }
-
-        Crypt crypt;
-        crypt.setKey(k_fileEncryptionKey);
-        QByteArray decryptedData = crypt.decryptToByteArray(QByteArray(streamData.data(), streamData.size()));
-
-        rapidjson::Document document;
-        document.Parse(decryptedData.data(), decryptedData.size());
-        if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
-        {
-            document.Parse(streamData.data(), streamData.size());
-            if (document.GetParseError() != rapidjson::ParseErrorCode::kParseErrorNone)
-            {
-                s_logger.logCritical(QString("Failed to open '%1': %2").arg(dataFilename.c_str()).arg(rapidjson::GetParseError_En(document.GetParseError())));
-                return Error("Cannot open DB");
-            }
-        }
-
-        if (!document.IsObject())
-        {
-            s_logger.logCritical(QString("Failed to load '%1': Bad document").arg(dataFilename.c_str()));
-            return Error("Cannot open DB");
-        }
-
-        //////////////////////////////////////////////////////////////////////////////////
-
-        auto it = document.FindMember("base_stations");
-        if (it == document.MemberEnd() || !it->value.IsArray())
-        {
-            s_logger.logCritical(QString("Failed to load '%1': Bad or missing base_stations array").arg(dataFilename.c_str()));
-            return Error("Cannot open DB");
-        }
-
-        {
-            rapidjson::Value const& bssj = it->value;
-            for (size_t i = 0; i < bssj.Size(); i++)
-            {
-                BaseStation bs;
-                rapidjson::Value const& bsj = bssj[i];
-                auto it = bsj.FindMember("name");
-                if (it == bsj.MemberEnd() || !it->value.IsString())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing base station name").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                bs.descriptor.name = it->value.GetString();
-
-//                it = bsj.FindMember("address");
-//                if (it == bsj.MemberEnd() || !it->value.IsString())
-//                {
-//                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing base station address").arg(dataFilename.c_str()));
-//                    return Error("Cannot open DB");
-//                }
-//                bs.descriptor.address = QHostAddress(it->value.GetString());
-
-                it = bsj.FindMember("id");
-                if (it == bsj.MemberEnd() || !it->value.IsUint())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing base station id").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                bs.id = it->value.GetUint();
-
-                it = bsj.FindMember("mac");
-                if (it == bsj.MemberEnd() || !it->value.IsString())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing base station mac").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-
-                int m0, m1, m2, m3, m4, m5;
-                if (sscanf(it->value.GetString(), "%X:%X:%X:%X:%X:%X", &m0, &m1, &m2, &m3, &m4, &m5) != 6)
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad base station mac").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                bs.descriptor.mac = { static_cast<uint8_t>(m0&0xFF), static_cast<uint8_t>(m1&0xFF), static_cast<uint8_t>(m2&0xFF),
-                            static_cast<uint8_t>(m3&0xFF), static_cast<uint8_t>(m4&0xFF), static_cast<uint8_t>(m5&0xFF) };
-
-                data.lastBaseStationId = std::max(data.lastBaseStationId, bs.id);
-                data.baseStations.push_back(bs);
-            }
-        }
-
-        //////////////////////////////////////////////////////////////////////////////////
-
-        it = document.FindMember("sensors_configs");
-        if (it == document.MemberEnd() || !it->value.IsArray())
-        {
-            s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor config array").arg(dataFilename.c_str()));
-            return Error("Cannot open DB");
-        }
-        {
-            rapidjson::Value const& configsj = it->value;
-            for (size_t i = 0; i < configsj.Size(); i++)
-            {
-                SensorsConfig config;
-                rapidjson::Value const& configj = configsj[i];
-                auto it = configj.FindMember("sensors_power");
-                if (it == configj.MemberEnd() || !it->value.IsInt())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing config sensors_power").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                config.descriptor.sensorsPower = static_cast<int8_t>(it->value.GetInt());
-
-                it = configj.FindMember("measurement_period");
-                if (it == configj.MemberEnd() || !it->value.IsUint64())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing config measurement_period").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                config.descriptor.measurementPeriod = std::chrono::seconds(it->value.GetUint64());
-
-                it = configj.FindMember("comms_period");
-                if (it == configj.MemberEnd() || !it->value.IsUint64())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing config comms_period").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                config.descriptor.commsPeriod = std::chrono::seconds(it->value.GetUint64());
-
-                it = configj.FindMember("baseline_measurement_tp");
-                if (it == configj.MemberEnd() || !it->value.IsUint64())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing config baseline_measurement_tp").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                config.baselineMeasurementTimePoint = Clock::from_time_t(static_cast<time_t>(it->value.GetUint64()));
-
-                it = configj.FindMember("baseline_measurement_index");
-                if (it == configj.MemberEnd() || !it->value.IsUint())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing config baseline_measurement_index").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                config.baselineMeasurementIndex = it->value.GetUint();
-                data.sensorsConfigs.push_back(config);
-            }
-        }
-
-        //////////////////////////////////////////////////////////////////////////////////
-
-        it = document.FindMember("sensors");
-        if (it == document.MemberEnd() || !it->value.IsArray())
-        {
-            s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensors array").arg(dataFilename.c_str()));
-            return Error("Cannot open DB");
-        }
-
-        {
-            rapidjson::Value const& sensorsj = it->value;
-            for (size_t i = 0; i < sensorsj.Size(); i++)
-            {
-                Sensor sensor;
-                rapidjson::Value const& sensorj = sensorsj[i];
-                auto it = sensorj.FindMember("name");
-                if (it == sensorj.MemberEnd() || !it->value.IsString())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor name").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                sensor.descriptor.name = it->value.GetString();
-
-                it = sensorj.FindMember("id");
-                if (it == sensorj.MemberEnd() || !it->value.IsUint())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor id").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                sensor.id = it->value.GetUint();
-
-                it = sensorj.FindMember("address");
-                if (it == sensorj.MemberEnd() || !it->value.IsUint())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor address").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                sensor.address = it->value.GetUint();
-
-                it = sensorj.FindMember("state");
-                if (it == sensorj.MemberEnd() || !it->value.IsUint())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor state").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                sensor.state = static_cast<Sensor::State>(it->value.GetUint());
-
-                it = sensorj.FindMember("should_sleep");
-                if (it == sensorj.MemberEnd() || !it->value.IsBool())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor should_sleep").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                sensor.shouldSleep = it->value.GetBool();
-
-                it = sensorj.FindMember("sleep_state_tp");
-                if (it == sensorj.MemberEnd() || !it->value.IsUint64())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing config sleep_state_tp").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                sensor.sleepStateTimePoint = Clock::from_time_t(static_cast<time_t>(it->value.GetUint64()));
-
-                it = sensorj.FindMember("serial_number");
-                if (it == sensorj.MemberEnd() || !it->value.IsUint())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor serial_number").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                sensor.serialNumber = it->value.GetUint();
-
-                it = sensorj.FindMember("last_confirmed_measurement_index");
-                if (it == sensorj.MemberEnd() || !it->value.IsUint())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor last_confirmed_measurement_index").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                sensor.lastConfirmedMeasurementIndex = it->value.GetUint();
-
-                it = sensorj.FindMember("last_comms");
-                if (it != sensorj.MemberEnd() && it->value.IsUint64())
-                {
-                    if (!it->value.IsUint64())
-                    {
-                        s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor next_comms").arg(dataFilename.c_str()));
-                        return Error("Cannot open DB");
-                    }
-                    sensor.lastCommsTimePoint = Clock::from_time_t(static_cast<time_t>(it->value.GetUint64()));
-                }
-
-                it = sensorj.FindMember("temperature_bias");
-                if (it == sensorj.MemberEnd() || !it->value.IsNumber())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor temperature_bias").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                sensor.calibration.temperatureBias = static_cast<float>(it->value.GetDouble());
-
-                it = sensorj.FindMember("humidity_bias");
-                if (it == sensorj.MemberEnd() || !it->value.IsNumber())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor humidity_bias").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                sensor.calibration.humidityBias = static_cast<float>(it->value.GetDouble());
-
-                it = sensorj.FindMember("error_counter_comms");
-                if (it == sensorj.MemberEnd() || !it->value.IsUint())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor error_counter_comms").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                sensor.errorCounters.comms = it->value.GetUint();
-
-                it = sensorj.FindMember("error_counter_reboot_unknown");
-                if (it == sensorj.MemberEnd() || !it->value.IsUint())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor error_counter_reboot_unknown").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                sensor.errorCounters.unknownReboots = it->value.GetUint();
-
-                it = sensorj.FindMember("error_counter_reboot_power_on");
-                if (it == sensorj.MemberEnd() || !it->value.IsUint())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor error_counter_reboot_power_on").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                sensor.errorCounters.powerOnReboots = it->value.GetUint();
-
-                it = sensorj.FindMember("error_counter_reboot_reset");
-                if (it == sensorj.MemberEnd() || !it->value.IsUint())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor error_counter_reboot_reset").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                sensor.errorCounters.resetReboots = it->value.GetUint();
-
-                it = sensorj.FindMember("error_counter_reboot_brownout");
-                if (it == sensorj.MemberEnd() || !it->value.IsUint())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor error_counter_reboot_brownout").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                sensor.errorCounters.brownoutReboots = it->value.GetUint();
-
-                it = sensorj.FindMember("error_counter_reboot_watchdog");
-                if (it == sensorj.MemberEnd() || !it->value.IsUint())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor error_counter_reboot_watchdog").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                sensor.errorCounters.watchdogReboots = it->value.GetUint();
-
-                data.lastSensorAddress = std::max(data.lastSensorAddress, sensor.address);
-                data.lastSensorId = std::max(data.lastSensorId, sensor.id);
-                data.sensors.push_back(sensor);
-            }
-        }
-
-        //////////////////////////////////////////////////////////////////////////////////
-
-        it = document.FindMember("alarms");
-        if (it == document.MemberEnd() || !it->value.IsArray())
-        {
-            s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarms array").arg(dataFilename.c_str()));
-            return Error("Cannot open DB");
-        }
-
-        {
-            rapidjson::Value const& alarmsj = it->value;
-            for (size_t i = 0; i < alarmsj.Size(); i++)
-            {
-                Alarm alarm;
-                rapidjson::Value const& alarmj = alarmsj[i];
-                auto it = alarmj.FindMember("name");
-                if (it == alarmj.MemberEnd() || !it->value.IsString())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm name").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                alarm.descriptor.name = it->value.GetString();
-
-                it = alarmj.FindMember("id");
-                if (it == alarmj.MemberEnd() || !it->value.IsUint())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm id").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                alarm.id = it->value.GetUint();
-
-                it = alarmj.FindMember("filter_sensors");
-                if (it != alarmj.MemberEnd() && !it->value.IsBool())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad alarm filter_sensors").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                if (it != alarmj.MemberEnd())
-                {
-                    alarm.descriptor.filterSensors = it->value.GetBool();
-                }
-
-                if (alarm.descriptor.filterSensors)
-                {
-                    it = alarmj.FindMember("sensors");
-                    if (it == alarmj.MemberEnd() || !it->value.IsArray())
-                    {
-                        s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm sensors").arg(dataFilename.c_str()));
-                        return Error("Cannot open DB");
-                    }
-                    rapidjson::Value const& sensorsj = it->value;
-                    for (size_t si = 0; si < sensorsj.Size(); si++)
-                    {
-                        rapidjson::Value const& sensorj = sensorsj[si];
-                        if (!sensorj.IsUint())
-                        {
-                            s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm sensor id").arg(dataFilename.c_str()));
-                            return Error("Cannot open DB");
-                        }
-                        alarm.descriptor.sensors.insert(sensorj.GetUint());
-                    }
-                }
-
-
-                it = alarmj.FindMember("low_temperature_watch");
-                if (it == alarmj.MemberEnd() || !it->value.IsBool())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm low_temperature_watch").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                alarm.descriptor.lowTemperatureWatch = it->value.GetBool();
-
-                it = alarmj.FindMember("low_temperature");
-                if (it == alarmj.MemberEnd() || !it->value.IsDouble())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm low_temperature").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                alarm.descriptor.lowTemperature = static_cast<float>(it->value.GetDouble());
-
-                it = alarmj.FindMember("high_temperature_watch");
-                if (it == alarmj.MemberEnd() || !it->value.IsBool())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm high_temperature_watch").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                alarm.descriptor.highTemperatureWatch = it->value.GetBool();
-
-                it = alarmj.FindMember("high_temperature");
-                if (it == alarmj.MemberEnd() || !it->value.IsDouble())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm high_temperature").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                alarm.descriptor.highTemperature = static_cast<float>(it->value.GetDouble());
-
-                it = alarmj.FindMember("low_humidity_watch");
-                if (it == alarmj.MemberEnd() || !it->value.IsBool())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm low_humidity_watch").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                alarm.descriptor.lowHumidityWatch = it->value.GetBool();
-
-                it = alarmj.FindMember("low_humidity");
-                if (it == alarmj.MemberEnd() || !it->value.IsDouble())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm low_humidity").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                alarm.descriptor.lowHumidity = static_cast<float>(it->value.GetDouble());
-
-                it = alarmj.FindMember("high_humidity_watch");
-                if (it == alarmj.MemberEnd() || !it->value.IsBool())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm high_humidity_watch").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                alarm.descriptor.highHumidityWatch = it->value.GetBool();
-
-                it = alarmj.FindMember("high_humidity");
-                if (it == alarmj.MemberEnd() || !it->value.IsDouble())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm high_humidity").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                alarm.descriptor.highHumidity = static_cast<float>(it->value.GetDouble());
-
-                it = alarmj.FindMember("low_vcc_watch");
-                if (it == alarmj.MemberEnd() || !it->value.IsBool())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm low_vcc_watch").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                alarm.descriptor.lowVccWatch = it->value.GetBool();
-
-                it = alarmj.FindMember("low_signal_watch");
-                if (it == alarmj.MemberEnd() || !it->value.IsBool())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm low_signal_watch").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                alarm.descriptor.lowSignalWatch = it->value.GetBool();
-
-//                it = alarmj.FindMember("sensor_errors_watch");
-//                if (it == alarmj.MemberEnd() || !it->value.IsBool())
-//                {
-//                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm sensor_errors_watch").arg(dataFilename.c_str()));
-//                    return Error("Cannot open DB");
-//                }
-//                alarm.descriptor.sensorErrorsWatch = it->value.GetBool();
-
-                it = alarmj.FindMember("send_email_action");
-                if (it == alarmj.MemberEnd() || !it->value.IsBool())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing alarm send_email_action").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                alarm.descriptor.sendEmailAction = it->value.GetBool();
-
-                it = alarmj.FindMember("triggers_per_sensor");
-                if (it != alarmj.MemberEnd() && it->value.IsArray())
-                {
-                    rapidjson::Value const& triggersPerSensorj = it->value;
-                    for (size_t si = 0; si < triggersPerSensorj.Size(); si++)
-                    {
-                        rapidjson::Value const& elementj = triggersPerSensorj[si];
-                        if (!elementj.IsObject())
-                        {
-                            s_logger.logCritical(QString("Failed to load '%1': Bad triggers_per_sensor").arg(dataFilename.c_str()));
-                            return Error("Cannot open DB");
-                        }
-                        it = elementj.FindMember("sensor");
-                        if (it == elementj.MemberEnd() || !it->value.IsUint())
-                        {
-                            s_logger.logCritical(QString("Failed to load '%1': Bad or missing triggers_per_sensor->sensor").arg(dataFilename.c_str()));
-                            return Error("Cannot open DB");
-                        }
-                        rapidjson::Value const& sensorj = it->value;
-
-                        it = elementj.FindMember("triggers");
-                        if (it == elementj.MemberEnd() || !it->value.IsUint())
-                        {
-                            s_logger.logCritical(QString("Failed to load '%1': Bad or missing triggers_per_sensor->triggers").arg(dataFilename.c_str()));
-                            return Error("Cannot open DB");
-                        }
-                        rapidjson::Value const& triggersj = it->value;
-                        alarm.triggersPerSensor.emplace(sensorj.GetUint(), triggersj.GetUint());
-                    }
-                }
-
-                data.lastAlarmId = std::max(data.lastAlarmId, alarm.id);
-                data.alarms.push_back(alarm);
-            }
-        }
-
-        //////////////////////////////////////////////////////////////////////////////////
-
-        it = document.FindMember("reports");
-        if (it == document.MemberEnd() || !it->value.IsArray())
-        {
-            s_logger.logCritical(QString("Failed to load '%1': Bad or missing reports array").arg(dataFilename.c_str()));
-            return Error("Cannot open DB");
-        }
-
-        {
-            rapidjson::Value const& reportsj = it->value;
-            for (size_t i = 0; i < reportsj.Size(); i++)
-            {
-                Report report;
-                rapidjson::Value const& reportj = reportsj[i];
-                auto it = reportj.FindMember("name");
-                if (it == reportj.MemberEnd() || !it->value.IsString())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing report name").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                report.descriptor.name = it->value.GetString();
-
-                it = reportj.FindMember("id");
-                if (it == reportj.MemberEnd() || !it->value.IsUint())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing report id").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                report.id = it->value.GetUint();
-
-                it = reportj.FindMember("last_triggered");
-                if (it == reportj.MemberEnd() || !it->value.IsUint64())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing sensor report last_triggered").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                report.lastTriggeredTimePoint = Clock::from_time_t(static_cast<time_t>(it->value.GetUint64()));
-
-                it = reportj.FindMember("filter_sensors");
-                if (it == reportj.MemberEnd() || !it->value.IsBool())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad report filter_sensors").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                report.descriptor.filterSensors = it->value.GetBool();
-
-                if (report.descriptor.filterSensors)
-                {
-                    it = reportj.FindMember("sensors");
-                    if (it == reportj.MemberEnd() || !it->value.IsArray())
-                    {
-                        s_logger.logCritical(QString("Failed to load '%1': Bad or missing report sensors").arg(dataFilename.c_str()));
-                        return Error("Cannot open DB");
-                    }
-                    rapidjson::Value const& sensorsj = it->value;
-                    for (size_t si = 0; si < sensorsj.Size(); si++)
-                    {
-                        rapidjson::Value const& sensorj = sensorsj[si];
-                        if (!sensorj.IsUint())
-                        {
-                            s_logger.logCritical(QString("Failed to load '%1': Bad or missing report sensor id").arg(dataFilename.c_str()));
-                            return Error("Cannot open DB");
-                        }
-                        report.descriptor.sensors.insert(sensorj.GetUint());
-                    }
-                }
-
-                it = reportj.FindMember("period");
-                if (it == reportj.MemberEnd() || !it->value.IsInt())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing report period").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                report.descriptor.period = static_cast<DB::ReportDescriptor::Period>(it->value.GetInt());
-
-                it = reportj.FindMember("custom_period");
-                if (it == reportj.MemberEnd() || !it->value.IsUint64())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing report custom_period").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                report.descriptor.customPeriod = std::chrono::seconds(it->value.GetUint64());
-
-                it = reportj.FindMember("data");
-                if (it == reportj.MemberEnd() || !it->value.IsInt())
-                {
-                    s_logger.logCritical(QString("Failed to load '%1': Bad or missing report data").arg(dataFilename.c_str()));
-                    return Error("Cannot open DB");
-                }
-                report.descriptor.data = static_cast<DB::ReportDescriptor::Data>(it->value.GetInt());
-
-                data.lastReportId = std::max(data.lastReportId, report.id);
-                data.reports.push_back(report);
-            }
-        }
-    }
+	std::string streamData;
+	{
+		std::ifstream file(dataFilename, std::ios_base::binary);
+		if (!file.is_open())
+		{
+            QString msg = QString("Failed to open '%1': %2").arg(dataFilename.c_str()).arg(std::strerror(errno));
+			s_logger.logCritical(msg);
+			return Error(msg.toUtf8().data());
+		}
+		streamData = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+	}
+
+	try
+	{
+		Crypt crypt;
+		crypt.setKey(k_fileEncryptionKey);
+		QByteArray decryptedData = crypt.decryptToByteArray(QByteArray(streamData.data(), int32_t(streamData.size())));
+
+		std::istringstream stream(std::string(decryptedData.data(), decryptedData.size()));
+		cereal::JSONInputArchive archive(stream);
+		archive(cereal::make_nvp("db", data));
+	}
+	catch (std::exception e)
+	{
+		try
+		{
+			std::istringstream stream(streamData);
+			cereal::JSONInputArchive archive(stream);
+			archive(cereal::make_nvp("db", data));
+		}
+		catch (std::exception e)
+		{
+			QString msg = QString("Failed to open '%1': %2").arg(dataFilename.c_str()).arg(e.what());
+			s_logger.logCritical(msg);
+			return Error(msg.toUtf8().data());
+		}
+	}
+
+	for (const BaseStation& bs: data.baseStations)
+	{
+		data.lastBaseStationId = std::max(data.lastBaseStationId, bs.id);
+	}
+	for (const Sensor& sensor: data.sensors)
+	{
+		data.lastSensorAddress = std::max(data.lastSensorAddress, sensor.address);
+		data.lastSensorId = std::max(data.lastSensorId, sensor.id);
+	}
+	for (const Alarm& alarm: data.alarms)
+	{
+		data.lastAlarmId = std::max(data.lastAlarmId, alarm.id);
+	}
+	for (const Report& report: data.reports)
+	{
+		data.lastReportId = std::max(data.lastReportId, report.id);
+	}
 
     //////////////////////////////////////////////////////////////////////////////////
 
@@ -776,7 +355,7 @@ Result<void> DB::load()
 
         Crypt crypt;
         crypt.setKey(k_fileEncryptionKey);
-        QByteArray decryptedData = crypt.decryptToByteArray(QByteArray(streamData.data(), streamData.size()));
+        QByteArray decryptedData = crypt.decryptToByteArray(QByteArray(streamData.data(), (int)streamData.size()));
 
         std::stringstream stream(std::string(decryptedData.data(), decryptedData.size()));
 
@@ -1399,9 +978,9 @@ Result<DB::SensorId> DB::bindSensor(uint32_t serialNumber, uint8_t sensorType, u
     }
 
     sensor.address = ++m_mainData.lastSensorAddress;
-    sensor.sensorType = sensorType;
-    sensor.hardwareVersion = hardwareVersion;
-    sensor.softwareVersion = softwareVersion;
+    sensor.deviceInfo.sensorType = sensorType;
+    sensor.deviceInfo.hardwareVersion = hardwareVersion;
+    sensor.deviceInfo.softwareVersion = softwareVersion;
     sensor.calibration = calibration;
     sensor.state = Sensor::State::Active;
     sensor.serialNumber = serialNumber;
@@ -1531,6 +1110,11 @@ bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
         {
             ok = false;
             continue;
+        }
+
+        if (d.hasDeviceInfo)
+        {
+            sensor.deviceInfo = d.deviceInfo;
         }
 
         //sensor.nextMeasurementTimePoint = d.nextMeasurementTimePoint;
@@ -2679,180 +2263,11 @@ void DB::save(Data const& data) const
     Clock::time_point start = now;
 
     {
-        rapidjson::Document document;
-        document.SetObject();
-//        {
-//            rapidjson::Value ssj;
-//            ssj.SetObject();
-//            ssj.AddMember("name", rapidjson::Value(data.sensorSettings.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
-//            ssj.AddMember("sensors_sleeping", data.sensorSettings.descriptor.sensorsSleeping, document.GetAllocator());
-//            ssj.AddMember("measurement_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.sensorSettings.descriptor.measurementPeriod).count()), document.GetAllocator());
-//            ssj.AddMember("comms_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(data.sensorSettings.descriptor.commsPeriod).count()), document.GetAllocator());
-////            ssj.AddMember("baseline", static_cast<uint64_t>(Clock::to_time_t(data.sensorSettings.baselineTimePoint)), document.GetAllocator());
-//            document.AddMember("sensor_settings", ssj, document.GetAllocator());
-//        }
-
+        std::stringstream jsonString;
         {
-            rapidjson::Value bssj;
-            bssj.SetArray();
-            for (BaseStation const& baseStation: data.baseStations)
-            {
-                rapidjson::Value bsj;
-                bsj.SetObject();
-                bsj.AddMember("id", baseStation.id, document.GetAllocator());
-                bsj.AddMember("name", rapidjson::Value(baseStation.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
-                //bsj.AddMember("address", rapidjson::Value(baseStation.descriptor.address.toString().toUtf8().data(), document.GetAllocator()), document.GetAllocator());
-
-                BaseStationDescriptor::Mac const& mac = baseStation.descriptor.mac;
-                bsj.AddMember("mac", rapidjson::Value(getMacStr(mac).c_str(), document.GetAllocator()), document.GetAllocator());
-                bssj.PushBack(bsj, document.GetAllocator());
-            }
-            document.AddMember("base_stations", bssj, document.GetAllocator());
+	        cereal::JSONOutputArchive archive(jsonString);
+	        archive(cereal::make_nvp("db", data));
         }
-
-        {
-            rapidjson::Value configsj;
-            configsj.SetArray();
-            for (SensorsConfig const& config: data.sensorsConfigs)
-            {
-                rapidjson::Value configj;
-                configj.SetObject();
-                configj.AddMember("sensors_power", static_cast<int32_t>(config.descriptor.sensorsPower), document.GetAllocator());
-                configj.AddMember("measurement_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.measurementPeriod).count()), document.GetAllocator());
-                configj.AddMember("comms_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(config.descriptor.commsPeriod).count()), document.GetAllocator());
-                configj.AddMember("baseline_measurement_tp", static_cast<uint64_t>(Clock::to_time_t(config.baselineMeasurementTimePoint)), document.GetAllocator());
-                configj.AddMember("baseline_measurement_index", config.baselineMeasurementIndex, document.GetAllocator());
-                configsj.PushBack(configj, document.GetAllocator());
-            }
-            document.AddMember("sensors_configs", configsj, document.GetAllocator());
-        }
-
-        {
-            rapidjson::Value sensorsj;
-            sensorsj.SetArray();
-            for (Sensor const& sensor: data.sensors)
-            {
-                if (sensor.state != Sensor::State::Unbound) //never save unbound sensors
-                {
-                    rapidjson::Value sensorj;
-                    sensorj.SetObject();
-                    sensorj.AddMember("name", rapidjson::Value(sensor.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
-                    sensorj.AddMember("id", sensor.id, document.GetAllocator());
-                    sensorj.AddMember("address", sensor.address, document.GetAllocator());
-                    sensorj.AddMember("state", static_cast<int>(sensor.state), document.GetAllocator());
-                    sensorj.AddMember("should_sleep", sensor.shouldSleep, document.GetAllocator());
-                    sensorj.AddMember("sleep_state_tp", static_cast<uint64_t>(Clock::to_time_t(sensor.sleepStateTimePoint)), document.GetAllocator());
-                    sensorj.AddMember("last_comms", static_cast<uint64_t>(Clock::to_time_t(sensor.lastCommsTimePoint)), document.GetAllocator());
-                    sensorj.AddMember("temperature_bias", sensor.calibration.temperatureBias, document.GetAllocator());
-                    sensorj.AddMember("humidity_bias", sensor.calibration.humidityBias, document.GetAllocator());
-                    sensorj.AddMember("serial_number", sensor.serialNumber, document.GetAllocator());
-                    sensorj.AddMember("last_confirmed_measurement_index", sensor.lastConfirmedMeasurementIndex, document.GetAllocator());
-                    sensorj.AddMember("error_counter_comms", sensor.errorCounters.comms, document.GetAllocator());
-                    sensorj.AddMember("error_counter_reboot_unknown", sensor.errorCounters.unknownReboots, document.GetAllocator());
-                    sensorj.AddMember("error_counter_reboot_power_on", sensor.errorCounters.powerOnReboots, document.GetAllocator());
-                    sensorj.AddMember("error_counter_reboot_reset", sensor.errorCounters.resetReboots, document.GetAllocator());
-                    sensorj.AddMember("error_counter_reboot_brownout", sensor.errorCounters.brownoutReboots, document.GetAllocator());
-                    sensorj.AddMember("error_counter_reboot_watchdog", sensor.errorCounters.watchdogReboots, document.GetAllocator());
-                    sensorsj.PushBack(sensorj, document.GetAllocator());
-                }
-            }
-            document.AddMember("sensors", sensorsj, document.GetAllocator());
-        }
-
-        {
-            rapidjson::Value alarmsj;
-            alarmsj.SetArray();
-            for (Alarm const& alarm: data.alarms)
-            {
-                rapidjson::Value alarmj;
-                alarmj.SetObject();
-                alarmj.AddMember("id", alarm.id, document.GetAllocator());
-                alarmj.AddMember("name", rapidjson::Value(alarm.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
-                alarmj.AddMember("filter_sensors", alarm.descriptor.filterSensors, document.GetAllocator());
-                if (alarm.descriptor.filterSensors)
-                {
-                    rapidjson::Value sensorsj;
-                    sensorsj.SetArray();
-                    for (SensorId const& sensorId: alarm.descriptor.sensors)
-                    {
-                        sensorsj.PushBack(sensorId, document.GetAllocator());
-                    }
-                    alarmj.AddMember("sensors", sensorsj, document.GetAllocator());
-                }
-                alarmj.AddMember("low_temperature_watch", alarm.descriptor.lowTemperatureWatch, document.GetAllocator());
-                alarmj.AddMember("low_temperature", alarm.descriptor.lowTemperature, document.GetAllocator());
-                alarmj.AddMember("high_temperature_watch", alarm.descriptor.highTemperatureWatch, document.GetAllocator());
-                alarmj.AddMember("high_temperature", alarm.descriptor.highTemperature, document.GetAllocator());
-                alarmj.AddMember("low_humidity_watch", alarm.descriptor.lowHumidityWatch, document.GetAllocator());
-                alarmj.AddMember("low_humidity", alarm.descriptor.lowHumidity, document.GetAllocator());
-                alarmj.AddMember("high_humidity_watch", alarm.descriptor.highHumidityWatch, document.GetAllocator());
-                alarmj.AddMember("high_humidity", alarm.descriptor.highHumidity, document.GetAllocator());
-                alarmj.AddMember("low_vcc_watch", alarm.descriptor.lowVccWatch, document.GetAllocator());
-                alarmj.AddMember("low_signal_watch", alarm.descriptor.lowSignalWatch, document.GetAllocator());
-//                alarmj.AddMember("sensor_errors_watch", alarm.descriptor.sensorErrorsWatch, document.GetAllocator());
-                alarmj.AddMember("send_email_action", alarm.descriptor.sendEmailAction, document.GetAllocator());
-
-                {
-                    rapidjson::Value triggersPerSensorj;
-                    triggersPerSensorj.SetArray();
-                    for (auto const& pair: alarm.triggersPerSensor)
-                    {
-                        rapidjson::Value elementj;
-                        elementj.SetObject();
-                        elementj.AddMember("sensor", pair.first, document.GetAllocator());
-                        elementj.AddMember("triggers", pair.second, document.GetAllocator());
-                        triggersPerSensorj.PushBack(elementj, document.GetAllocator());
-                    }
-                    alarmj.AddMember("triggers_per_sensor", triggersPerSensorj, document.GetAllocator());
-                }
-
-                alarmsj.PushBack(alarmj, document.GetAllocator());
-            }
-            document.AddMember("alarms", alarmsj, document.GetAllocator());
-        }
-
-        {
-            rapidjson::Value reportsj;
-            reportsj.SetArray();
-            for (Report const& report: data.reports)
-            {
-                rapidjson::Value reportj;
-                reportj.SetObject();
-                reportj.AddMember("id", report.id, document.GetAllocator());
-                reportj.AddMember("last_triggered", static_cast<uint64_t>(Clock::to_time_t(report.lastTriggeredTimePoint)), document.GetAllocator());
-                reportj.AddMember("name", rapidjson::Value(report.descriptor.name.c_str(), document.GetAllocator()), document.GetAllocator());
-                reportj.AddMember("filter_sensors", report.descriptor.filterSensors, document.GetAllocator());
-                if (report.descriptor.filterSensors)
-                {
-                    rapidjson::Value sensorsj;
-                    sensorsj.SetArray();
-                    for (SensorId const& sensorId: report.descriptor.sensors)
-                    {
-                        sensorsj.PushBack(sensorId, document.GetAllocator());
-                    }
-                    reportj.AddMember("sensors", sensorsj, document.GetAllocator());
-                }
-                reportj.AddMember("period", static_cast<int32_t>(report.descriptor.period), document.GetAllocator());
-                reportj.AddMember("custom_period", static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(report.descriptor.customPeriod).count()), document.GetAllocator());
-                reportj.AddMember("data", static_cast<int32_t>(report.descriptor.data), document.GetAllocator());
-                reportsj.PushBack(reportj, document.GetAllocator());
-            }
-            document.AddMember("reports", reportsj, document.GetAllocator());
-        }
-
-        rapidjson::StringBuffer buffer;
-        rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
-        document.Accept(writer);
-
-        Crypt crypt;
-        crypt.setCompressionLevel(-1); //default
-        crypt.setKey(k_fileEncryptionKey);
-#ifdef USE_DATA_ENCRYPTION
-        QByteArray dataToWrite = crypt.encryptToByteArray(QByteArray(buffer.GetString(), buffer.GetSize()));
-#else
-        QByteArray dataToWrite = QByteArray(buffer.GetString(), buffer.GetSize());
-#endif
-
 
         std::string tempFilename = (s_dataFolder + "/" + m_dataName + "_temp");
         {
@@ -2863,6 +2278,15 @@ void DB::save(Data const& data) const
             }
             else
             {
+                std::string str = jsonString.str();
+				Crypt crypt;
+				crypt.setCompressionLevel(-1); //default
+				crypt.setKey(k_fileEncryptionKey);
+#ifdef USE_DATA_ENCRYPTION
+				QByteArray dataToWrite = crypt.encryptToByteArray(QByteArray(str.data(), (int)str.size()));
+#else
+				QByteArray dataToWrite = QByteArray(str.data(), (int)str.size());
+#endif
                 file.write(dataToWrite.data(), dataToWrite.size());
             }
             file.flush();
@@ -2897,9 +2321,9 @@ void DB::save(Data const& data) const
         crypt.setCompressionLevel(1);
         crypt.setKey(k_fileEncryptionKey);
 #ifdef USE_DB_ENCRYPTION
-        QByteArray dataToWrite = crypt.encryptToByteArray(QByteArray(buffer.data(), buffer.size()));
+        QByteArray dataToWrite = crypt.encryptToByteArray(QByteArray(buffer.data(), (int)buffer.size()));
 #else
-        QByteArray dataToWrite = QByteArray(buffer.data(), buffer.size());
+        QByteArray dataToWrite = QByteArray(buffer.data(), (int)buffer.size());
 #endif
 
         std::string tempFilename = (s_dataFolder + "/" + m_dbName + "_temp");

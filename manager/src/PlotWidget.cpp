@@ -73,6 +73,8 @@ void PlotWidget::init(DB& db)
     m_uiConnections.push_back(connect(m_ui.showHumidity, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
 
     m_uiConnections.push_back(connect(m_db, &DB::measurementsAdded, this, &PlotWidget::scheduleSlowRefresh, Qt::QueuedConnection));
+	m_uiConnections.push_back(connect(m_db, &DB::sensorAdded, this, &PlotWidget::sensorAdded, Qt::QueuedConnection));
+	m_uiConnections.push_back(connect(m_db, &DB::sensorRemoved, this, &PlotWidget::sensorRemoved, Qt::QueuedConnection));
 
     loadSettings();
 
@@ -227,6 +229,20 @@ DB::Filter PlotWidget::createFilter() const
     filter.timePointFilter.max = DB::Clock::from_time_t(m_ui.dateTimeFilter->getToDateTime().toTime_t());
 
     return filter;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::sensorAdded(DB::SensorId id)
+{
+	m_selectedSensorIds.insert(id);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::sensorRemoved(DB::SensorId id)
+{
+	m_selectedSensorIds.erase(id);
 }
 
 //////////////////////////////////////////////////////////////////////////

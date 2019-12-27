@@ -212,7 +212,7 @@ void BaseStationsWidget::baseStationConnected(Comms::BaseStationDescriptor const
     if (_bsIndex >= 0)
     {
         size_t bsIndex = static_cast<size_t>(_bsIndex);
-        DB::BaseStation const& bs = db.getBaseStation(bsIndex);
+        //DB::BaseStation const& bs = db.getBaseStation(bsIndex);
         setStatus(bsIndex, "Added / Connected");
         setAddress(bsIndex, commsBS.address);
         return;

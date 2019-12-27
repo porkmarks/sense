@@ -57,25 +57,6 @@ void MeasurementsWidget::init(DB& db)
 
     m_ui.list->setUniformRowHeights(true);
 
-    connect(m_ui.list->header(), &QHeaderView::sectionResized, [this]()
-    {
-        if (!m_sectionSaveScheduled)
-        {
-            m_sectionSaveScheduled = true;
-            QTimer::singleShot(500, [this]()
-            {
-                m_sectionSaveScheduled = false;
-                QSettings settings;
-                settings.setValue("measurements/list/state", m_ui.list->header()->saveState());
-            });
-        }
-    });
-
-    {
-        QSettings settings;
-        m_ui.list->header()->restoreState(settings.value("measurements/list/state").toByteArray());
-    }
-
 //    DB::SensorDescriptor sd;
 //    sd.name = "test1";
 //    m_db->addSensor(sd);
@@ -128,6 +109,8 @@ void MeasurementsWidget::init(DB& db)
     m_uiConnections.push_back(connect(m_ui.showSignal, &QCheckBox::stateChanged, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
 
     m_uiConnections.push_back(connect(m_db, &DB::measurementsAdded, this, &MeasurementsWidget::scheduleSlowRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_db, &DB::sensorAdded, this, &MeasurementsWidget::sensorAdded, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_db, &DB::sensorRemoved, this, &MeasurementsWidget::sensorRemoved, Qt::QueuedConnection));
 
     loadSettings();
 }
@@ -212,15 +195,21 @@ void MeasurementsWidget::loadSettings()
                 m_selectedSensorIds.insert(id);
             }
         }
+		//validate the selected sensor ids
+		for (auto it = m_selectedSensorIds.begin(); it != m_selectedSensorIds.end(); )
+		{
+			if (m_db->findSensorIndexById(*it) < 0)
+			{
+				it = m_selectedSensorIds.erase(it);
+			}
+			else
+			{
+				++it;
+			}
+		}
     }
-    if (m_db && m_selectedSensorIds.empty()) //if no sensors were selected, select all
-    {
-        for (size_t i = 0; i < m_db->getSensorCount(); i++)
-        {
-            DB::Sensor const& sensor = m_db->getSensor(i);
-            m_selectedSensorIds.insert(sensor.id);
-        }
-    }
+
+	m_ui.list->header()->restoreState(settings.value("measurements/list/state").toByteArray());
 
     m_ui.minTemperature->setEnabled(m_ui.useTemperature->isChecked());
     m_ui.maxTemperature->setEnabled(m_ui.useTemperature->isChecked());
@@ -267,6 +256,7 @@ void MeasurementsWidget::saveSettings()
         ssid.append(id);
     }
     settings.setValue("filter/selectedSensors", ssid);
+	settings.setValue("measurements/list/state", m_ui.list->header()->saveState());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -295,6 +285,20 @@ DB::Filter MeasurementsWidget::createFilter() const
     filter.humidityFilter.max = static_cast<float>(m_ui.maxHumidity->value());
 
     return filter;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsWidget::sensorAdded(DB::SensorId id)
+{
+    m_selectedSensorIds.insert(id);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsWidget::sensorRemoved(DB::SensorId id)
+{
+    m_selectedSensorIds.erase(id);
 }
 
 //////////////////////////////////////////////////////////////////////////

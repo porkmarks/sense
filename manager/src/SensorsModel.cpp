@@ -60,9 +60,9 @@ std::pair<std::string, int32_t> computeRelativeTimePointString(DB::Clock::time_p
 
 uint32_t getSensorStorageCapacity(DB::Sensor const& sensor)
 {
-    if (sensor.sensorType == 1)
+    if (sensor.deviceInfo.sensorType == 1)
     {
-        if (sensor.hardwareVersion == 2)
+        if (sensor.deviceInfo.hardwareVersion == 2)
         {
             return 1000;
         }
@@ -112,7 +112,7 @@ void SensorsModel::refreshDetails()
 {
     for (size_t i = 0; i < m_db.getSensorCount(); i++)
     {
-        emit dataChanged(index(i, 0), index(i, columnCount() - 1));
+        emit dataChanged(index((int)i, 0), index((int)i, columnCount() - 1));
     }
 }
 
@@ -156,7 +156,7 @@ void SensorsModel::sensorAdded(DB::SensorId id)
 
     //DB::Sensor const& sensor = m_db.getSensor(sensorIndex);
 
-    emit beginInsertRows(QModelIndex(), m_sensors.size(), m_sensors.size());
+    emit beginInsertRows(QModelIndex(), (int)m_sensors.size(), (int)m_sensors.size());
     SensorData sd;
     sd.sensorId = id;
     m_sensors.push_back(sd);
@@ -335,7 +335,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
             return sensorData.isChecked ? Qt::Checked : Qt::Unchecked;
         }
     }
-    else if (role == Qt::BackgroundColorRole)
+    else if (role == Qt::BackgroundRole)
     {
         if (column == Column::NextComms)
         {

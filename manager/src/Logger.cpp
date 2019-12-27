@@ -8,13 +8,7 @@
 #include <QDateTime>
 #include <QTimer>
 
-#include "rapidjson/document.h"
-#include "rapidjson/prettywriter.h"
-#include "rapidjson/writer.h"
-#include "rapidjson/reader.h"
-#include "rapidjson/stringbuffer.h"
-#include "rapidjson/ostreamwrapper.h"
-#include "rapidjson/istreamwrapper.h"
+#include "cereal/archives/json.hpp"
 
 #include "CRC.h"
 #include "Utils.h"
@@ -272,7 +266,7 @@ bool Logger::loadV2(Data& data, std::string const& filename, std::ifstream& file
 
     Crypt crypt;
     crypt.setKey(k_fileEncryptionKey);
-    QByteArray decryptedData = crypt.decryptToByteArray(QByteArray(streamData.data(), streamData.size()));
+    QByteArray decryptedData = crypt.decryptToByteArray(QByteArray(streamData.data(), (int)streamData.size()));
 
     std::stringstream stream(std::string(decryptedData.data(), decryptedData.size()));
 
@@ -725,7 +719,7 @@ void Logger::save(Data const& data) const
         Crypt crypt;
         crypt.setKey(k_fileEncryptionKey);
         crypt.setCompressionLevel(1);
-        QByteArray encryptedData = crypt.encryptToByteArray(QByteArray(buffer.data(), buffer.size()));
+        QByteArray encryptedData = crypt.encryptToByteArray(QByteArray(buffer.data(), (int)buffer.size()));
 //        QByteArray encryptedData = QByteArray(buffer.data(), buffer.size());
 
         std::string tempFilename = (m_dataFolder + "/" + m_dataName + "_temp");

@@ -14,6 +14,7 @@
 
 #include "DB.h"
 #include "Emailer.h"
+#include "cereal/cereal.hpp"
 
 class Settings : public QObject
 {
@@ -49,6 +50,18 @@ public:
         std::string folder;
         bool uploadBackups = false;
         Clock::duration uploadBackupsPeriod = std::chrono::hours(24);
+
+		template<class Archive> void save(Archive& archive, std::uint32_t const version) const
+		{
+            int64_t seconds = std::chrono::duration_cast<std::chrono::seconds>(uploadBackupsPeriod).count();
+			archive(CEREAL_NVP(host), CEREAL_NVP(port), CEREAL_NVP(username), CEREAL_NVP(password), CEREAL_NVP(folder), CEREAL_NVP(uploadBackups), cereal::make_nvp("uploadBackupsPeriod", seconds));
+		}
+		template<class Archive> void load(Archive& archive, std::uint32_t const version)
+		{
+            int64_t seconds;
+			archive(CEREAL_NVP(host), CEREAL_NVP(port), CEREAL_NVP(username), CEREAL_NVP(password), CEREAL_NVP(folder), CEREAL_NVP(uploadBackups), cereal::make_nvp("uploadBackupsPeriod", seconds));
+            uploadBackupsPeriod = std::chrono::seconds(std::max<int64_t>(seconds, 0));
+		}
     };
 
     bool setFtpSettings(FtpSettings const& settings);
@@ -66,13 +79,23 @@ public:
             Normal
         };
         Type type = Type::Normal;
+
+		template<class Archive> void serialize(Archive& archive, std::uint32_t const version)
+		{
+			archive(CEREAL_NVP(name), CEREAL_NVP(passwordHash), CEREAL_NVP(type));
+		}
     };
 
     typedef uint32_t UserId;
     struct User
     {
         UserDescriptor descriptor;
-        UserId id;
+        UserId id = 0;
+
+		template<class Archive> void serialize(Archive& archive, std::uint32_t const version)
+		{
+			archive(CEREAL_NVP(descriptor), CEREAL_NVP(id));
+		}
     };
 
     size_t getUserCount() const;
@@ -106,6 +129,7 @@ signals:
     void userLoggedIn(UserId id);
 
 private:
+    friend class cereal::access;
 
     std::unique_ptr<DB> m_db;
     std::unique_ptr<Emailer> m_emailer;
@@ -116,6 +140,11 @@ private:
         FtpSettings ftpSettings;
         std::vector<User> users;
         UserId lastUserId = 0;
+
+		template<class Archive> void serialize(Archive& archive, std::uint32_t const version)
+		{
+			archive(CEREAL_NVP(emailSettings), CEREAL_NVP(ftpSettings), CEREAL_NVP(users));
+		}
     };
 
     Data m_mainData;
