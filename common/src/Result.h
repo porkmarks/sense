@@ -3,13 +3,12 @@
 #include <string>
 #include <cassert>
 
-namespace detail
+struct success_t
 {
-    struct success_helper{};
-}
+	constexpr success_t() {}; //Don't use default here!!! There is a rule in the standard that will make the 'static const success_t success;' line fail compilation if you use '= default' for this constructor. On iOS/Android ofc.
+};
 
-typedef int detail::success_helper::*success_t;
-constexpr success_t success = (static_cast<success_t>(0));
+static constexpr success_t success;
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -219,20 +218,20 @@ public:
     }
 
     inline Result(const Error& error)
-    : m_is_success(false)
+        : m_is_success(false)
     {
         new (&m_data) Error(error);
     }
 
     inline Result(const success_t& /*success*/)
-    : m_is_success(true)
+        : m_is_success(true)
     {
     }
 
     inline Result(const Result& other) = delete;
 
-    inline Result(Result&& other)
-    : m_is_success(other.m_is_success)
+    inline Result(Result&& other) noexcept
+        : m_is_success(other.m_is_success)
     {
 #ifndef NDEBUG
         m_check_pending = other.m_check_pending;
@@ -244,9 +243,9 @@ public:
         }
     }
 
-    inline Result& operator = (const Result& other) = delete;
+    inline Result& operator=(const Result& other) = delete;
 
-    inline Result& operator = (Result&& other)
+    inline Result& operator=(Result&& other) noexcept
     {
 #ifndef NDEBUG
         m_check_pending = other.m_check_pending;

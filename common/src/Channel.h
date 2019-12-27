@@ -11,7 +11,7 @@ namespace comms
 {
 namespace detail
 {
-inline uint32_t crc32(const void* data, uint8_t size)
+inline uint32_t crc32(const void* data, size_t size)
 {
     constexpr uint32_t Polynomial = 0xEDB88320;
     uint32_t crc = ~uint32_t(~0L);
@@ -118,7 +118,7 @@ private:
     struct Decoded
     {
         Magic_t magic = 0;
-        Message_t message;
+        Message_t message = Message_t();
         Message_Size_t data_size = 0;
         Header_Crc_t header_crc = 0;
         Data_Crc_t data_crc = 0;
