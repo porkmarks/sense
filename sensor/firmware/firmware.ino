@@ -60,7 +60,7 @@ static State s_state = State::PAIR;
 
 #define SENSOR_TYPE       1
 #define HARDWARE_VERSION  2
-#define SOFTWARE_VERSION  2
+#define SOFTWARE_VERSION  3
 
 static uint8_t s_reboot_flags = 0;
 static uint8_t s_comms_errors = 0;
@@ -84,6 +84,9 @@ static Storage s_storage;
 static bool s_sensor_sleeping = false;
 static Settings s_settings;
 static Stable_Settings s_stable_settings;
+
+constexpr float k_radio_min_battery_vcc = 2.0f; //radio works down to 1.8V
+constexpr float k_sensor_min_battery_vcc = 2.3f; //sensor works down to 2.1V
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -140,11 +143,37 @@ static uint16_t stack_size(void)
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-static void setup()
+void init_gpio()
+{
+    //set ping to input pull high to make sure they don't float in sleep mode
+
+    //PB
+    pinModeFast(8, INPUT); digitalWriteFast(8, HIGH);  //PB0
+    pinModeFast(9, INPUT); digitalWriteFast(9, HIGH);  //PB1
+    pinModeFast(10, INPUT); digitalWriteFast(10, HIGH);  //PB2
+    pinModeFast(11, INPUT); digitalWriteFast(11, HIGH);  //PB3
+    pinModeFast(12, INPUT); digitalWriteFast(12, HIGH);  //PB4
+    pinModeFast(13, INPUT); digitalWriteFast(13, HIGH);  //PB5
+
+    //PC
+    pinModeFast(14, INPUT); digitalWriteFast(14, HIGH);  //PC0
+    pinModeFast(15, INPUT); digitalWriteFast(15, HIGH);  //PC1
+    pinModeFast(17, INPUT); digitalWriteFast(17, HIGH);  //PC3
+
+    //PD
+    pinModeFast(7, INPUT); digitalWriteFast(7, HIGH);  //PD7
+
+    //PE
+    pinModeFast(25, INPUT); digitalWriteFast(25, HIGH);  //PE2 / ADC6
+    pinModeFast(26, INPUT); digitalWriteFast(26, HIGH);  //PE3 / ADC7
+}
+
+void setup()
 {
     int mcusr_value = MCUSR;
     MCUSR = 0;
 
+    init_gpio();
     uart_init();
 
     fdev_setup_stream(&s_uart_output, uart_putchar, NULL, _FDEV_SETUP_WRITE);
@@ -307,8 +336,8 @@ static void setup()
         s_sht.GetTemperature(t);
         float vcc = read_battery(s_stable_settings.vref);
         s_last_batery_vcc_during_comms = vcc;
-        LOG(PSTR("VCC: %dmV\n"), (int)(vcc*1000.f));
-        LOG(PSTR("T: %dm'C\n"), (int)(t*1000.f));
+        LOG(PSTR("VCC: %ldmV\n"), (int32_t)(vcc*1000.f));
+        LOG(PSTR("T: %ldm'C\n"), (int32_t)(t*1000.f));
         LOG(PSTR("H: %d%%\n"), (int)h);
         if (t != 0.f && h > 0.1f && vcc > 1.5f)
         {
@@ -368,7 +397,8 @@ static void setup()
         blink_led(Blink_Led::Red, 4, chrono::millis(200));
         sleep(true);
     }
-    s_radio.sleep_mode();
+    s_radio.set_auto_sleep(true);
+    s_radio.sleep();
 
 /* 
     //comms testing
@@ -478,7 +508,7 @@ static void setup()
 
     ///////////////////////////////////////////////
     //battery guard
-    battery_guard_auto(s_stable_settings.vref);
+    battery_guard_auto(s_stable_settings.vref, k_radio_min_battery_vcc);
 
     LOG(PSTR("Type: %d\n"), SENSOR_TYPE);
     LOG(PSTR("HW Ver: %d\n"), HARDWARE_VERSION);
@@ -527,7 +557,6 @@ static bool apply_config(const data::sensor::Config_Response& config)
     s_sensor_sleeping = config.sleeping;
 
     s_radio.set_transmission_power(config.power);
-    s_radio.sleep_mode();
 
     LOG(PSTR("T bias: %d\n"), (int)(s_stable_settings.calibration.temperature_bias));
     LOG(PSTR("H bias: %d\n"), (int)(s_stable_settings.calibration.humidity_bias));
@@ -563,6 +592,7 @@ static void fill_config_request(data::sensor::Config_Request& request)
     }
     else
     {
+        Battery_Monitor bm(s_stable_settings.vref, k_sensor_min_battery_vcc);
         float temperature = 0;
         float humidity = 0;
         if (s_sht.GetTemperature(temperature) && s_sht.GetHumidity(humidity))
@@ -579,7 +609,7 @@ static void fill_config_request(data::sensor::Config_Request& request)
 
 static bool request_config()
 {
-    Battery_Monitor bm(s_stable_settings.vref, s_last_batery_vcc_during_comms);
+    Battery_Monitor bm(s_stable_settings.vref, s_last_batery_vcc_during_comms, k_radio_min_battery_vcc);
   
     bool send_successful = false;
     {
@@ -599,7 +629,6 @@ static bool request_config()
         uint8_t size = sizeof(data::sensor::Config_Response);
         uint8_t raw_buffer[packet_raw_size(size)];
         uint8_t* buffer = s_radio.receive_packet(raw_buffer, size, chrono::millis(2000));
-        s_radio.sleep_mode();
         if (buffer)
         {
             data::sensor::Type type = static_cast<data::sensor::Type>(s_radio.get_rx_packet_type(buffer));
@@ -616,7 +645,6 @@ static bool request_config()
         s_comms_errors++;
     }
 
-    s_radio.sleep_mode();
     return false;
 }
 
@@ -630,8 +658,6 @@ static void pair_state()
     s_radio.set_address(addr);
     s_radio.set_destination_address(Radio::BASE_ADDRESS);
     s_radio.set_frequency(869.f);
-
-    s_radio.sleep_mode();
 
     wait_for_release(Button::BUTTON1);
     bool done = false;
@@ -649,7 +675,7 @@ static void pair_state()
                 //wait for the user to release the button
                 wait_for_release(Button::BUTTON1);
 
-                Battery_Monitor bm(s_stable_settings.vref, s_last_batery_vcc_during_comms);
+                Battery_Monitor bm(s_stable_settings.vref, s_last_batery_vcc_during_comms, k_radio_min_battery_vcc);
                 
                 LOG(PSTR("Send req..."));
 
@@ -674,7 +700,6 @@ static void pair_state()
                     uint8_t size = sizeof(data::sensor::Pair_Response);
                     uint8_t raw_buffer[packet_raw_size(size)];
                     uint8_t* buffer = s_radio.receive_packet(raw_buffer, size, chrono::millis(2000));
-                    s_radio.sleep_mode();
 
                     if (buffer && size == sizeof(data::sensor::Pair_Response) && 
                           s_radio.get_rx_packet_type(buffer) == static_cast<uint8_t>(data::sensor::Type::PAIR_RESPONSE))
@@ -701,13 +726,10 @@ static void pair_state()
                 }
                 else
                 {
-                    s_radio.sleep_mode();
                     LOG(PSTR("failed\n"));
                 }
                 blink_led(Blink_Led::Red, 3, chrono::millis(500));
             }
-
-            s_radio.sleep_mode();
 
             blink_led(Blink_Led::Yellow, 3, chrono::millis(100));
             chrono::delay(chrono::millis(1000));
@@ -733,12 +755,11 @@ static void pair_state()
             //we probably woken up because the user pressed the button - wait for him to release it
             wait_for_release(Button::BUTTON1);
 
-            battery_guard_auto(s_stable_settings.vref);
+            battery_guard_auto(s_stable_settings.vref, k_radio_min_battery_vcc);
         }
     }
 
     s_radio.set_frequency(868.f);
-    s_radio.sleep_mode();
 
     blink_led(Blink_Led::Green, 3, chrono::millis(500));
 
@@ -768,6 +789,7 @@ static void do_measurement()
     do
     {
         LOG(PSTR("Meas %d..."), tries);
+        Battery_Monitor bm(s_stable_settings.vref, k_sensor_min_battery_vcc);
         if (s_sht.GetTemperature(data.temperature) && s_sht.GetHumidity(data.humidity))
         {
             data.temperature += static_cast<float>(s_stable_settings.calibration.temperature_bias) * 0.01f;
@@ -788,7 +810,7 @@ static void do_measurement()
     }
 
     //push back and make room if it fails
-    LOG(PSTR("store %dm'C, %d%%..."), (int)(data.temperature*1000.f), (int)data.humidity);
+    LOG(PSTR("store %ldm'C, %d%%..."), (int32_t)(data.temperature*1000.f), (int)data.humidity);
     while (s_storage.push_back(data) == false)
     {
         LOG(PSTR("*"));
@@ -822,27 +844,17 @@ static void do_comms()
         do
         {
             bool send = false;
-            if (s_storage.unpack_next(it) == false)
+            if (s_storage.unpack_next(it))
             {
-                done = true;
-                send = true;
+                data::sensor::Measurement& item = batch.measurements[batch.count++];
+                item.pack(it.data.humidity, it.data.temperature);
+                batch.qvcc = data::sensor::pack_qvcc(s_last_batery_vcc_during_comms);
+                
+                send = batch.count >= data::sensor::Measurement_Batch_Request::MAX_COUNT;
             }
             else
             {
-                data::sensor::Measurement& item = batch.measurements[batch.count++];
-                if (it.data.humidity < MIN_VALID_HUMIDITY)
-                {
-                    item.pack(0.f, 0.f);
-                }
-                else
-                {
-                    item.pack(it.data.humidity, it.data.temperature);
-                }
-                batch.qvcc = data::sensor::pack_qvcc(s_last_batery_vcc_during_comms);
-            }
-
-            if (batch.count >= data::sensor::Measurement_Batch_Request::MAX_COUNT)
-            {
+                done = true;
                 send = true;
             }
 
@@ -855,7 +867,7 @@ static void do_comms()
 
             if (send && batch.count > 0)
             {
-                Battery_Monitor bm(s_stable_settings.vref, s_last_batery_vcc_during_comms);
+                Battery_Monitor bm(s_stable_settings.vref, s_last_batery_vcc_during_comms, k_radio_min_battery_vcc);
                 
                 batch.last_batch = done ? 1 : 0;
                 LOG(PSTR("Send batch of %d..."), (int)batch.count);
@@ -868,7 +880,7 @@ static void do_comms()
                 {
                     s_comms_errors++;
                     LOG(PSTR("failed: comms\n"));
-                    if (allowed_failures-- == 0)
+                    if (allowed_failures-- <= 0)
                     {
                       break;
                     }
@@ -906,7 +918,7 @@ static bool apply_first_config(const data::sensor::First_Config_Response& first_
 
 static bool request_first_config()
 {
-    Battery_Monitor bm(s_stable_settings.vref, s_last_batery_vcc_during_comms);
+    Battery_Monitor bm(s_stable_settings.vref, s_last_batery_vcc_during_comms, k_radio_min_battery_vcc);
     
     bool send_successful = false;
     {
@@ -929,7 +941,6 @@ static bool request_first_config()
         uint8_t size = sizeof(data::sensor::First_Config_Response);
         uint8_t raw_buffer[packet_raw_size(size)];
         uint8_t* buffer = s_radio.receive_packet(raw_buffer, size, chrono::millis(2000));
-        s_radio.sleep_mode();
         if (buffer)
         {
             data::sensor::Type type = static_cast<data::sensor::Type>(s_radio.get_rx_packet_type(buffer));
@@ -941,7 +952,6 @@ static bool request_first_config()
             }
         }
     }
-    s_radio.sleep_mode();
     return false;
 }
 
@@ -1124,7 +1134,7 @@ static void sleep_loop_state()
 
         LOG(PSTR("Sleeping..."));
         sleep(true);
-        battery_guard_manual(s_stable_settings.vref);
+        battery_guard_manual(s_stable_settings.vref, k_radio_min_battery_vcc);
         chrono::calibrate();
         LOG(PSTR("done\n"));
     }

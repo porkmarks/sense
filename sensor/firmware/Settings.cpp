@@ -80,7 +80,7 @@ void reset_stable_settings()
 {
     if (eeprom_read_byte((const uint8_t*)eeprom_stable_settings::version) != 0)
     {
-        eeprom_write_byte((const uint8_t*)eeprom_stable_settings::version, 0);
+        eeprom_write_byte((uint8_t*)eeprom_stable_settings::version, 0);
     }
 }
 
@@ -88,7 +88,7 @@ void save_stable_settings(Stable_Settings const& settings)
 {
     LOG(PSTR("Save stable settings..."));
     uint32_t crc = 123456789ULL;
-    eeprom_write_byte((const uint8_t*)eeprom_stable_settings::version, STABLE_SETTINGS_VERSION);
+    eeprom_write_byte((uint8_t*)eeprom_stable_settings::version, STABLE_SETTINGS_VERSION);
     hash_combine(crc, STABLE_SETTINGS_VERSION);
 
     eeprom_write_dword((uint32_t*)eeprom_stable_settings::serial_number, settings.serial_number);
@@ -100,7 +100,7 @@ void save_stable_settings(Stable_Settings const& settings)
     eeprom_write_word((uint16_t*)eeprom_stable_settings::humidity_bias, *(uint16_t*)&settings.calibration.humidity_bias);
     hash_combine(crc, int32_t(settings.calibration.humidity_bias) + 65535ULL);
 
-    eeprom_write_byte((const uint8_t*)eeprom_stable_settings::vref, settings.vref);
+    eeprom_write_byte((uint8_t*)eeprom_stable_settings::vref, settings.vref);
     hash_combine(crc, int32_t(settings.vref));
 
     eeprom_write_dword((uint32_t*)eeprom_stable_settings::crc, crc);

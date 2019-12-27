@@ -77,6 +77,11 @@ ISR(INT0_vect)
 #define START_TIMER() do { TCCR2B = bit(CS22) | bit(CS21) | bit(CS20); } while (false)
 #define STOP_TIMER() do { TCCR2B = 0; } while (false)
 
+//stuff that is always disabled since I don't use
+constexpr uint8_t k_prr0Value = bit(PRUSART1);
+constexpr uint8_t k_prr1Value = bit(PRTWI1) | bit(PRPTC) | bit(PRTIM4) | bit(PRSPI1);
+
+
 void init_sleep()
 {
     //main clock, ~1Mhz
@@ -109,6 +114,12 @@ void init_sleep()
     EICRA &= ~(bit(ISC00) | bit(ISC01));
     EICRA |= bit(ISC01);
     EIMSK |= bit(INT0);
+
+    //disablePower(POWER_SPI);
+    //disablePower(POWER_SERIAL1);
+
+    PRR0 = k_prr0Value;
+    PRR1 = k_prr1Value;
 
     sei();
 }
@@ -170,9 +181,9 @@ void sleep(bool allow_button)
     }
     sei();
     
+    PRR0 = k_prr0Value;
+    PRR1 = k_prr1Value;
     ADCSRA = adcsra; //restore adc
-    PRR0 = 0;
-    PRR1 = 0;
 
     i2c_init();
     uart_init();

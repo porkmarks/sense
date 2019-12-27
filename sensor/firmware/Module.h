@@ -5,7 +5,7 @@
 #include "TypeDef.h"
 
 #ifdef RASPBERRY_PI
-#   include <spi.h>
+#   include "spi_rpi.h"
 #endif
 
 #define SPI_READ  0b00000000

@@ -9,8 +9,6 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
-constexpr float k_min_battery_vcc = 2.3f;
-
 void init_battery()
 {
     //1000000 /128 = 7.8KHz
@@ -23,13 +21,13 @@ void init_battery()
 
 void enable_battery_adc()
 {
-    // enable a2d conversions
-    sbi(ADCSRA, ADEN);
-
     // Read 1.1V reference against AVcc
     // set the reference to Vcc and the measurement to the internal 1.1V reference
     ADMUX = bit(REFS0) | bit(MUX3) | bit(MUX2) | bit(MUX1);
-  
+
+    // enable a2d conversions
+    sbi(ADCSRA, ADEN);
+
     chrono::delay(chrono::millis(20)); // Wait for Vref to settle
 }
 
@@ -52,7 +50,7 @@ float compute_vcc(uint16_t adc, float vref)
 
 float read_battery(uint8_t vref)
 {
-    return read_battery(vref / 100.f);
+    return read_battery(vref * 0.01f);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -87,29 +85,29 @@ float read_battery(float vref)
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
-void battery_guard_auto(float vref)
+void battery_guard_auto(float vref, float min_vcc)
 {
-    battery_guard_manual(read_battery(vref));
+    battery_guard_manual(read_battery(vref), min_vcc);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
-void battery_guard_auto(uint8_t vref)
+void battery_guard_auto(uint8_t vref, float min_vcc)
 {
-    battery_guard_manual(read_battery(vref));
+    battery_guard_manual(read_battery(vref), min_vcc);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
-void battery_guard_manual(float vcc)
+void battery_guard_manual(float vcc, float min_vcc)
 {
-    if (vcc > k_min_battery_vcc)
+    if (vcc > min_vcc)
     {
         return;
     }
     while (true)
     {
-        //LOG(PSTR("VCC failed\n"));
+        LOG(PSTR("VCC failed\n"));
         blink_led(Blink_Led::Red, 5, chrono::millis(200));
         sleep(true);
     }
@@ -124,37 +122,38 @@ ISR (TIMER3_COMPA_vect)
     while (bit_is_set(ADCSRA, ADSC)); // measuring
     uint8_t low  = ADCL; // must read ADCL first - it then locks ADCH
     uint8_t high = ADCH; // unlocks both
-    uint16_t adc = (high<<8) | low;
+    uint16_t adc = (uint16_t(high) << 8) | uint16_t(low);
+    ADCSRA |= bit(ADSC); // Start next conversion
     if (adc > s_battery_max_adc)
     {
         s_battery_max_adc = adc;
     }
-    //xxx++;
-    ADCSRA |= bit(ADSC); // Start next conversion
+//    xxx++;
 }
 
 void start_battery_monitor()
 {
-    enable_battery_adc();
-    ADCSRA |= bit(ADSC); // Start conversion
-    
+//    xxx = 0;
     s_battery_max_adc = 0;
+    enable_battery_adc();
     
     TCCR3A &= ~(bit(WGM31) | bit(WGM30));
     TCCR3B &= ~(bit(WGM33) | bit(WGM32));
     TCCR3B |= bit(WGM32); //CTC mode
 
-    OCR3A = 5; //so ~100Hz
+    OCR3A = 3; //so ~128Hz (1024/(2 * (OCR3A + 1))
     
     TIMSK3 |= bit(OCIE3A);
     TCCR3B |= bit(CS32) | bit(CS30); //1024 divider
+
+    ADCSRA |= bit(ADSC); // Start conversion
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
 float stop_battery_monitor(uint8_t vref)
 {
-    stop_battery_monitor(vref / 100.f);
+    return stop_battery_monitor(vref * 0.01f);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -177,25 +176,29 @@ float stop_battery_monitor(float vref)
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
-Battery_Monitor::Battery_Monitor(float vref)
+Battery_Monitor::Battery_Monitor(float vref, float min_vcc)
   : vref(vref)
+  , min_vcc(min_vcc)
 {
   start_battery_monitor();
 }
-Battery_Monitor::Battery_Monitor(uint8_t vref)
-  : vref(vref / 100.f)
+Battery_Monitor::Battery_Monitor(uint8_t vref, float min_vcc)
+  : vref(vref * 0.01f)
+  , min_vcc(min_vcc)
 {
   start_battery_monitor();
 }
-Battery_Monitor::Battery_Monitor(float vref, float& vcc)
+Battery_Monitor::Battery_Monitor(float vref, float& vcc, float min_vcc)
   : vref(vref)
   , vcc(&vcc)
+  , min_vcc(min_vcc)
 {
   start_battery_monitor();
 }
-Battery_Monitor::Battery_Monitor(uint8_t vref, float& vcc)
-  : vref(vref / 100.f)
+Battery_Monitor::Battery_Monitor(uint8_t vref, float& vcc, float min_vcc)
+  : vref(vref * 0.01f)
   , vcc(&vcc)
+  , min_vcc(min_vcc)
 {
   start_battery_monitor();
 }
@@ -205,7 +208,8 @@ Battery_Monitor::Battery_Monitor(uint8_t vref, float& vcc)
 Battery_Monitor::~Battery_Monitor()
 {
   float new_vcc = stop_battery_monitor(vref);
-  battery_guard_manual(new_vcc);
+//  printf_P(PSTR("monitor done, vcc =%ld, count=%d\n"), (int32_t)(new_vcc * 1000.f), xxx);
+  battery_guard_manual(new_vcc, min_vcc);
   if (vcc != nullptr)
   {
     float mu = (new_vcc < *vcc) ? 0.1f : 0.01f;

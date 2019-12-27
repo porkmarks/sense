@@ -18,6 +18,9 @@ void uart_shutdown()
 {
   uart_flush();
   UCSR0B &= ~(bit(RXEN0) | bit(TXEN0));
+
+  pinModeFast(0, INPUT); digitalWriteFast(0, HIGH);
+  pinModeFast(1, INPUT); digitalWriteFast(1, HIGH);
 }
 
 int uart_putchar(char c, FILE* stream)

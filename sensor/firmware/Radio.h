@@ -49,7 +49,8 @@ public:
     void set_address(Address address);
     void set_destination_address(Address address);
 
-    void sleep_mode();
+    void set_auto_sleep(bool enabled);
+    void sleep();
 
     void* get_tx_packet_payload(uint8_t* raw_buffer) const;
 
@@ -90,10 +91,10 @@ private:
     bool validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload_size);
 
     void send_ack(const Header& header);
+    void auto_sleep();
 
     uint8_t m_offset = 0;
+    bool m_auto_sleep = false;
 };
 
 uint8_t packet_raw_size(uint8_t payload_size);
-
-

@@ -178,138 +178,26 @@ public:
   // Before using SPI.transfer() or asserting chip select pins,
   // this function is used to gain exclusive access to the SPI bus
   // and configure the correct settings.
-  inline static void beginTransaction(SPI2Settings settings) {
-    if (interruptMode > 0) {
-      uint8_t sreg = SREG;
-      cli();
-
-      #ifdef SPI_AVR_EIMSK
-      if (interruptMode == 1) {
-        interruptSave = SPI_AVR_EIMSK;
-        SPI_AVR_EIMSK &= ~interruptMask;
-        SREG = sreg;
-      } else
-      #endif
-      {
-        interruptSave = sreg;
-      }
-    }
-
-    #ifdef SPI_TRANSACTION_MISMATCH_LED
-    if (inTransactionFlag) {
-      pinModeFast(SPI_TRANSACTION_MISMATCH_LED, OUTPUT);
-      digitalWriteFast(SPI_TRANSACTION_MISMATCH_LED, HIGH);
-    }
-    inTransactionFlag = 1;
-    #endif
-
-    SPCR0 = settings.spcr;
-    SPSR0 = settings.spsr;
-  }
+  static void beginTransaction(SPI2Settings settings);
 
   // Write to the SPI bus (MOSI pin) and also receive (MISO pin)
-  inline static uint8_t transfer(uint8_t data) {
-    SPDR0 = data;
-    /*
-     * The following NOP introduces a small delay that can prevent the wait
-     * loop form iterating when running at the maximum speed. This gives
-     * about 10% more speed, even if it seems counter-intuitive. At lower
-     * speeds it is unnoticed.
-     */
-    while (!(SPSR0 & _BV(SPIF))) ; // wait
-    return SPDR0;
-  }
-  inline static uint16_t transfer16(uint16_t data) {
-    union { uint16_t val; struct { uint8_t lsb; uint8_t msb; }; } in, out;
-    in.val = data;
-    if (!(SPCR0 & _BV(DORD))) {
-      SPDR0 = in.msb;
-      while (!(SPSR0 & _BV(SPIF))) ;
-      out.msb = SPDR0;
-      SPDR0 = in.lsb;
-      while (!(SPSR0 & _BV(SPIF))) ;
-      out.lsb = SPDR0;
-    } else {
-      SPDR0 = in.lsb;
-      while (!(SPSR0 & _BV(SPIF))) ;
-      out.lsb = SPDR0;
-      SPDR0 = in.msb;
-      while (!(SPSR0 & _BV(SPIF))) ;
-      out.msb = SPDR0;
-    }
-    return out.val;
-  }
-  inline static void read(void *buf, size_t count) {
-    if (count == 0) return;
-    uint8_t *p = (uint8_t *)buf;
-    SPDR0 = 0xFF;
-    while (--count > 0) {
-      while (!(SPSR0 & _BV(SPIF))) ;
-      *p++ = SPDR0;
-      SPDR0 = 0xFF;
-    }
-    while (!(SPSR0 & _BV(SPIF))) ;
-    *p = SPDR0;
-  }
-  inline static void write(void *buf, size_t count) {
-    if (count == 0) return;
-    uint8_t *p = (uint8_t *)buf;
-    SPDR0 = *p;
-    while (--count > 0) {
-      while (!(SPSR0 & _BV(SPIF))) ;
-      uint8_t in = SPDR0;
-      SPDR0 = *++p;
-    }
-    while (!(SPSR0 & _BV(SPIF))) ;
-    uint8_t in = SPDR0;
-  }  // After performing a group of transfers and releasing the chip select
-  // signal, this function allows others to access the SPI bus
-  inline static void endTransaction(void) {
-    #ifdef SPI_TRANSACTION_MISMATCH_LED
-    if (!inTransactionFlag) {
-      pinModeFast(SPI_TRANSACTION_MISMATCH_LED, OUTPUT);
-      digitalWriteFast(SPI_TRANSACTION_MISMATCH_LED, HIGH);
-    }
-    inTransactionFlag = 0;
-    #endif
-
-    if (interruptMode > 0) {
-      #ifdef SPI_AVR_EIMSK
-      uint8_t sreg = SREG;
-      #endif
-      cli();
-      #ifdef SPI_AVR_EIMSK
-      if (interruptMode == 1) {
-        SPI_AVR_EIMSK = interruptSave;
-        SREG = sreg;
-      } else
-      #endif
-      {
-        SREG = interruptSave;
-      }
-    }
-  }
-
+  static uint8_t transfer(uint8_t data);
+  static uint16_t transfer16(uint16_t data);
+  static void read(void *buf, size_t count);
+  static void write(void *buf, size_t count);
+  static void endTransaction(void);
   // Disable the SPI bus
   static void end();
 
   // This function is deprecated.  New applications should use
   // beginTransaction() to configure SPI settings.
-  inline static void setBitOrder(uint8_t bitOrder) {
-    if (bitOrder == LSBFIRST) SPCR0 |= _BV(DORD);
-    else SPCR0 &= ~(_BV(DORD));
-  }
+  static void setBitOrder(uint8_t bitOrder);
   // This function is deprecated.  New applications should use
   // beginTransaction() to configure SPI settings.
-  inline static void setDataMode(uint8_t dataMode) {
-    SPCR0 = (SPCR0 & ~SPI_MODE_MASK) | dataMode;
-  }
+  static void setDataMode(uint8_t dataMode);
   // This function is deprecated.  New applications should use
   // beginTransaction() to configure SPI settings.
-  inline static void setClockDivider(uint8_t clockDiv) {
-    SPCR0 = (SPCR0 & ~SPI_CLOCK_MASK) | (clockDiv & SPI_CLOCK_MASK);
-    SPSR0 = (SPSR0 & ~SPI_2XCLOCK_MASK) | ((clockDiv >> 2) & SPI_2XCLOCK_MASK);
-  }
+  static void setClockDivider(uint8_t clockDiv);
 
 private:
   static uint8_t initialized;

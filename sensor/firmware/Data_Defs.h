@@ -82,7 +82,7 @@ struct Calibration
 {
     int16_t temperature_bias = 0; //*100
     int16_t humidity_bias = 0; //*100
-    uint8_t reserved[16];
+    uint8_t reserved[16] = {};
 };
 static_assert(sizeof(Calibration) == 20, "");
 
