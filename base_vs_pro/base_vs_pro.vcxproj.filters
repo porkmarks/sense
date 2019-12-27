@@ -1,0 +1,107 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="..\base\src\command.c">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\src\LEDs.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\src\main.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\src\pigpio.c">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\src\Server.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\src\tests.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sensor\firmware\Chrono.cpp">
+      <Filter>firmware</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sensor\firmware\CRC.cpp">
+      <Filter>firmware</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sensor\firmware\Radio.cpp">
+      <Filter>firmware</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sensor\firmware\RFM95.cpp">
+      <Filter>firmware</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sensor\firmware\Storage.cpp">
+      <Filter>firmware</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sensor\firmware\Module.cpp">
+      <Filter>firmware</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sensor\firmware\spi_rpi.cpp">
+      <Filter>firmware</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\base\src\command.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\src\LEDs.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\src\Log.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\src\pigpio.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\src\Server.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sensor\firmware\Chrono.h">
+      <Filter>firmware</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sensor\firmware\CRC.h">
+      <Filter>firmware</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sensor\firmware\Radio.h">
+      <Filter>firmware</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sensor\firmware\RFM95.h">
+      <Filter>firmware</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sensor\firmware\Storage.h">
+      <Filter>firmware</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sensor\firmware\Log.h">
+      <Filter>firmware</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sensor\firmware\Data_Defs.h">
+      <Filter>firmware</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sensor\firmware\TypeDef.h">
+      <Filter>firmware</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sensor\firmware\Module.h">
+      <Filter>firmware</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sensor\firmware\Arduino_Compat.h">
+      <Filter>firmware</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sensor\firmware\spi_rpi.h">
+      <Filter>firmware</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="base">
+      <UniqueIdentifier>{009fa26a-5360-4e44-a138-e7b913cd5409}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="firmware">
+      <UniqueIdentifier>{5037d1b0-d13c-4ab8-8c67-dc07e6655ed6}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\base\src\Makefile">
+      <Filter>base</Filter>
+    </None>
+  </ItemGroup>
+</Project>
