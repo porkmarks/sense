@@ -1,3 +1,5 @@
+#if 0
+
 #include "Storage.h"
 #include <vector>
 #include <cstdio>
@@ -202,3 +204,5 @@ void run_tests()
 {
     test_storage();
 }
+
+#endif

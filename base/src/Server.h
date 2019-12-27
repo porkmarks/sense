@@ -8,8 +8,8 @@
 
 #include "ASIO_Socket_Adapter.h"
 #include "Channel.h"
-#include "Data_Defs.h"
-#include "Radio.h"
+#include "../../sensor/firmware/Data_Defs.h"
+#include "../../sensor/firmware/Radio.h"
 #include "Queue.h"
 #include "LEDs.h"
 
@@ -25,7 +25,7 @@ public:
 
     bool is_connected() const;
 
-    struct Sensor_Request
+    struct Sensor_Request                                                                              
     {
         uint8_t type = 0;
         int8_t signal_s2b = 0;

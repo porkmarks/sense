@@ -90,7 +90,7 @@ int main(int, const char**)
     Server server(radio, leds);
 
     size_t tries = 0;
-    while (!radio.init(10, 20))
+    while (!radio.init(10, 20))       
     {
         tries++;
         LOGE << "Comms init failed. Trying again: " << tries << std::endl;
