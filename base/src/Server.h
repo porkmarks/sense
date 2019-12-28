@@ -65,7 +65,7 @@ private:
     bool wait_for_message(data::Server_Message expected_message, Clock::duration timeout);
     void process_message(data::Server_Message message);
 
-    void process_change_state_req();
+    void process_change_state();
     void process_ping();
 
     std::string compute_sensor_details_response() const;

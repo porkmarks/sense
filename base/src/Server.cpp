@@ -420,7 +420,7 @@ void Server::radio_thread_func()
             if (m_new_radio_state != m_radio_state)
             {
                 LOGI << "Changing radio state to " << (int) m_new_radio_state << std::endl;
-                m_revert_radio_state_to_normal_tp = std::chrono::system_clock::now() + std::chrono::seconds(180);
+                m_revert_radio_state_to_normal_tp = std::chrono::system_clock::now() + std::chrono::seconds(30);
                 m_radio_state = m_new_radio_state;
 
                 if (m_radio_state == data::Radio_State::PAIRING)
@@ -440,6 +440,7 @@ void Server::radio_thread_func()
                 {
                     LOGI << "Reverting radio state to NORMAL" << std::endl;
                     m_new_radio_state = data::Radio_State::NORMAL;
+					m_channel.send(data::Server_Message::REVERTED_RADIO_STATE_TO_NORMAL, nullptr, 0);
                 }
             }
         }
@@ -563,7 +564,7 @@ void Server::process_ping()
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-void Server::process_change_state_req()
+void Server::process_change_state()
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
@@ -592,8 +593,8 @@ void Server::process_message(data::Server_Message message)
     case data::Server_Message::PING:
         process_ping();
         break;
-    case data::Server_Message::CHANGE_RADIO_STATE_REQ:
-        process_change_state_req();
+    case data::Server_Message::CHANGE_RADIO_STATE:
+        process_change_state();
         break;
     default:
         LOGE << "Invalid message received: " << int(message) << std::endl;
