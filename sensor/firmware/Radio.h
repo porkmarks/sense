@@ -68,6 +68,7 @@ public:
     void stop_async_receive();
 
     int8_t get_input_dBm();
+    int8_t get_last_input_dBm();
     Address get_rx_packet_source_address(uint8_t* received_buffer) const;
     uint8_t get_rx_packet_type(uint8_t* received_buffer) const;
     bool get_rx_packet_needs_response(uint8_t* received_buffer) const;
@@ -95,6 +96,7 @@ private:
 
     uint8_t m_offset = 0;
     bool m_auto_sleep = false;
+    int8_t m_last_rssi = 0;
 };
 
 uint8_t packet_raw_size(uint8_t payload_size);

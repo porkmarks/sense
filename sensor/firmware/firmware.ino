@@ -634,7 +634,7 @@ static bool request_config()
             data::sensor::Type type = static_cast<data::sensor::Type>(s_radio.get_rx_packet_type(buffer));
             if (type == data::sensor::Type::CONFIG_RESPONSE && size == sizeof(data::sensor::Config_Response))
             {
-                s_last_input_dBm = s_radio.get_input_dBm();
+                s_last_input_dBm = s_radio.get_last_input_dBm();
                 const data::sensor::Config_Response* ptr = reinterpret_cast<const data::sensor::Config_Response*>(s_radio.get_rx_packet_payload(buffer));
                 return apply_config(*ptr);
             }
@@ -704,7 +704,7 @@ static void pair_state()
                     if (buffer && size == sizeof(data::sensor::Pair_Response) && 
                           s_radio.get_rx_packet_type(buffer) == static_cast<uint8_t>(data::sensor::Type::PAIR_RESPONSE))
                     {
-                        s_last_input_dBm = s_radio.get_input_dBm();
+                        s_last_input_dBm = s_radio.get_last_input_dBm();
 
                         const data::sensor::Pair_Response* response_ptr = reinterpret_cast<const data::sensor::Pair_Response*>(s_radio.get_rx_packet_payload(buffer));
                         s_radio.set_address(response_ptr->address);
@@ -946,7 +946,7 @@ static bool request_first_config()
             data::sensor::Type type = static_cast<data::sensor::Type>(s_radio.get_rx_packet_type(buffer));
             if (type == data::sensor::Type::FIRST_CONFIG_RESPONSE && size == sizeof(data::sensor::First_Config_Response))
             {
-                s_last_input_dBm = s_radio.get_input_dBm();
+                s_last_input_dBm = s_radio.get_last_input_dBm();
                 const data::sensor::First_Config_Response* ptr = reinterpret_cast<const data::sensor::First_Config_Response*>(s_radio.get_rx_packet_payload(buffer));
                 return apply_first_config(*ptr);
             }
