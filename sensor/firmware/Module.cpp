@@ -5,7 +5,7 @@
 #ifdef __AVR__
 #   include "SPI2.h"
 #else
-#   include "spi.h"
+#   include "spi_rpi.h"
 #   include "pigpio.h"
 #   define min(a,b) ((a)<(b)?(a):(b))
 #   define max(a,b) ((a)>(b)?(a):(b))
