@@ -314,7 +314,7 @@ void Comms::changeToRadioState(InitializedBaseStation& cbs, data::Radio_State st
     std::array<uint8_t, 1024> buffer;
     size_t offset = 0;
     pack(buffer, state, offset);
-    cbs.channel.send(data::Server_Message::CHANGE_RADIO_STATE_REQ, buffer.data(), offset);
+    cbs.channel.send(data::Server_Message::CHANGE_RADIO_STATE, buffer.data(), offset);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -351,6 +351,25 @@ void Comms::processSensorReq(InitializedBaseStation& cbs)
     processSensorReq(cbs, request);
 
     std::cout << "Duration: " << std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - startTp).count() << std::endl;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Comms::processRevertedRadioStateToNormal(InitializedBaseStation& cbs)
+{
+	Clock::time_point startTp = Clock::now();
+
+    int32_t index = cbs.db.findUnboundSensorIndex();
+    if (index < 0)
+    {
+        s_logger.logWarning(QString("Unexpected state reversal (no unbound sensor)"));
+    }
+    else
+    {
+        cbs.db.removeSensor((size_t)index);
+    }
+
+	std::cout << "Duration: " << std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - startTp).count() << std::endl;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -656,6 +675,9 @@ void Comms::process()
             case data::Server_Message::SENSOR_REQ:
                 processSensorReq(*cbs);
                 break;
+			case data::Server_Message::REVERTED_RADIO_STATE_TO_NORMAL:
+				processRevertedRadioStateToNormal(*cbs);
+				break;
             default:
                 s_logger.logCritical(QString("Invalid message received: %1").arg(int(message)));
             }

@@ -109,6 +109,7 @@ private:
     void processSensorReq_ConfigRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Config_Request const& payload);
     void processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::First_Config_Request const& payload);
     void processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Pair_Request const& payload);
+    void processRevertedRadioStateToNormal(InitializedBaseStation& cbs);
 
     QUdpSocket m_broadcastSocket;
 

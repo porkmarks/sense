@@ -9,58 +9,9 @@
 #include <array>
 #include <cassert>
 #include <iostream>
+#include "Utils.h"
 
 static std::array<const char*, 10> s_headerNames = {"Id", "Sensor", "Index", "Timestamp", "Temperature", "Humidity", "Battery", "Signal", "Alarms"};
-
-float getBatteryLevel(float vcc)
-{
-    float level = std::max(std::min(vcc, DB::k_maxBatteryLevel) - DB::k_minBatteryLevel, 0.f) / (DB::k_maxBatteryLevel - DB::k_minBatteryLevel);
-    level = std::pow(level, 1.f / 6.f); //to revert the battery curve
-    return level;
-}
-
-QIcon getBatteryIcon(float vcc)
-{
-    static std::array<QIcon, 5> s_batteryIconNames =
-    {
-        QIcon(":/icons/ui/battery-0.png"),
-        QIcon(":/icons/ui/battery-25.png"),
-        QIcon(":/icons/ui/battery-50.png"),
-        QIcon(":/icons/ui/battery-75.png"),
-        QIcon(":/icons/ui/battery-100.png")
-    };
-
-    float level = getBatteryLevel(vcc);
-    size_t index = static_cast<size_t>(std::floor(level * (s_batteryIconNames.size() - 1) + 0.5f));
-    return s_batteryIconNames[index];
-}
-
-float getSignalLevel(int8_t dBm)
-{
-    if (dBm == 0)
-    {
-        return 0.f;
-    }
-    float level = std::max(std::min(static_cast<float>(dBm), DB::k_maxSignalLevel) - DB::k_minSignalLevel, 0.f) / (DB::k_maxSignalLevel - DB::k_minSignalLevel);
-    return level;
-}
-
-QIcon getSignalIcon(int8_t dBm)
-{
-    static std::array<QIcon, 6> s_signalIconNames =
-    {
-        QIcon(":/icons/ui/signal-0.png"),
-        QIcon(":/icons/ui/signal-20.png"),
-        QIcon(":/icons/ui/signal-40.png"),
-        QIcon(":/icons/ui/signal-60.png"),
-        QIcon(":/icons/ui/signal-80.png"),
-        QIcon(":/icons/ui/signal-100.png")
-    };
-
-    float level = getSignalLevel(dBm);
-    size_t index = static_cast<size_t>(std::floor(level * (s_signalIconNames.size() - 1) + 0.5f));
-    return s_signalIconNames[index];
-}
 
 //////////////////////////////////////////////////////////////////////////
 

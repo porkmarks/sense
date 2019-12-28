@@ -1,6 +1,6 @@
 <RCC>
 <qresource prefix="/">
-<file>icons/ui/mqtt.png</file>
+<file>icons/ui/admin.png</file>
 <file>icons/ui/manager.png</file>
 <file>icons/ui/unbound.png</file>
 <file>icons/ui/sleeping.png</file>
@@ -29,9 +29,10 @@
 <file>icons/ui/today.png</file>
 <file>icons/ui/question.png</file>
 <file>icons/ui/battery-0.png</file>
-<file>icons/ui/battery-25.png</file>
-<file>icons/ui/battery-50.png</file>
-<file>icons/ui/battery-75.png</file>
+<file>icons/ui/battery-20.png</file>
+<file>icons/ui/battery-40.png</file>
+<file>icons/ui/battery-60.png</file>
+<file>icons/ui/battery-80.png</file> 
 <file>icons/ui/battery-100.png</file>
 <file>icons/ui/add.png</file>
 <file>icons/ui/alarm.png</file>
@@ -39,12 +40,9 @@
 <file>icons/ui/back.png</file>
 <file>icons/ui/connected.png</file>
 <file>icons/ui/disconnected.png</file>
-<file>icons/ui/fft.png</file>
 <file>icons/ui/filter.png</file>
 <file>icons/ui/graph.png</file>
 <file>icons/ui/ip.png</file>
-<file>icons/ui/minus.png</file>
-<file>icons/ui/plus.png</file>
 <file>icons/ui/port.png</file>
 <file>icons/ui/reconnect.png</file>
 <file>icons/ui/reload.png</file>
@@ -53,7 +51,5 @@
 <file>icons/ui/sensor.png</file>
 <file>icons/ui/setup.png</file>
 <file>icons/ui/station.png</file>
-<file>icons/ui/view.png</file>
-<file>icons/ui/wifi.png</file>
 </qresource>
 </RCC>

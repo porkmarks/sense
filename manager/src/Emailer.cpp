@@ -4,11 +4,9 @@
 #include "Smtp/SmtpMime"
 #include "Settings.h"
 #include "Logger.h"
+#include "Utils.h"
 
 extern Logger s_logger;
-
-extern float getBatteryLevel(float vcc);
-extern float getSignalLevel(int8_t dBm);
 
 //////////////////////////////////////////////////////////////////////////
 

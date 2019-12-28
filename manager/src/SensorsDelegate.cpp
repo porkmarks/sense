@@ -9,11 +9,6 @@
 
 #include <cassert>
 
-extern float getBatteryLevel(float vcc);
-extern QIcon getBatteryIcon(float vcc);
-extern float getSignalLevel(int8_t dBm);
-extern QIcon getSignalIcon(int8_t dBm);
-
 constexpr QSize k_iconMargin(4, 2);
 
 //////////////////////////////////////////////////////////////////////////
@@ -52,9 +47,9 @@ void SensorsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
 
         if (alarmTriggers == -1)
         {
-            static QIcon icon(":/icons/ui/question.png");
-            painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
-            pos.setX(pos.x() + iconSize + k_iconMargin.width());
+//             static QIcon icon(":/icons/ui/question.png");
+//             painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
+//             pos.setX(pos.x() + iconSize + k_iconMargin.width());
         }
         else
         {

@@ -9,13 +9,9 @@
 
 #include <algorithm>
 #include <cassert>
+#include "Utils.h"
 
 static std::array<const char*, 9> s_headerNames = {"Name", "Serial Number", "Temperature", "Humidity", "Battery", "Signal", "Comms", "Stored", "Alarms"};
-
-extern float getBatteryLevel(float vcc);
-extern QIcon getBatteryIcon(float vcc);
-extern float getSignalLevel(int8_t dBm);
-extern QIcon getSignalIcon(int8_t dBm);
 
 std::pair<std::string, int32_t> computeDurationString(DB::Clock::duration d)
 {
@@ -389,7 +385,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
             if (sensor.lastCommsTimePoint.time_since_epoch().count() == 0)
             {
                 return QIcon(":/icons/ui/question.png");
-            }
+            } 
         }
         else if (column == Column::Stored)
         {

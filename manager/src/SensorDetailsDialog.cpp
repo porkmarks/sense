@@ -2,11 +2,8 @@
 #include <QMessageBox>
 #include <QDateTime>
 #include <QSettings>
+#include "Utils.h"
 
-extern float getBatteryLevel(float vcc);
-extern QIcon getBatteryIcon(float vcc);
-extern float getSignalLevel(int8_t dBm);
-extern QIcon getSignalIcon(int8_t dBm);
 extern std::pair<std::string, int32_t> computeRelativeTimePointString(DB::Clock::time_point tp);
 extern uint32_t getSensorStorageCapacity(DB::Sensor const& sensor);
 

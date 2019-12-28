@@ -31,9 +31,6 @@ extern Logger s_logger;
 
 extern std::string s_dataFolder;
 
-constexpr float k_alertPercentageVcc = 10.f; //%
-constexpr int8_t k_alertPercentageSignal = 10.f; //%
-
 constexpr uint64_t k_fileEncryptionKey = 4353123543565ULL;
 
 template <typename Stream, typename T>
@@ -54,12 +51,6 @@ const DB::Clock::duration COMMS_DURATION = std::chrono::seconds(10);
 
 extern std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac);
 
-
-constexpr float DB::k_maxBatteryLevel;
-constexpr float DB::k_minBatteryLevel;
-
-constexpr float DB::k_maxSignalLevel;
-constexpr float DB::k_minSignalLevel;
 
 #define NVP(x) cereal::make_nvp(#x, v.x)
 template<class Archive> void save(Archive& archive, const DB::BaseStationDescriptor& v, std::uint32_t const version)
@@ -471,6 +462,16 @@ Result<void> DB::load()
     {
         std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
         m_mainData = data;
+
+		{
+            //remove any unbound sensor
+			int32_t index = findUnboundSensorIndex();
+			if (index >= 0)
+			{
+				removeSensor((size_t)index);
+			}
+		}
+
         //refresh signal strengths
         for (Sensor& sensor: m_mainData.sensors)
         {
@@ -1168,6 +1169,10 @@ bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
         if (d.hasSignalStrength)
         {
             sensor.lastSignalStrengthB2S = d.signalStrengthB2S;
+
+            //we do this here just in case the sensor doesn't have any measurements. In that case the average signal strength will be calculated from the lastSignalStrengthB2S
+			sensor.averageSignalStrength = computeAverageSignalStrength(sensor.id, m_mainData);
+			sensor.averageCombinedSignalStrength = std::min(sensor.averageSignalStrength.b2s, sensor.averageSignalStrength.s2b);
         }
 
         if (d.hasErrorCountersDelta)
@@ -1496,7 +1501,7 @@ uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
         triggers |= AlarmTrigger::Humidity;
     }
 
-    float alertLevelVcc = (k_alertPercentageVcc / 100.f) * (k_maxBatteryLevel - k_minBatteryLevel) + k_minBatteryLevel;
+    float alertLevelVcc = k_alertBatteryLevel * (k_maxBatteryLevel - k_minBatteryLevel) + k_minBatteryLevel;
     if (ad.lowVccWatch && m.descriptor.vcc <= alertLevelVcc)
     {
         triggers |= AlarmTrigger::LowVcc;
@@ -1506,7 +1511,7 @@ uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
 //            triggers |= AlarmTrigger::SensorErrors;
 //        }
 
-    float alertLevelSignal = (k_alertPercentageSignal / 100.f) * (k_maxSignalLevel - k_minSignalLevel) + k_minSignalLevel;
+    float alertLevelSignal = k_alertSignalLevel * (k_maxSignalLevel - k_minSignalLevel) + k_minSignalLevel;
     if (ad.lowSignalWatch && m.combinedSignalStrength <= alertLevelSignal)
     {
         triggers |= AlarmTrigger::LowSignal;
@@ -2152,7 +2157,12 @@ DB::SignalStrength DB::computeAverageSignalStrength(SensorId sensorId, Data cons
     auto sit = data.measurements.find(sensorId);
     if (sit == data.measurements.end())
     {
-        assert(false);
+        int32_t sensorIndex = findSensorIndexById(sensorId);
+        if (sensorIndex >= 0)
+        {
+            Sensor const& sensor = getSensor((size_t)sensorIndex);
+            return { sensor.lastSignalStrengthB2S, sensor.lastSignalStrengthB2S };
+        }
         return {};
     }
 

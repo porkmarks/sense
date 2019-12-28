@@ -144,7 +144,8 @@ void SettingsWidget::setRW()
 {
     m_ui.emailPage->setEnabled(m_settings->isLoggedInAsAdmin());
     m_ui.ftpPage->setEnabled(m_settings->isLoggedInAsAdmin());
-    m_ui.sensorsPage->setEnabled(m_settings->isLoggedInAsAdmin());
+	m_ui.sensorsPower->setEnabled(m_settings->isLoggedInAsAdmin());
+	m_ui.batteryCapacity->setEnabled(m_settings->isLoggedInAsAdmin());
 }
 
 //////////////////////////////////////////////////////////////////////////

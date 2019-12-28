@@ -903,13 +903,19 @@ void PlotWidget::saveToPng(const QString& fileName, bool showLegend, bool showAn
         annotation->setVisible(showAnnotations);
     }
 
-    m_plot->legend->setVisible(showLegend);
-    m_plot->plotLayout()->take(m_legendLayout);
+    if (!showLegend)
+	{
+        m_plot->legend->setVisible(false);
+		m_plot->plotLayout()->take(m_legendLayout);
+	}
 
     m_plot->savePng(fileName);
 
-    m_plot->plotLayout()->addElement(0, 1, m_legendLayout);
-    m_plot->legend->setVisible(true);
+    if (!showLegend)
+	{
+		m_plot->plotLayout()->addElement(0, 1, m_legendLayout);
+        m_plot->legend->setVisible(true);
+	}
 
     if (m_annotation)
     {

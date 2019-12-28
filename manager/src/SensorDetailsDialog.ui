@@ -23,16 +23,13 @@
    <item>
     <widget class="QWidget" name="widget" native="true">
      <layout class="QGridLayout" name="gridLayout">
-      <property name="horizontalSpacing">
+      <property name="spacing">
        <number>6</number>
-      </property>
-      <property name="verticalSpacing">
-       <number>9</number>
       </property>
       <item row="8" column="0">
        <widget class="QLabel" name="label_12">
         <property name="text">
-         <string>Sored Measurements:</string>
+         <string>Stored Measurements:</string>
         </property>
        </widget>
       </item>
@@ -263,21 +260,6 @@
         </property>
        </widget>
       </item>
-      <item row="4" column="0" colspan="4">
-       <widget class="QLabel" name="label_21">
-        <property name="font">
-         <font>
-          <pointsize>7</pointsize>
-         </font>
-        </property>
-        <property name="text">
-         <string>To wake up the sensor, uncheck the box above, press OK and then press the sensor button briefly.</string>
-        </property>
-        <property name="wordWrap">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
       <item row="3" column="0" colspan="4">
        <widget class="QLabel" name="label_19">
         <property name="font">
@@ -286,7 +268,7 @@
          </font>
         </property>
         <property name="text">
-         <string>To put the sensor to sleep, check the box above, press OK and then press the sensor button briefly.</string>
+         <string>To put the sensor to sleep, check the box above, press OK and then press the sensor button briefly. To wake up the sensor, uncheck the box above, press OK and then press the sensor button briefly.</string>
         </property>
         <property name="wordWrap">
          <bool>true</bool>

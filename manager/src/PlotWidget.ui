@@ -287,6 +287,10 @@
            <property name="text">
             <string>Smooth Results</string>
            </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/smooth.png</normaloff>:/icons/ui/smooth.png</iconset>
+           </property>
            <property name="checked">
             <bool>true</bool>
            </property>

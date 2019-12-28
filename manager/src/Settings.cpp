@@ -136,6 +136,11 @@ bool Settings::load(std::string const& name)
 		}
     }
 
+	for (const User& user : data.users)
+	{
+		data.lastUserId = std::max(data.lastUserId, user.id);
+	}
+
     if (m_db->load() != success)
     {
         if (m_db->create() != success)

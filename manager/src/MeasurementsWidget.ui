@@ -278,7 +278,7 @@
                  </property>
                  <property name="icon">
                   <iconset resource="../res/res.qrc">
-                   <normaloff>:/icons/ui/battery-75.png</normaloff>:/icons/ui/battery-75.png</iconset>
+                   <normaloff>:/icons/ui/battery-80.png</normaloff>:/icons/ui/battery-80.png</iconset>
                  </property>
                 </widget>
                </item>

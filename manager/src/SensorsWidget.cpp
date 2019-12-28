@@ -128,16 +128,6 @@ void SensorsWidget::bindSensor()
             continue;
         }
 
-        //remove the sensor if not bounded after 30 seconds
-        QTimer::singleShot(30 * 1000, [this]()
-        {
-           int32_t index = m_db->findUnboundSensorIndex();
-           if (index >= 0)
-           {
-               m_db->removeSensor(static_cast<size_t>(index));
-           }
-        });
-
         break;
     }
 }
@@ -164,7 +154,7 @@ void SensorsWidget::unbindSensor()
     size_t index = static_cast<size_t>(_index);
     DB::Sensor const& sensor = m_db->getSensor(index);
 
-    int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete sensor '%1'").arg(sensor.descriptor.name.c_str()));
+    int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete sensor '%1'?\nThis will delete all the measurements from this\nsensor as well.").arg(sensor.descriptor.name.c_str()));
     if (response != QMessageBox::Yes)
     {
         return;

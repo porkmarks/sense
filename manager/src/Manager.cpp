@@ -14,7 +14,7 @@
 #   define CHECK_PASSWORD
 #endif
 
-static const std::string s_version = "1.0.15";
+static const std::string s_version = "1.0.16";
 
 Logger s_logger;
 
@@ -62,9 +62,9 @@ Manager::Manager(QWidget *parent)
     m_ui.plotWidget->init(m_settings.getDB());
     m_ui.alarmsWidget->init(m_settings);
 
-    m_ui.actionEmailSettings->setEnabled(true);
-    m_ui.actionFtpSettings->setEnabled(true);
-    m_ui.actionSensorSettings->setEnabled(true);
+//     m_ui.actionEmailSettings->setEnabled(true);
+//     m_ui.actionFtpSettings->setEnabled(true);
+//     m_ui.actionSensorSettings->setEnabled(true);
 
     //m_ui.baseStationsWidget->init(m_comms);
 

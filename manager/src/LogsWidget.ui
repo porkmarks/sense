@@ -85,6 +85,10 @@
            <property name="text">
             <string>Warning</string>
            </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/warning.png</normaloff>:/icons/ui/warning.png</iconset>
+           </property>
            <property name="checked">
             <bool>true</bool>
            </property>
@@ -94,6 +98,10 @@
           <widget class="QCheckBox" name="error">
            <property name="text">
             <string>Error</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/error.png</normaloff>:/icons/ui/error.png</iconset>
            </property>
            <property name="checked">
             <bool>true</bool>
@@ -105,6 +113,10 @@
            <property name="text">
             <string>Info</string>
            </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/info.png</normaloff>:/icons/ui/info.png</iconset>
+           </property>
            <property name="checked">
             <bool>true</bool>
            </property>
@@ -114,6 +126,10 @@
           <widget class="QCheckBox" name="verbose">
            <property name="text">
             <string>Verbose</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/verbose.png</normaloff>:/icons/ui/verbose.png</iconset>
            </property>
           </widget>
          </item>

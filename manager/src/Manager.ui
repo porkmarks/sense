@@ -106,7 +106,7 @@
      <x>0</x>
      <y>0</y>
      <width>1094</width>
-     <height>26</height>
+     <height>18</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -126,51 +126,6 @@
    <addaction name="menuFile"/>
    <addaction name="menuHelp"/>
   </widget>
-  <action name="action_connect">
-   <property name="icon">
-    <iconset resource="../res/res.qrc">
-     <normaloff>:/icons/ui/wifi.png</normaloff>:/icons/ui/wifi.png</iconset>
-   </property>
-   <property name="text">
-    <string>Connect</string>
-   </property>
-  </action>
-  <action name="actionEmailSettings">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
-   <property name="icon">
-    <iconset resource="../res/res.qrc">
-     <normaloff>:/icons/ui/email.png</normaloff>:/icons/ui/email.png</iconset>
-   </property>
-   <property name="text">
-    <string>Email Settings</string>
-   </property>
-  </action>
-  <action name="actionFtpSettings">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
-   <property name="icon">
-    <iconset resource="../res/res.qrc">
-     <normaloff>:/icons/ui/ftp.png</normaloff>:/icons/ui/ftp.png</iconset>
-   </property>
-   <property name="text">
-    <string>FTP Settings</string>
-   </property>
-  </action>
-  <action name="actionSensorSettings">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
-   <property name="icon">
-    <iconset resource="../res/res.qrc">
-     <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
-   </property>
-   <property name="text">
-    <string>Sensor Settings</string>
-   </property>
-  </action>
   <action name="actionLogout">
    <property name="text">
     <string>Logout</string>

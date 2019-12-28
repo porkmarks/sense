@@ -11,10 +11,9 @@
 #include <iomanip>
 #include <cstring>
 #include "Logger.h"
+#include "Utils.h"
 
 extern Logger s_logger;
-extern float getBatteryLevel(float vcc);
-extern float getSignalLevel(int8_t dBm);
 
 ExportDataDialog::ExportDataDialog(DB& db, MeasurementsModel& model, QWidget* parent)
     : QDialog(parent)
