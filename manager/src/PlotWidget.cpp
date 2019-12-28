@@ -73,6 +73,7 @@ void PlotWidget::init(DB& db)
     m_uiConnections.push_back(connect(m_ui.showHumidity, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
 
     m_uiConnections.push_back(connect(m_db, &DB::measurementsAdded, this, &PlotWidget::scheduleSlowRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_db, &DB::measurementsChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
 	m_uiConnections.push_back(connect(m_db, &DB::sensorAdded, this, &PlotWidget::sensorAdded, Qt::QueuedConnection));
 	m_uiConnections.push_back(connect(m_db, &DB::sensorRemoved, this, &PlotWidget::sensorRemoved, Qt::QueuedConnection));
 

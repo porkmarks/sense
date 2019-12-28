@@ -25,7 +25,7 @@ private slots:
     void bindSensor();
     void unbindSensor();
     void configureSensor(QModelIndex const& index);
-    void setRW();
+	void setPermissions();
 
 private:
     Ui::SensorsWidget m_ui;

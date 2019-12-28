@@ -73,16 +73,48 @@ public:
     {
         std::string name;
         std::string passwordHash;
+
+        enum Permissions
+        {
+            PermissionAddRemoveSensors = 1 << 0,
+            PermissionChangeSensors = 1 << 1,
+
+            PermissionAddRemoveBaseStations = 1 << 2,
+            PermissionChangeBaseStations = 1 << 3,
+
+            PermissionChangeMeasurements = 1 << 4,
+            PermissionChangeEmailSettings = 1 << 5,
+            PermissionChangeFtpSettings = 1 << 6,
+
+            PermissionAddRemoveAlarms = 1 << 7,
+            PermissionChangeAlarms = 1 << 8,
+
+            PermissionAddRemoveReports = 1 << 9,
+            PermissionChangeReports = 1 << 10,
+
+            PermissionAddRemoveUsers = 1 << 11,
+            PermissionChangeUsers = 1 << 12,
+        };
+
+        uint32_t permissions = 0;
+
         enum class Type
         {
-            Admin,
+            Admin, //has all the permissions
             Normal
         };
         Type type = Type::Normal;
 
 		template<class Archive> void serialize(Archive& archive, std::uint32_t const version)
 		{
-			archive(CEREAL_NVP(name), CEREAL_NVP(passwordHash), CEREAL_NVP(type));
+            if (version == 0)
+			{
+				archive(CEREAL_NVP(name), CEREAL_NVP(passwordHash), CEREAL_NVP(type));
+			}
+            else
+            {
+				archive(CEREAL_NVP(name), CEREAL_NVP(passwordHash), CEREAL_NVP(permissions), CEREAL_NVP(type));
+            }
 		}
     };
 
@@ -104,7 +136,7 @@ public:
     int32_t findUserIndexById(UserId id) const;
     int32_t findUserIndexByPasswordHash(std::string const& passwordHash) const;
     bool addUser(UserDescriptor const& descriptor);
-    bool setUser(UserId id, UserDescriptor const& descriptor);
+    Result<void> setUser(UserId id, UserDescriptor const& descriptor);
     void removeUser(size_t index);
     bool needsAdmin() const;
     void setLoggedInUserId(UserId id);

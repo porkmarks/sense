@@ -22,7 +22,7 @@ public:
 signals:
 
 private slots:
-    void setRW();
+    void setPermissions();
     void addAlarm();
     void removeAlarms();
     void configureAlarm(QModelIndex const& index);

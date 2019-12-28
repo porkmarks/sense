@@ -1,6 +1,6 @@
 #include "UsersWidget.h"
 #include "ConfigureUserDialog.h"
-#include "AdminCheck.h"
+#include "PermissionsCheck.h"
 #include "Settings.h"
 
 #include <QMessageBox>
@@ -63,8 +63,8 @@ void UsersWidget::init(Settings& settings)
         m_ui.list->header()->restoreState(settings.value("users/list/state").toByteArray());
     }
 
-    setRW();
-    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &UsersWidget::setRW));
+    setPermissions();
+    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &UsersWidget::setPermissions));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -80,10 +80,8 @@ void UsersWidget::shutdown()
 
 //////////////////////////////////////////////////////////////////////////
 
-void UsersWidget::setRW()
+void UsersWidget::setPermissions()
 {
-    m_ui.add->setEnabled(m_settings->isLoggedInAsAdmin());
-    m_ui.remove->setEnabled(m_settings->isLoggedInAsAdmin());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -97,12 +95,11 @@ void UsersWidget::configureUser(QModelIndex const& index)
     }
 
     Settings::User user = m_settings->getUser(indexRow);
-    if (m_settings->getLoggedInUserId() != user.id)
+    if (m_settings->getLoggedInUserId() != user.id && 
+        !hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionChangeUsers, this))
     {
-        if (!adminCheck(*m_settings, this))
-        {
-            return;
-        }
+        QMessageBox::critical(this, "Error", "You don't have permission to configure users.");
+        return;
     }
 
     ConfigureUserDialog dialog(*m_settings, this);
@@ -117,21 +114,31 @@ void UsersWidget::configureUser(QModelIndex const& index)
         dialog.setForcedType(Settings::UserDescriptor::Type::Normal);
     }
 
-    int result = dialog.exec();
-    if (result == QDialog::Accepted)
-    {
-        user = dialog.getUser();
-        m_settings->setUser(user.id, user.descriptor);
-        m_model->refresh();
-    }
+    do
+	{
+		int result = dialog.exec();
+		if (result == QDialog::Accepted)
+		{
+			user = dialog.getUser();
+			Result<void> result = m_settings->setUser(user.id, user.descriptor);
+			if (result != success)
+			{
+				QMessageBox::critical(this, "Error", QString("Cannot change user '%1': %2").arg(user.descriptor.name.c_str()).arg(result.error().what().c_str()));
+				continue;
+			}
+			m_model->refresh();
+		}
+        break;
+    } while (true);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void UsersWidget::addUser()
 {
-    if (!adminCheck(*m_settings, this))
+    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionAddRemoveUsers, this))
     {
+        QMessageBox::critical(this, "Error", "You don't have permission to add users.");
         return;
     }
 
@@ -162,8 +169,9 @@ void UsersWidget::addUser()
 
 void UsersWidget::removeUsers()
 {
-    if (!adminCheck(*m_settings, this))
+    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionAddRemoveUsers, this))
     {
+        QMessageBox::critical(this, "Error", "You don't have permission to remove users.");
         return;
     }
 

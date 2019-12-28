@@ -14,6 +14,8 @@
 #include "ui_SensorsFilterDialog.h"
 
 #include "Logger.h"
+#include "PermissionsCheck.h"
+#include "MeasurementDetailsDialog.h"
 
 extern Logger s_logger;
 
@@ -24,6 +26,8 @@ MeasurementsWidget::MeasurementsWidget(QWidget *parent)
 {
     m_ui.setupUi(this);
     setEnabled(false);
+
+    connect(m_ui.list, &QTreeView::activated, this, &MeasurementsWidget::configureMeasurement);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -35,7 +39,7 @@ MeasurementsWidget::~MeasurementsWidget()
 
 //////////////////////////////////////////////////////////////////////////
 
-void MeasurementsWidget::init(DB& db)
+void MeasurementsWidget::init(Settings& settings)
 {
     for (const QMetaObject::Connection& connection: m_uiConnections)
     {
@@ -44,7 +48,8 @@ void MeasurementsWidget::init(DB& db)
     m_uiConnections.clear();
 
     setEnabled(true);
-    m_db = &db;
+	m_settings = &settings;
+	m_db = &m_settings->getDB();
 
     m_model.reset(new MeasurementsModel(*m_db));
     m_sortingModel.setSourceModel(m_model.get());
@@ -82,8 +87,8 @@ void MeasurementsWidget::init(DB& db)
 //        std::vector<DB::Measurement> result = m_db->getFilteredMeasurements(filter);
 //    }
 //    std::cout << "Time to filter: " << (std::chrono::duration<float>(DB::Clock::now() - start).count()) << "\n";
-
-    refresh();
+//
+//    refresh();
 
     m_uiConnections.push_back(connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.selectSensors, &QPushButton::released, this, &MeasurementsWidget::selectSensors, Qt::QueuedConnection));
@@ -108,7 +113,8 @@ void MeasurementsWidget::init(DB& db)
     m_uiConnections.push_back(connect(m_ui.showBattery, &QCheckBox::stateChanged, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.showSignal, &QCheckBox::stateChanged, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
 
-    m_uiConnections.push_back(connect(m_db, &DB::measurementsAdded, this, &MeasurementsWidget::scheduleSlowRefresh, Qt::QueuedConnection));
+//    m_uiConnections.push_back(connect(m_db, &DB::measurementsAdded, this, &MeasurementsWidget::scheduleSlowRefresh, Qt::QueuedConnection));
+//    m_uiConnections.push_back(connect(m_db, &DB::measurementsChanged, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_db, &DB::sensorAdded, this, &MeasurementsWidget::sensorAdded, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_db, &DB::sensorRemoved, this, &MeasurementsWidget::sensorRemoved, Qt::QueuedConnection));
 
@@ -339,10 +345,10 @@ void MeasurementsWidget::refresh()
 
     DB::Clock::time_point start = DB::Clock::now();
 
-    m_model->setColumnVisibility(MeasurementsModel::Column::Temperature, m_ui.showTemperature->isChecked());
-    m_model->setColumnVisibility(MeasurementsModel::Column::Humidity, m_ui.showHumidity->isChecked());
-    m_model->setColumnVisibility(MeasurementsModel::Column::Battery, m_ui.showBattery->isChecked());
-    m_model->setColumnVisibility(MeasurementsModel::Column::Signal, m_ui.showSignal->isChecked());
+    m_ui.list->header()->setSectionHidden((int)MeasurementsModel::Column::Temperature, !m_ui.showTemperature->isChecked());
+    m_ui.list->header()->setSectionHidden((int)MeasurementsModel::Column::Humidity, !m_ui.showHumidity->isChecked());
+    m_ui.list->header()->setSectionHidden((int)MeasurementsModel::Column::Battery, !m_ui.showBattery->isChecked());
+    m_ui.list->header()->setSectionHidden((int)MeasurementsModel::Column::Signal, !m_ui.showSignal->isChecked());
 
     DB::Filter filter = createFilter();
     m_model->setFilter(filter);
@@ -466,6 +472,46 @@ void MeasurementsWidget::selectSensors()
     }
 
     refresh();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsWidget::configureMeasurement(QModelIndex const& index)
+{
+	if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionChangeMeasurements, this))
+	{
+        QMessageBox::critical(this, "Error", "You don't have permission to change measurements.");
+		return;
+	}
+
+	QModelIndex mi = m_sortingModel.mapToSource(index);
+	Result<DB::Measurement> result = m_model->getMeasurement(mi);
+	if (result != success)
+	{
+		QMessageBox::critical(this, "Error", "Invalid measurement selected.");
+		return;
+	}
+
+    DB::Measurement measurement = result.payload();
+
+	MeasurementDetailsDialog dialog(*m_db, this);
+	dialog.setMeasurement(measurement);
+
+	do
+	{
+		int result = dialog.exec();
+		if (result == QDialog::Accepted)
+		{
+			measurement = dialog.getMeasurement();
+			Result<void> result = m_db->setMeasurement(measurement.id, measurement.descriptor);
+			if (result != success)
+			{
+				QMessageBox::critical(this, "Error", QString("Cannot change measurement '%1': %2").arg(measurement.id).arg(result.error().what().c_str()));
+				continue;
+			}
+		}
+		break;
+	} while (true);
 }
 
 //////////////////////////////////////////////////////////////////////////

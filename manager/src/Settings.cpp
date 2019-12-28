@@ -18,6 +18,7 @@
 #include "cereal/types/string.hpp"
 #include "cereal/types/chrono.hpp"
 #include "cereal/external/rapidjson/error/en.h"
+#include "PermissionsCheck.h"
 
 #ifdef _MSC_VER
 //not #if defined(_WIN32) || defined(_WIN64) because we have strncasecmp in mingw
@@ -38,6 +39,8 @@ constexpr uint64_t k_fileEncryptionKey = 32455153254365ULL;
 //constexpr uint64_t k_ftpEncryptionKey = 45235321231234ULL;
 
 //CEREAL_CLASS_VERSION(Settings::Data, 1);
+
+CEREAL_CLASS_VERSION(Settings::UserDescriptor, 1);
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -334,28 +337,56 @@ bool Settings::addUser(UserDescriptor const& descriptor)
 
 //////////////////////////////////////////////////////////////////////////
 
-bool Settings::setUser(UserId id, UserDescriptor const& descriptor)
+Result<void> Settings::setUser(UserId id, UserDescriptor const& descriptor)
 {
     int32_t index = findUserIndexByName(descriptor.name);
     if (index >= 0 && getUser(static_cast<size_t>(index)).id != id)
     {
-        return false;
+        return Error(QString("Cannot find user '%1'").arg(descriptor.name.c_str()).toUtf8().data());
     }
 
     index = findUserIndexById(id);
     if (index < 0)
     {
-        return false;
+		return Error(QString("Cannot find user '%1' (internal inconsistency)").arg(descriptor.name.c_str()).toUtf8().data());
     }
 
-    m_mainData.users[static_cast<size_t>(index)].descriptor = descriptor;
+    User& user = m_mainData.users[static_cast<size_t>(index)];
+
+    int32_t loggedInUserIndex = findUserIndexById(m_loggedInUserId);
+    if (loggedInUserIndex >= 0)
+    {
+		const User& loggedInUser = m_mainData.users[static_cast<size_t>(loggedInUserIndex)];
+        if (loggedInUser.descriptor.type != UserDescriptor::Type::Admin)
+		{
+			if (user.descriptor.permissions != descriptor.permissions &&
+				(loggedInUser.descriptor.permissions & Settings::UserDescriptor::PermissionChangeUsers) == 0)
+			{
+				return Error(QString("No permission to change permissions").toUtf8().data());
+			}
+
+			//check that the user is not adding too many permissions
+			uint32_t diff = loggedInUser.descriptor.permissions ^ descriptor.permissions;
+			if ((diff & loggedInUser.descriptor.permissions) != diff)
+			{
+				return Error(QString("Permission escalation between users is not allowed").toUtf8().data());
+			}
+
+			if (loggedInUser.descriptor.type != UserDescriptor::Type::Admin && user.descriptor.type == UserDescriptor::Type::Admin)
+			{
+				return Error(QString("Cannot change admin user").toUtf8().data());
+			}
+		}
+    }
+
+    user.descriptor = descriptor;
     emit userChanged(id);
 
     s_logger.logInfo(QString("Changed user '%1'").arg(descriptor.name.c_str()));
 
     triggerSave();
 
-    return true;
+    return success;
 }
 
 //////////////////////////////////////////////////////////////////////////

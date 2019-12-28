@@ -5,6 +5,7 @@
 #include <QSettings>
 #include <QInputDialog>
 #include <QDateTime>
+#include "PermissionsCheck.h"
 
 extern std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac);
 
@@ -110,17 +111,15 @@ void BaseStationsWidget::init(Comms& comms, Settings& settings)
         m_baseStationDescriptors.push_back(bs.descriptor);
     }
 
-    setRW();
-    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &BaseStationsWidget::setRW));
+    setPermissions();
+    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &BaseStationsWidget::setPermissions));
 }
 
 
 //////////////////////////////////////////////////////////////////////////
 
-void BaseStationsWidget::setRW()
+void BaseStationsWidget::setPermissions()
 {
-//    m_ui.add->setEnabled(m_settings->isLoggedInAsAdmin());
-//    m_ui.remove->setEnabled(m_settings->isLoggedInAsAdmin());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -153,9 +152,9 @@ void BaseStationsWidget::setAddress(size_t row, QHostAddress const& address)
 
 void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
 {
-    if (!m_settings->isLoggedInAsAdmin())
+	if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionAddRemoveBaseStations, this))
     {
-        QMessageBox::critical(this, "Error", "You need to be logged in as admin to activate/add base stations.");
+        QMessageBox::critical(this, "Error", "You don't have permission to add base stations.");
         return;
     }
 

@@ -8,6 +8,7 @@
 #include "DB.h"
 #include "MeasurementsModel.h"
 #include "MeasurementsDelegate.h"
+#include "Settings.h"
 
 class MeasurementsWidget : public QWidget
 {
@@ -15,13 +16,11 @@ class MeasurementsWidget : public QWidget
 public:
     explicit MeasurementsWidget(QWidget *parent = 0);
     ~MeasurementsWidget();
-    void init(DB& db);
+    void init(Settings& settings);
     void shutdown();
 
     void loadSettings();
     void saveSettings();
-
-signals:
 
 private slots:
     void scheduleSlowRefresh();
@@ -37,6 +36,7 @@ private slots:
 
     void minHumidityChanged();
     void maxHumidityChanged();
+    void configureMeasurement(QModelIndex const& index);
 
 private:
 
@@ -47,6 +47,7 @@ private:
     void scheduleRefresh(DB::Clock::duration dt);
     std::unique_ptr<QTimer> m_scheduleTimer;
 
+	Settings* m_settings = nullptr;
     DB* m_db = nullptr;
     std::unique_ptr<MeasurementsModel> m_model;
     QSortFilterProxyModel m_sortingModel;

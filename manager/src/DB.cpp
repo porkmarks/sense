@@ -2016,11 +2016,11 @@ size_t DB::_getFilteredMeasurements(Filter const& filter, std::vector<DB::Measur
 
 //////////////////////////////////////////////////////////////////////////
 
-Result<DB::Measurement> DB::getLastMeasurementForSensor(SensorId sensor_id) const
+Result<DB::Measurement> DB::getLastMeasurementForSensor(SensorId sensorId) const
 {
     std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
 
-    auto it = m_mainData.measurements.find(sensor_id);
+    auto it = m_mainData.measurements.find(sensorId);
     if (it == m_mainData.measurements.end())
     {
         return Error("Sensor not found");
@@ -2031,7 +2031,56 @@ Result<DB::Measurement> DB::getLastMeasurementForSensor(SensorId sensor_id) cons
     {
         return Error("No data");
     }
-    return unpack(sensor_id, storedMeasurements.back());
+    return unpack(sensorId, storedMeasurements.back());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+Result<DB::Measurement> DB::findMeasurementById(MeasurementId id) const
+{
+    SensorId sensorId = getSensorIdFromMeasurementId(id);
+    auto it = m_mainData.measurements.find(sensorId);
+	if (it == m_mainData.measurements.end())
+	{
+		return Error("Cannot find measurements for sensor");
+	}
+    
+    const StoredMeasurements& sm = it->second;
+
+    auto smit = std::find_if(sm.begin(), sm.end(), [id, sensorId](const StoredMeasurement& _sm) { return computeMeasurementId(sensorId, _sm) == id; });
+    if (smit == sm.end())
+    {
+		return Error("Cannot find measurement");
+    }
+    return unpack(sensorId, *smit);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+Result<void> DB::setMeasurement(MeasurementId id, MeasurementDescriptor const& measurement)
+{
+	SensorId sensorId = getSensorIdFromMeasurementId(id);
+	auto it = m_mainData.measurements.find(sensorId);
+	if (it == m_mainData.measurements.end())
+	{
+		return Error("Cannot find measurements for sensor");
+	}
+
+	StoredMeasurements& sms = it->second;
+
+	auto smit = std::find_if(sms.begin(), sms.end(), [id, sensorId](const StoredMeasurement& _sm) { return computeMeasurementId(sensorId, _sm) == id; });
+	if (smit == sms.end())
+	{
+		return Error("Cannot find measurement");
+	}
+    StoredMeasurement& sm = *smit;
+    Measurement m = unpack(sensorId, sm);
+    m.descriptor = measurement;
+    sm = pack(m);
+
+    emit measurementsChanged(sensorId);
+
+    return success;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -2138,6 +2187,13 @@ inline DB::Measurement DB::unpack(SensorId sensorId, StoredMeasurement const& sm
 
 //////////////////////////////////////////////////////////////////////////
 
+inline DB::SensorId DB::getSensorIdFromMeasurementId(MeasurementId id)
+{
+	return SensorId(id >> 32);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 inline DB::MeasurementId DB::computeMeasurementId(MeasurementDescriptor const& md)
 {
     return (MeasurementId(md.sensorId) << 32) | MeasurementId(md.index);
@@ -2145,9 +2201,9 @@ inline DB::MeasurementId DB::computeMeasurementId(MeasurementDescriptor const& m
 
 //////////////////////////////////////////////////////////////////////////
 
-inline DB::MeasurementId DB::computeMeasurementId(SensorId sensor_id, StoredMeasurement const& m)
+inline DB::MeasurementId DB::computeMeasurementId(SensorId sensorId, StoredMeasurement const& m)
 {
-    return (MeasurementId(sensor_id) << 32) | MeasurementId(m.index);
+    return (MeasurementId(sensorId) << 32) | MeasurementId(m.index);
 }
 
 //////////////////////////////////////////////////////////////////////////

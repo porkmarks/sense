@@ -58,7 +58,7 @@ Manager::Manager(QWidget *parent)
     m_ui.logsWidget->init();
 
     m_ui.sensorsWidget->init(m_settings);
-    m_ui.measurementsWidget->init(m_settings.getDB());
+    m_ui.measurementsWidget->init(m_settings);
     m_ui.plotWidget->init(m_settings.getDB());
     m_ui.alarmsWidget->init(m_settings);
 

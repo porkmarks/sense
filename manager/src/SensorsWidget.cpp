@@ -1,7 +1,7 @@
 #include "SensorsWidget.h"
 #include "Settings.h"
 #include "SensorDetailsDialog.h"
-#include "AdminCheck.h"
+#include "PermissionsCheck.h"
 
 #include <QSettings>
 #include <QMessageBox>
@@ -71,9 +71,8 @@ void SensorsWidget::init(Settings& settings)
         m_ui.list->header()->restoreState(settings.value("sensors/list/state").toByteArray());
     }
 
-    setRW();
-    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &SensorsWidget::setRW));
-    m_uiConnections.push_back(connect(m_db, &DB::baseStationAdded, this, &SensorsWidget::setRW));
+    setPermissions();
+    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &SensorsWidget::setPermissions));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -90,10 +89,8 @@ void SensorsWidget::shutdown()
 
 //////////////////////////////////////////////////////////////////////////
 
-void SensorsWidget::setRW()
+void SensorsWidget::setPermissions()
 {
-    m_ui.add->setEnabled(m_settings->isLoggedInAsAdmin() && m_db->getBaseStationCount() > 0);
-    m_ui.remove->setEnabled(m_settings->isLoggedInAsAdmin());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -102,6 +99,17 @@ void SensorsWidget::bindSensor()
 {
     if (!m_db)
     {
+        return;
+    }
+
+    if (m_db->getBaseStationCount() == 0)
+    {
+        QMessageBox::critical(this, "Error", "No base stations active.");
+    }
+
+    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionAddRemoveSensors, this))
+    {
+        QMessageBox::critical(this, "Error", "You don't have permission to add sensors.");
         return;
     }
 
@@ -143,6 +151,12 @@ void SensorsWidget::unbindSensor()
         return;
     }
 
+	if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionAddRemoveSensors, this))
+	{
+        QMessageBox::critical(this, "Error", "You don't have permission to remove sensors.");
+		return;
+	}
+
     QModelIndex mi = m_sortingModel.mapToSource(m_sortingModel.index(selected.at(0).row(), 0));
     int32_t _index = m_model->getSensorIndex(mi);
     if (_index < 0)
@@ -167,8 +181,9 @@ void SensorsWidget::unbindSensor()
 
 void SensorsWidget::configureSensor(QModelIndex const& index)
 {
-    if (!adminCheck(*m_settings, this))
+    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionChangeSensors, this))
     {
+        QMessageBox::critical(this, "Error", "You don't have permission to configure sensors.");
         return;
     }
 
@@ -214,5 +229,6 @@ void SensorsWidget::configureSensor(QModelIndex const& index)
         break;
     } while (true);
 }
+
 //////////////////////////////////////////////////////////////////////////
 

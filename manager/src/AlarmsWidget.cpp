@@ -1,7 +1,7 @@
 #include "AlarmsWidget.h"
 #include "ConfigureAlarmDialog.h"
 #include "Settings.h"
-#include "AdminCheck.h"
+#include "PermissionsCheck.h"
 #include "DB.h"
 
 #include <QMessageBox>
@@ -65,8 +65,8 @@ void AlarmsWidget::init(Settings& settings)
         m_ui.list->header()->restoreState(settings.value("alarms/list/state").toByteArray());
     }
 
-    setRW();
-    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &AlarmsWidget::setRW));
+    setPermissions();
+    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &AlarmsWidget::setPermissions));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -82,18 +82,17 @@ void AlarmsWidget::shutdown()
 
 //////////////////////////////////////////////////////////////////////////
 
-void AlarmsWidget::setRW()
+void AlarmsWidget::setPermissions()
 {
-    m_ui.add->setEnabled(m_settings->isLoggedInAsAdmin());
-    m_ui.remove->setEnabled(m_settings->isLoggedInAsAdmin());
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void AlarmsWidget::configureAlarm(QModelIndex const& index)
 {
-    if (!adminCheck(*m_settings, this))
+    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionChangeAlarms, this))
     {
+		QMessageBox::critical(this, "Error", "You don't have permission to configure alarms.");
         return;
     }
 
@@ -131,8 +130,9 @@ void AlarmsWidget::configureAlarm(QModelIndex const& index)
 
 void AlarmsWidget::addAlarm()
 {
-    if (!adminCheck(*m_settings, this))
+    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionAddRemoveAlarms, this))
     {
+        QMessageBox::critical(this, "Error", "You don't have permission to add alarms.");
         return;
     }
 
@@ -159,8 +159,9 @@ void AlarmsWidget::addAlarm()
 
 void AlarmsWidget::removeAlarms()
 {
-    if (!adminCheck(*m_settings, this))
+    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionAddRemoveAlarms, this))
     {
+        QMessageBox::critical(this, "Error", "You don't have permission to remove alarms.");
         return;
     }
 

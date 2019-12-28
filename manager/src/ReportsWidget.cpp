@@ -1,7 +1,7 @@
 #include "ReportsWidget.h"
 #include "ConfigureReportDialog.h"
 #include "Settings.h"
-#include "AdminCheck.h"
+#include "PermissionsCheck.h"
 
 #include <QSettings>
 #include <QMessageBox>
@@ -64,8 +64,8 @@ void ReportsWidget::init(Settings& settings)
         m_ui.list->header()->restoreState(settings.value("reports/list/state").toByteArray());
     }
 
-    setRW();
-    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &ReportsWidget::setRW));
+    setPermissions();
+    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &ReportsWidget::setPermissions));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -81,18 +81,17 @@ void ReportsWidget::shutdown()
 
 //////////////////////////////////////////////////////////////////////////
 
-void ReportsWidget::setRW()
+void ReportsWidget::setPermissions()
 {
-    m_ui.add->setEnabled(m_settings->isLoggedInAsAdmin());
-    m_ui.remove->setEnabled(m_settings->isLoggedInAsAdmin());
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void ReportsWidget::configureReport(QModelIndex const& index)
 {
-    if (!adminCheck(*m_settings, this))
+    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionChangeReports, this))
     {
+        QMessageBox::critical(this, "Error", "You don't have permission to configure reports.");
         return;
     }
 
@@ -125,8 +124,9 @@ void ReportsWidget::configureReport(QModelIndex const& index)
 
 void ReportsWidget::addReport()
 {
-    if (!adminCheck(*m_settings, this))
+    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionAddRemoveReports, this))
     {
+        QMessageBox::critical(this, "Error", "You don't have permission to add reports.");
         return;
     }
 
@@ -155,8 +155,9 @@ void ReportsWidget::addReport()
 
 void ReportsWidget::removeReports()
 {
-    if (!adminCheck(*m_settings, this))
+    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionAddRemoveReports, this))
     {
+        QMessageBox::critical(this, "Error", "You don't have permission to remove reports.");
         return;
     }
 

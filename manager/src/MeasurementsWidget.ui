@@ -280,6 +280,9 @@
                   <iconset resource="../res/res.qrc">
                    <normaloff>:/icons/ui/battery-80.png</normaloff>:/icons/ui/battery-80.png</iconset>
                  </property>
+                 <property name="checked">
+                  <bool>true</bool>
+                 </property>
                 </widget>
                </item>
                <item row="0" column="0">
@@ -304,6 +307,9 @@
                  <property name="icon">
                   <iconset resource="../res/res.qrc">
                    <normaloff>:/icons/ui/signal-80.png</normaloff>:/icons/ui/signal-80.png</iconset>
+                 </property>
+                 <property name="checked">
+                  <bool>true</bool>
                  </property>
                 </widget>
                </item>

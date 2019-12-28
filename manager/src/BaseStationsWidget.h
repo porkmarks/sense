@@ -23,7 +23,7 @@ signals:
 
 
 private slots:
-    void setRW();
+	void setPermissions();
     void baseStationDiscovered(Comms::BaseStationDescriptor const& bs);
     void baseStationConnected(Comms::BaseStationDescriptor const& bs);
     void baseStationDisconnected(Comms::BaseStationDescriptor const& bs);

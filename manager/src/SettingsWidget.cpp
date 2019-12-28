@@ -7,6 +7,7 @@
 #include "qftp.h"
 
 #include "DB.h"
+#include "PermissionsCheck.h"
 
 extern std::pair<std::string, int32_t> computeDurationString(DB::Clock::duration d);
 
@@ -85,7 +86,7 @@ void SettingsWidget::init(Comms& comms, Settings& settings)
     m_ui.baseStationsWidget->init(comms, settings);
     m_ui.usersWidget->init(settings);
 
-    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &SettingsWidget::setRW));
+    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &SettingsWidget::setPermissions));
 
     m_uiConnections.push_back(connect(m_ui.sensorsPower, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
     m_uiConnections.push_back(connect(m_ui.sensorsMeasurementPeriod, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
@@ -117,7 +118,7 @@ void SettingsWidget::init(Comms& comms, Settings& settings)
     setSensorsConfig(m_db->getLastSensorsConfig());
     m_dbConnections.push_back(connect(m_db, &DB::sensorsConfigChanged, [this]() { if (m_db) setSensorsConfig(m_db->getLastSensorsConfig()); }));
 
-    setRW();
+    setPermissions();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -140,12 +141,12 @@ void SettingsWidget::shutdown()
 
 //////////////////////////////////////////////////////////////////////////
 
-void SettingsWidget::setRW()
+void SettingsWidget::setPermissions()
 {
-    m_ui.emailPage->setEnabled(m_settings->isLoggedInAsAdmin());
-    m_ui.ftpPage->setEnabled(m_settings->isLoggedInAsAdmin());
-	m_ui.sensorsPower->setEnabled(m_settings->isLoggedInAsAdmin());
-	m_ui.batteryCapacity->setEnabled(m_settings->isLoggedInAsAdmin());
+	m_ui.emailPage->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeEmailSettings));
+    m_ui.ftpPage->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeFtpSettings));
+	m_ui.sensorsPower->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensors));
+	m_ui.batteryCapacity->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensors));
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -412,6 +412,9 @@ public:
 
     Result<Measurement> getLastMeasurementForSensor(SensorId sensorId) const;
 
+    Result<Measurement> findMeasurementById(MeasurementId id) const;
+    Result<void> setMeasurement(MeasurementId id, MeasurementDescriptor const& measurement);
+
     ////////////////////////////////////////////////////////////////////////////
 
 signals:
@@ -437,6 +440,7 @@ signals:
     void reportChanged(ReportId id);
 
     void measurementsAdded(SensorId id);
+    void measurementsChanged(SensorId id);
     void measurementsRemoved(SensorId id);
 
    void alarmTriggersChanged(AlarmId alarmId, Measurement const& m, uint8_t oldTriggers, uint8_t newTriggers, uint8_t addedTriggers, uint8_t removedTriggers);
@@ -467,9 +471,10 @@ private:
     typedef std::vector<StoredMeasurement> StoredMeasurements;
 
     static inline StoredMeasurement pack(Measurement const& m);
-    static inline Measurement unpack(SensorId sensor_id, StoredMeasurement const& m);
+    static inline Measurement unpack(SensorId sensorId, StoredMeasurement const& m);
     static inline MeasurementId computeMeasurementId(MeasurementDescriptor const& md);
-    static inline MeasurementId computeMeasurementId(SensorId sensor_id, StoredMeasurement const& m);
+    static inline MeasurementId computeMeasurementId(SensorId sensorId, StoredMeasurement const& m);
+    static inline SensorId getSensorIdFromMeasurementId(MeasurementId id);
 
     Clock::time_point computeNextCommsTimePoint(Sensor const& sensor, size_t sensorIndex) const;
     Clock::time_point computeNextMeasurementTimePoint(Sensor const& sensor) const;

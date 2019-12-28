@@ -21,11 +21,9 @@ MeasurementsModel::MeasurementsModel(DB& db)
     m_refreshTimer = new QTimer(this);
     m_refreshTimer->setSingleShot(true);
 
-    connect(&db, &DB::measurementsAdded, this, &MeasurementsModel::startAutoRefresh);
+    connect(&db, &DB::measurementsAdded, this, &MeasurementsModel::startSlowAutoRefresh);
+    connect(&db, &DB::measurementsChanged, this, &MeasurementsModel::startFastAutoRefresh);
     connect(m_refreshTimer, &QTimer::timeout, this, &MeasurementsModel::refresh);
-
-    m_columnsVisible.resize(s_headerNames.size(), true);
-    refreshVisibleColumnToRealColumn();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -71,32 +69,21 @@ int MeasurementsModel::rowCount(QModelIndex const& index) const
 
 int MeasurementsModel::columnCount(QModelIndex const& /*index*/) const
 {
-    int cc = static_cast<int>(m_columnsVisibleCount);
-    return cc;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void MeasurementsModel::refreshVisibleColumnToRealColumn()
-{
-    m_visibleColumnToRealColumn.clear();
-    for (size_t i = 0; i < s_headerNames.size(); i++)
-    {
-        if (m_columnsVisible[i] == true)
-        {
-            m_visibleColumnToRealColumn.push_back(static_cast<Column>(i));
-        }
-    }
-    m_columnsVisibleCount = std::count(m_columnsVisible.begin(), m_columnsVisible.end(), true);
+    return (int)s_headerNames.size();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 QVariant MeasurementsModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
+    if (section < 0)
+    {
+        int a = 0;
+        section = 0;
+    }
     if (orientation == Qt::Horizontal && role == Qt::DisplayRole)
     {
-        return s_headerNames[static_cast<size_t>(m_visibleColumnToRealColumn[static_cast<size_t>(section)])];
+        return s_headerNames[static_cast<size_t>(section)];
     }
     return QAbstractItemModel::headerData(section, orientation, role);
 }
@@ -119,7 +106,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
     DB::Measurement const& measurement = m_measurements[indexRow];
 
     //code to skip over disabled columns
-    Column column = m_visibleColumnToRealColumn[static_cast<size_t>(index.column())];
+    Column column = static_cast<Column>(index.column());
 
     if (role == UserRole::RealColumnRole)
     {
@@ -267,14 +254,6 @@ void MeasurementsModel::setFilter(DB::Filter const& filter)
 
 //////////////////////////////////////////////////////////////////////////
 
-void MeasurementsModel::setColumnVisibility(Column column, bool visibility)
-{
-    m_columnsVisible[static_cast<size_t>(column)] = visibility;
-    refreshVisibleColumnToRealColumn();
-}
-
-//////////////////////////////////////////////////////////////////////////
-
 void MeasurementsModel::refresh()
 {
     beginResetModel();
@@ -286,18 +265,31 @@ void MeasurementsModel::refresh()
 
 //////////////////////////////////////////////////////////////////////////
 
-void MeasurementsModel::startAutoRefresh(DB::SensorId sensorId)
+void MeasurementsModel::startSlowAutoRefresh(DB::SensorId sensorId)
 {
-    //see if the sensor is in the filter
-    if (m_filter.useSensorFilter)
-    {
-        if (m_filter.sensorIds.find(sensorId) == m_filter.sensorIds.end())
-        {
-            return;
-        }
-    }
+	startAutoRefresh(sensorId, std::chrono::milliseconds(5000));
+}
 
-    m_refreshTimer->start(5000);
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsModel::startFastAutoRefresh(DB::SensorId sensorId)
+{
+    startAutoRefresh(sensorId, std::chrono::milliseconds(1000));
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsModel::startAutoRefresh(DB::SensorId sensorId, DB::Clock::duration timer)
+{
+	//see if the sensor is in the filter
+	if (m_filter.useSensorFilter)
+	{
+		if (m_filter.sensorIds.find(sensorId) == m_filter.sensorIds.end())
+		{
+			return;
+		}
+	}
+	m_refreshTimer->start(std::chrono::duration_cast<std::chrono::milliseconds>(timer).count());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -312,6 +304,24 @@ size_t MeasurementsModel::getMeasurementCount() const
 DB::Measurement const& MeasurementsModel::getMeasurement(size_t index) const
 {
     return m_measurements[index];
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+Result<DB::Measurement> MeasurementsModel::getMeasurement(QModelIndex index) const
+{
+	if (!index.isValid())
+	{
+		return Error("Invalid Index");
+	}
+
+	size_t indexRow = static_cast<size_t>(index.row());
+	if (indexRow >= m_measurements.size())
+	{
+        return Error("Invalid Index");
+	}
+
+	return m_measurements[indexRow];
 }
 
 //////////////////////////////////////////////////////////////////////////

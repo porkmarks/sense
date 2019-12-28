@@ -2,6 +2,7 @@
 #include "Crypt.h"
 #include <QMessageBox>
 #include <QSettings>
+#include "PermissionsCheck.h"
 
 std::string k_passwordHashReferenceText = "Cannot open file.";
 
@@ -52,7 +53,38 @@ void ConfigureUserDialog::setUser(Settings::User const& user)
 
     m_ui.name->setText(descriptor.name.c_str());
 
-    m_ui.administrator->setChecked(descriptor.type == Settings::UserDescriptor::Type::Admin);
+    if (m_ui.administrator->isEnabled())
+	{
+		m_ui.administrator->setChecked(descriptor.type == Settings::UserDescriptor::Type::Admin);
+	}
+    if (descriptor.type != Settings::UserDescriptor::Type::Admin)
+    {
+        m_ui.addRemoveSensors->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionAddRemoveSensors);
+        m_ui.changeSensors->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeSensors);
+
+		m_ui.addRemoveBaseStations->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionAddRemoveBaseStations);
+		m_ui.changeBaseStations->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeBaseStations);
+
+		m_ui.addRemoveAlarms->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionAddRemoveAlarms);
+		m_ui.changeAlarms->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeAlarms);
+
+		m_ui.addRemoveReports->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionAddRemoveReports);
+		m_ui.changeReports->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeReports);
+
+		m_ui.addRemoveUsers->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionAddRemoveUsers);
+		m_ui.changeUsers->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeUsers);
+
+        m_ui.changeMeasurements->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeMeasurements);
+		m_ui.changeEmailSettings->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeEmailSettings);
+		m_ui.changeFtpSettings->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeFtpSettings);
+    }
+
+    if (!hasPermission(m_settings, Settings::UserDescriptor::PermissionChangeUsers))
+    {
+        m_ui.administrator->setEnabled(false);
+        m_ui.permissions->setEnabled(false);
+    }
+
     m_ui.password1->clear();
     m_ui.password2->clear();
 }
@@ -77,7 +109,7 @@ void ConfigureUserDialog::done(int result)
 
 void ConfigureUserDialog::accept()
 {
-    Settings::UserDescriptor descriptor;
+    Settings::UserDescriptor descriptor = m_user.descriptor;
     descriptor.name = m_ui.name->text().toUtf8().data();
     if (descriptor.name.empty())
     {
@@ -85,7 +117,21 @@ void ConfigureUserDialog::accept()
         return;
     }
 
-    descriptor.type = m_ui.administrator->isChecked() ? Settings::UserDescriptor::Type::Admin : Settings::UserDescriptor::Type::Normal;
+	descriptor.type = m_ui.administrator->isChecked() ? Settings::UserDescriptor::Type::Admin : Settings::UserDescriptor::Type::Normal;
+    descriptor.permissions = 0;
+	descriptor.permissions |= m_ui.addRemoveSensors->isChecked() ? Settings::UserDescriptor::PermissionAddRemoveSensors : 0;
+	descriptor.permissions |= m_ui.changeSensors->isChecked() ? Settings::UserDescriptor::PermissionChangeSensors : 0;
+	descriptor.permissions |= m_ui.addRemoveBaseStations->isChecked() ? Settings::UserDescriptor::PermissionAddRemoveBaseStations : 0;
+	descriptor.permissions |= m_ui.changeBaseStations->isChecked() ? Settings::UserDescriptor::PermissionChangeBaseStations : 0;
+	descriptor.permissions |= m_ui.addRemoveAlarms->isChecked() ? Settings::UserDescriptor::PermissionAddRemoveAlarms : 0;
+	descriptor.permissions |= m_ui.changeAlarms->isChecked() ? Settings::UserDescriptor::PermissionChangeAlarms : 0;
+	descriptor.permissions |= m_ui.addRemoveReports->isChecked() ? Settings::UserDescriptor::PermissionAddRemoveReports : 0;
+	descriptor.permissions |= m_ui.changeReports->isChecked() ? Settings::UserDescriptor::PermissionChangeReports : 0;
+	descriptor.permissions |= m_ui.addRemoveUsers->isChecked() ? Settings::UserDescriptor::PermissionAddRemoveUsers : 0;
+	descriptor.permissions |= m_ui.changeUsers->isChecked() ? Settings::UserDescriptor::PermissionChangeUsers : 0;
+	descriptor.permissions |= m_ui.changeMeasurements->isChecked() ? Settings::UserDescriptor::PermissionChangeMeasurements : 0;
+	descriptor.permissions |= m_ui.changeEmailSettings->isChecked() ? Settings::UserDescriptor::PermissionChangeEmailSettings : 0;
+	descriptor.permissions |= m_ui.changeFtpSettings->isChecked() ? Settings::UserDescriptor::PermissionChangeFtpSettings : 0;
 
     if (m_ui.password1->text().isEmpty() && m_ui.password2->text().isEmpty())
     {

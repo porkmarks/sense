@@ -1,4 +1,4 @@
-#include "AdminCheck.h"
+#include "PermissionsCheck.h"
 #include "Settings.h"
 #include "Logger.h"
 #include "Crypt.h"
@@ -23,7 +23,8 @@ bool adminCheck(Settings& settings, QWidget* parent)
     QDialog dialog(parent);
     Ui::LoginDialog ui;
     ui.setupUi(&dialog);
-    dialog.setWindowTitle("Admin credentials needed");
+    ui.info->setText("The operation you're trying to do needs a user with more permissions or an admin.\nPlease login again to proceed, or press cancel to go back.");
+    dialog.setWindowTitle("Login");
     dialog.adjustSize();
 
     int result = dialog.exec();
@@ -63,4 +64,24 @@ bool adminCheck(Settings& settings, QWidget* parent)
     }
     s_logger.logCritical("User adming check cancelled");
     return false;
+}
+
+bool hasPermission(Settings& settings, Settings::UserDescriptor::Permissions permission)
+{
+	Settings::User const* user = settings.getLoggedInUser();
+    if (!user)
+    {
+        return false;
+    }
+
+	if (user->descriptor.type == Settings::UserDescriptor::Type::Admin)
+	{
+		return true;
+	}
+    return (user->descriptor.permissions & permission) != 0;
+}
+
+bool hasPermissionOrCanLoginAsAdmin(Settings& settings, Settings::UserDescriptor::Permissions permission, QWidget* parent)
+{
+    return hasPermission(settings, permission) || adminCheck(settings, parent);
 }

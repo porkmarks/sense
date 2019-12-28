@@ -23,7 +23,7 @@ public:
 signals:
 
 private slots:
-    void setRW();
+    void setPermissions();
     void sendTestEmail();
     void testFtpSettings();
     void applyEmailSettings();
