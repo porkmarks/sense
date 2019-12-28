@@ -206,6 +206,7 @@ public:
     Result<void> setSensorCalibration(SensorId id, Sensor::Calibration const& calibration);
     Result<void> setSensorSleep(SensorId id, bool sleep);
     Result<SensorId> bindSensor(uint32_t serialNumber, uint8_t sensorType, uint8_t hardwareVersion, uint8_t softwareRevision, Sensor::Calibration const& calibration);
+    Result<void> clearErrorCounters(SensorId id);
 
     struct SensorInputDetails
     {

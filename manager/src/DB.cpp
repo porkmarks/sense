@@ -1082,6 +1082,30 @@ Result<void> DB::setSensorSleep(SensorId id, bool sleep)
 
 //////////////////////////////////////////////////////////////////////////
 
+Result<void> DB::clearErrorCounters(SensorId id)
+{
+	std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+
+	int32_t _index = findSensorIndexById(id);
+	if (_index < 0)
+	{
+		return Error("Invalid sensor id");
+	}
+	size_t index = static_cast<size_t>(_index);
+	Sensor& sensor = m_mainData.sensors[index];
+    sensor.errorCounters = ErrorCounters();
+
+	emit sensorChanged(sensor.id);
+
+	s_logger.logInfo(QString("Sensor '%1' error counters cleared").arg(sensor.descriptor.name.c_str()));
+
+	triggerDelayedSave(std::chrono::seconds(1));
+
+	return success;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 bool DB::setSensorInputDetails(SensorInputDetails const& details)
 {
     std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);

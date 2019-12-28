@@ -32,13 +32,16 @@
       <item row="1" column="0">
        <widget class="QLabel" name="label">
         <property name="text">
-         <string>Sensor</string>
+         <string>Sensor:</string>
         </property>
        </widget>
       </item>
       <item row="4" column="1">
        <widget class="QWidget" name="widget" native="true">
         <layout class="QHBoxLayout" name="horizontalLayout">
+         <property name="spacing">
+          <number>12</number>
+         </property>
          <property name="leftMargin">
           <number>0</number>
          </property>
@@ -91,7 +94,7 @@
       <item row="4" column="0">
        <widget class="QLabel" name="label_20">
         <property name="text">
-         <string>Battery</string>
+         <string>Battery:</string>
         </property>
        </widget>
       </item>
@@ -121,7 +124,7 @@
       <item row="6" column="0">
        <widget class="QLabel" name="label_3">
         <property name="text">
-         <string>Signal (Base Station -&gt; Sensor)</string>
+         <string>Signal Strength (Base Station -&gt; Sensor):</string>
         </property>
        </widget>
       </item>
@@ -151,20 +154,23 @@
       <item row="0" column="0">
        <widget class="QLabel" name="label_2">
         <property name="text">
-         <string>ID</string>
+         <string>ID:</string>
         </property>
        </widget>
       </item>
       <item row="5" column="0">
        <widget class="QLabel" name="label_10">
         <property name="text">
-         <string>Signal (Sensor -&gt; Base Station)</string>
+         <string>Signal Strength (Sensor -&gt; Base Station):</string>
         </property>
        </widget>
       </item>
       <item row="5" column="1">
        <widget class="QWidget" name="widget_2" native="true">
         <layout class="QHBoxLayout" name="horizontalLayout_2">
+         <property name="spacing">
+          <number>12</number>
+         </property>
          <property name="leftMargin">
           <number>0</number>
          </property>
@@ -217,7 +223,7 @@
       <item row="2" column="0">
        <widget class="QLabel" name="label_14">
         <property name="text">
-         <string>Timestamp</string>
+         <string>Timestamp:</string>
         </property>
        </widget>
       </item>
@@ -231,6 +237,9 @@
       <item row="6" column="1">
        <widget class="QWidget" name="widget_3" native="true">
         <layout class="QHBoxLayout" name="horizontalLayout_3">
+         <property name="spacing">
+          <number>12</number>
+         </property>
          <property name="leftMargin">
           <number>0</number>
          </property>

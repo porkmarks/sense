@@ -87,18 +87,28 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
 
     if (sensor.isMeasurementValid)
     {
-        float vcc = sensor.measurementVcc;
-        m_ui.battery->setText(QString("%1% (%2V)").arg(static_cast<int>(getBatteryLevel(vcc) * 100.f)).arg(vcc, 0, 'f', 2));
-        m_ui.batteryIcon->setPixmap(getBatteryIcon(vcc).pixmap(24, 24));
+		{
+			float vcc = sensor.measurementVcc;
+			m_ui.battery->setText(QString("%1% (%2V)").arg(static_cast<int>(getBatteryLevel(vcc) * 100.f)).arg(vcc, 0, 'f', 2));
+			m_ui.batteryIcon->setPixmap(getBatteryIcon(vcc).pixmap(24, 24));
+		}
 
-        int8_t signal = static_cast<int8_t>(getSignalLevel(m_sensor.averageCombinedSignalStrength) * 100.f);
-        m_ui.signalStrength->setText(QString("%1% (%2 dBm)").arg(signal).arg(m_sensor.averageCombinedSignalStrength));
-        m_ui.signalStrengthIcon->setPixmap(getSignalIcon(signal).pixmap(24, 24));
+		{
+			int8_t signal = static_cast<int8_t>(getSignalLevel(m_sensor.averageSignalStrength.b2s) * 100.f);
+			m_ui.signalStrengthB2S->setText(QString("%1% (%2 dBm)").arg(signal).arg(m_sensor.averageSignalStrength.b2s));
+			m_ui.signalStrengthIconB2S->setPixmap(getSignalIcon(signal).pixmap(24, 24));
+		}
+		{
+			int8_t signal = static_cast<int8_t>(getSignalLevel(m_sensor.averageSignalStrength.s2b) * 100.f);
+			m_ui.signalStrengthS2B->setText(QString("%1% (%2 dBm)").arg(signal).arg(m_sensor.averageSignalStrength.s2b));
+			m_ui.signalStrengthIconS2B->setPixmap(getSignalIcon(signal).pixmap(24, 24));
+		}
     }
     else
     {
         m_ui.battery->setText(QString("N/A"));
-        m_ui.signalStrength->setText(QString("N/A"));
+        m_ui.signalStrengthS2B->setText(QString("N/A"));
+        m_ui.signalStrengthB2S->setText(QString("N/A"));
     }
 
     m_ui.power->setText(QString("%1 dBm").arg(config.descriptor.sensorsPower));
@@ -139,13 +149,27 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
     m_ui.hardwareVersion->setText(QString("%1").arg((int)m_sensor.deviceInfo.hardwareVersion));
     m_ui.softwareVersion->setText(QString("%1").arg((int)m_sensor.deviceInfo.softwareVersion));
 
-    m_ui.commsErrors->setText(QString("%1").arg(m_sensor.errorCounters.comms));
-    //m_ui.measurementErrors->setText(QString("%1").arg(m_sensor.errorCounters));
-    m_ui.unknownReboots->setText(QString("%1").arg(m_sensor.errorCounters.unknownReboots));
-    m_ui.brownoutReboots->setText(QString("%1").arg(m_sensor.errorCounters.brownoutReboots));
-    m_ui.watchdogReboots->setText(QString("%1").arg(m_sensor.errorCounters.watchdogReboots));
-    m_ui.resets->setText(QString("%1").arg(m_sensor.errorCounters.resetReboots));
-    m_ui.powerOnReboots->setText(QString("%1").arg(m_sensor.errorCounters.powerOnReboots));
+    setupErrorCountersUI();
+
+    connect(m_ui.clearStats, &QPushButton::clicked, [this]()
+    {
+        Result<void> result = m_db.clearErrorCounters(m_sensor.id);
+        Q_ASSERT(result == success);
+        m_sensor.errorCounters = DB::ErrorCounters();
+        setupErrorCountersUI();
+    });
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SensorDetailsDialog::setupErrorCountersUI()
+{
+	m_ui.commsErrors->setText(QString("%1").arg(m_sensor.errorCounters.comms));
+	m_ui.unknownReboots->setText(QString("%1").arg(m_sensor.errorCounters.unknownReboots));
+	m_ui.brownoutReboots->setText(QString("%1").arg(m_sensor.errorCounters.brownoutReboots));
+	m_ui.watchdogReboots->setText(QString("%1").arg(m_sensor.errorCounters.watchdogReboots));
+	m_ui.resets->setText(QString("%1").arg(m_sensor.errorCounters.resetReboots));
+	m_ui.powerOnReboots->setText(QString("%1").arg(m_sensor.errorCounters.powerOnReboots));
 }
 
 //////////////////////////////////////////////////////////////////////////
