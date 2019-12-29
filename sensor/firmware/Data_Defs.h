@@ -37,21 +37,21 @@ struct Measurement
 {
     void pack(float humidity, float temperature)
     {
-        this->qhumidity = static_cast<uint8_t>(humidity * 2.55f);
-        this->qtemperature = static_cast<uint16_t>(temperature * 100.f);
+        this->qhumidity = static_cast<uint16_t>(fmin(fmax(humidity, 0.f), 100.f) * 655.f + 0.5f);
+        this->qtemperature = static_cast<int16_t>(fmin(fmax(temperature, -100.f), 100.f) * 327.f + 0.5f);
     }
 
     void unpack(float& humidity, float& temperature) const
     {
-        humidity = static_cast<float>(this->qhumidity) / 2.55f;
-        temperature = static_cast<float>(this->qtemperature) / 100.f;
+        humidity = static_cast<float>(this->qhumidity) / 655.f;
+        temperature = static_cast<float>(this->qtemperature) / 327.f;
     }
 
 //packed data
-    uint8_t qhumidity = 0; //*2.55
-    int16_t qtemperature = 0; //*100
+    uint16_t qhumidity = 0; //*655
+    int16_t qtemperature = 0; //*327
 };
-static_assert(sizeof(Measurement) == 3, "");
+static_assert(sizeof(Measurement) == 4, "");
 
 typedef uint8_t QVCC;
 inline QVCC pack_qvcc(float vcc)
@@ -71,10 +71,10 @@ struct Measurement_Batch_Request
     uint8_t count : 7;
     QVCC qvcc = 0; //(vcc - 2) * 100
 
-    enum { MAX_COUNT = 8 };
+    enum { MAX_COUNT = 12 };
     Measurement measurements[MAX_COUNT];
 };
-static_assert(sizeof(Measurement_Batch_Request) == 30, "");
+static_assert(sizeof(Measurement_Batch_Request) == 54, "");
 //template<int s> struct Size_Checker;
 //Size_Checker<sizeof(Measurement_Batch)> size_checker;
 
@@ -109,7 +109,7 @@ struct Config_Request
     Calibration calibration;
     uint32_t reserved[3];
 };
-static_assert(sizeof(Config_Request) == 48, "");
+static_assert(sizeof(Config_Request) == 49, "");
 
 struct Config_Response
 {
@@ -141,7 +141,7 @@ struct First_Config_Request : Config_Request
 {
     Descriptor descriptor;
 };
-static_assert(sizeof(First_Config_Request) == 71, "");
+static_assert(sizeof(First_Config_Request) == 72, "");
 
 struct First_Config_Response : Config_Response
 {

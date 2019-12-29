@@ -1,6 +1,4 @@
-#if 0
-
-#include "Storage.h"
+#include "../../sensor/firmware/Storage.h"
 #include <vector>
 #include <cstdio>
 #include <cstdlib>
@@ -25,21 +23,21 @@ static bool check_equal(const Storage& storage, const std::vector<Storage::Data>
     size_t data_idx = 0;
     Storage::iterator it;
 
-    constexpr float TEMPERATURE_ACCURACY = 0.25f;
-    constexpr float HUMIDITY_ACCURACY = 0.5f;
+    constexpr float TEMPERATURE_ACCURACY = 0.2f;
+    constexpr float HUMIDITY_ACCURACY = 0.25f;
 
     while (storage.unpack_next(it))
     {
         const Storage::Data& data = it.data;
         const Storage::Data& ref_data = ref_datas[data_idx];
 
-        float temperature_delta = fabs(data.temperature - ref_data.temperature);
+        float temperature_delta = fabsf(data.temperature - ref_data.temperature);
         if (temperature_delta > TEMPERATURE_ACCURACY)
         {
             //std::cout << data_idx << ": Temperature delta too big: " << temperature_delta << ".\n";
             return false;
         }
-        float humidity_delta = fabs(data.humidity - ref_data.humidity);
+        float humidity_delta = fabsf(data.humidity - ref_data.humidity);
         if (humidity_delta > HUMIDITY_ACCURACY)
         {
             //std::cout << data_idx << ": Humidity delta too big: " << humidity_delta << ".\n";
@@ -187,6 +185,8 @@ static void test_storage_accuracy()
 
         if (!check_equal(storage, ref_datas))
         {
+            ref_datas.clear();
+            storage.clear();
             std::cout << "Data mismatch\n";
         }
     }
@@ -204,5 +204,3 @@ void run_tests()
 {
     test_storage();
 }
-
-#endif

@@ -18,17 +18,15 @@ PlotToolTip::~PlotToolTip()
 
 bool PlotToolTip::mousePressed(QCPAbstractItem* item, const QPointF& pos)
 {
-    if (m_textLabel == item ||
-            m_arrow == item ||
-            m_closeBox == item)
+    if (m_textLabel == item || m_arrow == item || m_closeBox == item)
     {
         m_draggedItem = item;
 
         //refine the dragged item
         if (pos.x() >= m_closeBox->left->pixelPosition().x() &&
-                pos.x() <= m_closeBox->right->pixelPosition().x() &&
-                pos.y() >= m_closeBox->top->pixelPosition().y() &&
-                pos.y() <= m_closeBox->bottom->pixelPosition().y())
+            pos.x() <= m_closeBox->right->pixelPosition().x() &&
+            pos.y() >= m_closeBox->top->pixelPosition().y() &&
+            pos.y() <= m_closeBox->bottom->pixelPosition().y())
         {
             m_draggedItem = m_closeBox;
         }
@@ -40,19 +38,32 @@ bool PlotToolTip::mousePressed(QCPAbstractItem* item, const QPointF& pos)
     return false;
 }
 
-void PlotToolTip::mouseMoved(const QPointF& pos)
+bool PlotToolTip::mouseMoved(QCPGraph* graph, const QPointF& pos)
 {
-    Q_ASSERT(m_draggedItem != nullptr);
-    QPointF delta = pos - m_lastDragPosition;
-    applyTextLabelPositionDelta(delta);
-    m_lastDragPosition = pos;
+	if (pos.x() >= m_textLabel->left->pixelPosition().x() &&
+		pos.x() <= m_textLabel->right->pixelPosition().x() &&
+		pos.y() >= m_textLabel->top->pixelPosition().y() &&
+		pos.y() <= m_textLabel->bottom->pixelPosition().y())
+	{
+		if (m_draggedItem != nullptr)
+		{
+			QPointF delta = pos - m_lastDragPosition;
+			applyTextLabelPositionDelta(graph, delta);
+			m_lastDragPosition = pos;
+		}
+
+		m_closeBox->setVisible(m_isVisible);
+		return true;
+	}
+	m_closeBox->setVisible(false);
+	return false;
 }
 
-void PlotToolTip::mouseReleased(const QPointF& pos)
+void PlotToolTip::mouseReleased(QCPGraph* graph, const QPointF& pos)
 {
     Q_ASSERT(m_draggedItem != nullptr);
     QPointF delta = pos - m_lastDragPosition;
-    applyTextLabelPositionDelta(delta);
+    applyTextLabelPositionDelta(graph, delta);
     m_lastDragPosition = pos;
 
     QCPAbstractItem* draggedItem = m_draggedItem;
@@ -68,9 +79,12 @@ void PlotToolTip::mouseReleased(const QPointF& pos)
     }
 }
 
-void PlotToolTip::applyTextLabelPositionDelta(const QPointF& delta)
+void PlotToolTip::applyTextLabelPositionDelta(QCPGraph* graph, const QPointF& delta)
 {
-    setTextLabelPosition(m_textLabelPosition + delta);
+    m_textLabelDelta += delta;
+	double x, y;
+	graph->coordsToPixels(m_key, m_value, x, y);
+    setTextLabelPosition(graph, QPointF(x, y) + m_textLabelDelta);
 }
 
 //void PlotToolTip::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
@@ -180,13 +194,15 @@ void PlotToolTip::setVisible(bool visible)
     }
 }
 
-void PlotToolTip::refresh()
+void PlotToolTip::refresh(QCPGraph* graph)
 {
-    if (m_graph)
+    if (graph)
     {
         double x, y;
-        m_graph->coordsToPixels(m_key, m_value, x, y);
+        graph->coordsToPixels(m_key, m_value, x, y);
         refreshBestArrowAnchor(QPointF(x, y));
+        updateGeometry(graph);
+        setTextLabelPosition(graph, QPointF(x, y) + m_textLabelDelta);
     }
     refreshCloseBox();
 }
@@ -197,10 +213,10 @@ void PlotToolTip::setFixed(bool fixed)
     refreshCloseBox();
 }
 
-void PlotToolTip::setText(const QString& text)
+void PlotToolTip::setText(QCPGraph* graph, const QString& text)
 {
     m_text = text;
-    updateGeometry();
+    updateGeometry(graph);
 
     QTextDocument td;
     td.setHtml(m_text);
@@ -214,19 +230,19 @@ void PlotToolTip::setAnchor(QCPGraph* graph, const QPointF point, double key, do
     //m_anchor = point;
     m_key = key;
     m_value = value;
-    m_graph = graph;
+    //m_graph = graph;
 
-    updateGeometry();
+    updateGeometry(graph);
 }
 
-void PlotToolTip::updateGeometry()
+void PlotToolTip::updateGeometry(QCPGraph* graph)
 {
-    if (!m_graph)
+    if (!graph)
     {
         return;
     }
     double x, y;
-    m_graph->coordsToPixels(m_key, m_value, x, y);
+    graph->coordsToPixels(m_key, m_value, x, y);
 
     if (!m_textLabel)
     {
@@ -237,6 +253,7 @@ void PlotToolTip::updateGeometry()
         m_textLabel->setPen(QPen(Qt::black)); // show black border around text
         m_textLabel->setBrush(QBrush(Qt::white));
         m_textLabel->setClipToAxisRect(false);
+        m_textLabelDelta = QPointF(150, -150);
     }
     m_textLabel->setVisible(m_isVisible);
     m_textLabel->setText(m_text);
@@ -250,13 +267,14 @@ void PlotToolTip::updateGeometry()
         m_arrow->setClipToAxisRect(false);
     }
     m_arrow->setVisible(m_isVisible);
-    m_arrow->end->setAxes(m_graph->keyAxis(), m_graph->valueAxis());
-    m_arrow->end->setCoords(m_key, m_value); // point to (4, 1.6) in x-y-plot coordinates
+    //m_arrow->end->setAxes(graph->keyAxis(), graph->valueAxis());
+    //m_arrow->end->setCoords(m_key, m_value); // point to (4, 1.6) in x-y-plot coordinates
+    m_arrow->end->setPixelPosition(QPointF(x, y));
 
-    setTextLabelPosition(QPointF(x + 150, y - 150));
+    setTextLabelPosition(graph, QPointF(x, y) + m_textLabelDelta);
 }
 
-void PlotToolTip::setTextLabelPosition(const QPointF& pos)
+void PlotToolTip::setTextLabelPosition(QCPGraph* graph, const QPointF& pos)
 {
     QRect rect = m_plot->axisRect()->rect();
     double px = pos.x();
@@ -285,13 +303,12 @@ void PlotToolTip::setTextLabelPosition(const QPointF& pos)
     }
 
     m_textLabel->position->setCoords(px, py);
-    m_textLabelPosition = QPointF(px, py);
 
     refreshCloseBox();
 
     {
         double x, y;
-        m_graph->coordsToPixels(m_key, m_value, x, y);
+        graph->coordsToPixels(m_key, m_value, x, y);
         refreshBestArrowAnchor(QPointF(x, y));
     }
 }
@@ -318,7 +335,7 @@ void PlotToolTip::refreshCloseBox()
         m_closeBox->setText("x");
     }
 
-    m_closeBox->setVisible(m_isVisible);
+    //m_closeBox->setVisible(m_isVisible);
     m_closeBox->position->setCoords(m_textLabel->topRight->pixelPosition());// + QPointF(-width, height));
 }
 

@@ -356,8 +356,8 @@ void PlotWidget::selectSensors()
 
 void PlotWidget::clearAnnotations()
 {
-    m_draggedAnnotation = nullptr;
-    m_annotation.reset();
+    m_draggedAnnotationIndex = -1;
+    m_annotation.toolTip.reset();
     m_annotations.clear();
     m_ui.clearAnnotations->setEnabled(false);
     if (m_plot)
@@ -370,8 +370,6 @@ void PlotWidget::clearAnnotations()
 
 void PlotWidget::createPlotWidgets()
 {
-    clearAnnotations();
-
     m_graphs.clear();
 
     QFont font;
@@ -619,7 +617,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
             QCPGraph* graph = m_plot->addGraph(m_axisD, m_axisT);
             graph->setLayer(m_graphsLayer);
             QPen pen = graph->pen();
-            pen.setWidth(2);
+            //pen.setWidth(2);
             pen.setColor(color);
             graph->setPen(pen);
             graph->setName(QString("%1 °C").arg(graphData.sensor.descriptor.name.c_str()));
@@ -634,7 +632,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
             QCPGraph* graph = m_plot->addGraph(m_axisD, m_axisH);
             graph->setLayer(m_graphsLayer);
             QPen pen = graph->pen();
-            pen.setWidth(2);
+            //pen.setWidth(2);
             pen.setColor(color);
             pen.setStyle(Qt::DotLine);
             graph->setPen(pen);
@@ -649,6 +647,25 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
 
     m_graphsLayer->replot();
     m_plot->replot();
+
+	{
+		//clear invalid annotations
+		for (auto it = m_annotations.begin(); it != m_annotations.end();)
+		{
+			if (!findAnnotationGraph(*it))
+			{
+				it = m_annotations.erase(it);
+			}
+			else
+			{
+				++it;
+			}
+		}
+		m_draggedAnnotationIndex = -1;
+		m_annotation.toolTip.reset();
+		m_ui.clearAnnotations->setEnabled(!m_annotations.empty());
+		m_annotationsLayer->replot();
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -656,13 +673,15 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
 void PlotWidget::mousePressEvent(QMouseEvent* event)
 {
     QCPAbstractItem* item = qobject_cast<QCPAbstractItem*>(m_plot->itemAt(event->pos()));
-    for (std::unique_ptr<PlotToolTip>& annotation: m_annotations)
+    int32_t index = 0;
+    for (const Annotation& annotation: m_annotations)
     {
-        if (annotation->mousePressed(item, event->localPos()))
+        if (annotation.toolTip->mousePressed(item, event->localPos()))
         {
-            m_draggedAnnotation = annotation.get();
+            m_draggedAnnotationIndex = index;
             break;
         }
+        index++;
     }
 }
 
@@ -670,10 +689,22 @@ void PlotWidget::mousePressEvent(QMouseEvent* event)
 
 void PlotWidget::mouseReleaseEvent(QMouseEvent* event)
 {
-    if (m_draggedAnnotation)
+    if (m_draggedAnnotationIndex >= 0)
     {
-        m_draggedAnnotation->mouseReleased(event->localPos());
-        m_draggedAnnotation = nullptr;
+        if ((size_t)m_draggedAnnotationIndex >= m_annotations.size())
+        {
+            Q_ASSERT(false);
+        }
+        else
+		{
+            const Annotation& annotation = m_annotations[m_draggedAnnotationIndex];
+            QCPGraph* graph = findAnnotationGraph(annotation);
+            if (graph)
+			{
+				annotation.toolTip->mouseReleased(graph, event->localPos());
+			}
+		}
+		m_draggedAnnotationIndex = -1;
     }
     else
     {
@@ -685,20 +716,34 @@ void PlotWidget::mouseReleaseEvent(QMouseEvent* event)
 
 void PlotWidget::mouseMoveEvent(QMouseEvent* event)
 {
-    if (m_draggedAnnotation)
-    {
-        m_draggedAnnotation->mouseMoved(event->localPos());
-    }
+	if (m_draggedAnnotationIndex >= 0)
+	{
+		if ((size_t)m_draggedAnnotationIndex >= m_annotations.size())
+		{
+			Q_ASSERT(false);
+			m_draggedAnnotationIndex = -1;
+		}
+		else
+		{
+			const Annotation& annotation = m_annotations[m_draggedAnnotationIndex];
+			QCPGraph* graph = findAnnotationGraph(annotation);
+			if (graph)
+			{
+				annotation.toolTip->mouseMoved(graph, event->localPos());
+			}
+		}
+	}
     else
     {
         bool overlaps = false;
         QCPAbstractItem* item = qobject_cast<QCPAbstractItem*>(m_plot->itemAt(event->pos()));
-        for (std::unique_ptr<PlotToolTip>& annotation: m_annotations)
+        for (const Annotation& annotation: m_annotations)
         {
-            if (annotation->mousePressed(item, event->localPos()))
+			QCPGraph* graph = findAnnotationGraph(annotation);
+            if (graph && annotation.toolTip->mouseMoved(graph, event->localPos()))
             {
-                overlaps = true;
-                break;
+				overlaps = true;
+				break;
             }
         }
 
@@ -708,7 +753,7 @@ void PlotWidget::mouseMoveEvent(QMouseEvent* event)
         }
         else
         {
-            m_annotation.reset();
+            m_annotation = Annotation();
         }
     }
     m_annotationsLayer->replot();
@@ -718,10 +763,14 @@ void PlotWidget::mouseMoveEvent(QMouseEvent* event)
 
 void PlotWidget::resizeEvent(QResizeEvent *event)
 {
-    for (std::unique_ptr<PlotToolTip>& p: m_annotations)
-    {
-        p->refresh();
-    }
+	for (const Annotation& annotation : m_annotations)
+	{
+		QCPGraph* graph = findAnnotationGraph(annotation);
+		if (graph)
+		{
+            annotation.toolTip->refresh(graph);
+		}
+	}
     QWidget::resizeEvent(event);
 }
 
@@ -756,7 +805,6 @@ void PlotWidget::showAnnotation(const QPointF& pos)
         return found;
     };
 
-    QCPGraph* bestGraph = nullptr;
     const GraphData* bestGraphData = nullptr;
     bool isTemperature = false;
     for (const auto& pair: m_graphs)
@@ -765,14 +813,12 @@ void PlotWidget::showAnnotation(const QPointF& pos)
         QCPGraph* graph = graphData.temperatureGraph;
         if (graph && computeClosestPoint(graph, pos))
         {
-            bestGraph = graph;
             bestGraphData = &graphData;
             isTemperature = true;
         }
         graph = graphData.humidityGraph;
         if (graph && computeClosestPoint(graph, pos))
         {
-            bestGraph = graph;
             bestGraphData = &graphData;
             isTemperature = false;
         }
@@ -780,26 +826,39 @@ void PlotWidget::showAnnotation(const QPointF& pos)
 
     if (bestGraphData)
     {
-        createAnnotation(bestGraph, QPointF(), key, value, true, bestGraphData->sensor, isTemperature);
+        createAnnotation(bestGraphData->sensor.id, QPointF(), key, value, bestGraphData->sensor, isTemperature);
     }
     else
     {
-        m_annotation.reset();
+        m_annotation = Annotation();
     }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+QCPGraph* PlotWidget::findAnnotationGraph(const Annotation& annotation) const
+{
+    auto it = m_graphs.find(annotation.sensorId);
+    if (it == m_graphs.end())
+    {
+        return nullptr;
+    }
+    const GraphData& gd = it->second;
+    return annotation.isTemperature ? gd.temperatureGraph : gd.humidityGraph;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void PlotWidget::keepAnnotation()
 {
-    if (m_annotation != nullptr)
+    if (m_annotation.toolTip != nullptr)
     {
-        m_annotation->setFixed(true);
+        m_annotation.toolTip->setFixed(true);
 
-        PlotToolTip* annotation = m_annotation.get();
-        connect(annotation, &PlotToolTip::closeMe, [this, annotation]()
+        PlotToolTip* toolTip = m_annotation.toolTip.get();
+        connect(toolTip, &PlotToolTip::closeMe, [this, toolTip]()
         {
-            auto it = std::find_if(m_annotations.begin(), m_annotations.end(), [annotation](std::unique_ptr<PlotToolTip> const& a) { return a.get() == annotation; });
+            auto it = std::find_if(m_annotations.begin(), m_annotations.end(), [toolTip](Annotation const& a) { return a.toolTip.get() == toolTip; });
             if (it != m_annotations.end())
             {
                 m_annotations.erase(it);
@@ -810,47 +869,48 @@ void PlotWidget::keepAnnotation()
         m_annotations.push_back(std::move(m_annotation));
         m_ui.clearAnnotations->setEnabled(true);
 
-        //m_annotation.reset(new PlotToolTip(m_chart));
+        m_annotation = Annotation();
     }
     m_annotationsLayer->replot();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void PlotWidget::createAnnotation(QCPGraph* graph, QPointF point, double key, double value, bool state, DB::Sensor const& sensor, bool temperature)
+void PlotWidget::createAnnotation(DB::SensorId sensorId, QPointF point, double key, double value, DB::Sensor const& sensor, bool temperature)
 {
-    if (m_annotation == nullptr)
+    if (m_annotation.toolTip == nullptr)
     {
-        m_annotation.reset(new PlotToolTip(m_plot, m_annotationsLayer));
+        m_annotation.toolTip.reset(new PlotToolTip(m_plot, m_annotationsLayer));
+    }
+    m_annotation.sensorId = sensorId;
+    m_annotation.isTemperature = temperature;
+
+	QCPGraph* graph = findAnnotationGraph(m_annotation);
+    if (!graph)
+    {
+        return;
     }
 
-    if (state)
+    QColor color = graph->pen().color();
+    QDateTime dt;
+    dt.setSecsSinceEpoch(static_cast<int64_t>(key));
+    if (temperature)
     {
-        QColor color = graph->pen().color();
-        QDateTime dt;
-        dt.setSecsSinceEpoch(static_cast<int64_t>(key));
-        if (temperature)
-        {
-            m_annotation->setText(QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Temperature: <b>%3 °C</b>")
-                               .arg(sensor.descriptor.name.c_str())
-                               .arg(dt.toString("dd-MM-yyyy h:mm"))
-                               .arg(value, 0, 'f', 1)
-                               .arg(color.name()));
-        }
-        else
-        {
-            m_annotation->setText(QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Humidity: <b>%3 %RH</b>")
-                               .arg(sensor.descriptor.name.c_str())
-                               .arg(dt.toString("dd-MM-yyyy h:mm"))
-                               .arg(value, 0, 'f', 1)
-                               .arg(color.name()));
-        }
-        m_annotation->setAnchor(graph, point, key, value);
+        m_annotation.toolTip->setText(graph, QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Temperature: <b>%3 °C</b>")
+                                      .arg(sensor.descriptor.name.c_str())
+                                      .arg(dt.toString("dd-MM-yyyy h:mm"))
+                                      .arg(value, 0, 'f', 1)
+                                      .arg(color.name()));
     }
     else
     {
-        m_annotation.reset();
+        m_annotation.toolTip->setText(graph, QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Humidity: <b>%3 %RH</b>")
+                                      .arg(sensor.descriptor.name.c_str())
+                                      .arg(dt.toString("dd-MM-yyyy h:mm"))
+                                      .arg(value, 0, 'f', 1)
+                                      .arg(color.name()));
     }
+	m_annotation.toolTip->setAnchor(graph, point, key, value);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -894,14 +954,14 @@ QSize PlotWidget::getPlotSize() const
 
 void PlotWidget::saveToPng(const QString& fileName, bool showLegend, bool showAnnotations)
 {
-    if (m_annotation)
+    if (m_annotation.toolTip)
     {
-        m_annotation->setVisible(false);
+        m_annotation.toolTip->setVisible(false);
     }
 
-    for (std::unique_ptr<PlotToolTip>& annotation: m_annotations)
+    for (const Annotation& annotation: m_annotations)
     {
-        annotation->setVisible(showAnnotations);
+        annotation.toolTip->setVisible(showAnnotations);
     }
 
     if (!showLegend)
@@ -918,13 +978,13 @@ void PlotWidget::saveToPng(const QString& fileName, bool showLegend, bool showAn
         m_plot->legend->setVisible(true);
 	}
 
-    if (m_annotation)
+    if (m_annotation.toolTip)
     {
-        m_annotation->setVisible(true);
+        m_annotation.toolTip->setVisible(true);
     }
-    for (std::unique_ptr<PlotToolTip>& annotation: m_annotations)
+    for (const Annotation& annotation: m_annotations)
     {
-        annotation->setVisible(true);
+        annotation.toolTip->setVisible(true);
     }
 }
 

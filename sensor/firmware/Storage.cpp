@@ -21,9 +21,9 @@ struct Item8
     uint8_t m_is_16 : 1;
     //humidity is very unstable so allocate more bits
     uint8_t m_humidity_delta : 4;
-    static constexpr float HUMIDITY_SCALE = 2.f;
+    static constexpr float HUMIDITY_SCALE = 4.f;
     static constexpr float HUMIDITY_INV_SCALE = 1.f / HUMIDITY_SCALE;
-    static constexpr float MAX_HUMIDITY_DELTA = 3.75f; //+-
+    static constexpr float MAX_HUMIDITY_DELTA = 1.875f; //+-
 
     //temp is pretty stable.
     uint8_t m_temperature_delta : 3;
@@ -45,7 +45,7 @@ struct Item16
     uint16_t m_temperature_delta : 7;
     static constexpr float TEMPERATURE_SCALE = 5.f;
     static constexpr float TEMPERATURE_INV_SCALE = 1.f / TEMPERATURE_SCALE;
-    static constexpr float MAX_TEMPERATURE_DELTA = 12.7f;//+-
+    static constexpr float MAX_TEMPERATURE_DELTA = 12.6f;//+-
 
     typedef Storage::Data Data;
 
@@ -68,19 +68,19 @@ static_assert(sizeof(Storage) <= 38 * Storage::MAX_GROUP_COUNT + 18, "");
 bool Item8::pack(const Data& last_data, const Data& data)
 {
     float dt = data.temperature - last_data.temperature;
-    if (fabs(dt) > MAX_TEMPERATURE_DELTA)
+    if (fabsf(dt) > MAX_TEMPERATURE_DELTA)
     {
         return false;
     }
     float dh = data.humidity - last_data.humidity;
-    if (fabs(dh) > MAX_HUMIDITY_DELTA)
+    if (fabsf(dh) > MAX_HUMIDITY_DELTA)
     {
         return false;
     }
 
     m_is_16 = 0;
-    m_humidity_delta = static_cast<uint8_t>((dh + MAX_HUMIDITY_DELTA) * HUMIDITY_SCALE);
-    m_temperature_delta = static_cast<uint8_t>((dt + MAX_TEMPERATURE_DELTA) * TEMPERATURE_SCALE);
+    m_humidity_delta = static_cast<uint8_t>((dh + MAX_HUMIDITY_DELTA) * HUMIDITY_SCALE + 0.5f);
+    m_temperature_delta = static_cast<uint8_t>((dt + MAX_TEMPERATURE_DELTA) * TEMPERATURE_SCALE + 0.5f);
     return true;
 }
 Item8::Data Item8::unpack(const Data& last_data) const
@@ -95,16 +95,16 @@ Item8::Data Item8::unpack(const Data& last_data) const
 bool Item16::pack(const Data& last_data, const Data& data)
 {
     float dt = data.temperature - last_data.temperature;
-    if (fabs(dt) > MAX_TEMPERATURE_DELTA)
+    if (fabsf(dt) > MAX_TEMPERATURE_DELTA)
     {
         return false;
     }
 
     m_is_16 = 1;
-    int16_t ih = static_cast<int16_t>(data.humidity * HUMIDITY_SCALE);
+    int16_t ih = static_cast<int16_t>(data.humidity * HUMIDITY_SCALE + 0.5f);
     m_humidity = static_cast<uint8_t>(std::min(std::max(ih, int16_t(0)), int16_t(255)));
 
-    int16_t idt = static_cast<int16_t>((dt + MAX_TEMPERATURE_DELTA) * TEMPERATURE_SCALE);
+    int16_t idt = static_cast<int16_t>((dt + MAX_TEMPERATURE_DELTA) * TEMPERATURE_SCALE + 0.5f);
     m_temperature_delta = static_cast<uint8_t>(std::min(std::max(idt, int16_t(0)), int16_t(127)));
     return true;
 }
@@ -124,21 +124,21 @@ static constexpr float GROUP_HUMIDITY_INV_SCALE = 1.f / GROUP_HUMIDITY_SCALE;
 static constexpr float GROUP_MIN_HUMIDITY = 0.f;
 static constexpr float GROUP_MAX_HUMIDITY = 100.f;
 
-static constexpr float GROUP_TEMPERATURE_SCALE = 100.f;
+static constexpr float GROUP_TEMPERATURE_SCALE = 327.f;
 static constexpr float GROUP_TEMPERATURE_INV_SCALE = 1.f / GROUP_TEMPERATURE_SCALE;
-static constexpr float GROUP_MIN_TEMPERATURE = -60.f;
-static constexpr float GROUP_MAX_TEMPERATURE = 80.f;
+static constexpr float GROUP_MIN_TEMPERATURE = -100.f;
+static constexpr float GROUP_MAX_TEMPERATURE = 100.f;
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void Storage::Group::pack(const Data& data)
 {
     float humidity = std::min(std::max(data.humidity, GROUP_MIN_HUMIDITY), GROUP_MAX_HUMIDITY);
-    int16_t ih = static_cast<int16_t>(humidity * GROUP_HUMIDITY_SCALE);
+    int16_t ih = static_cast<int16_t>(humidity * GROUP_HUMIDITY_SCALE + 0.5f);
     m_humidity = static_cast<uint8_t>(std::min(std::max(ih, int16_t(0)), int16_t(255)));
 
     float temperature = std::min(std::max(data.temperature, GROUP_MIN_TEMPERATURE), GROUP_MAX_TEMPERATURE);
-    int32_t it = static_cast<int32_t>(temperature * GROUP_TEMPERATURE_SCALE);
+    int32_t it = static_cast<int32_t>(temperature * GROUP_TEMPERATURE_SCALE + 0.5f);
     m_temperature = static_cast<int16_t>(std::min(std::max(it, int32_t(-32767)), int32_t(32767)));
 }
 

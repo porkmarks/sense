@@ -32,7 +32,7 @@ public:
 private slots:
     void resizeEvent(QResizeEvent* event);
     void keepAnnotation();
-    void createAnnotation(QCPGraph* graph, QPointF point, double key, double value, bool state, DB::Sensor const& sensor, bool temperature);
+    void createAnnotation(DB::SensorId sensorId, QPointF point, double key, double value, DB::Sensor const& sensor, bool temperature);
     void plotContextMenu(QPoint const& position);
     void refresh();
     void scheduleSlowRefresh();
@@ -76,8 +76,17 @@ private:
 
     void createPlotWidgets();
 
-    std::unique_ptr<PlotToolTip> m_annotation;
-    std::vector<std::unique_ptr<PlotToolTip>> m_annotations;
+    struct Annotation
+    {
+        std::unique_ptr<PlotToolTip> toolTip;
+        DB::SensorId sensorId;
+        bool isTemperature = false;
+    };
+
+    Annotation m_annotation;
+    std::vector<Annotation> m_annotations;
+
+	QCPGraph* findAnnotationGraph(const Annotation& annotation) const;
 
 //    QChart* m_chart = nullptr;
 //    QDateTimeAxis* m_axisX = nullptr;
@@ -102,7 +111,7 @@ private:
     Ui::PlotWidget m_ui;
     std::vector<QMetaObject::Connection> m_uiConnections;
 
-    PlotToolTip* m_draggedAnnotation = nullptr;
+    int32_t m_draggedAnnotationIndex = -1;
     //bool m_isDragging = false;
 };
 

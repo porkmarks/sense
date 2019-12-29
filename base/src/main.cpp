@@ -79,6 +79,8 @@ int main(int, const char**)
 
     srand(time(nullptr));
 
+    //run_tests();
+
     if (gpioInitialise() < 0)
     {
         LOGE << "GPIO init failed." << std::endl;

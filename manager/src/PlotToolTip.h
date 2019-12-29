@@ -13,15 +13,15 @@ public:
     ~PlotToolTip();
 
     bool mousePressed(QCPAbstractItem* item, const QPointF& pos);
-    void mouseMoved(const QPointF& pos);
-    void mouseReleased(const QPointF& pos);
+    bool mouseMoved(QCPGraph* graph, const QPointF& pos);
+    void mouseReleased(QCPGraph* graph, const QPointF& pos);
 
     void setFixed(bool fixed);
-    void setText(const QString& text);
+    void setText(QCPGraph* graph, const QString& text);
     void setAnchor(QCPGraph* graph, const QPointF point, double key, double value);
     void setVisible(bool visible);
 
-    void refresh();
+    void refresh(QCPGraph* graph);
 
 //    QRectF boundingRect() const;
 //    void paint(QPainter* painter, const QStyleOptionGraphicsItem* option,QWidget* widget);
@@ -30,11 +30,11 @@ signals:
     void closeMe();
 
 private:
-    void updateGeometry();
+    void updateGeometry(QCPGraph* graph);
     void refreshBestArrowAnchor(const QPointF& point);
     void refreshCloseBox();
-    void applyTextLabelPositionDelta(const QPointF& delta);
-    void setTextLabelPosition(const QPointF& pos);
+    void applyTextLabelPositionDelta(QCPGraph* graph, const QPointF& delta);
+    void setTextLabelPosition(QCPGraph* graph, const QPointF& pos);
 
     QCustomPlot* m_plot = nullptr;
     QCPLayer* m_layer = nullptr;
@@ -42,10 +42,10 @@ private:
     bool m_isFixed = false;
 
     QString m_text;
-    QPointF m_textLabelPosition;
+    QPointF m_textLabelDelta;
     double m_key = 0;
     double m_value = 0;
-    QCPGraph* m_graph = nullptr;
+    //QCPGraph* m_graph = nullptr;
     QCPItemText* m_textLabel = nullptr;
     QCPItemLine* m_arrow = nullptr;
     QCPItemText* m_closeBox = nullptr;
