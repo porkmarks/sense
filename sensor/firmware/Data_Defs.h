@@ -57,7 +57,7 @@ typedef uint8_t QVCC;
 inline QVCC pack_qvcc(float vcc)
 {
     vcc -= 2.f;
-    return static_cast<QVCC>(fmin(fmax(vcc, 0.f), 2.55f) * 100.f);
+    return static_cast<QVCC>(fmin(fmax(vcc, 0.f), 2.54f) * 100.f + 0.5f);
 }
 inline float unpack_qvcc(QVCC qvcc)
 {
