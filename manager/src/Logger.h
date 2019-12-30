@@ -8,6 +8,10 @@
 #include <QString>
 #include <QObject>
 #include <QTimer>
+#include "Result.h"
+
+struct sqlite3;
+struct sqlite3_stmt;
 
 class Logger : public QObject
 {
@@ -22,12 +26,12 @@ public:
 
     void process();
 
-    bool create(std::string const& name);
-    bool load(std::string const& name);
+	static Result<void> create(sqlite3& db);
+    bool load(sqlite3& db);
 
     enum class Type : uint8_t
     {
-        VERBOSE,
+        VERBOSE = 0,
         INFO,
         WARNING,
         CRITICAL
@@ -73,57 +77,9 @@ signals:
     void logLinesAdded();
 
 private:
-    void triggerSave();
-    void triggerDelayedSave(Clock::duration i_dt);
+    void addToDB(std::string const& message, Type type);
 
-#pragma pack(push, 1) // exact fit - no padding
-
-    struct StoredLogLine
-    {
-        uint64_t timePoint; //milliseconds
-        uint32_t index;
-        uint32_t messageOffset;
-        uint32_t messageSize;
-    };
-
-#pragma pack(pop) // exact fit - no padding
-
-    struct Data
-    {
-        std::string logs;
-        std::vector<StoredLogLine> storedVerboseLogLines;
-        std::vector<StoredLogLine> storedInfoLogLines;
-        std::vector<StoredLogLine> storedWarningLogLines;
-        std::vector<StoredLogLine> storedCriticalLogLines;
-    };
-
-    bool load(Data& data, std::string const& filename) const;
-    bool loadV2(Data& data, std::string const& filename, std::ifstream& file) const;
-
-    //bool loadAndMerge(Data& data, Data const& delta) const;
-
-    mutable std::mutex m_mainDataMutex;
-    Data m_mainData;
-    uint32_t m_mainDataLastLineIndex = 0;
-
-    std::atomic_bool m_threadsExit = { false };
-
-    void storeThreadProc();
-    void save(Data const& data) const;
-    std::atomic_bool m_storeThreadTriggered = { false };
-    std::thread m_storeThread;
-    std::condition_variable m_storeCV;
-    std::mutex m_storeMutex;
-    Data m_storeData;
-
-    std::string m_dataFolder;
-    std::string m_dataName;
-
-    mutable Clock::time_point m_lastDailyBackupTP = Clock::time_point(Clock::duration::zero());
-    mutable Clock::time_point m_lastWeeklyBackupTP = Clock::time_point(Clock::duration::zero());
-
-    std::mutex m_delayedTriggerSaveMutex;
-    bool m_delayedTriggerSave = false;
-    Clock::time_point m_delayedTriggerSaveTP;
+    sqlite3* m_sqlite = nullptr;
+	sqlite3_stmt* m_insertStmt = nullptr;
 };
 

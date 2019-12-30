@@ -14,7 +14,9 @@
 
 #include "DB.h"
 #include "Emailer.h"
-#include "cereal/cereal.hpp"
+#include "Result.h"
+
+struct sqlite3;
 
 class Settings : public QObject
 {
@@ -26,8 +28,8 @@ public:
     typedef std::chrono::system_clock Clock;
 
     void process();
-    bool create(std::string const& name);
-    bool load(std::string const& name);
+    static Result<void> create(sqlite3& db);
+    bool load(sqlite3& db);
 
     DB const& getDB() const;
     DB& getDB();
@@ -50,18 +52,6 @@ public:
         std::string folder;
         bool uploadBackups = false;
         Clock::duration uploadBackupsPeriod = std::chrono::hours(24);
-
-		template<class Archive> void save(Archive& archive, std::uint32_t const version) const
-		{
-            int64_t seconds = std::chrono::duration_cast<std::chrono::seconds>(uploadBackupsPeriod).count();
-			archive(CEREAL_NVP(host), CEREAL_NVP(port), CEREAL_NVP(username), CEREAL_NVP(password), CEREAL_NVP(folder), CEREAL_NVP(uploadBackups), cereal::make_nvp("uploadBackupsPeriod", seconds));
-		}
-		template<class Archive> void load(Archive& archive, std::uint32_t const version)
-		{
-            int64_t seconds;
-			archive(CEREAL_NVP(host), CEREAL_NVP(port), CEREAL_NVP(username), CEREAL_NVP(password), CEREAL_NVP(folder), CEREAL_NVP(uploadBackups), cereal::make_nvp("uploadBackupsPeriod", seconds));
-            uploadBackupsPeriod = std::chrono::seconds(std::max<int64_t>(seconds, 0));
-		}
     };
 
     bool setFtpSettings(FtpSettings const& settings);
@@ -104,18 +94,6 @@ public:
             Normal
         };
         Type type = Type::Normal;
-
-		template<class Archive> void serialize(Archive& archive, std::uint32_t const version)
-		{
-            if (version == 0)
-			{
-				archive(CEREAL_NVP(name), CEREAL_NVP(passwordHash), CEREAL_NVP(type));
-			}
-            else
-            {
-				archive(CEREAL_NVP(name), CEREAL_NVP(passwordHash), CEREAL_NVP(permissions), CEREAL_NVP(type));
-            }
-		}
     };
 
     typedef uint32_t UserId;
@@ -123,11 +101,7 @@ public:
     {
         UserDescriptor descriptor;
         UserId id = 0;
-
-		template<class Archive> void serialize(Archive& archive, std::uint32_t const version)
-		{
-			archive(CEREAL_NVP(descriptor), CEREAL_NVP(id));
-		}
+        Clock::time_point lastLogin = Clock::time_point(Clock::duration::zero());
     };
 
     size_t getUserCount() const;
@@ -172,13 +146,9 @@ private:
         FtpSettings ftpSettings;
         std::vector<User> users;
         UserId lastUserId = 0;
-
-		template<class Archive> void serialize(Archive& archive, std::uint32_t const version)
-		{
-			archive(CEREAL_NVP(emailSettings), CEREAL_NVP(ftpSettings), CEREAL_NVP(users));
-		}
     };
 
+    sqlite3* m_sqlite = nullptr;
     Data m_mainData;
     UserId m_loggedInUserId = UserId(-1);
 
@@ -194,7 +164,4 @@ private:
     Data m_storeData;
 
     std::string m_dataName;
-
-    mutable Clock::time_point m_lastDailyBackupTP = Clock::time_point(Clock::duration::zero());
-    mutable Clock::time_point m_lastWeeklyBackupTP = Clock::time_point(Clock::duration::zero());
 };

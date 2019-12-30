@@ -7,6 +7,8 @@
 #include "DB.h"
 #include "Logger.h"
 
+struct sqlite3;
+
 class Manager : public QMainWindow
 {
 public:
@@ -39,6 +41,8 @@ private:
 
     Ui::Manager m_ui;
     int m_currentTabIndex = 0;
+
+	std::unique_ptr<sqlite3, int(*)(sqlite3*)> m_sqlite;
 };
 
 

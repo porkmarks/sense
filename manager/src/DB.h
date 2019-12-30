@@ -3,6 +3,7 @@
 #include <QObject>
 #include <array>
 #include <chrono>
+#include <optional>
 #include <string>
 #include <vector>
 #include <set>
@@ -14,6 +15,8 @@
 #include "Result.h"
 #include "Radio.h"
 #include "cereal/cereal.hpp"
+
+struct sqlite3;
 
 class DB : public QObject
 {
@@ -27,6 +30,8 @@ public:
     void test();
 
     void process();
+
+	static Result<void> create(sqlite3& db);
     Result<void> create();
     Result<void> load();
 
@@ -454,7 +459,7 @@ private:
 
 #pragma pack(push, 1) // exact fit - no padding
 
-    struct StoredMeasurement
+	struct PackedMeasurement
     {
         uint32_t index;
         uint64_t timePoint;
@@ -469,12 +474,12 @@ private:
 
 #pragma pack(pop) // exact fit - no padding
 
-    typedef std::vector<StoredMeasurement> StoredMeasurements;
+    typedef std::vector<PackedMeasurement> PackedMeasurements;
 
-    static inline StoredMeasurement pack(Measurement const& m);
-    static inline Measurement unpack(SensorId sensorId, StoredMeasurement const& m);
+    static inline PackedMeasurement pack(Measurement const& m);
+    static inline Measurement unpack(SensorId sensorId, PackedMeasurement const& m);
     static inline MeasurementId computeMeasurementId(MeasurementDescriptor const& md);
-    static inline MeasurementId computeMeasurementId(SensorId sensorId, StoredMeasurement const& m);
+    static inline MeasurementId computeMeasurementId(SensorId sensorId, PackedMeasurement const& m);
     static inline SensorId getSensorIdFromMeasurementId(MeasurementId id);
 
     Clock::time_point computeNextCommsTimePoint(Sensor const& sensor, size_t sensorIndex) const;
@@ -492,7 +497,7 @@ private:
         std::vector<Sensor> sensors;
         std::vector<Alarm> alarms;
         std::vector<Report> reports;
-        std::map<SensorId, StoredMeasurements> measurements;
+        std::map<SensorId, PackedMeasurements> measurements;
         std::vector<MeasurementId> sortedMeasurementIds;
         BaseStationId lastBaseStationId = 0;
         SensorId lastSensorId = 0;
@@ -518,6 +523,7 @@ private:
     void triggerDelayedSave(Clock::duration i_dt);
     void storeThreadProc();
     void save(Data const& data) const;
+
     std::atomic_bool m_storeThreadTriggered = { false };
     std::thread m_storeThread;
     std::condition_variable m_storeCV;

@@ -9,6 +9,7 @@
 #include "Crypt.h"
 #include "Logger.h"
 #include "Settings.h"
+#include "sqlite3.h"
 
 #ifdef NDEBUG
 #   define CHECK_PASSWORD
@@ -17,6 +18,7 @@
 static const std::string s_version = "1.0.16";
 
 Logger s_logger;
+extern std::string s_dataFolder;
 
 extern std::string k_passwordHashReferenceText;
 
@@ -31,27 +33,65 @@ std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac)
 
 Manager::Manager(QWidget *parent)
     : QMainWindow(parent)
+	, m_sqlite(nullptr, &sqlite3_close)
 {
     m_ui.setupUi(this);
 
-    if (!s_logger.load("log"))
+	{
+		std::string dataFilename = s_dataFolder + "/sense.db";
+		sqlite3* db;
+		if (sqlite3_open_v2(dataFilename.c_str(), &db, SQLITE_OPEN_READWRITE, nullptr))
+		{
+            if (sqlite3_open_v2(dataFilename.c_str(), &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr))
+            {
+                QMessageBox::critical(this, "Error", QString("Cannot load nor create the database file: %1").arg(sqlite3_errmsg(db)));
+                sqlite3_close(db);
+                exit(-1);
+            }
+// 			sqlite3_exec(db, "PRAGMA synchronous = OFF", NULL, NULL, nullptr);
+// 			sqlite3_exec(db, "PRAGMA journal_mode = MEMORY", NULL, NULL, nullptr);
+
+            Result<void> result = Logger::create(*db);
+            if (result != success)
+			{
+				QMessageBox::critical(this, "Error", QString("Cannot create logging db structure: %1").arg(result.error().what().c_str()));
+				sqlite3_close(db);
+                remove(dataFilename.c_str());
+				exit(-1);
+			}
+			result = Settings::create(*db);
+			if (result != success)
+			{
+				QMessageBox::critical(this, "Error", QString("Cannot create settings db structure: %1").arg(result.error().what().c_str()));
+				sqlite3_close(db);
+                remove(dataFilename.c_str());
+				exit(-1);
+			}
+			result = DB::create(*db);
+			if (result != success)
+			{
+				QMessageBox::critical(this, "Error", QString("Cannot create measurements db structure: %1").arg(result.error().what().c_str()));
+				sqlite3_close(db);
+                remove(dataFilename.c_str());
+				exit(-1);
+			}
+		}
+
+        m_sqlite = std::unique_ptr<sqlite3, int(*)(sqlite3*)>(db, &sqlite3_close);
+	}
+
+    if (!s_logger.load(*m_sqlite))
     {
-        if (!s_logger.create("log"))
-        {
-            QMessageBox::critical(this, "Error", "Cannot create the log file.");
-            exit(1);
-        }
+        QMessageBox::critical(this, "Error", "Cannot load the logging module.");
+        exit(1);
     }
     s_logger.logInfo("Program started");
 
-    if (!m_settings.load("settings"))
+    if (!m_settings.load(*m_sqlite))
     {
-        if (!m_settings.create("settings"))
-        {
-            s_logger.logCritical("Cannot create the settings file");
-            QMessageBox::critical(this, "Error", "Cannot create the settings file.");
-            exit(1);
-        }
+        s_logger.logCritical("Cannot load settings");
+        QMessageBox::critical(this, "Error", "Cannot load settings module.");
+        exit(1);
     }
 
     m_ui.settingsWidget->init(m_comms, m_settings);

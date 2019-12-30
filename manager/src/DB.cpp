@@ -8,6 +8,7 @@
 #include <QApplication>
 #include <QDateTime>
 #include <QDir>
+#include <QByteArray>
 
 #include "cereal/archives/json.hpp"
 #include "cereal/types/vector.hpp"
@@ -21,6 +22,7 @@
 #include "Utils.h"
 #include "Crypt.h"
 #include "Logger.h"
+#include "sqlite3.h"
 
 #ifdef NDEBUG
 #   define USE_DB_ENCRYPTION
@@ -213,6 +215,75 @@ DB::~DB()
 
 //////////////////////////////////////////////////////////////////////////
 
+Result<void> DB::create(sqlite3& db)
+{
+	char* errorMsg = nullptr;
+	{
+		const char* sqlCreateTable = "CREATE TABLE BaseStations (id INTEGER PRIMARY KEY, name STRING, mac STRING);";
+		if (sqlite3_exec(&db, sqlCreateTable, NULL, NULL, &errorMsg))
+		{
+			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			sqlite3_free(errorMsg);
+			return error;
+		}
+	}
+	{
+		const char* sqlCreateTable = "CREATE TABLE SensorsConfigs (id INTEGER PRIMARY KEY, baselineMeasurementTimePoint DATETIME, baselineMeasurementIndex INTEGER, sensorsPower INTEGER, measurementPeriod INTEGER, commsPeriod INTEGER);";
+		if (sqlite3_exec(&db, sqlCreateTable, NULL, NULL, &errorMsg))
+		{
+			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			sqlite3_free(errorMsg);
+			return error;
+		}
+	}
+	{
+		const char* sqlCreateTable = "CREATE TABLE Sensors (id INTEGER PRIMARY KEY, name STRING, address INTEGER, sensorType INTEGER, hardwareVersion INTEGER, softwareVersion INTEGER, "
+            "temperatureBias REAL, humidityBias REAL, serialNumber INTEGER, state INTEGER, shouldSleep BOOLEAN, sleepStateTimePoint DATETIME, commsErrorCounter INTEGER, "
+            "unknownRebootsErrorCounter INTEGER, powerOnRebootsErrorCounter INTEGER, resetRebootsErrorCounter INTEGER, brownoutRebootsErrorCounter INTEGER, watchdogRebootsErrorCounter INTEGER, lastCommsTimePoint DATETIME, lastConfirmedMeasurementIndex INTEGER, "
+            "firstStoredMeasurementIndex INTEGER, storedMeasurementCount INTEGER, estimatedStoredMeasurementCount INTEGER, lastSignalStrengthB2S INTEGER, averageSignalStrengthB2S INTEGER, averageSignalStrengthS2B INTEGER, averageCombinedSignalStrength INTEGER, "
+            "isMeasurementValid BOOLEAN, measurementTemperature REAL, measurementHumidity REAL, measurementVcc REAL);";
+		if (sqlite3_exec(&db, sqlCreateTable, NULL, NULL, &errorMsg))
+		{
+			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			sqlite3_free(errorMsg);
+			return error;
+		}
+	}
+	{
+		const char* sqlCreateTable = "CREATE TABLE Alarms (id INTEGER PRIMARY KEY, filterSensors BOOLEAN, sensors STRING, lowTemperatureWatch BOOLEAN, lowTemperature REAL, highTemperatureWatch BOOLEAN, highTemperature REAL, "
+            "lowHumidityWatch BOOLEAN, lowHumidity REAL, highHumidityWatch BOOLEAN, highHumidity REAL, "
+            "lowVccWatch BOOLEAN, highSignalWatch BOOLEAN, "
+            "sendEmailAction BOOLEAN);";
+		if (sqlite3_exec(&db, sqlCreateTable, NULL, NULL, &errorMsg))
+		{
+			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			sqlite3_free(errorMsg);
+			return error;
+		}
+	}
+	{
+		const char* sqlCreateTable = "CREATE TABLE Reports (id INTEGER PRIMARY KEY, name STRING, period INTEGER, customPeriod INTEGER, data INTEGER, filterSensors BOOLEAN, sensors STRING, lastTriggeredTimePoint DATETIME);";
+		if (sqlite3_exec(&db, sqlCreateTable, NULL, NULL, &errorMsg))
+		{
+			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			sqlite3_free(errorMsg);
+			return error;
+		}
+	} {
+		const char* sqlCreateTable = "CREATE TABLE Measurements (id INTEGER PRIMARY KEY, timePoint DATETIME, idx INTEGER, sensorId INTEGER, temperature REAL, humidity REAL, vcc REAL, signalStrengthS2B INTEGER, signalStrengthB2S INTEGER, "
+            "sensorErrors INTEGER, alarmTriggers INTEGER, compinedSignalStrength INTEGER);";
+		if (sqlite3_exec(&db, sqlCreateTable, NULL, NULL, &errorMsg))
+		{
+			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			sqlite3_free(errorMsg);
+			return error;
+		}
+	}
+	return success;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 Result<void> DB::create()
 {
     std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
@@ -224,8 +295,8 @@ Result<void> DB::create()
     std::string dataFilename = s_dataFolder + "/" + m_dataName;
     std::string dbFilename = s_dataFolder + "/" + m_dbName;
 
-    moveToBackup(m_dbName, dbFilename, s_dataFolder + "/backups/deleted", 50);
-    moveToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/deleted", 50);
+    utils::moveToBackup(m_dbName, dbFilename, s_dataFolder + "/backups/deleted", 50);
+    utils::moveToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/deleted", 50);
 
     remove((dbFilename).c_str());
     remove((dataFilename).c_str());
@@ -389,25 +460,25 @@ Result<void> DB::load()
             }
             Sensor& sensor = *sensorIt;
 
-            StoredMeasurements& storedMeasurements = data.measurements[sensorId];
+            PackedMeasurements& packedMeasurements = data.measurements[sensorId];
 
-            size_t recordSize = sizeof(StoredMeasurement);
-            storedMeasurements.resize(measurementsCount);
-            if (stream.read(reinterpret_cast<char*>(storedMeasurements.data()), storedMeasurements.size() * recordSize).bad())
+			size_t recordSize = sizeof(PackedMeasurement);
+			packedMeasurements.resize(measurementsCount);
+            if (stream.read(reinterpret_cast<char*>(packedMeasurements.data()), packedMeasurements.size() * recordSize).bad())
             {
                 s_logger.logCritical(QString("Failed to read '%1': %2").arg(dbFilename.c_str()).arg(std::strerror(errno)));
                 return Error("Cannot open DB");
             }
 
-            std::sort(storedMeasurements.begin(), storedMeasurements.end(), [](StoredMeasurement const& a, StoredMeasurement const& b)
+			std::sort(packedMeasurements.begin(), packedMeasurements.end(), [](PackedMeasurement const& a, PackedMeasurement const& b)
             {
                 return a.timePoint < b.timePoint;
             });
 
-            for (auto it = storedMeasurements.begin(); it != storedMeasurements.end();)
+			for (auto it = packedMeasurements.begin(); it != packedMeasurements.end();)
             {
-                StoredMeasurement& sm = *it;
-                Measurement measurement = unpack(sensorId, sm);
+				PackedMeasurement& pm = *it;
+                Measurement measurement = unpack(sensorId, pm);
                 MeasurementId id = computeMeasurementId(measurement.descriptor);
 
 //                std::cout << "index: " << std::to_string(measurement.descriptor.index) << " s: " << std::to_string(measurement.descriptor.sensorId) << "\n";
@@ -417,8 +488,8 @@ Result<void> DB::load()
                 auto lbit = std::lower_bound(data.sortedMeasurementIds.begin(), data.sortedMeasurementIds.end(), id);
                 if (lbit != data.sortedMeasurementIds.end() && *lbit == id)
                 {
-                    s_logger.logWarning(QString("Duplicate measurement index %1 found. Deleting it").arg(sm.index));
-                    storedMeasurements.erase(it);
+                    s_logger.logWarning(QString("Duplicate measurement index %1 found. Deleting it").arg(pm.index));
+					packedMeasurements.erase(it);
                 }
                 else
                 {
@@ -427,9 +498,9 @@ Result<void> DB::load()
                 }
             }
 
-            if (!storedMeasurements.empty())
+            if (!packedMeasurements.empty())
             {
-                Measurement measurement = unpack(sensorId, storedMeasurements.back());
+                Measurement measurement = unpack(sensorId, packedMeasurements.back());
                 sensor.isMeasurementValid = true;
                 sensor.measurementTemperature = measurement.descriptor.temperature;
                 sensor.measurementHumidity = measurement.descriptor.humidity;
@@ -440,7 +511,7 @@ Result<void> DB::load()
 
     std::flush(std::cout);
 
-    std::pair<std::string, time_t> bkf = getMostRecentBackup(dbFilename, s_dataFolder + "/backups/daily");
+    std::pair<std::string, time_t> bkf = utils::getMostRecentBackup(dbFilename, s_dataFolder + "/backups/daily");
     if (bkf.first.empty())
     {
         m_lastDailyBackupTP = DB::Clock::now();
@@ -449,7 +520,7 @@ Result<void> DB::load()
     {
         m_lastDailyBackupTP = DB::Clock::from_time_t(bkf.second);
     }
-    bkf = getMostRecentBackup(dbFilename, s_dataFolder + "/backups/weekly");
+    bkf = utils::getMostRecentBackup(dbFilename, s_dataFolder + "/backups/weekly");
     if (bkf.first.empty())
     {
         m_lastWeeklyBackupTP = DB::Clock::now();
@@ -493,9 +564,9 @@ Result<void> DB::load()
 
 //void DB::test()
 //{
-//    for (StoredMeasurement const& sm: m_mainData.measurements.begin()->second)
+//    for (PackedMeasurement const& pm: m_mainData.measurements.begin()->second)
 //    {
-//        Measurement measurement = unpack(m_mainData.measurements.begin()->first, sm);
+//        Measurement measurement = unpack(m_mainData.measurements.begin()->first, pm);
 //        computeTriggeredAlarm(measurement.descriptor);
 //    }
 //}
@@ -1239,9 +1310,9 @@ void DB::removeSensor(size_t index)
         auto it = m_mainData.measurements.find(sensorId);
         if (it != m_mainData.measurements.end())
         {
-            for (StoredMeasurement const& sm: it->second)
+			for (PackedMeasurement const& pm : it->second)
             {
-                MeasurementId id = computeMeasurementId(sensorId, sm);
+                MeasurementId id = computeMeasurementId(sensorId, pm);
                 auto sit = std::lower_bound(m_mainData.sortedMeasurementIds.begin(), m_mainData.sortedMeasurementIds.end(), id);
                 if (sit != m_mainData.sortedMeasurementIds.end() && *sit == id)
                 {
@@ -1525,7 +1596,7 @@ uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
         triggers |= AlarmTrigger::Humidity;
     }
 
-    float alertLevelVcc = k_alertBatteryLevel * (k_maxBatteryLevel - k_minBatteryLevel) + k_minBatteryLevel;
+    float alertLevelVcc = utils::k_alertBatteryLevel * (utils::k_maxBatteryLevel - utils::k_minBatteryLevel) + utils::k_minBatteryLevel;
     if (ad.lowVccWatch && m.descriptor.vcc <= alertLevelVcc)
     {
         triggers |= AlarmTrigger::LowVcc;
@@ -1535,7 +1606,7 @@ uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
 //            triggers |= AlarmTrigger::SensorErrors;
 //        }
 
-    float alertLevelSignal = k_alertSignalLevel * (k_maxSignalLevel - k_minSignalLevel) + k_minSignalLevel;
+    float alertLevelSignal = utils::k_alertSignalLevel * (utils::k_maxSignalLevel - utils::k_minSignalLevel) + utils::k_minSignalLevel;
     if (ad.lowSignalWatch && m.combinedSignalStrength <= alertLevelSignal)
     {
         triggers |= AlarmTrigger::LowSignal;
@@ -1878,15 +1949,15 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
 
         //insert sorted data
         {
-            StoredMeasurements& storedMeasurements = m_mainData.measurements[md.sensorId];
+			PackedMeasurements& packedMeasurements = m_mainData.measurements[md.sensorId];
 
             uint64_t mdtp = static_cast<uint64_t>(Clock::to_time_t(measurement.timePoint));
-            auto smit = std::lower_bound(storedMeasurements.begin(), storedMeasurements.end(), mdtp, [](StoredMeasurement const& sm, uint64_t mdtp)
+			auto pmit = std::lower_bound(packedMeasurements.begin(), packedMeasurements.end(), mdtp, [](PackedMeasurement const& pm, uint64_t mdtp)
             {
-                return sm.timePoint < mdtp;
+                return pm.timePoint < mdtp;
             });
 
-            storedMeasurements.insert(smit, pack(measurement));
+			packedMeasurements.insert(pmit, pack(measurement));
         }
         minIndex = std::min(minIndex, md.index);
         maxIndex = std::max(maxIndex, md.index);
@@ -1934,9 +2005,9 @@ std::vector<DB::Measurement> DB::getAllMeasurements() const
 
     for (auto const& pair : m_mainData.measurements)
     {
-        for (StoredMeasurement const& sm: pair.second)
+		for (PackedMeasurement const& pm : pair.second)
         {
-            result.push_back(unpack(pair.first, sm));
+            result.push_back(unpack(pair.first, pm));
         }
     }
     return result;
@@ -1979,8 +2050,10 @@ size_t DB::getFilteredMeasurementCount(Filter const& filter) const
 
 //////////////////////////////////////////////////////////////////////////
 
-size_t DB::_getFilteredMeasurements(Filter const& filter, std::vector<DB::Measurement>* result) const
+size_t DB::_getFilteredMeasurements(Filter const& filter, std::vector<DB::Measurement>* out) const
 {
+    Clock::time_point start = Clock::now();
+
     size_t count = 0;
     for (auto const& pair : m_mainData.measurements)
     {
@@ -1993,27 +2066,27 @@ size_t DB::_getFilteredMeasurements(Filter const& filter, std::vector<DB::Measur
             }
         }
 
-        StoredMeasurements const& storedMeasurements = pair.second;
+		PackedMeasurements const& packedMeasurements = pair.second;
 
         //find the first date
         if (filter.useTimePointFilter)
         {
             uint64_t mintp = static_cast<uint64_t>(Clock::to_time_t(filter.timePointFilter.min));
             uint64_t maxtp = static_cast<uint64_t>(Clock::to_time_t(filter.timePointFilter.max));
-            auto smit = std::lower_bound(storedMeasurements.begin(), storedMeasurements.end(), mintp, [](StoredMeasurement const& sm, uint64_t mintp)
+			auto pmit = std::lower_bound(packedMeasurements.begin(), packedMeasurements.end(), mintp, [](PackedMeasurement const& pm, uint64_t mintp)
             {
-                return sm.timePoint < mintp;
+                return pm.timePoint < mintp;
             });
 
             //get all results
-            for (auto it = smit; it != storedMeasurements.end() && it->timePoint <= maxtp; ++it)
+			for (auto it = pmit; it != packedMeasurements.end() && it->timePoint <= maxtp; ++it)
             {
                 Measurement m = unpack(sensorId, *it);
                 if (cull(m, filter))
                 {
-                    if (result)
+                    if (out)
                     {
-                        result->push_back(m);
+                        out->push_back(m);
                     }
                     count++;
                 }
@@ -2021,14 +2094,14 @@ size_t DB::_getFilteredMeasurements(Filter const& filter, std::vector<DB::Measur
         }
         else
         {
-            for (StoredMeasurement const& sm: storedMeasurements)
+			for (PackedMeasurement const& pm : packedMeasurements)
             {
-                Measurement m = unpack(sensorId, sm);
+                Measurement m = unpack(sensorId, pm);
                 if (cull(m, filter))
                 {
-                    if (result)
+                    if (out)
                     {
-                        result->push_back(m);
+                        out->push_back(m);
                     }
                     count++;
                 }
@@ -2050,12 +2123,12 @@ Result<DB::Measurement> DB::getLastMeasurementForSensor(SensorId sensorId) const
         return Error("Sensor not found");
     }
 
-    const StoredMeasurements& storedMeasurements = it->second;
-    if (storedMeasurements.empty())
+	const PackedMeasurements& packedMeasurements = it->second;
+    if (packedMeasurements.empty())
     {
         return Error("No data");
     }
-    return unpack(sensorId, storedMeasurements.back());
+    return unpack(sensorId, packedMeasurements.back());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -2069,14 +2142,14 @@ Result<DB::Measurement> DB::findMeasurementById(MeasurementId id) const
 		return Error("Cannot find measurements for sensor");
 	}
     
-    const StoredMeasurements& sm = it->second;
+	const PackedMeasurements& pm = it->second;
 
-    auto smit = std::find_if(sm.begin(), sm.end(), [id, sensorId](const StoredMeasurement& _sm) { return computeMeasurementId(sensorId, _sm) == id; });
-    if (smit == sm.end())
+    auto pmit = std::find_if(pm.begin(), pm.end(), [id, sensorId](const PackedMeasurement& _pm) { return computeMeasurementId(sensorId, _pm) == id; });
+    if (pmit == pm.end())
     {
 		return Error("Cannot find measurement");
     }
-    return unpack(sensorId, *smit);
+    return unpack(sensorId, *pmit);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -2090,17 +2163,17 @@ Result<void> DB::setMeasurement(MeasurementId id, MeasurementDescriptor const& m
 		return Error("Cannot find measurements for sensor");
 	}
 
-	StoredMeasurements& sms = it->second;
+    PackedMeasurements& pms = it->second;
 
-	auto smit = std::find_if(sms.begin(), sms.end(), [id, sensorId](const StoredMeasurement& _sm) { return computeMeasurementId(sensorId, _sm) == id; });
-	if (smit == sms.end())
+	auto pmit = std::find_if(pms.begin(), pms.end(), [id, sensorId](const PackedMeasurement& _pm) { return computeMeasurementId(sensorId, _pm) == id; });
+	if (pmit == pms.end())
 	{
 		return Error("Cannot find measurement");
 	}
-    StoredMeasurement& sm = *smit;
-    Measurement m = unpack(sensorId, sm);
+    PackedMeasurement& pm = *pmit;
+    Measurement m = unpack(sensorId, pm);
     m.descriptor = measurement;
-    sm = pack(m);
+    pm = pack(m);
 
     emit measurementsChanged(sensorId);
 
@@ -2174,38 +2247,38 @@ bool DB::cull(Measurement const& m, Filter const& filter) const
 
 //////////////////////////////////////////////////////////////////////////
 
-inline DB::StoredMeasurement DB::pack(Measurement const& m)
+inline DB::PackedMeasurement DB::pack(Measurement const& m)
 {
-    StoredMeasurement sm;
-    sm.index = m.descriptor.index;
-    sm.timePoint = static_cast<uint64_t>(Clock::to_time_t(m.timePoint));
-    sm.temperature = static_cast<int16_t>(std::max(std::min(m.descriptor.temperature, 320.f), -320.f) * 100.f);
-    sm.humidity = static_cast<int16_t>(std::max(std::min(m.descriptor.humidity, 320.f), -320.f) * 100.f);
-    sm.vcc = static_cast<uint8_t>(std::max(std::min((m.descriptor.vcc - 2.f), 2.55f), 0.f) * 100.f);
-    sm.b2s = m.descriptor.signalStrength.b2s;
-    sm.s2b = m.descriptor.signalStrength.s2b;
-    sm.sensorErrors = m.descriptor.sensorErrors;
-    sm.alarmTriggers = m.alarmTriggers;
-    return sm;
+    PackedMeasurement pm;
+    pm.index = m.descriptor.index;
+    pm.timePoint = static_cast<uint64_t>(Clock::to_time_t(m.timePoint));
+    pm.temperature = static_cast<int16_t>(std::max(std::min(m.descriptor.temperature, 100.f), -100.f) * 327.f + 0.5f);
+    pm.humidity = static_cast<int16_t>(std::max(std::min(m.descriptor.humidity, 100.f), 0.f) * 655.f + 0.5f);
+    pm.vcc = static_cast<uint8_t>(std::max(std::min((m.descriptor.vcc - 2.f), 2.54f), 0.f) * 100.f + 0.5f);
+    pm.b2s = m.descriptor.signalStrength.b2s;
+    pm.s2b = m.descriptor.signalStrength.s2b;
+    pm.sensorErrors = m.descriptor.sensorErrors;
+    pm.alarmTriggers = m.alarmTriggers;
+    return pm;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-inline DB::Measurement DB::unpack(SensorId sensorId, StoredMeasurement const& sm)
+inline DB::Measurement DB::unpack(SensorId sensorId, PackedMeasurement const& pm)
 {
     Measurement m;
-    m.id = computeMeasurementId(sensorId, sm);
+    m.id = computeMeasurementId(sensorId, pm);
     m.descriptor.sensorId = sensorId;
-    m.descriptor.index = sm.index;
-    m.timePoint = Clock::from_time_t(static_cast<time_t>(sm.timePoint));
-    m.descriptor.temperature = static_cast<float>(sm.temperature) / 100.f;
-    m.descriptor.humidity = static_cast<float>(sm.humidity) / 100.f;
-    m.descriptor.vcc = static_cast<float>(sm.vcc) / 100.f + 2.f;
-    m.descriptor.signalStrength.b2s = sm.b2s;
-    m.descriptor.signalStrength.s2b = sm.s2b;
-    m.combinedSignalStrength = std::min(sm.b2s, sm.s2b);
-    m.descriptor.sensorErrors = sm.sensorErrors;
-    m.alarmTriggers = sm.alarmTriggers;
+    m.descriptor.index = pm.index;
+    m.timePoint = Clock::from_time_t(static_cast<time_t>(pm.timePoint));
+    m.descriptor.temperature = static_cast<float>(pm.temperature) / 327.f;
+    m.descriptor.humidity = static_cast<float>(pm.humidity) / 655.f;
+    m.descriptor.vcc = static_cast<float>(pm.vcc) / 100.f + 2.f;
+    m.descriptor.signalStrength.b2s = pm.b2s;
+    m.descriptor.signalStrength.s2b = pm.s2b;
+    m.combinedSignalStrength = std::min(pm.b2s, pm.s2b);
+    m.descriptor.sensorErrors = pm.sensorErrors;
+    m.alarmTriggers = pm.alarmTriggers;
     return m;
 }
 
@@ -2225,7 +2298,7 @@ inline DB::MeasurementId DB::computeMeasurementId(MeasurementDescriptor const& m
 
 //////////////////////////////////////////////////////////////////////////
 
-inline DB::MeasurementId DB::computeMeasurementId(SensorId sensorId, StoredMeasurement const& m)
+inline DB::MeasurementId DB::computeMeasurementId(SensorId sensorId, PackedMeasurement const& m)
 {
     return (MeasurementId(sensorId) << 32) | MeasurementId(m.index);
 }
@@ -2361,7 +2434,7 @@ void DB::save(Data const& data) const
 
         std::string tempFilename = (s_dataFolder + "/" + m_dataName + "_temp");
         {
-            std::ofstream file(tempFilename, std::ios_base::binary);
+            std::fstream file(tempFilename, std::ios_base::binary);
             if (!file.is_open())
             {
                 s_logger.logCritical(QString("Failed to open '%1': %2").arg(tempFilename.c_str()).arg(std::strerror(errno)));
@@ -2383,11 +2456,11 @@ void DB::save(Data const& data) const
             file.close();
         }
 
-        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/incremental", 50);
+        utils::copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/incremental", 50);
 
-        if (!renameFile(tempFilename, dataFilename))
+        if (!utils::renameFile(tempFilename, dataFilename))
         {
-            s_logger.logCritical(QString("Failed to rename file '%1' to '%2': %3").arg(tempFilename.c_str()).arg(dataFilename.c_str()).arg(getLastErrorAsString().c_str()));
+            s_logger.logCritical(QString("Failed to rename file '%1' to '%2': %3").arg(tempFilename.c_str()).arg(dataFilename.c_str()).arg(utils::getLastErrorAsString().c_str()));
         }
     }
 
@@ -2401,7 +2474,7 @@ void DB::save(Data const& data) const
                 {
                     write(stream, static_cast<uint32_t>(pair.first));
                     write(stream, static_cast<uint32_t>(pair.second.size()));
-                    stream.write(reinterpret_cast<const char*>(pair.second.data()), pair.second.size() * sizeof(StoredMeasurement));
+					stream.write(reinterpret_cast<const char*>(pair.second.data()), pair.second.size() * sizeof(PackedMeasurement));
                 }
             }
             buffer = stream.str();
@@ -2431,11 +2504,11 @@ void DB::save(Data const& data) const
             file.close();
         }
 
-        copyToBackup(m_dbName, dbFilename, s_dataFolder + "/backups/incremental", 50);
+        utils::copyToBackup(m_dbName, dbFilename, s_dataFolder + "/backups/incremental", 50);
 
-        if (!renameFile(tempFilename, dbFilename))
+        if (!utils::renameFile(tempFilename, dbFilename))
         {
-            s_logger.logCritical(QString("Failed to rename file '%1' to '%2': %3").arg(tempFilename.c_str()).arg(dbFilename.c_str()).arg(getLastErrorAsString().c_str()));
+            s_logger.logCritical(QString("Failed to rename file '%1' to '%2': %3").arg(tempFilename.c_str()).arg(dbFilename.c_str()).arg(utils::getLastErrorAsString().c_str()));
         }
     }
 
@@ -2444,16 +2517,16 @@ void DB::save(Data const& data) const
 
     if (dailyBackup)
     {
-        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/daily", 10);
-        copyToBackup(m_dbName, dbFilename, s_dataFolder + "/backups/daily", 10);
+        utils::copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/daily", 10);
+        utils::copyToBackup(m_dbName, dbFilename, s_dataFolder + "/backups/daily", 10);
     }
     if (weeklyBackup)
     {
-        copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/weekly", 10);
-        copyToBackup(m_dbName, dbFilename, s_dataFolder + "/backups/weekly", 10);
+        utils::copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/weekly", 10);
+        utils::copyToBackup(m_dbName, dbFilename, s_dataFolder + "/backups/weekly", 10);
     }
 }
-
+                                                                              
 //////////////////////////////////////////////////////////////////////////
 
 void DB::storeThreadProc()

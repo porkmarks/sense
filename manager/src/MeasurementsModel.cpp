@@ -128,11 +128,11 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Battery)
         {
-            return getBatteryLevel(measurement.descriptor.vcc);
+            return utils::getBatteryLevel(measurement.descriptor.vcc);
         }
         else if (column == Column::Signal)
         {
-            return getSignalLevel(measurement.combinedSignalStrength);
+            return utils::getSignalLevel(measurement.combinedSignalStrength);
         }
 //        else if (column == Column::SensorErrors)
 //        {
@@ -164,11 +164,11 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Battery)
         {
-            return getBatteryIcon(measurement.descriptor.vcc);
+            return utils::getBatteryIcon(measurement.descriptor.vcc);
         }
         else if (column == Column::Signal)
         {
-            return getSignalIcon(measurement.combinedSignalStrength);
+            return utils::getSignalIcon(measurement.combinedSignalStrength);
         }
     }
     else if (role == Qt::DisplayRole)
@@ -209,12 +209,12 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Battery)
         {
-            return QString("%1 %").arg(static_cast<int>(getBatteryLevel(measurement.descriptor.vcc) * 100.f));
+            return QString("%1 %").arg(static_cast<int>(utils::getBatteryLevel(measurement.descriptor.vcc) * 100.f));
             //return QString("%1 %").arg(static_cast<int>(measurement.descriptor.signalStrength.s2b));
         }
         else if (column == Column::Signal)
         {
-            return QString("%1 %").arg(static_cast<int>(getSignalLevel(measurement.combinedSignalStrength) * 100.f));
+            return QString("%1 %").arg(static_cast<int>(utils::getSignalLevel(measurement.combinedSignalStrength) * 100.f));
             //return QString("%1 %").arg(static_cast<int>(measurement.descriptor.signalStrength.b2s));
             //return QString("%1 %").arg(std::min(measurement.descriptor.b2s, measurement.descriptor.s2b));
         }

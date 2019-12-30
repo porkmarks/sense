@@ -77,18 +77,18 @@ void MeasurementDetailsDialog::setMeasurement(DB::Measurement const& measurement
 
 	{
 		float vcc = m_measurement.descriptor.vcc;
-		m_ui.battery->setText(QString("%1% (%2V)").arg(static_cast<int>(getBatteryLevel(vcc) * 100.f)).arg(vcc, 0, 'f', 2));
-		m_ui.batteryIcon->setPixmap(getBatteryIcon(vcc).pixmap(24, 24));
+		m_ui.battery->setText(QString("%1% (%2V)").arg(static_cast<int>(utils::getBatteryLevel(vcc) * 100.f)).arg(vcc, 0, 'f', 2));
+		m_ui.batteryIcon->setPixmap(utils::getBatteryIcon(vcc).pixmap(24, 24));
 
 		{
-			int8_t signal = static_cast<int8_t>(getSignalLevel(m_measurement.descriptor.signalStrength.b2s) * 100.f);
+			int8_t signal = static_cast<int8_t>(utils::getSignalLevel(m_measurement.descriptor.signalStrength.b2s) * 100.f);
 			m_ui.signalStrengthB2S->setText(QString("%1% (%2 dBm)").arg(signal).arg(m_measurement.descriptor.signalStrength.b2s));
-			m_ui.signalStrengthIconB2S->setPixmap(getSignalIcon(signal).pixmap(24, 24));
+			m_ui.signalStrengthIconB2S->setPixmap(utils::getSignalIcon(signal).pixmap(24, 24));
 		}
 		{
-			int8_t signal = static_cast<int8_t>(getSignalLevel(m_measurement.descriptor.signalStrength.s2b) * 100.f);
+			int8_t signal = static_cast<int8_t>(utils::getSignalLevel(m_measurement.descriptor.signalStrength.s2b) * 100.f);
 			m_ui.signalStrengthS2B->setText(QString("%1% (%2 dBm)").arg(signal).arg(m_measurement.descriptor.signalStrength.s2b));
-			m_ui.signalStrengthIconS2B->setPixmap(getSignalIcon(signal).pixmap(24, 24));
+			m_ui.signalStrengthIconS2B->setPixmap(utils::getSignalIcon(signal).pixmap(24, 24));
 		}
 	}
 

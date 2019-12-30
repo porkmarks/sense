@@ -199,7 +199,7 @@ void SettingsWidget::setEmailSettings(Settings::EmailSettings const& settings)
     m_ui.emailConnection->setCurrentIndex(static_cast<int>(settings.connection));
     m_ui.emailUsername->setText(settings.username.c_str());
     m_ui.emailPassword->setText(settings.password.c_str());
-    m_ui.emailFrom->setText(settings.from.c_str());
+    m_ui.emailSender->setText(settings.sender.c_str());
 
     m_ui.emailRecipientList->clear();
     for (std::string const& recipient: settings.recipients)
@@ -218,7 +218,7 @@ bool SettingsWidget::getEmailSettings(Settings::EmailSettings& settings)
     settings.connection = static_cast<Settings::EmailSettings::Connection>(m_ui.emailConnection->currentIndex());
     settings.username = m_ui.emailUsername->text().toUtf8().data();
     settings.password = m_ui.emailPassword->text().toUtf8().data();
-    settings.from = m_ui.emailFrom->text().toUtf8().data();
+    settings.sender = m_ui.emailSender->text().toUtf8().data();
 
     settings.recipients.clear();
     for (int i = 0; i < m_ui.emailRecipientList->count(); i++)
@@ -358,7 +358,7 @@ void SettingsWidget::sendTestEmail()
 
         MimeMessage message;
 
-        message.setSender(new EmailAddress(QString::fromUtf8(settings.from.c_str()), QString::fromUtf8(settings.from.c_str())));
+        message.setSender(new EmailAddress(QString::fromUtf8(settings.sender.c_str()), QString::fromUtf8(settings.sender.c_str())));
         for (std::string const& recipient: settings.recipients)
         {
             message.addRecipient(new EmailAddress(QString::fromUtf8(recipient.c_str())));

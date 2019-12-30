@@ -104,7 +104,7 @@
    <item>
     <widget class="QStackedWidget" name="stackedWidget">
      <property name="currentIndex">
-      <number>5</number>
+      <number>3</number>
      </property>
      <widget class="QWidget" name="baseStationsPage">
       <layout class="QVBoxLayout" name="verticalLayout_3">
@@ -198,14 +198,14 @@
           <item row="0" column="0">
            <widget class="QLabel" name="label">
             <property name="text">
-             <string>SMTP server address</string>
+             <string>SMTP server address:</string>
             </property>
            </widget>
           </item>
           <item row="2" column="0">
            <widget class="QLabel" name="label_2">
             <property name="text">
-             <string>Username</string>
+             <string>Username:</string>
             </property>
            </widget>
           </item>
@@ -222,28 +222,28 @@
           <item row="3" column="0">
            <widget class="QLabel" name="label_3">
             <property name="text">
-             <string>Password</string>
+             <string>Password:</string>
             </property>
            </widget>
           </item>
           <item row="4" column="0">
            <widget class="QLabel" name="label_8">
             <property name="text">
-             <string>From field</string>
+             <string>Sender:</string>
             </property>
            </widget>
           </item>
           <item row="5" column="0">
            <widget class="QLabel" name="label_4">
             <property name="text">
-             <string>Recipients</string>
+             <string>Recipients:</string>
             </property>
            </widget>
           </item>
           <item row="1" column="0">
            <widget class="QLabel" name="label_5">
             <property name="text">
-             <string>SMTP Port</string>
+             <string>SMTP Port:</string>
             </property>
            </widget>
           </item>
@@ -294,7 +294,7 @@
            </widget>
           </item>
           <item row="4" column="1" colspan="3">
-           <widget class="QLineEdit" name="emailFrom">
+           <widget class="QLineEdit" name="emailSender">
             <property name="text">
              <string>Sense Monitoring System</string>
             </property>
@@ -933,7 +933,7 @@
   <tabstop>emailConnection</tabstop>
   <tabstop>emailUsername</tabstop>
   <tabstop>emailPassword</tabstop>
-  <tabstop>emailFrom</tabstop>
+  <tabstop>emailSender</tabstop>
   <tabstop>emailRecipientList</tabstop>
   <tabstop>emailAddRecipient</tabstop>
   <tabstop>emailRemoveRecipient</tabstop>

@@ -189,11 +189,11 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
             .arg(getStatus(DB::AlarmTrigger::Humidity))
 
             .arg(getColor(DB::AlarmTrigger::LowVcc))
-            .arg(static_cast<int>(getBatteryLevel(m.descriptor.vcc)*100.f))
+            .arg(static_cast<int>(utils::getBatteryLevel(m.descriptor.vcc)*100.f))
             .arg(getStatus(DB::AlarmTrigger::LowVcc))
 
             .arg(getColor(DB::AlarmTrigger::LowSignal))
-            .arg(static_cast<int>(getSignalLevel(m.combinedSignalStrength)*100.f))
+            .arg(static_cast<int>(utils::getSignalLevel(m.combinedSignalStrength)*100.f))
             .arg(getStatus(DB::AlarmTrigger::LowSignal))
 
             .arg(dt.toString("dd-MM-yyyy HH:mm"))
@@ -483,7 +483,7 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
 
         MimeMessage message;
 
-        message.setSender(new EmailAddress(QString::fromUtf8(email.settings.from.c_str())));
+        message.setSender(new EmailAddress(QString::fromUtf8(email.settings.sender.c_str())));
         for (std::string const& recipient: email.settings.recipients)
         {
             message.addRecipient(new EmailAddress(QString::fromUtf8(recipient.c_str())));

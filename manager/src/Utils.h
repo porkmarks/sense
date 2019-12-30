@@ -3,6 +3,9 @@
 #include <string>
 #include <QIcon>
 
+namespace utils
+{
+
 std::pair<std::string, time_t> getMostRecentBackup(std::string const& filename, std::string const& folder);
 void copyToBackup(std::string const& filename, std::string const& srcFilepath, std::string const& folder, size_t maxBackups);
 void moveToBackup(std::string const& filename, std::string const& srcFilepath, std::string const& folder, size_t maxBackups);
@@ -21,3 +24,7 @@ float getBatteryLevel(float vcc);
 QIcon getBatteryIcon(float vcc);
 float getSignalLevel(int8_t dBm);
 QIcon getSignalIcon(int8_t dBm);
+
+uint32_t crc32(const void* data, size_t size);
+
+}

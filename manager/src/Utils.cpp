@@ -20,6 +20,10 @@
 
 extern Logger s_logger;
 
+namespace utils
+{
+//////////////////////////////////////////////////////////////////////////
+
 typedef std::pair<std::string, time_t> FD;
 static std::vector<FD> getBackupFiles(std::string const& filename, std::string const& folder)
 {
@@ -32,14 +36,14 @@ static std::vector<FD> getBackupFiles(std::string const& filename, std::string c
         QString fn = info.fileName();
         if (!info.isFile())
         {
-//            std::cout << "Skipping folder '" << fn.toUtf8().data() << "'.\n";
+            //            std::cout << "Skipping folder '" << fn.toUtf8().data() << "'.\n";
             it.next();
             continue;
         }
 
         if (!fn.startsWith((filename + "_").c_str()))
         {
-//            std::cout << "Skipping unrecognized file '" << fn.toUtf8().data() << "'.\n";
+            //            std::cout << "Skipping unrecognized file '" << fn.toUtf8().data() << "'.\n";
             it.next();
             continue;
         }
@@ -47,7 +51,7 @@ static std::vector<FD> getBackupFiles(std::string const& filename, std::string c
         QString tsStr = fn.mid(static_cast<int>(filename.size()) + 1);
         if (tsStr.isEmpty())
         {
-//            std::cout << "Skipping unrecognized file '" << fn.toUtf8().data() << "'.\n";
+            //            std::cout << "Skipping unrecognized file '" << fn.toUtf8().data() << "'.\n";
             it.next();
             continue;
         }
@@ -56,7 +60,7 @@ static std::vector<FD> getBackupFiles(std::string const& filename, std::string c
         time_t tt = tsStr.toULongLong(&ok);
         if (!ok)
         {
-//            std::cout << "Skipping file '" << fn.toUtf8().data() << "' because of malformed timestamp.\n";
+            //            std::cout << "Skipping file '" << fn.toUtf8().data() << "' because of malformed timestamp.\n";
             it.next();
             continue;
         }
@@ -159,7 +163,7 @@ std::string getLastErrorAsString()
 #ifdef _WIN32
     //Get the error message, if any.
     DWORD errorMessageID = ::GetLastError();
-    if(errorMessageID == 0)
+    if (errorMessageID == 0)
         return std::string(); //No error message has been recorded
 
     LPSTR messageBuffer = nullptr;
@@ -178,24 +182,24 @@ std::string getLastErrorAsString()
 
 float getBatteryLevel(float vcc)
 {
-	float level = std::max(std::min(vcc, k_maxBatteryLevel) - k_minBatteryLevel, 0.f) / (k_maxBatteryLevel - k_minBatteryLevel);
-	level = std::pow(level, 6.f); //to revert the battery curve
-	return level;
+    float level = std::max(std::min(vcc, k_maxBatteryLevel) - k_minBatteryLevel, 0.f) / (k_maxBatteryLevel - k_minBatteryLevel);
+    level = std::pow(level, 5.f); //to revert the battery curve
+    return level;
 }
 
 QIcon getBatteryIcon(float vcc)
 {
     static const QIcon k_alertIcon = QIcon(":/icons/ui/battery-0.png");
-	const static std::array<QIcon, 5> k_icons =
-	{
-		QIcon(":/icons/ui/battery-20.png"),
-		QIcon(":/icons/ui/battery-40.png"),
-		QIcon(":/icons/ui/battery-60.png"),
-		QIcon(":/icons/ui/battery-80.png"),
-		QIcon(":/icons/ui/battery-100.png")
-	};
+    const static std::array<QIcon, 5> k_icons =
+    {
+        QIcon(":/icons/ui/battery-20.png"),
+        QIcon(":/icons/ui/battery-40.png"),
+        QIcon(":/icons/ui/battery-60.png"),
+        QIcon(":/icons/ui/battery-80.png"),
+        QIcon(":/icons/ui/battery-100.png")
+    };
 
-	float level = getBatteryLevel(vcc);
+    float level = getBatteryLevel(vcc);
     if (level <= k_alertBatteryLevel)
     {
         return k_alertIcon;
@@ -204,41 +208,88 @@ QIcon getBatteryIcon(float vcc)
     //renormalize the remaining range
     level = (level - k_alertBatteryLevel) / (1.f - k_alertBatteryLevel);
 
-	size_t index = std::min(static_cast<size_t>(level * static_cast<float>(k_icons.size())), k_icons.size() - 1);
-	return k_icons[index];
+    size_t index = std::min(static_cast<size_t>(level * static_cast<float>(k_icons.size())), k_icons.size() - 1);
+    return k_icons[index];
 }
 
 float getSignalLevel(int8_t dBm)
 {
-	if (dBm == 0)
-	{
-		return 0.f;
-	}
-	float level = std::max(std::min(static_cast<float>(dBm), k_maxSignalLevel) - k_minSignalLevel, 0.f) / (k_maxSignalLevel - k_minSignalLevel);
-	return level;
+    if (dBm == 0)
+    {
+        return 0.f;
+    }
+    float level = std::max(std::min(static_cast<float>(dBm), k_maxSignalLevel) - k_minSignalLevel, 0.f) / (k_maxSignalLevel - k_minSignalLevel);
+    return level;
 }
 
 QIcon getSignalIcon(int8_t dBm)
 {
-	static const QIcon k_alertIcon = QIcon(":/icons/ui/signal-0.png");
-	const static std::array<QIcon, 5> k_icons =
-	{
-		QIcon(":/icons/ui/signal-20.png"),
-		QIcon(":/icons/ui/signal-40.png"),
-		QIcon(":/icons/ui/signal-60.png"),
-		QIcon(":/icons/ui/signal-80.png"),
-		QIcon(":/icons/ui/signal-100.png")
-	};
+    static const QIcon k_alertIcon = QIcon(":/icons/ui/signal-0.png");
+    const static std::array<QIcon, 5> k_icons =
+    {
+        QIcon(":/icons/ui/signal-20.png"),
+        QIcon(":/icons/ui/signal-40.png"),
+        QIcon(":/icons/ui/signal-60.png"),
+        QIcon(":/icons/ui/signal-80.png"),
+        QIcon(":/icons/ui/signal-100.png")
+    };
 
-	float level = getSignalLevel(dBm);
-	if (level <= k_alertSignalLevel)
-	{
-		return k_alertIcon;
-	}
+    float level = getSignalLevel(dBm);
+    if (level <= k_alertSignalLevel)
+    {
+        return k_alertIcon;
+    }
 
-	//renormalize the remaining range
-	level = (level - k_alertSignalLevel) / (1.f - k_alertSignalLevel);
+    //renormalize the remaining range
+    level = (level - k_alertSignalLevel) / (1.f - k_alertSignalLevel);
 
-	size_t index = std::min(static_cast<size_t>(level * static_cast<float>(k_icons.size())), k_icons.size() - 1);
-	return k_icons[index];
+    size_t index = std::min(static_cast<size_t>(level * static_cast<float>(k_icons.size())), k_icons.size() - 1);
+    return k_icons[index];
+}
+
+uint32_t crc32(const void* data, size_t size)
+{
+    constexpr uint32_t Polynomial = 0xEDB88320;
+    uint32_t crc = ~uint32_t(~0L);
+    const uint8_t* p = reinterpret_cast<const uint8_t*>(data);
+    while (size--)
+    {
+        crc ^= *p++;
+
+        uint8_t lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+
+        lowestBit = crc & 1;
+        crc >>= 1;
+        if (lowestBit) crc ^= Polynomial;
+    }
+    return ~crc;
+}
+
+//////////////////////////////////////////////////////////////////////////
 }

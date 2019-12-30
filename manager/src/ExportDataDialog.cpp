@@ -369,7 +369,7 @@ bool ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount, bool show
         }
         if (exportBattery)
         {
-            stream << std::fixed << std::setprecision(decimalPlaces) << getBatteryLevel(m.descriptor.vcc) * 100.f;
+            stream << std::fixed << std::setprecision(decimalPlaces) << utils::getBatteryLevel(m.descriptor.vcc) * 100.f;
             if (unitsFormat == UnitsFormat::Embedded)
             {
                 stream << " %";
@@ -383,7 +383,7 @@ bool ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount, bool show
         }
         if (exportSignal)
         {
-            stream << std::fixed << std::setprecision(decimalPlaces) << getSignalLevel(m.combinedSignalStrength) * 100.f;
+            stream << std::fixed << std::setprecision(decimalPlaces) << utils::getSignalLevel(m.combinedSignalStrength) * 100.f;
             if (unitsFormat == UnitsFormat::Embedded)
             {
                 stream << " %";

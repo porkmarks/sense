@@ -400,11 +400,11 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
             {
                 if (column == Column::Battery)
                 {
-                    return getBatteryIcon(sensor.measurementVcc);
+                    return utils::getBatteryIcon(sensor.measurementVcc);
                 }
                 else if (column == Column::Signal)
                 {
-                    return getSignalIcon(sensor.averageCombinedSignalStrength);
+                    return utils::getSignalIcon(sensor.averageCombinedSignalStrength);
                 }
                 else if (column == Column::Temperature)
                 {
@@ -485,11 +485,11 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                 }
                 else if (column == Column::Battery)
                 {
-                    return QString("%1 %").arg(static_cast<int>(getBatteryLevel(sensor.measurementVcc) * 100.f));
+                    return QString("%1 %").arg(static_cast<int>(utils::getBatteryLevel(sensor.measurementVcc) * 100.f));
                 }
                 else if (column == Column::Signal)
                 {
-                    int average = static_cast<int>(getSignalLevel(sensor.averageCombinedSignalStrength) * 100.f);
+                    int average = static_cast<int>(utils::getSignalLevel(sensor.averageCombinedSignalStrength) * 100.f);
                     return QString("%1 %").arg(average);
                 }
             }
