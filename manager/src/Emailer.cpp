@@ -193,7 +193,7 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
             .arg(getStatus(DB::AlarmTrigger::LowVcc))
 
             .arg(getColor(DB::AlarmTrigger::LowSignal))
-            .arg(static_cast<int>(utils::getSignalLevel(m.combinedSignalStrength)*100.f))
+            .arg(static_cast<int>(utils::getSignalLevel(std::min(m.descriptor.signalStrength.s2b, m.descriptor.signalStrength.b2s))*100.f))
             .arg(getStatus(DB::AlarmTrigger::LowSignal))
 
             .arg(dt.toString("dd-MM-yyyy HH:mm"))

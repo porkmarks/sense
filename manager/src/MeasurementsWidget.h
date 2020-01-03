@@ -26,6 +26,7 @@ private slots:
     void scheduleSlowRefresh();
     void scheduleFastRefresh();
     void refresh();
+    void refreshCounter();
     void selectSensors();
     void exportData();
     void sensorAdded(DB::SensorId id);

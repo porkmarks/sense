@@ -2,8 +2,6 @@
 #include <cassert>
 #include <iostream>
 
-#include "cereal/archives/json.hpp"
-#include "cereal/external/rapidjson/error/en.h"
 #include "Logger.h"
 #include "Settings.h"
 
@@ -471,7 +469,7 @@ void Comms::processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, Senso
         measurements.push_back(d);
     }
 
-    cbs.db.addMeasurements(measurements);
+    cbs.db.addMeasurements(std::move(measurements));
 }
 
 //////////////////////////////////////////////////////////////////////////

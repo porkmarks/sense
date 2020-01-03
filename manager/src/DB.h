@@ -14,9 +14,9 @@
 #include <condition_variable>
 #include "Result.h"
 #include "Radio.h"
-#include "cereal/cereal.hpp"
 
 struct sqlite3;
+struct sqlite3_stmt;
 
 class DB : public QObject
 {
@@ -32,8 +32,7 @@ public:
     void process();
 
 	static Result<void> create(sqlite3& db);
-    Result<void> create();
-    Result<void> load();
+    Result<void> load(sqlite3& db);
 
     ////////////////////////////////////////////////////////////////////////////
 
@@ -125,7 +124,6 @@ public:
         MeasurementDescriptor descriptor;
         Clock::time_point timePoint;
         uint8_t alarmTriggers = 0;
-        int8_t combinedSignalStrength = 0;
     };
 
     struct ErrorCounters
@@ -158,7 +156,7 @@ public:
 			uint8_t softwareVersion = 0;
         };
 
-        enum class State
+        enum class State : uint8_t
         {
             Active,
             Sleeping,
@@ -196,7 +194,6 @@ public:
         int8_t lastSignalStrengthB2S = 0; //dBm
 
         SignalStrength averageSignalStrength;
-        int8_t averageCombinedSignalStrength = 0; //dBm
 
         bool isMeasurementValid = false;
         float measurementTemperature = 0;
@@ -330,7 +327,7 @@ public:
     {
         std::string name;
 
-        enum class Period
+        enum class Period : uint8_t
         {
             Daily,
             Weekly,
@@ -341,7 +338,7 @@ public:
         Period period = Period::Weekly;
         Clock::duration customPeriod = std::chrono::hours(48);
 
-        enum class Data
+        enum class Data : uint8_t
         {
             Summary,
             All
@@ -374,7 +371,7 @@ public:
     ////////////////////////////////////////////////////////////////////////////
 
     bool addMeasurement(MeasurementDescriptor const& descriptor);
-    bool addMeasurements(std::vector<MeasurementDescriptor> const& descriptors);
+    bool addMeasurements(std::vector<MeasurementDescriptor> descriptors);
 
     template <typename T>
     struct Range
@@ -387,9 +384,6 @@ public:
     {
         bool useSensorFilter = false;
         std::set<SensorId> sensorIds;
-
-        bool useIndexFilter = false;
-        Range<uint32_t> indexFilter;
 
         bool useTimePointFilter = false;
         Range<Clock::time_point> timePointFilter;
@@ -410,7 +404,6 @@ public:
 //        bool sensorErrorsFilter = true;
     };
 
-    std::vector<Measurement> getAllMeasurements() const;
     size_t getAllMeasurementCount() const;
 
     std::vector<Measurement> getFilteredMeasurements(Filter const& filter) const;
@@ -455,32 +448,10 @@ private:
     uint8_t _computeAlarmTriggers(Alarm& alarm, Measurement const& m);
     bool _addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> mds);
     size_t _getFilteredMeasurements(Filter const& filter, std::vector<Measurement>* result) const;
-    bool cull(Measurement const& measurement, Filter const& filter) const;
 
-#pragma pack(push, 1) // exact fit - no padding
-
-	struct PackedMeasurement
-    {
-        uint32_t index;
-        uint64_t timePoint;
-        int16_t temperature;    //t * 100
-        int16_t humidity;       //h * 100
-        uint8_t vcc;            //(vcc - 2) * 100
-        int8_t b2s;
-        int8_t s2b;
-        uint8_t sensorErrors;
-        uint8_t alarmTriggers;
-    };
-
-#pragma pack(pop) // exact fit - no padding
-
-    typedef std::vector<PackedMeasurement> PackedMeasurements;
-
-    static inline PackedMeasurement pack(Measurement const& m);
-    static inline Measurement unpack(SensorId sensorId, PackedMeasurement const& m);
     static inline MeasurementId computeMeasurementId(MeasurementDescriptor const& md);
-    static inline MeasurementId computeMeasurementId(SensorId sensorId, PackedMeasurement const& m);
     static inline SensorId getSensorIdFromMeasurementId(MeasurementId id);
+    static Measurement unpack(sqlite3_stmt* stmt);
 
     Clock::time_point computeNextCommsTimePoint(Sensor const& sensor, size_t sensorIndex) const;
     Clock::time_point computeNextMeasurementTimePoint(Sensor const& sensor) const;
@@ -497,46 +468,35 @@ private:
         std::vector<Sensor> sensors;
         std::vector<Alarm> alarms;
         std::vector<Report> reports;
-        std::map<SensorId, PackedMeasurements> measurements;
-        std::vector<MeasurementId> sortedMeasurementIds;
+
         BaseStationId lastBaseStationId = 0;
         SensorId lastSensorId = 0;
         AlarmId lastAlarmId = 0;
         ReportId lastReportId = 0;
         MeasurementId lastMeasurementId = 0;
         uint32_t lastSensorAddress = Radio::SLAVE_ADDRESS_BEGIN;
-
-		template<class Archive> void serialize(Archive& archive, std::uint32_t const version)
-		{
-			archive(CEREAL_NVP(baseStations), CEREAL_NVP(sensorsConfigs), CEREAL_NVP(sensors), CEREAL_NVP(alarms), CEREAL_NVP(reports));
-		}
     };
 
-    mutable std::recursive_mutex m_mainDataMutex;
-    Data m_mainData;
+	sqlite3* m_sqlite = nullptr;
+	std::shared_ptr<sqlite3_stmt> m_saveBaseStationsStmt;
+	std::shared_ptr<sqlite3_stmt> m_saveSensorsConfigsStmt;
+	std::shared_ptr<sqlite3_stmt> m_saveSensorsStmt;
+	std::shared_ptr<sqlite3_stmt> m_saveAlarmsStmt;
+	std::shared_ptr<sqlite3_stmt> m_saveReportsStmt;
+	std::shared_ptr<sqlite3_stmt> m_addMeasurementsStmt;
+
+
+    mutable std::recursive_mutex m_dataMutex;
+    Data m_data;
+
+	mutable std::recursive_mutex m_asyncMeasurementsMutex;
+    std::vector<Measurement> m_asyncMeasurements;
+    void addAsyncMeasurements();
 
     SignalStrength computeAverageSignalStrength(SensorId sensorId, Data const& data) const;
 
-    std::atomic_bool m_threadsExit = { false };
-
-    void triggerSave();
-    void triggerDelayedSave(Clock::duration i_dt);
-    void storeThreadProc();
+    bool m_saveScheduled = false;
+    void scheduleSave();
+    void save();
     void save(Data const& data) const;
-
-    std::atomic_bool m_storeThreadTriggered = { false };
-    std::thread m_storeThread;
-    std::condition_variable m_storeCV;
-    std::mutex m_storeMutex;
-    Data m_storeData;
-
-    std::string m_dbName;
-    std::string m_dataName;
-
-    std::mutex m_delayedTriggerSaveMutex;
-    bool m_delayedTriggerSave = false;
-    Clock::time_point m_delayedTriggerSaveTP;
-
-    mutable Clock::time_point m_lastDailyBackupTP = Clock::time_point(Clock::duration::zero());
-    mutable Clock::time_point m_lastWeeklyBackupTP = Clock::time_point(Clock::duration::zero());
 };

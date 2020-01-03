@@ -9,7 +9,10 @@
 #include "Crypt.h"
 #include "Logger.h"
 #include "Settings.h"
+
+#define SQLITE_HAS_CODEC
 #include "sqlite3.h"
+#include "Utils.h"
 
 #ifdef NDEBUG
 #   define CHECK_PASSWORD
@@ -37,6 +40,15 @@ Manager::Manager(QWidget *parent)
 {
     m_ui.setupUi(this);
 
+    {
+		std::pair<std::string, time_t> bkf = utils::getMostRecentBackup("sense.db", s_dataFolder + "/backups/hourly");
+		m_lastHourlyBackupTP = bkf.first.empty() ? DB::Clock::now() : DB::Clock::from_time_t(bkf.second);
+		bkf = utils::getMostRecentBackup("sense.db", s_dataFolder + "/backups/daily");
+		m_lastDailyBackupTP = bkf.first.empty() ? DB::Clock::now() : DB::Clock::from_time_t(bkf.second);
+		bkf = utils::getMostRecentBackup("sense.db", s_dataFolder + "/backups/weekly");
+		m_lastWeeklyBackupTP = bkf.first.empty() ? DB::Clock::now() : DB::Clock::from_time_t(bkf.second);
+    }
+
 	{
 		std::string dataFilename = s_dataFolder + "/sense.db";
 		sqlite3* db;
@@ -48,8 +60,12 @@ Manager::Manager(QWidget *parent)
                 sqlite3_close(db);
                 exit(-1);
             }
-// 			sqlite3_exec(db, "PRAGMA synchronous = OFF", NULL, NULL, nullptr);
-// 			sqlite3_exec(db, "PRAGMA journal_mode = MEMORY", NULL, NULL, nullptr);
+
+//            sqlite3_key_v2(db, "sense", "sense", -1);
+
+// 			sqlite3_exec(db, "PRAGMA synchronous = OFF;", NULL, NULL, nullptr);
+// 			sqlite3_exec(db, "PRAGMA journal_mode = MEMORY;", NULL, NULL, nullptr);
+ 			sqlite3_exec(db, "PRAGMA main.locking_mode = EXCLUSIVE;", NULL, NULL, nullptr);
 
             Result<void> result = Logger::create(*db);
             if (result != success)
@@ -136,7 +152,6 @@ Manager::Manager(QWidget *parent)
 Manager::~Manager()
 {
     s_logger.logInfo("Program exit");
-    s_logger.shutdown();
 
     QObject::disconnect(m_tabChangedConnection);
 
@@ -363,6 +378,28 @@ void Manager::readSettings()
 
 //////////////////////////////////////////////////////////////////////////
 
+void Manager::processBackups()
+{
+	Settings::Clock::time_point now = Settings::Clock::now();
+    if (now - m_lastHourlyBackupTP >= std::chrono::hours(1))
+    {
+        m_lastHourlyBackupTP = now;
+        utils::copyToBackup("sense.db", s_dataFolder + "/sense.db", s_dataFolder + "/backups/hourly", 24);
+    }
+	if (now - m_lastDailyBackupTP >= std::chrono::hours(24))
+	{
+		m_lastDailyBackupTP = now;
+		utils::copyToBackup("sense.db", s_dataFolder + "/sense.db", s_dataFolder + "/backups/daily", 7);
+	}
+	if (now - m_lastWeeklyBackupTP >= std::chrono::hours(24 * 7))
+	{
+		m_lastWeeklyBackupTP = now;
+		utils::copyToBackup("sense.db", s_dataFolder + "/sense.db", s_dataFolder + "/backups/weekly", 30);
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void Manager::process()
 {
 //    if (m_comms.is_connected())
@@ -375,8 +412,9 @@ void Manager::process()
 //    }
 
     m_comms.process();
-    s_logger.process();
     m_settings.process();
+
+    processBackups();
 }
 
 //////////////////////////////////////////////////////////////////////////

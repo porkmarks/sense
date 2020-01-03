@@ -32,42 +32,40 @@ static std::vector<FD> getBackupFiles(std::string const& filename, std::string c
     QDirIterator it(folder.c_str(), QDirIterator::Subdirectories);
     while (it.hasNext())
     {
+		it.next();
         QFileInfo info = it.fileInfo();
         QString fn = info.fileName();
         if (!info.isFile())
         {
-            //            std::cout << "Skipping folder '" << fn.toUtf8().data() << "'.\n";
+            //std::cout << "Skipping folder '" << fn.toUtf8().data() << "'.\n";
             it.next();
             continue;
         }
 
-        if (!fn.startsWith((filename + "_").c_str()))
+        if (!fn.endsWith((filename + "_backup").c_str()))
         {
-            //            std::cout << "Skipping unrecognized file '" << fn.toUtf8().data() << "'.\n";
+            //std::cout << "Skipping unrecognized file '" << fn.toUtf8().data() << "'.\n";
             it.next();
             continue;
         }
 
-        QString tsStr = fn.mid(static_cast<int>(filename.size()) + 1);
-        if (tsStr.isEmpty())
+		QString tsStr = fn.mid(0, fn.size() - static_cast<int>((filename + "_backup").size()));
+		if (tsStr.isEmpty())
+		{
+			//            std::cout << "Skipping unrecognized file '" << fn.toUtf8().data() << "'.\n";
+			it.next();
+			continue;
+		}
+
+		QDateTime dt = QDateTime::fromString(tsStr, "yyyy-MM-dd-HH-mm-ss");
+        if (!dt.isValid())
         {
-            //            std::cout << "Skipping unrecognized file '" << fn.toUtf8().data() << "'.\n";
+            //std::cout << "Skipping file '" << fn.toUtf8().data() << "' because of malformed timestamp.\n";
             it.next();
             continue;
         }
 
-        bool ok = true;
-        time_t tt = tsStr.toULongLong(&ok);
-        if (!ok)
-        {
-            //            std::cout << "Skipping file '" << fn.toUtf8().data() << "' because of malformed timestamp.\n";
-            it.next();
-            continue;
-        }
-
-        bkFiles.emplace_back(std::string(fn.toUtf8().data()), tt);
-
-        it.next();
+        bkFiles.emplace_back(std::string(fn.toUtf8().data()), dt.toTime_t());
     }
 
     return bkFiles;
@@ -108,8 +106,8 @@ std::pair<std::string, time_t> getMostRecentBackup(std::string const& filename, 
 
 void copyToBackup(std::string const& filename, std::string const& srcFilepath, std::string const& folder, size_t maxBackups)
 {
-    time_t nowTT = QDateTime::currentDateTime().toTime_t();
-    std::string newFilepath = folder + "/" + filename + "_" + std::to_string(nowTT);
+    QString nowStr = QDateTime::currentDateTime().toString("yyyy-MM-dd-HH-mm-ss");
+    std::string newFilepath = folder + "/" + nowStr.toUtf8().data() + filename + "_backup";
 
     QDir().mkpath(folder.c_str());
 
@@ -128,8 +126,8 @@ void copyToBackup(std::string const& filename, std::string const& srcFilepath, s
 
 void moveToBackup(std::string const& filename, std::string const& srcFilepath, std::string const& folder, size_t maxBackups)
 {
-    time_t nowTT = QDateTime::currentDateTime().toTime_t();
-    std::string newFilepath = folder + "/" + filename + "_" + std::to_string(nowTT);
+	QString nowStr = QDateTime::currentDateTime().toString("yyyy-MM-dd-HH-mm-ss");
+	std::string newFilepath = folder + "/" + nowStr.toUtf8().data() + filename + "_backup";
 
     QDir().mkpath(folder.c_str());
 

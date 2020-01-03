@@ -27,9 +27,10 @@ public:
 
     typedef std::chrono::system_clock Clock;
 
-    void process();
     static Result<void> create(sqlite3& db);
     bool load(sqlite3& db);
+
+    void process();
 
     DB const& getDB() const;
     DB& getDB();
@@ -88,7 +89,7 @@ public:
 
         uint32_t permissions = 0;
 
-        enum class Type
+        enum class Type : uint8_t
         {
             Admin, //has all the permissions
             Normal
@@ -135,8 +136,6 @@ signals:
     void userLoggedIn(UserId id);
 
 private:
-    friend class cereal::access;
-
     std::unique_ptr<DB> m_db;
     std::unique_ptr<Emailer> m_emailer;
 
@@ -149,19 +148,8 @@ private:
     };
 
     sqlite3* m_sqlite = nullptr;
-    Data m_mainData;
+    Data m_data;
     UserId m_loggedInUserId = UserId(-1);
 
-    std::atomic_bool m_threadsExit = { false };
-
-    void triggerSave();
-    void storeThreadProc();
     void save(Data const& data) const;
-    std::atomic_bool m_storeThreadTriggered = { false };
-    std::thread m_storeThread;
-    std::condition_variable m_storeCV;
-    std::mutex m_storeMutex;
-    Data m_storeData;
-
-    std::string m_dataName;
 };

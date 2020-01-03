@@ -55,6 +55,9 @@ void MeasurementsWidget::init(Settings& settings)
     m_sortingModel.setSourceModel(m_model.get());
     m_sortingModel.setSortRole(MeasurementsModel::SortingRole);
 
+    connect(m_model.get(), &MeasurementsModel::rowsAboutToBeInserted, this, &MeasurementsWidget::refreshCounter);
+    connect(m_model.get(), &MeasurementsModel::modelReset, this, &MeasurementsWidget::refreshCounter);
+
     m_delegate.reset(new MeasurementsDelegate(m_sortingModel));
 
     m_ui.list->setModel(&m_sortingModel);
@@ -311,7 +314,7 @@ void MeasurementsWidget::sensorRemoved(DB::SensorId id)
 
 void MeasurementsWidget::scheduleFastRefresh()
 {
-    scheduleRefresh(std::chrono::milliseconds(500));
+    scheduleRefresh(std::chrono::milliseconds(100));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -353,14 +356,19 @@ void MeasurementsWidget::refresh()
     DB::Filter filter = createFilter();
     m_model->setFilter(filter);
 
-    std::cout << (QString("Refreshed %1/%2 measurements: %3ms\n")
-                        .arg(m_model->getMeasurementCount())
-                        .arg(m_db->getAllMeasurementCount())
-                        .arg(std::chrono::duration_cast<std::chrono::milliseconds>(DB::Clock::now() - start).count())).toStdString();
-
-    m_ui.resultCount->setText(QString("%1 out of %2 results.").arg(m_model->getMeasurementCount()).arg(m_db->getAllMeasurementCount()));
+    refreshCounter();
 
     m_ui.exportData->setEnabled(m_model->getMeasurementCount() > 0);
+
+	std::cout << (QString("Refreshed measurements: %3ms\n")
+				  .arg(std::chrono::duration_cast<std::chrono::milliseconds>(DB::Clock::now() - start).count())).toStdString();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsWidget::refreshCounter()
+{
+	m_ui.resultCount->setText(QString("%1 out of %2 results.").arg(m_model->getMeasurementCount()).arg(m_db->getAllMeasurementCount()));
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -383,7 +383,7 @@ bool ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount, bool show
         }
         if (exportSignal)
         {
-            stream << std::fixed << std::setprecision(decimalPlaces) << utils::getSignalLevel(m.combinedSignalStrength) * 100.f;
+            stream << std::fixed << std::setprecision(decimalPlaces) << utils::getSignalLevel(std::min(m.descriptor.signalStrength.s2b, m.descriptor.signalStrength.b2s)) * 100.f;
             if (unitsFormat == UnitsFormat::Embedded)
             {
                 stream << " %";

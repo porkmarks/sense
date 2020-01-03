@@ -250,7 +250,7 @@ void PlotWidget::sensorRemoved(DB::SensorId id)
 
 void PlotWidget::scheduleFastRefresh()
 {
-    scheduleRefresh(std::chrono::milliseconds(500));
+    scheduleRefresh(std::chrono::milliseconds(100));
 }
 
 //////////////////////////////////////////////////////////////////////////

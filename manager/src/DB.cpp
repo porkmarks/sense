@@ -10,376 +10,340 @@
 #include <QDir>
 #include <QByteArray>
 
-#include "cereal/archives/json.hpp"
-#include "cereal/types/vector.hpp"
-#include "cereal/types/string.hpp"
-#include "cereal/types/array.hpp"
-#include "cereal/types/map.hpp"
-#include "cereal/types/set.hpp"
-#include "cereal/types/chrono.hpp"
-#include "cereal/external/rapidjson/error/en.h"
-
 #include "Utils.h"
 #include "Crypt.h"
 #include "Logger.h"
 #include "sqlite3.h"
 
-#ifdef NDEBUG
-#   define USE_DB_ENCRYPTION
-#   define USE_DATA_ENCRYPTION
-#endif
-
 extern Logger s_logger;
-
-extern std::string s_dataFolder;
-
-constexpr uint64_t k_fileEncryptionKey = 4353123543565ULL;
-
-template <typename Stream, typename T>
-void write(Stream& s, T const& t)
-{
-    s.write(reinterpret_cast<const char*>(&t), sizeof(T));
-}
-
-template <typename Stream, typename T>
-bool read(Stream& s, T& t)
-{
-    return s.read(reinterpret_cast<char*>(&t), sizeof(T)).good();
-}
-
 
 const DB::Clock::duration MEASUREMENT_JITTER = std::chrono::seconds(10);
 const DB::Clock::duration COMMS_DURATION = std::chrono::seconds(10);
 
 extern std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac);
 
-
-#define NVP(x) cereal::make_nvp(#x, v.x)
-template<class Archive> void save(Archive& archive, const DB::BaseStationDescriptor& v, std::uint32_t const version)
-{
-	char macStr[128];
-	sprintf(macStr, "%X:%X:%X:%X:%X:%X", v.mac[0] & 0xFF, v.mac[1] & 0xFF, v.mac[2] & 0xFF, v.mac[3] & 0xFF, v.mac[4] & 0xFF, v.mac[5] & 0xFF);
-	archive(NVP(name), cereal::make_nvp("mac", std::string(macStr)));
-}
-template<class Archive> void load(Archive& archive, DB::BaseStationDescriptor& v, std::uint32_t const version)
-{
-    std::string macStr;
-	archive(NVP(name), cereal::make_nvp("mac", macStr));
-	int m0, m1, m2, m3, m4, m5;
-	if (sscanf(macStr.c_str(), "%X:%X:%X:%X:%X:%X", &m0, &m1, &m2, &m3, &m4, &m5) != 6)
-	{
-		throw cereal::Exception("Bad base station mac");
-	}
-	v.mac = { static_cast<uint8_t>(m0 & 0xFF), static_cast<uint8_t>(m1 & 0xFF), static_cast<uint8_t>(m2 & 0xFF), static_cast<uint8_t>(m3 & 0xFF), static_cast<uint8_t>(m4 & 0xFF), static_cast<uint8_t>(m5 & 0xFF) };
-}
-template<class Archive> void serialize(Archive& archive, DB::BaseStation& v, std::uint32_t const version)
-{
-	archive(NVP(descriptor), NVP(id));
-}
-template<class Archive> void save(Archive& archive, const DB::SensorsConfigDescriptor& v, std::uint32_t const version)
-{
-	int64_t mp = std::chrono::duration_cast<std::chrono::seconds>(v.measurementPeriod).count();
-    int64_t cp = std::chrono::duration_cast<std::chrono::seconds>(v.commsPeriod).count();
-	archive(NVP(sensorsPower), CEREAL_NVP(mp), CEREAL_NVP(cp));
-}
-template<class Archive> void load(Archive& archive, DB::SensorsConfigDescriptor& v, std::uint32_t const version)
-{
-    int64_t mp;
-    int64_t cp;
-	archive(NVP(sensorsPower), CEREAL_NVP(mp), CEREAL_NVP(cp));
-	v.measurementPeriod = std::chrono::seconds(std::max<int64_t>(mp, 0));
-    v.commsPeriod = std::chrono::seconds(std::max<int64_t>(cp, 0));
-}
-template<class Archive> void save(Archive& archive, const DB::SensorsConfig& v, std::uint32_t const version)
-{
-    int64_t ccp = std::chrono::duration_cast<std::chrono::seconds>(v.computedCommsPeriod).count();
-	uint64_t bmtp = static_cast<uint64_t>(DB::Clock::to_time_t(v.baselineMeasurementTimePoint));
-	archive(NVP(descriptor), CEREAL_NVP(ccp), CEREAL_NVP(bmtp), NVP(baselineMeasurementIndex));
-}
-template<class Archive> void load(Archive& archive, DB::SensorsConfig& v, std::uint32_t const version)
-{
-    int64_t ccp;
-    uint64_t bmtp;
-	archive(NVP(descriptor), CEREAL_NVP(ccp), CEREAL_NVP(bmtp), NVP(baselineMeasurementIndex));
-	v.computedCommsPeriod = std::chrono::seconds(std::max<int64_t>(ccp, 0));
-    v.baselineMeasurementTimePoint = DB::Clock::from_time_t(bmtp);
-}
-template<class Archive> void serialize(Archive& archive, DB::SignalStrength& v, std::uint32_t const version)
-{
-	archive(NVP(s2b), NVP(b2s));
-}
-template<class Archive> void serialize(Archive& archive, DB::ErrorCounters& v, std::uint32_t const version)
-{
-	archive(NVP(comms), NVP(unknownReboots), NVP(powerOnReboots), NVP(resetReboots), NVP(brownoutReboots), NVP(watchdogReboots));
-}
-template<class Archive> void serialize(Archive& archive, DB::SensorDescriptor& v, std::uint32_t const version)
-{
-	archive(NVP(name));
-}
-template<class Archive> void serialize(Archive& archive, DB::Sensor::Calibration& v, std::uint32_t const version)
-{
-	archive(NVP(temperatureBias), NVP(humidityBias));
-}
-template<class Archive> void serialize(Archive& archive, DB::Sensor::DeviceInfo& v, std::uint32_t const version)
-{
-	archive(NVP(sensorType), NVP(softwareVersion), NVP(hardwareVersion));
-}
-template<class Archive> void save(Archive& archive, const DB::Sensor& v, std::uint32_t const version)
-{
-    uint64_t sstp = static_cast<uint64_t>(DB::Clock::to_time_t(v.sleepStateTimePoint));
-    uint64_t lctp = static_cast<uint64_t>(DB::Clock::to_time_t(v.lastCommsTimePoint));
-	archive(NVP(descriptor), NVP(id), NVP(address), NVP(deviceInfo),
-            NVP(calibration), NVP(serialNumber), NVP(state),
-            NVP(shouldSleep), CEREAL_NVP(sstp), NVP(errorCounters),
-			CEREAL_NVP(lctp), NVP(lastConfirmedMeasurementIndex), NVP(firstStoredMeasurementIndex),
-            NVP(storedMeasurementCount), NVP(estimatedStoredMeasurementCount), NVP(lastSignalStrengthB2S),
-            NVP(averageSignalStrength), NVP(averageCombinedSignalStrength),
-            NVP(isMeasurementValid), NVP(measurementTemperature), NVP(measurementHumidity), NVP(measurementVcc));
-}
-template<class Archive> void load(Archive& archive, DB::Sensor& v, std::uint32_t const version)
-{
-    uint64_t sstp;
-    uint64_t lctp;
-	archive(NVP(descriptor), NVP(id), NVP(address), NVP(deviceInfo),
-            NVP(calibration), NVP(serialNumber), NVP(state),
-            NVP(shouldSleep), CEREAL_NVP(sstp), NVP(errorCounters),
-			CEREAL_NVP(lctp), NVP(lastConfirmedMeasurementIndex), NVP(firstStoredMeasurementIndex),
-            NVP(storedMeasurementCount), NVP(estimatedStoredMeasurementCount), NVP(lastSignalStrengthB2S),
-            NVP(averageSignalStrength), NVP(averageCombinedSignalStrength),
-            NVP(isMeasurementValid), NVP(measurementTemperature), NVP(measurementHumidity), NVP(measurementVcc));
-    v.sleepStateTimePoint = DB::Clock::from_time_t(sstp);
-    v.lastCommsTimePoint = DB::Clock::from_time_t(lctp);
-}
-template<class Archive> void serialize(Archive& archive, DB::AlarmDescriptor& v, std::uint32_t const version)
-{
-	archive(NVP(name), NVP(filterSensors), NVP(sensors), NVP(lowTemperatureWatch), NVP(lowTemperature), NVP(highTemperatureWatch), NVP(highTemperature),
-            NVP(lowHumidityWatch), NVP(lowHumidity), NVP(highHumidityWatch), NVP(highHumidity), NVP(lowVccWatch), NVP(lowSignalWatch), NVP(sendEmailAction));
-}
-template<class Archive> void serialize(Archive& archive, DB::Alarm& v, std::uint32_t const version)
-{
-	archive(NVP(descriptor), NVP(id), NVP(triggersPerSensor));
-}
-template<class Archive> void save(Archive& archive, const DB::ReportDescriptor& v, std::uint32_t const version)
-{
-    int64_t cp = std::chrono::duration_cast<std::chrono::seconds>(v.customPeriod).count();
-	archive(NVP(name), NVP(period), CEREAL_NVP(cp), NVP(data), NVP(filterSensors), NVP(sensors));
-}
-template<class Archive> void load(Archive& archive, DB::ReportDescriptor& v, std::uint32_t const version)
-{
-    int64_t cp;
-	archive(NVP(name), NVP(period), CEREAL_NVP(cp), NVP(data), NVP(filterSensors), NVP(sensors));
-    v.customPeriod = std::chrono::seconds(std::max<int64_t>(cp, 0));
-}
-template<class Archive> void save(Archive& archive, const DB::Report& v, std::uint32_t const version)
-{
-    uint64_t lttp = static_cast<uint64_t>(DB::Clock::to_time_t(v.lastTriggeredTimePoint));
-	archive(NVP(descriptor), NVP(id), CEREAL_NVP(lttp));
-}
-template<class Archive> void load(Archive& archive, DB::Report& v, std::uint32_t const version)
-{
-    uint64_t lttp;
-	archive(NVP(descriptor), NVP(id), CEREAL_NVP(lttp));
-    v.lastTriggeredTimePoint = DB::Clock::from_time_t(lttp);
-}
-
 //////////////////////////////////////////////////////////////////////////
 
 DB::DB()
 {
-    m_storeThread = std::thread(std::bind(&DB::storeThreadProc, this));
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 DB::~DB()
 {
-    if (m_delayedTriggerSave)
-    {
-        std::cout << "A DB save was scheduled. Performing it now...\n";
-        triggerSave();
-        while (m_storeThreadTriggered) //wait for the thread to finish saving
-        {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
-        std::cout << "Finished scheduled save\n";
-    }
-
-    m_threadsExit = true;
-
-    m_storeCV.notify_all();
-    if (m_storeThread.joinable())
-    {
-        m_storeThread.join();
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 Result<void> DB::create(sqlite3& db)
 {
-	char* errorMsg = nullptr;
+	sqlite3_exec(&db, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+	utils::epilogue epi([&db] { sqlite3_exec(&db, "END TRANSACTION;", NULL, NULL, NULL); });
+
 	{
-		const char* sqlCreateTable = "CREATE TABLE BaseStations (id INTEGER PRIMARY KEY, name STRING, mac STRING);";
-		if (sqlite3_exec(&db, sqlCreateTable, NULL, NULL, &errorMsg))
+		const char* sql = "CREATE TABLE BaseStations (id INTEGER PRIMARY KEY, name STRING, mac STRING);";
+		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
-			sqlite3_free(errorMsg);
 			return error;
 		}
 	}
 	{
-		const char* sqlCreateTable = "CREATE TABLE SensorsConfigs (id INTEGER PRIMARY KEY, baselineMeasurementTimePoint DATETIME, baselineMeasurementIndex INTEGER, sensorsPower INTEGER, measurementPeriod INTEGER, commsPeriod INTEGER);";
-		if (sqlite3_exec(&db, sqlCreateTable, NULL, NULL, &errorMsg))
+		const char* sql = "CREATE TABLE SensorsConfigs (baselineMeasurementTimePoint DATETIME, baselineMeasurementIndex INTEGER, sensorsPower INTEGER, measurementPeriod INTEGER, commsPeriod INTEGER);";
+		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
-			sqlite3_free(errorMsg);
 			return error;
 		}
 	}
 	{
-		const char* sqlCreateTable = "CREATE TABLE Sensors (id INTEGER PRIMARY KEY, name STRING, address INTEGER, sensorType INTEGER, hardwareVersion INTEGER, softwareVersion INTEGER, "
+		const char* sql = "CREATE TABLE Sensors (id INTEGER PRIMARY KEY, name STRING, address INTEGER, sensorType INTEGER, hardwareVersion INTEGER, softwareVersion INTEGER, "
             "temperatureBias REAL, humidityBias REAL, serialNumber INTEGER, state INTEGER, shouldSleep BOOLEAN, sleepStateTimePoint DATETIME, commsErrorCounter INTEGER, "
             "unknownRebootsErrorCounter INTEGER, powerOnRebootsErrorCounter INTEGER, resetRebootsErrorCounter INTEGER, brownoutRebootsErrorCounter INTEGER, watchdogRebootsErrorCounter INTEGER, lastCommsTimePoint DATETIME, lastConfirmedMeasurementIndex INTEGER, "
-            "firstStoredMeasurementIndex INTEGER, storedMeasurementCount INTEGER, estimatedStoredMeasurementCount INTEGER, lastSignalStrengthB2S INTEGER, averageSignalStrengthB2S INTEGER, averageSignalStrengthS2B INTEGER, averageCombinedSignalStrength INTEGER, "
+            "firstStoredMeasurementIndex INTEGER, storedMeasurementCount INTEGER, estimatedStoredMeasurementCount INTEGER, lastSignalStrengthB2S INTEGER, averageSignalStrengthB2S INTEGER, averageSignalStrengthS2B INTEGER, "
             "isMeasurementValid BOOLEAN, measurementTemperature REAL, measurementHumidity REAL, measurementVcc REAL);";
-		if (sqlite3_exec(&db, sqlCreateTable, NULL, NULL, &errorMsg))
+		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
-			sqlite3_free(errorMsg);
 			return error;
 		}
 	}
 	{
-		const char* sqlCreateTable = "CREATE TABLE Alarms (id INTEGER PRIMARY KEY, filterSensors BOOLEAN, sensors STRING, lowTemperatureWatch BOOLEAN, lowTemperature REAL, highTemperatureWatch BOOLEAN, highTemperature REAL, "
+		const char* sql = "CREATE TABLE Alarms (id INTEGER PRIMARY KEY, name STRING, filterSensors BOOLEAN, sensors STRING, lowTemperatureWatch BOOLEAN, lowTemperature REAL, highTemperatureWatch BOOLEAN, highTemperature REAL, "
             "lowHumidityWatch BOOLEAN, lowHumidity REAL, highHumidityWatch BOOLEAN, highHumidity REAL, "
-            "lowVccWatch BOOLEAN, highSignalWatch BOOLEAN, "
+            "lowVccWatch BOOLEAN, lowSignalWatch BOOLEAN, "
             "sendEmailAction BOOLEAN);";
-		if (sqlite3_exec(&db, sqlCreateTable, NULL, NULL, &errorMsg))
+		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
-			sqlite3_free(errorMsg);
 			return error;
 		}
 	}
 	{
-		const char* sqlCreateTable = "CREATE TABLE Reports (id INTEGER PRIMARY KEY, name STRING, period INTEGER, customPeriod INTEGER, data INTEGER, filterSensors BOOLEAN, sensors STRING, lastTriggeredTimePoint DATETIME);";
-		if (sqlite3_exec(&db, sqlCreateTable, NULL, NULL, &errorMsg))
+		const char* sql = "CREATE TABLE Reports (id INTEGER PRIMARY KEY, name STRING, period INTEGER, customPeriod INTEGER, data INTEGER, filterSensors BOOLEAN, sensors STRING, lastTriggeredTimePoint DATETIME);";
+		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
-			sqlite3_free(errorMsg);
 			return error;
 		}
-	} {
-		const char* sqlCreateTable = "CREATE TABLE Measurements (id INTEGER PRIMARY KEY, timePoint DATETIME, idx INTEGER, sensorId INTEGER, temperature REAL, humidity REAL, vcc REAL, signalStrengthS2B INTEGER, signalStrengthB2S INTEGER, "
-            "sensorErrors INTEGER, alarmTriggers INTEGER, compinedSignalStrength INTEGER);";
-		if (sqlite3_exec(&db, sqlCreateTable, NULL, NULL, &errorMsg))
+	} 
+    {
+		const char* sql = "CREATE TABLE Measurements (id INTEGER PRIMARY KEY, timePoint DATETIME, idx INTEGER, sensorId INTEGER, temperature REAL, humidity REAL, vcc REAL, signalStrengthS2B INTEGER, signalStrengthB2S INTEGER, "
+            "sensorErrors INTEGER, alarmTriggers INTEGER);";
+		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
-			sqlite3_free(errorMsg);
 			return error;
 		}
 	}
+
 	return success;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-Result<void> DB::create()
-{
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
-
-    m_dbName = "sense.db";
-    m_dataName = "sense.data";
-    m_mainData.measurements.clear();
-
-    std::string dataFilename = s_dataFolder + "/" + m_dataName;
-    std::string dbFilename = s_dataFolder + "/" + m_dbName;
-
-    utils::moveToBackup(m_dbName, dbFilename, s_dataFolder + "/backups/deleted", 50);
-    utils::moveToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/deleted", 50);
-
-    remove((dbFilename).c_str());
-    remove((dataFilename).c_str());
-
-    m_mainData = Data();
-    addSensorsConfig(SensorsConfigDescriptor()).ignore();
-    save(m_mainData);
-
-    s_logger.logVerbose(QString("Creating DB files: '%1' & '%2'").arg(m_dataName.c_str()).arg(m_dbName.c_str()));
-
-    return success;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void DB::process()
-{
-    bool trigger = false;
-    {
-        std::lock_guard<std::mutex> lg(m_delayedTriggerSaveMutex);
-        if (m_delayedTriggerSave)
-        {
-            trigger = Clock::now() >= m_delayedTriggerSaveTP;
-        }
-    }
-
-    if (trigger)
-    {
-        triggerSave();
-    }
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-Result<void> DB::load()
+Result<void> DB::load(sqlite3& db)
 {
     Clock::time_point start = Clock::now();
 
-    m_dbName = "sense.db";
-    m_dataName = "sense.data";
-
-    std::string dataFilename = (s_dataFolder + "/" + m_dataName);
-    std::string dbFilename = (s_dataFolder + "/" + m_dbName);
-
     Data data;
 
-	std::string streamData;
-	{
-		std::ifstream file(dataFilename, std::ios_base::binary);
-		if (!file.is_open())
+    {
+		sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(&db, "REPLACE INTO BaseStations (id, name, mac) "
+                                    "VALUES (?1, ?2, ?3);", -1, &stmt, NULL) != SQLITE_OK)
 		{
-            QString msg = QString("Failed to open '%1': %2").arg(dataFilename.c_str()).arg(std::strerror(errno));
-			s_logger.logCritical(msg);
-			return Error(msg.toUtf8().data());
+			return Error(QString("Cannot load base stations: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
-		streamData = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        m_saveBaseStationsStmt.reset(stmt, &sqlite3_finalize);
+    }
+	{
+		sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(&db, "INSERT INTO SensorsConfigs (baselineMeasurementTimePoint, baselineMeasurementIndex, sensorsPower, measurementPeriod, commsPeriod) "
+						            "VALUES (?1, ?2, ?3, ?4, ?5);", -1, &stmt, NULL) != SQLITE_OK)
+		{
+			return Error(QString("Cannot load base stations: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+		}
+		m_saveSensorsConfigsStmt.reset(stmt, &sqlite3_finalize);
+	}
+	{
+		sqlite3_stmt* stmt;
+		if (sqlite3_prepare_v2(&db, "REPLACE INTO Sensors (id, name, address, sensorType, hardwareVersion, softwareVersion, "
+						                       "temperatureBias, humidityBias, serialNumber, state, shouldSleep, sleepStateTimePoint, commsErrorCounter, "
+						                       "unknownRebootsErrorCounter, powerOnRebootsErrorCounter, resetRebootsErrorCounter, brownoutRebootsErrorCounter, watchdogRebootsErrorCounter, lastCommsTimePoint, lastConfirmedMeasurementIndex, "
+						                       "firstStoredMeasurementIndex, storedMeasurementCount, estimatedStoredMeasurementCount, lastSignalStrengthB2S, averageSignalStrengthB2S, averageSignalStrengthS2B, "
+						                       "isMeasurementValid, measurementTemperature, measurementHumidity, measurementVcc) "
+						            "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30);", -1, &stmt, NULL) != SQLITE_OK)
+		{
+			return Error(QString("Cannot load base stations: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+		}
+		m_saveSensorsStmt.reset(stmt, &sqlite3_finalize);
+	}
+	{
+		sqlite3_stmt* stmt;
+		if (sqlite3_prepare_v2(&db, "REPLACE INTO Alarms (id, name, filterSensors, sensors, lowTemperatureWatch, lowTemperature, highTemperatureWatch, highTemperature, "
+						                       "lowHumidityWatch, lowHumidity, highHumidityWatch, highHumidity, "
+						                       "lowVccWatch, lowSignalWatch, "
+						                       "sendEmailAction) "
+							        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15);", -1, &stmt, NULL) != SQLITE_OK)
+		{
+			return Error(QString("Cannot load base stations: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+		}
+		m_saveAlarmsStmt.reset(stmt, &sqlite3_finalize);
+	}
+	{
+		sqlite3_stmt* stmt;
+		if (sqlite3_prepare_v2(&db, "REPLACE INTO Reports (id, name, period, customPeriod, data, filterSensors, sensors, lastTriggeredTimePoint) "
+							        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8);", -1, &stmt, NULL) != SQLITE_OK)
+		{
+			return Error(QString("Cannot load base stations: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+		}
+		m_saveReportsStmt.reset(stmt, &sqlite3_finalize);
+    }
+    {
+		sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(&db, "REPLACE INTO Measurements (id, timePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggers) "
+							        "VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11);", -1, &stmt, NULL) != SQLITE_OK)
+		{
+			return Error(QString("Cannot load base stations: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+		}
+		m_addMeasurementsStmt.reset(stmt, &sqlite3_finalize);
+    }
+
+	{
+		//const char* sql = "CREATE TABLE BaseStations (id INTEGER PRIMARY KEY, name STRING, mac STRING);";
+		const char* sql = "SELECT id, name, mac "
+                          "FROM BaseStations;";
+		sqlite3_stmt* stmt;
+		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
+		{
+			return Error(QString("Cannot load base stations: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+		}
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+        while (sqlite3_step(stmt) == SQLITE_ROW)
+        {
+            BaseStation bs;
+            bs.id = sqlite3_column_int64(stmt, 0);
+		    bs.descriptor.name = (char const*)sqlite3_column_text(stmt, 1);
+		    std::string macStr = (char const*)sqlite3_column_text(stmt, 2);
+			int m0, m1, m2, m3, m4, m5;
+            if (sscanf(macStr.c_str(), "%X:%X:%X:%X:%X:%X", &m0, &m1, &m2, &m3, &m4, &m5) != 6)
+            {
+                return Error(QString("Bad base station mac: %1").arg(macStr.c_str()).toUtf8().data());
+            }
+            bs.descriptor.mac = { static_cast<uint8_t>(m0 & 0xFF), static_cast<uint8_t>(m1 & 0xFF), static_cast<uint8_t>(m2 & 0xFF), static_cast<uint8_t>(m3 & 0xFF), static_cast<uint8_t>(m4 & 0xFF), static_cast<uint8_t>(m5 & 0xFF) };
+            data.baseStations.push_back(std::move(bs));
+        }
 	}
 
-	try
 	{
-		Crypt crypt;
-		crypt.setKey(k_fileEncryptionKey);
-		QByteArray decryptedData = crypt.decryptToByteArray(QByteArray(streamData.data(), int32_t(streamData.size())));
+		//const char* sql = "CREATE TABLE SensorsConfigs (baselineMeasurementTimePoint DATETIME, baselineMeasurementIndex INTEGER, sensorsPower INTEGER, measurementPeriod INTEGER, commsPeriod INTEGER);";
+		const char* sql = "SELECT baselineMeasurementTimePoint, baselineMeasurementIndex, sensorsPower, measurementPeriod, commsPeriod "
+                          "FROM SensorsConfigs;";
+		sqlite3_stmt* stmt;
+		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
+		{
+			return Error(QString("Cannot load sensors configs: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+		}
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
 
-		std::istringstream stream(std::string(decryptedData.data(), decryptedData.size()));
-		cereal::JSONInputArchive archive(stream);
-		archive(cereal::make_nvp("db", data));
+		while (sqlite3_step(stmt) == SQLITE_ROW)
+		{
+            SensorsConfig sc;
+			sc.baselineMeasurementTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 0));
+			sc.baselineMeasurementIndex = sqlite3_column_int64(stmt, 1);
+			sc.descriptor.sensorsPower = (int8_t)sqlite3_column_int64(stmt, 2);
+			sc.descriptor.measurementPeriod = std::chrono::seconds(sqlite3_column_int64(stmt, 3));
+			sc.descriptor.commsPeriod = std::chrono::seconds(sqlite3_column_int64(stmt, 4));
+			data.sensorsConfigs.push_back(std::move(sc));
+		}
 	}
-	catch (std::exception e)
+
 	{
-		try
+		const char* sql = "SELECT id, name, address, sensorType, hardwareVersion, softwareVersion, "
+			 			        "temperatureBias, humidityBias, serialNumber, state, shouldSleep, sleepStateTimePoint, commsErrorCounter, "
+			 			        "unknownRebootsErrorCounter, powerOnRebootsErrorCounter, resetRebootsErrorCounter, brownoutRebootsErrorCounter, watchdogRebootsErrorCounter, lastCommsTimePoint, lastConfirmedMeasurementIndex, "
+			 			        "firstStoredMeasurementIndex, storedMeasurementCount, estimatedStoredMeasurementCount, lastSignalStrengthB2S, averageSignalStrengthB2S, averageSignalStrengthS2B, "
+			 			        "isMeasurementValid, measurementTemperature, measurementHumidity, measurementVcc "
+                          "FROM Sensors;";
+		sqlite3_stmt* stmt;
+		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
 		{
-			std::istringstream stream(streamData);
-			cereal::JSONInputArchive archive(stream);
-			archive(cereal::make_nvp("db", data));
+			return Error(QString("Cannot load sensors: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
-		catch (std::exception e)
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+		while (sqlite3_step(stmt) == SQLITE_ROW)
 		{
-			QString msg = QString("Failed to open '%1': %2").arg(dataFilename.c_str()).arg(e.what());
-			s_logger.logCritical(msg);
-			return Error(msg.toUtf8().data());
+			Sensor s;
+			s.id = sqlite3_column_int64(stmt, 0);
+			s.descriptor.name = (char const*)sqlite3_column_text(stmt, 1);
+			s.address = sqlite3_column_int64(stmt, 2);
+			s.deviceInfo.sensorType = (uint8_t)sqlite3_column_int64(stmt, 3);
+			s.deviceInfo.hardwareVersion = (uint8_t)sqlite3_column_int64(stmt, 4);
+			s.deviceInfo.softwareVersion = (uint8_t)sqlite3_column_int64(stmt, 5);
+			s.calibration.temperatureBias = (float)sqlite3_column_double(stmt, 6);
+			s.calibration.humidityBias = (float)sqlite3_column_double(stmt, 7);
+			s.serialNumber = (uint32_t)sqlite3_column_int64(stmt, 8);
+			s.state = (Sensor::State)sqlite3_column_int64(stmt, 9);
+			s.shouldSleep = sqlite3_column_int64(stmt, 10) ? true : false;
+			s.sleepStateTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 11));
+			s.errorCounters.comms = (uint32_t)sqlite3_column_int64(stmt, 12);
+			s.errorCounters.unknownReboots = (uint32_t)sqlite3_column_int64(stmt, 13);
+			s.errorCounters.powerOnReboots = (uint32_t)sqlite3_column_int64(stmt, 14);
+			s.errorCounters.resetReboots = (uint32_t)sqlite3_column_int64(stmt, 15);
+			s.errorCounters.brownoutReboots = (uint32_t)sqlite3_column_int64(stmt, 16);
+			s.errorCounters.watchdogReboots = (uint32_t)sqlite3_column_int64(stmt, 17);
+			s.lastCommsTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 18));
+			s.lastConfirmedMeasurementIndex = (uint32_t)sqlite3_column_int64(stmt, 19);
+			s.firstStoredMeasurementIndex = (uint32_t)sqlite3_column_int64(stmt, 20);
+			s.storedMeasurementCount = (uint32_t)sqlite3_column_int64(stmt, 21);
+			s.estimatedStoredMeasurementCount = (uint32_t)sqlite3_column_int64(stmt, 22);
+			s.lastSignalStrengthB2S = (int8_t)sqlite3_column_int64(stmt, 23);
+			s.averageSignalStrength.b2s = (int8_t)sqlite3_column_int64(stmt, 24);
+			s.averageSignalStrength.s2b = (int8_t)sqlite3_column_int64(stmt, 25);
+			s.isMeasurementValid = sqlite3_column_int64(stmt, 26) ? true : false;
+			s.measurementTemperature = (float)sqlite3_column_double(stmt, 27);
+			s.measurementHumidity = (float)sqlite3_column_double(stmt, 28);
+			s.measurementVcc = (float)sqlite3_column_double(stmt, 29);
+			data.sensors.push_back(std::move(s));
 		}
 	}
+
+	{
+// 		const char* sql = "CREATE TABLE Alarms (id INTEGER PRIMARY KEY, name, filterSensors BOOLEAN, sensors STRING, lowTemperatureWatch BOOLEAN, lowTemperature REAL, highTemperatureWatch BOOLEAN, highTemperature REAL, "
+// 			"lowHumidityWatch BOOLEAN, lowHumidity REAL, highHumidityWatch BOOLEAN, highHumidity REAL, "
+// 			"lowVccWatch BOOLEAN, lowSignalWatch BOOLEAN, "
+// 			"sendEmailAction BOOLEAN);";
+		const char* sql = "SELECT id, name, filterSensors, sensors, lowTemperatureWatch, lowTemperature, highTemperatureWatch, highTemperature, "
+			 			            "lowHumidityWatch, lowHumidity, highHumidityWatch, highHumidity, "
+			 			            "lowVccWatch, lowSignalWatch, sendEmailAction "
+                          "FROM Alarms;";
+		sqlite3_stmt* stmt;
+		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
+		{
+			return Error(QString("Cannot load alarms: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+		}
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+		while (sqlite3_step(stmt) == SQLITE_ROW)
+		{
+			Alarm a;
+            a.id = sqlite3_column_int64(stmt, 0);
+			a.descriptor.name = (char const*)sqlite3_column_text(stmt, 1);
+            a.descriptor.filterSensors = sqlite3_column_int64(stmt, 2) ? true : false;
+			QString sensors = (char const*)sqlite3_column_text(stmt, 3);
+			QStringList l = sensors.split(QChar(';'), QString::SkipEmptyParts);
+			for (QString str : l)
+			{
+				a.descriptor.sensors.insert(atoll(str.trimmed().toUtf8().data()));
+			}
+            a.descriptor.lowTemperatureWatch = sqlite3_column_int64(stmt, 4) ? true : false;
+            a.descriptor.lowTemperature = (float)sqlite3_column_double(stmt, 5);
+			a.descriptor.highTemperatureWatch = sqlite3_column_int64(stmt, 6) ? true : false;
+			a.descriptor.highTemperature = (float)sqlite3_column_double(stmt, 7);
+			a.descriptor.lowHumidityWatch = sqlite3_column_int64(stmt, 8) ? true : false;
+			a.descriptor.lowHumidity = (float)sqlite3_column_double(stmt, 9);
+			a.descriptor.highHumidityWatch = sqlite3_column_int64(stmt, 10) ? true : false;
+			a.descriptor.highHumidity = (float)sqlite3_column_double(stmt, 11);
+			a.descriptor.lowVccWatch = sqlite3_column_int64(stmt, 12);
+			a.descriptor.lowSignalWatch = sqlite3_column_int64(stmt, 13);
+			a.descriptor.sendEmailAction = sqlite3_column_int64(stmt, 14);
+			data.alarms.push_back(std::move(a));
+		}
+	}
+	{
+		//const char* sql = "CREATE TABLE Reports (id INTEGER PRIMARY KEY, name STRING, period INTEGER, customPeriod INTEGER, data INTEGER, filterSensors BOOLEAN, sensors STRING, lastTriggeredTimePoint DATETIME);";
+		const char* sql = "SELECT id, name, period, data, filterSensors, sensors, lastTriggeredTimePoint "
+                          "FROM Reports;";
+		sqlite3_stmt* stmt;
+		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
+		{
+			return Error(QString("Cannot load reports: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+		}
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+		while (sqlite3_step(stmt) == SQLITE_ROW)
+		{
+			Report r;
+			r.id = sqlite3_column_int64(stmt, 0);
+			r.descriptor.name = (char const*)sqlite3_column_text(stmt, 1);
+			r.descriptor.period = (ReportDescriptor::Period)sqlite3_column_int64(stmt, 2);
+			r.descriptor.customPeriod = std::chrono::seconds(sqlite3_column_int64(stmt, 3));
+			r.descriptor.data = (ReportDescriptor::Data)sqlite3_column_int64(stmt, 4);
+			r.descriptor.filterSensors = sqlite3_column_int64(stmt, 5) ? true : false;
+			QString sensors = (char const*)sqlite3_column_text(stmt, 6);
+			QStringList l = sensors.split(QChar(';'), QString::SkipEmptyParts);
+			for (QString str : l)
+			{
+				r.descriptor.sensors.insert(atoll(str.trimmed().toUtf8().data()));
+			}
+			r.lastTriggeredTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 7));
+			data.reports.push_back(std::move(r));
+		}
+    }
 
 	for (const BaseStation& bs: data.baseStations)
 	{
@@ -399,140 +363,9 @@ Result<void> DB::load()
 		data.lastReportId = std::max(data.lastReportId, report.id);
 	}
 
-    //////////////////////////////////////////////////////////////////////////////////
-
     {
-        std::string streamData;
-        {
-            std::ifstream file(dbFilename, std::ios_base::binary);
-            if (!file.is_open())
-            {
-                s_logger.logCritical(QString("Failed to open '%1': %2").arg(dbFilename.c_str()).arg(std::strerror(errno)));
-                return Error("Cannot open DB");
-            }
-
-            streamData = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-            file.close();
-        }
-
-        Crypt crypt;
-        crypt.setKey(k_fileEncryptionKey);
-        QByteArray decryptedData = crypt.decryptToByteArray(QByteArray(streamData.data(), (int)streamData.size()));
-
-        std::stringstream stream(std::string(decryptedData.data(), decryptedData.size()));
-
-        uint32_t sensorCount = 0;
-        if (!read(stream, sensorCount))
-        {
-            stream = std::stringstream(std::string(streamData.data(), streamData.size())); //try unencrypted
-            if (!read(stream, sensorCount))
-            {
-                s_logger.logCritical(QString("Failed to read '%1': %2").arg(dbFilename.c_str()).arg(std::strerror(errno)));
-                return Error("Cannot open DB");
-            }
-        }
-        if (sensorCount > 10000)
-        {
-            s_logger.logCritical(QString("Failed to read '%1': file seems to be corrupted").arg(dbFilename.c_str()));
-            return Error("Cannot open DB");
-        }
-
-        for (uint32_t i = 0; i < sensorCount; i++)
-        {
-            uint32_t sensorId = 0;
-            uint32_t measurementsCount = 0;
-            if (!read(stream, sensorId) || !read(stream, measurementsCount))
-            {
-                s_logger.logCritical(QString("Failed to read '%1': %2").arg(dbFilename.c_str()).arg(std::strerror(errno)));
-                return Error("Cannot open DB");
-            }
-            if (measurementsCount > 100000000)
-            {
-                s_logger.logCritical(QString("Failed to read '%1': file seems to be corrupted").arg(dbFilename.c_str()));
-                return Error("Cannot open DB");
-            }
-
-            auto sensorIt = std::find_if(data.sensors.begin(), data.sensors.end(), [&sensorId](Sensor const& sensor) { return sensor.id == sensorId; });
-            if (sensorIt == data.sensors.end())
-            {
-                s_logger.logCritical(QString("Failed to read '%1': cannot find sensor").arg(dbFilename.c_str()));
-                return Error("Cannot open DB");
-            }
-            Sensor& sensor = *sensorIt;
-
-            PackedMeasurements& packedMeasurements = data.measurements[sensorId];
-
-			size_t recordSize = sizeof(PackedMeasurement);
-			packedMeasurements.resize(measurementsCount);
-            if (stream.read(reinterpret_cast<char*>(packedMeasurements.data()), packedMeasurements.size() * recordSize).bad())
-            {
-                s_logger.logCritical(QString("Failed to read '%1': %2").arg(dbFilename.c_str()).arg(std::strerror(errno)));
-                return Error("Cannot open DB");
-            }
-
-			std::sort(packedMeasurements.begin(), packedMeasurements.end(), [](PackedMeasurement const& a, PackedMeasurement const& b)
-            {
-                return a.timePoint < b.timePoint;
-            });
-
-			for (auto it = packedMeasurements.begin(); it != packedMeasurements.end();)
-            {
-				PackedMeasurement& pm = *it;
-                Measurement measurement = unpack(sensorId, pm);
-                MeasurementId id = computeMeasurementId(measurement.descriptor);
-
-//                std::cout << "index: " << std::to_string(measurement.descriptor.index) << " s: " << std::to_string(measurement.descriptor.sensorId) << "\n";
-
-
-                //check for duplicates
-                auto lbit = std::lower_bound(data.sortedMeasurementIds.begin(), data.sortedMeasurementIds.end(), id);
-                if (lbit != data.sortedMeasurementIds.end() && *lbit == id)
-                {
-                    s_logger.logWarning(QString("Duplicate measurement index %1 found. Deleting it").arg(pm.index));
-					packedMeasurements.erase(it);
-                }
-                else
-                {
-                    data.sortedMeasurementIds.insert(lbit, id);
-                    ++it;
-                }
-            }
-
-            if (!packedMeasurements.empty())
-            {
-                Measurement measurement = unpack(sensorId, packedMeasurements.back());
-                sensor.isMeasurementValid = true;
-                sensor.measurementTemperature = measurement.descriptor.temperature;
-                sensor.measurementHumidity = measurement.descriptor.humidity;
-                sensor.measurementVcc = measurement.descriptor.vcc;
-            }
-        }
-    }
-
-    std::flush(std::cout);
-
-    std::pair<std::string, time_t> bkf = utils::getMostRecentBackup(dbFilename, s_dataFolder + "/backups/daily");
-    if (bkf.first.empty())
-    {
-        m_lastDailyBackupTP = DB::Clock::now();
-    }
-    else
-    {
-        m_lastDailyBackupTP = DB::Clock::from_time_t(bkf.second);
-    }
-    bkf = utils::getMostRecentBackup(dbFilename, s_dataFolder + "/backups/weekly");
-    if (bkf.first.empty())
-    {
-        m_lastWeeklyBackupTP = DB::Clock::now();
-    }
-    else
-    {
-        m_lastWeeklyBackupTP = DB::Clock::from_time_t(bkf.second);
-    }
-
-    {
-        std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
-        m_mainData = data;
+        std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+        m_data = data;
 
 		{
             //remove any unbound sensor
@@ -543,21 +376,17 @@ Result<void> DB::load()
 			}
 		}
 
-        //refresh signal strengths
-        for (Sensor& sensor: m_mainData.sensors)
-        {
-            sensor.averageSignalStrength = computeAverageSignalStrength(sensor.id, m_mainData);
-            sensor.averageCombinedSignalStrength = std::min(sensor.averageSignalStrength.b2s, sensor.averageSignalStrength.s2b);
-        }
         //refresh computed comms period
-        if (!m_mainData.sensorsConfigs.empty())
+        if (!m_data.sensorsConfigs.empty())
         {
-            SensorsConfig& config = m_mainData.sensorsConfigs.back();
+            SensorsConfig& config = m_data.sensorsConfigs.back();
             config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
         }
 
-        s_logger.logVerbose(QString("Done loading DB from '%1' & '%2'. Time: %3s").arg(m_dataName.c_str()).arg(m_dbName.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()));
+        s_logger.logVerbose(QString("Done loading DB. Time: %3s").arg(std::chrono::duration<float>(Clock::now() - start).count()));
     }
+
+	m_sqlite = &db;
 
     return success;
 }
@@ -571,13 +400,23 @@ Result<void> DB::load()
 //    }
 //}
 
+//////////////////////////////////////////////////////////////////////////
+
+void DB::process()
+{
+    if (m_saveScheduled)
+    {
+        save();
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 DB::Clock::duration DB::computeActualCommsPeriod(SensorsConfigDescriptor const& config) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    Clock::duration max_period = m_mainData.sensors.size() * COMMS_DURATION;
+    Clock::duration max_period = m_data.sensors.size() * COMMS_DURATION;
     Clock::duration period = std::max(config.commsPeriod, max_period);
     return std::max(period, config.measurementPeriod + MEASUREMENT_JITTER);
 }
@@ -624,26 +463,26 @@ uint32_t DB::computeNextMeasurementIndex(Sensor const& sensor) const
 
 size_t DB::getBaseStationCount() const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    return m_mainData.baseStations.size();
+    return m_data.baseStations.size();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 DB::BaseStation const& DB::getBaseStation(size_t index) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    assert(index < m_mainData.baseStations.size());
-    return m_mainData.baseStations[index];
+    assert(index < m_data.baseStations.size());
+    return m_data.baseStations[index];
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 bool DB::addBaseStation(BaseStationDescriptor const& descriptor)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     if (findBaseStationIndexByName(descriptor.name) >= 0)
     {
@@ -657,28 +496,24 @@ bool DB::addBaseStation(BaseStationDescriptor const& descriptor)
     BaseStationDescriptor::Mac const& mac = descriptor.mac;
     char macStr[128];
     sprintf(macStr, "%X_%X_%X_%X_%X_%X", mac[0]&0xFF, mac[1]&0xFF, mac[2]&0xFF, mac[3]&0xFF, mac[4]&0xFF, mac[5]&0xFF);
-    std::string dbName = macStr;
 
     std::unique_ptr<DB> db(new DB());
-    if (db->load() != success)
+    if (db->load(*m_sqlite) != success)
     {
-        if (db->create() != success)
-        {
-            s_logger.logCritical(QString("Cannot open nor create a DB for Base Station '%1' / %2").arg(descriptor.name.c_str()).arg(macStr).toUtf8().data());
-            return false;
-        }
+        s_logger.logCritical(QString("Cannot load db for Base Station '%1' / %2").arg(descriptor.name.c_str()).arg(macStr).toUtf8().data());
+        return false;
     }
 
     s_logger.logInfo(QString("Adding base station '%1' / %2").arg(descriptor.name.c_str()).arg(getMacStr(descriptor.mac).c_str()));
 
     BaseStation baseStation;
     baseStation.descriptor = descriptor;
-    baseStation.id = ++m_mainData.lastBaseStationId;
+    baseStation.id = ++m_data.lastBaseStationId;
 
-    m_mainData.baseStations.push_back(baseStation);
+    m_data.baseStations.push_back(baseStation);
     emit baseStationAdded(baseStation.id);
 
-    triggerSave();
+    save();
 
     return true;
 }
@@ -687,7 +522,7 @@ bool DB::addBaseStation(BaseStationDescriptor const& descriptor)
 
 bool DB::setBaseStation(BaseStationId id, BaseStationDescriptor const& descriptor)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     int32_t _index = findBaseStationIndexByName(descriptor.name);
     if (_index >= 0 && getBaseStation(static_cast<size_t>(_index)).id != id)
@@ -710,10 +545,10 @@ bool DB::setBaseStation(BaseStationId id, BaseStationDescriptor const& descripto
 
     s_logger.logInfo(QString("Changing base station '%1' / %2").arg(descriptor.name.c_str()).arg(getMacStr(descriptor.mac).c_str()));
 
-    m_mainData.baseStations[index].descriptor = descriptor;
+    m_data.baseStations[index].descriptor = descriptor;
     emit baseStationChanged(id);
 
-    triggerSave();
+    save();
 
     return true;
 }
@@ -722,77 +557,77 @@ bool DB::setBaseStation(BaseStationId id, BaseStationDescriptor const& descripto
 
 void DB::removeBaseStation(size_t index)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    assert(index < m_mainData.baseStations.size());
-    BaseStationId id = m_mainData.baseStations[index].id;
+    assert(index < m_data.baseStations.size());
+    BaseStationId id = m_data.baseStations[index].id;
 
-    BaseStationDescriptor const& descriptor = m_mainData.baseStations[index].descriptor;
+    BaseStationDescriptor const& descriptor = m_data.baseStations[index].descriptor;
     s_logger.logInfo(QString("Removing base station '%1' / %2").arg(descriptor.name.c_str()).arg(getMacStr(descriptor.mac).c_str()));
 
-    m_mainData.baseStations.erase(m_mainData.baseStations.begin() + index);
+    m_data.baseStations.erase(m_data.baseStations.begin() + index);
     emit baseStationRemoved(id);
 
-    triggerSave();
+    save();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 int32_t DB::findBaseStationIndexByName(std::string const& name) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    auto it = std::find_if(m_mainData.baseStations.begin(), m_mainData.baseStations.end(), [&name](BaseStation const& baseStation) { return baseStation.descriptor.name == name; });
-    if (it == m_mainData.baseStations.end())
+    auto it = std::find_if(m_data.baseStations.begin(), m_data.baseStations.end(), [&name](BaseStation const& baseStation) { return baseStation.descriptor.name == name; });
+    if (it == m_data.baseStations.end())
     {
         return -1;
     }
-    return std::distance(m_mainData.baseStations.begin(), it);
+    return std::distance(m_data.baseStations.begin(), it);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 int32_t DB::findBaseStationIndexById(BaseStationId id) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    auto it = std::find_if(m_mainData.baseStations.begin(), m_mainData.baseStations.end(), [id](BaseStation const& baseStation) { return baseStation.id == id; });
-    if (it == m_mainData.baseStations.end())
+    auto it = std::find_if(m_data.baseStations.begin(), m_data.baseStations.end(), [id](BaseStation const& baseStation) { return baseStation.id == id; });
+    if (it == m_data.baseStations.end())
     {
         return -1;
     }
-    return std::distance(m_mainData.baseStations.begin(), it);
+    return std::distance(m_data.baseStations.begin(), it);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 int32_t DB::findBaseStationIndexByMac(BaseStationDescriptor::Mac const& mac) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    auto it = std::find_if(m_mainData.baseStations.begin(), m_mainData.baseStations.end(), [&mac](BaseStation const& baseStation) { return baseStation.descriptor.mac == mac; });
-    if (it == m_mainData.baseStations.end())
+    auto it = std::find_if(m_data.baseStations.begin(), m_data.baseStations.end(), [&mac](BaseStation const& baseStation) { return baseStation.descriptor.mac == mac; });
+    if (it == m_data.baseStations.end())
     {
         return -1;
     }
-    return std::distance(m_mainData.baseStations.begin(), it);
+    return std::distance(m_data.baseStations.begin(), it);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 size_t DB::getSensorCount() const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
-    return m_mainData.sensors.size();
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+    return m_data.sensors.size();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 DB::Sensor const& DB::getSensor(size_t index) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
-    assert(index < m_mainData.sensors.size());
-    Sensor const& sensor = m_mainData.sensors[index];
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+    assert(index < m_data.sensors.size());
+    Sensor const& sensor = m_data.sensors[index];
     return sensor;
 }
 
@@ -800,7 +635,7 @@ DB::Sensor const& DB::getSensor(size_t index) const
 
 DB::SensorOutputDetails DB::computeSensorOutputDetails(SensorId id) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     int32_t _index = findSensorIndexById(id);
     if (_index < 0)
@@ -809,7 +644,7 @@ DB::SensorOutputDetails DB::computeSensorOutputDetails(SensorId id) const
     }
 
     size_t index = static_cast<size_t>(_index);
-    Sensor const& sensor = m_mainData.sensors[index];
+    Sensor const& sensor = m_data.sensors[index];
     SensorsConfig const& config = getLastSensorsConfig();
 
     SensorOutputDetails details;
@@ -836,7 +671,7 @@ uint32_t DB::computeNextRealTimeMeasurementIndex() const
 
 Result<void> DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     if (descriptor.commsPeriod < std::chrono::seconds(30))
     {
@@ -854,7 +689,7 @@ Result<void> DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
     SensorsConfig config;
     config.descriptor = descriptor;
 
-    if (!m_mainData.sensorsConfigs.empty())
+    if (!m_data.sensorsConfigs.empty())
     {
         uint32_t nextRealTimeMeasurementIndex = computeNextRealTimeMeasurementIndex();
 
@@ -862,10 +697,10 @@ Result<void> DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
         uint32_t index = nextRealTimeMeasurementIndex >= c.baselineMeasurementIndex ? nextRealTimeMeasurementIndex - c.baselineMeasurementIndex : 0;
         Clock::time_point nextMeasurementTP = c.baselineMeasurementTimePoint + c.descriptor.measurementPeriod * index;
 
-        m_mainData.sensorsConfigs.erase(std::remove_if(m_mainData.sensorsConfigs.begin(), m_mainData.sensorsConfigs.end(), [&nextRealTimeMeasurementIndex](SensorsConfig const& c)
+        m_data.sensorsConfigs.erase(std::remove_if(m_data.sensorsConfigs.begin(), m_data.sensorsConfigs.end(), [&nextRealTimeMeasurementIndex](SensorsConfig const& c)
         {
             return c.baselineMeasurementIndex == nextRealTimeMeasurementIndex;
-        }), m_mainData.sensorsConfigs.end());
+        }), m_data.sensorsConfigs.end());
         config.baselineMeasurementIndex = nextRealTimeMeasurementIndex;
         config.baselineMeasurementTimePoint = nextMeasurementTP;
     }
@@ -875,18 +710,18 @@ Result<void> DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
         config.baselineMeasurementTimePoint = Clock::now();
     }
 
-    m_mainData.sensorsConfigs.push_back(config);
-    while (m_mainData.sensorsConfigs.size() > 100)
+    m_data.sensorsConfigs.push_back(config);
+    while (m_data.sensorsConfigs.size() > 100)
     {
-        m_mainData.sensorsConfigs.erase(m_mainData.sensorsConfigs.begin());
+        m_data.sensorsConfigs.erase(m_data.sensorsConfigs.begin());
     }
-    m_mainData.sensorsConfigs.back().computedCommsPeriod = computeActualCommsPeriod(m_mainData.sensorsConfigs.back().descriptor); //make sure the computed commd config is up-to-date
+    m_data.sensorsConfigs.back().computedCommsPeriod = computeActualCommsPeriod(m_data.sensorsConfigs.back().descriptor); //make sure the computed commd config is up-to-date
 
     emit sensorsConfigAdded();
 
     s_logger.logInfo("Added sensors config");
 
-    triggerDelayedSave(std::chrono::seconds(1));
+    save();
 
     return success;
 }
@@ -895,16 +730,16 @@ Result<void> DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
 
 Result<void> DB::setSensorsConfigs(std::vector<SensorsConfig> const& configs)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    m_mainData.sensorsConfigs = configs;
-    for (SensorsConfig& config: m_mainData.sensorsConfigs)
+    m_data.sensorsConfigs = configs;
+    for (SensorsConfig& config: m_data.sensorsConfigs)
     {
         config.computedCommsPeriod = config.descriptor.commsPeriod;
     }
-    if (!m_mainData.sensorsConfigs.empty())
+    if (!m_data.sensorsConfigs.empty())
     {
-        SensorsConfig& config = m_mainData.sensorsConfigs.back();
+        SensorsConfig& config = m_data.sensorsConfigs.back();
         config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
     }
 
@@ -912,7 +747,8 @@ Result<void> DB::setSensorsConfigs(std::vector<SensorsConfig> const& configs)
 
     s_logger.logInfo("Changed sensors configs");
 
-    triggerDelayedSave(std::chrono::seconds(1));
+    save();
+
     return success;
 }
 
@@ -920,36 +756,36 @@ Result<void> DB::setSensorsConfigs(std::vector<SensorsConfig> const& configs)
 
 DB::SensorsConfig const& DB::getLastSensorsConfig() const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     static SensorsConfig s_empty;
-    return m_mainData.sensorsConfigs.empty() ? s_empty : m_mainData.sensorsConfigs.back();
+    return m_data.sensorsConfigs.empty() ? s_empty : m_data.sensorsConfigs.back();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 size_t DB::getSensorsConfigCount() const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
-    return m_mainData.sensorsConfigs.size();
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+    return m_data.sensorsConfigs.size();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 DB::SensorsConfig const& DB::getSensorsConfig(size_t index) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
-    assert(index < m_mainData.sensorsConfigs.size());
-    return m_mainData.sensorsConfigs[index];
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+    assert(index < m_data.sensorsConfigs.size());
+    return m_data.sensorsConfigs[index];
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 DB::SensorsConfig const& DB::findSensorsConfigForMeasurementIndex(uint32_t index) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    for (auto it = m_mainData.sensorsConfigs.rbegin(); it != m_mainData.sensorsConfigs.rend(); ++it)
+    for (auto it = m_data.sensorsConfigs.rbegin(); it != m_data.sensorsConfigs.rend(); ++it)
     {
         SensorsConfig const& c = *it;
         if (index >= c.baselineMeasurementIndex)
@@ -964,14 +800,14 @@ DB::SensorsConfig const& DB::findSensorsConfigForMeasurementIndex(uint32_t index
 
 Result<void> DB::addSensor(SensorDescriptor const& descriptor)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     if (findSensorIndexByName(descriptor.name) >= 0)
     {
         return Error("Name '" + descriptor.name + "' already in use");
     }
-    auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [](Sensor const& sensor) { return sensor.state == Sensor::State::Unbound; });
-    if (it != m_mainData.sensors.end())
+    auto it = std::find_if(m_data.sensors.begin(), m_data.sensors.end(), [](Sensor const& sensor) { return sensor.state == Sensor::State::Unbound; });
+    if (it != m_data.sensors.end())
     {
         return Error("There is already an unbound sensor");
     }
@@ -979,24 +815,24 @@ Result<void> DB::addSensor(SensorDescriptor const& descriptor)
     {
         Sensor sensor;
         sensor.descriptor.name = descriptor.name;
-        sensor.id = ++m_mainData.lastSensorId;
+        sensor.id = ++m_data.lastSensorId;
         sensor.state = Sensor::State::Unbound;
 
-        m_mainData.sensors.push_back(sensor);
+        m_data.sensors.push_back(sensor);
         emit sensorAdded(sensor.id);
 
         s_logger.logInfo(QString("Added sensor '%1'").arg(descriptor.name.c_str()));
     }
 
     //refresh computed comms period as new sensors are added
-    if (!m_mainData.sensorsConfigs.empty())
+    if (!m_data.sensorsConfigs.empty())
     {
-        SensorsConfig& config = m_mainData.sensorsConfigs.back();
+        SensorsConfig& config = m_data.sensorsConfigs.back();
         config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
         emit sensorsConfigChanged();
     }
 
-    triggerDelayedSave(std::chrono::seconds(1));
+    save();
 
     return success;
 }
@@ -1005,7 +841,7 @@ Result<void> DB::addSensor(SensorDescriptor const& descriptor)
 
 Result<void> DB::setSensor(SensorId id, SensorDescriptor const& descriptor)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     int32_t _index = findSensorIndexByName(descriptor.name);
     if (_index >= 0 && getSensor(static_cast<size_t>(_index)).id != id)
@@ -1020,12 +856,12 @@ Result<void> DB::setSensor(SensorId id, SensorDescriptor const& descriptor)
     }
 
     size_t index = static_cast<size_t>(_index);
-    m_mainData.sensors[index].descriptor = descriptor;
+    m_data.sensors[index].descriptor = descriptor;
     emit sensorChanged(id);
 
     s_logger.logInfo(QString("Changed sensor '%1'").arg(descriptor.name.c_str()));
 
-    triggerDelayedSave(std::chrono::seconds(1));
+    save();
 
     return success;
 }
@@ -1034,7 +870,7 @@ Result<void> DB::setSensor(SensorId id, SensorDescriptor const& descriptor)
 
 Result<DB::SensorId> DB::bindSensor(uint32_t serialNumber, uint8_t sensorType, uint8_t hardwareVersion, uint8_t softwareVersion, Sensor::Calibration const& calibration)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     int32_t _index = findUnboundSensorIndex();
     if (_index < 0)
@@ -1043,13 +879,13 @@ Result<DB::SensorId> DB::bindSensor(uint32_t serialNumber, uint8_t sensorType, u
     }
 
     size_t index = static_cast<size_t>(_index);
-    Sensor& sensor = m_mainData.sensors[index];
+    Sensor& sensor = m_data.sensors[index];
     if (sensor.state != Sensor::State::Unbound)
     {
         return Error("No unbound sensor (inconsistent internal state)");
     }
 
-    sensor.address = ++m_mainData.lastSensorAddress;
+    sensor.address = ++m_data.lastSensorAddress;
     sensor.deviceInfo.sensorType = sensorType;
     sensor.deviceInfo.hardwareVersion = hardwareVersion;
     sensor.deviceInfo.softwareVersion = softwareVersion;
@@ -1063,14 +899,14 @@ Result<DB::SensorId> DB::bindSensor(uint32_t serialNumber, uint8_t sensorType, u
     s_logger.logInfo(QString("Sensor '%1' bound to address %2").arg(sensor.descriptor.name.c_str()).arg(sensor.address));
 
     //refresh computed comms period as new sensors are added
-    if (!m_mainData.sensorsConfigs.empty())
+    if (!m_data.sensorsConfigs.empty())
     {
-        SensorsConfig& config = m_mainData.sensorsConfigs.back();
+        SensorsConfig& config = m_data.sensorsConfigs.back();
         config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
         emit sensorsConfigChanged();
     }
 
-    triggerDelayedSave(std::chrono::seconds(1));
+    save();
 
     return sensor.id;
 }
@@ -1079,7 +915,7 @@ Result<DB::SensorId> DB::bindSensor(uint32_t serialNumber, uint8_t sensorType, u
 
 Result<void> DB::setSensorCalibration(SensorId id, Sensor::Calibration const& calibration)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     int32_t _index = findSensorIndexById(id);
     if (_index < 0)
@@ -1087,7 +923,7 @@ Result<void> DB::setSensorCalibration(SensorId id, Sensor::Calibration const& ca
         return Error("Invalid sensor id");
     }
     size_t index = static_cast<size_t>(_index);
-    Sensor& sensor = m_mainData.sensors[index];
+    Sensor& sensor = m_data.sensors[index];
     if (sensor.state == Sensor::State::Unbound)
     {
         return Error("Cannot change calibration for unbound sensor");
@@ -1099,7 +935,7 @@ Result<void> DB::setSensorCalibration(SensorId id, Sensor::Calibration const& ca
 
     s_logger.logInfo(QString("Sensor '%1' calibration changed").arg(sensor.descriptor.name.c_str()));
 
-    triggerDelayedSave(std::chrono::seconds(1));
+    save();
 
     return success;
 }
@@ -1108,7 +944,7 @@ Result<void> DB::setSensorCalibration(SensorId id, Sensor::Calibration const& ca
 
 Result<void> DB::setSensorSleep(SensorId id, bool sleep)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     int32_t _index = findSensorIndexById(id);
     if (_index < 0)
@@ -1116,7 +952,7 @@ Result<void> DB::setSensorSleep(SensorId id, bool sleep)
         return Error("Invalid sensor id");
     }
     size_t index = static_cast<size_t>(_index);
-    Sensor& sensor = m_mainData.sensors[index];
+    Sensor& sensor = m_data.sensors[index];
     if (sensor.state == Sensor::State::Unbound)
     {
         return Error("Cannot put unbound sensor to sleep");
@@ -1146,7 +982,7 @@ Result<void> DB::setSensorSleep(SensorId id, bool sleep)
 
     s_logger.logInfo(QString("Sensor '%1' sleep state changed to %2").arg(sensor.descriptor.name.c_str()).arg(sleep));
 
-    triggerDelayedSave(std::chrono::seconds(1));
+    save();
 
     return success;
 }
@@ -1155,7 +991,7 @@ Result<void> DB::setSensorSleep(SensorId id, bool sleep)
 
 Result<void> DB::clearErrorCounters(SensorId id)
 {
-	std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
 	int32_t _index = findSensorIndexById(id);
 	if (_index < 0)
@@ -1163,14 +999,14 @@ Result<void> DB::clearErrorCounters(SensorId id)
 		return Error("Invalid sensor id");
 	}
 	size_t index = static_cast<size_t>(_index);
-	Sensor& sensor = m_mainData.sensors[index];
+	Sensor& sensor = m_data.sensors[index];
     sensor.errorCounters = ErrorCounters();
 
 	emit sensorChanged(sensor.id);
 
 	s_logger.logInfo(QString("Sensor '%1' error counters cleared").arg(sensor.descriptor.name.c_str()));
 
-	triggerDelayedSave(std::chrono::seconds(1));
+    save();
 
 	return success;
 }
@@ -1179,7 +1015,7 @@ Result<void> DB::clearErrorCounters(SensorId id)
 
 bool DB::setSensorInputDetails(SensorInputDetails const& details)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     return setSensorsInputDetails({details});
 }
@@ -1188,7 +1024,7 @@ bool DB::setSensorInputDetails(SensorInputDetails const& details)
 
 bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     bool ok = true;
     for (SensorInputDetails const& d: details)
@@ -1201,7 +1037,7 @@ bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
         }
 
         size_t index = static_cast<size_t>(_index);
-        Sensor& sensor = m_mainData.sensors[index];
+        Sensor& sensor = m_data.sensors[index];
         if (sensor.state == Sensor::State::Unbound)
         {
             ok = false;
@@ -1266,8 +1102,11 @@ bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
             sensor.lastSignalStrengthB2S = d.signalStrengthB2S;
 
             //we do this here just in case the sensor doesn't have any measurements. In that case the average signal strength will be calculated from the lastSignalStrengthB2S
-			sensor.averageSignalStrength = computeAverageSignalStrength(sensor.id, m_mainData);
-			sensor.averageCombinedSignalStrength = std::min(sensor.averageSignalStrength.b2s, sensor.averageSignalStrength.s2b);
+            //this happens the first time a sensor is added
+            if (sensor.averageSignalStrength.b2s == 0 || sensor.averageSignalStrength.s2b == 0)
+			{
+                sensor.averageSignalStrength = { d.signalStrengthB2S, d.signalStrengthB2S };
+			}
         }
 
         if (d.hasErrorCountersDelta)
@@ -1291,7 +1130,7 @@ bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
         emit sensorDataChanged(sensor.id);
     }
 
-    triggerDelayedSave(std::chrono::seconds(1));
+    scheduleSave();
 
     return ok;
 }
@@ -1300,152 +1139,144 @@ bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
 
 void DB::removeSensor(size_t index)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    assert(index < m_mainData.sensors.size());
+    assert(index < m_data.sensors.size());
 
-    SensorId sensorId = m_mainData.sensors[index].id;
+    SensorId sensorId = m_data.sensors[index].id;
 
     {
-        auto it = m_mainData.measurements.find(sensorId);
-        if (it != m_mainData.measurements.end())
-        {
-			for (PackedMeasurement const& pm : it->second)
-            {
-                MeasurementId id = computeMeasurementId(sensorId, pm);
-                auto sit = std::lower_bound(m_mainData.sortedMeasurementIds.begin(), m_mainData.sortedMeasurementIds.end(), id);
-                if (sit != m_mainData.sortedMeasurementIds.end() && *sit == id)
-                {
-                    m_mainData.sortedMeasurementIds.erase(sit);
-                }
-            }
-
-            m_mainData.measurements.erase(it);
-            emit measurementsRemoved(sensorId);
-        }
+		QString sql = QString("DELETE FROM Measurements "
+                              "WHERE sensorId = %1;").arg(sensorId);
+		if (sqlite3_exec(m_sqlite, sql.toUtf8().data(), NULL, NULL, nullptr))
+		{
+			s_logger.logCritical(QString("Failed to remove measurements for sensor %1: %2").arg(sensorId).arg(sqlite3_errmsg(m_sqlite)));
+			return;
+		}
+        emit measurementsRemoved(sensorId);
     }
 
-    for (Alarm& alarm: m_mainData.alarms)
+    for (Alarm& alarm: m_data.alarms)
     {
         alarm.descriptor.sensors.erase(sensorId);
         alarm.triggersPerSensor.erase(sensorId);
     }
 
-    for (Report& report: m_mainData.reports)
+    for (Report& report: m_data.reports)
     {
         report.descriptor.sensors.erase(sensorId);
     }
 
-    s_logger.logInfo(QString("Removing sensor '%1'").arg(m_mainData.sensors[index].descriptor.name.c_str()));
+    s_logger.logInfo(QString("Removing sensor '%1'").arg(m_data.sensors[index].descriptor.name.c_str()));
 
-    m_mainData.sensors.erase(m_mainData.sensors.begin() + index);
+    m_data.sensors.erase(m_data.sensors.begin() + index);
     emit sensorRemoved(sensorId);
 
     //refresh computed comms period as new sensors are removed
-    if (!m_mainData.sensorsConfigs.empty())
+    if (!m_data.sensorsConfigs.empty())
     {
-        SensorsConfig& config = m_mainData.sensorsConfigs.back();
+        SensorsConfig& config = m_data.sensorsConfigs.back();
         config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
         emit sensorsConfigChanged();
     }
 
-    triggerDelayedSave(std::chrono::seconds(1));
+    save();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 int32_t DB::findSensorIndexByName(std::string const& name) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [&name](Sensor const& sensor) { return sensor.descriptor.name == name; });
-    if (it == m_mainData.sensors.end())
+    auto it = std::find_if(m_data.sensors.begin(), m_data.sensors.end(), [&name](Sensor const& sensor) { return sensor.descriptor.name == name; });
+    if (it == m_data.sensors.end())
     {
         return -1;
     }
-    return std::distance(m_mainData.sensors.begin(), it);
+    return std::distance(m_data.sensors.begin(), it);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 int32_t DB::findSensorIndexById(SensorId id) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [&id](Sensor const& sensor) { return sensor.id == id; });
-    if (it == m_mainData.sensors.end())
+    auto it = std::find_if(m_data.sensors.begin(), m_data.sensors.end(), [&id](Sensor const& sensor) { return sensor.id == id; });
+    if (it == m_data.sensors.end())
     {
         return -1;
     }
-    return std::distance(m_mainData.sensors.begin(), it);
+    return std::distance(m_data.sensors.begin(), it);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 int32_t DB::findSensorIndexByAddress(SensorAddress address) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [&address](Sensor const& sensor) { return sensor.address == address; });
-    if (it == m_mainData.sensors.end())
+    auto it = std::find_if(m_data.sensors.begin(), m_data.sensors.end(), [&address](Sensor const& sensor) { return sensor.address == address; });
+    if (it == m_data.sensors.end())
     {
         return -1;
     }
-    return std::distance(m_mainData.sensors.begin(), it);
+    return std::distance(m_data.sensors.begin(), it);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 int32_t DB::findSensorIndexBySerialNumber(SensorSerialNumber serialNumber) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [&serialNumber](Sensor const& sensor) { return sensor.serialNumber == serialNumber; });
-    if (it == m_mainData.sensors.end())
+    auto it = std::find_if(m_data.sensors.begin(), m_data.sensors.end(), [&serialNumber](Sensor const& sensor) { return sensor.serialNumber == serialNumber; });
+    if (it == m_data.sensors.end())
     {
         return -1;
     }
-    return std::distance(m_mainData.sensors.begin(), it);
+    return std::distance(m_data.sensors.begin(), it);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 int32_t DB::findUnboundSensorIndex() const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    auto it = std::find_if(m_mainData.sensors.begin(), m_mainData.sensors.end(), [](Sensor const& sensor) { return sensor.state == Sensor::State::Unbound; });
-    if (it == m_mainData.sensors.end())
+    auto it = std::find_if(m_data.sensors.begin(), m_data.sensors.end(), [](Sensor const& sensor) { return sensor.state == Sensor::State::Unbound; });
+    if (it == m_data.sensors.end())
     {
         return -1;
     }
-    return std::distance(m_mainData.sensors.begin(), it);
+    return std::distance(m_data.sensors.begin(), it);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 size_t DB::getAlarmCount() const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    return m_mainData.alarms.size();
+    return m_data.alarms.size();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 DB::Alarm const& DB::getAlarm(size_t index) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    assert(index < m_mainData.alarms.size());
-    return m_mainData.alarms[index];
+    assert(index < m_data.alarms.size());
+    return m_data.alarms[index];
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 Result<void> DB::addAlarm(AlarmDescriptor const& descriptor)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     if (findAlarmIndexByName(descriptor.name) >= 0)
     {
@@ -1459,14 +1290,14 @@ Result<void> DB::addAlarm(AlarmDescriptor const& descriptor)
         alarm.descriptor.sensors.clear();
     }
 
-    alarm.id = ++m_mainData.lastAlarmId;
+    alarm.id = ++m_data.lastAlarmId;
 
-    m_mainData.alarms.push_back(alarm);
+    m_data.alarms.push_back(alarm);
     emit alarmAdded(alarm.id);
 
     s_logger.logInfo(QString("Added alarm '%1'").arg(descriptor.name.c_str()));
 
-    triggerDelayedSave(std::chrono::seconds(1));
+    save();
 
     return success;
 }
@@ -1475,7 +1306,7 @@ Result<void> DB::addAlarm(AlarmDescriptor const& descriptor)
 
 Result<void> DB::setAlarm(AlarmId id, AlarmDescriptor const& descriptor)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     int32_t _index = findAlarmIndexByName(descriptor.name);
     if (_index >= 0 && getAlarm(static_cast<size_t>(_index)).id != id)
@@ -1490,12 +1321,12 @@ Result<void> DB::setAlarm(AlarmId id, AlarmDescriptor const& descriptor)
     }
 
     size_t index = static_cast<size_t>(_index);
-    m_mainData.alarms[index].descriptor = descriptor;
+    m_data.alarms[index].descriptor = descriptor;
     emit alarmChanged(id);
 
     s_logger.logInfo(QString("Changed alarm '%1'").arg(descriptor.name.c_str()));
 
-    triggerDelayedSave(std::chrono::seconds(1));
+    save();
 
     return success;
 }
@@ -1504,56 +1335,56 @@ Result<void> DB::setAlarm(AlarmId id, AlarmDescriptor const& descriptor)
 
 void DB::removeAlarm(size_t index)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    assert(index < m_mainData.alarms.size());
-    AlarmId id = m_mainData.alarms[index].id;
+    assert(index < m_data.alarms.size());
+    AlarmId id = m_data.alarms[index].id;
 
-    s_logger.logInfo(QString("Removed alarm '%1'").arg(m_mainData.alarms[index].descriptor.name.c_str()));
+    s_logger.logInfo(QString("Removed alarm '%1'").arg(m_data.alarms[index].descriptor.name.c_str()));
 
-    m_mainData.alarms.erase(m_mainData.alarms.begin() + index);
+    m_data.alarms.erase(m_data.alarms.begin() + index);
     emit alarmRemoved(id);
 
-    triggerDelayedSave(std::chrono::seconds(1));
+    save();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 int32_t DB::findAlarmIndexByName(std::string const& name) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    auto it = std::find_if(m_mainData.alarms.begin(), m_mainData.alarms.end(), [&name](Alarm const& alarm) { return alarm.descriptor.name == name; });
-    if (it == m_mainData.alarms.end())
+    auto it = std::find_if(m_data.alarms.begin(), m_data.alarms.end(), [&name](Alarm const& alarm) { return alarm.descriptor.name == name; });
+    if (it == m_data.alarms.end())
     {
         return -1;
     }
-    return std::distance(m_mainData.alarms.begin(), it);
+    return std::distance(m_data.alarms.begin(), it);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 int32_t DB::findAlarmIndexById(AlarmId id) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    auto it = std::find_if(m_mainData.alarms.begin(), m_mainData.alarms.end(), [id](Alarm const& alarm) { return alarm.id == id; });
-    if (it == m_mainData.alarms.end())
+    auto it = std::find_if(m_data.alarms.begin(), m_data.alarms.end(), [id](Alarm const& alarm) { return alarm.id == id; });
+    if (it == m_data.alarms.end())
     {
         return -1;
     }
-    return std::distance(m_mainData.alarms.begin(), it);
+    return std::distance(m_data.alarms.begin(), it);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 uint8_t DB::computeAlarmTriggers(Measurement const& m)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     uint8_t allTriggers = 0;
 
-    for (Alarm& alarm: m_mainData.alarms)
+    for (Alarm& alarm: m_data.alarms)
     {
         uint8_t triggers = _computeAlarmTriggers(alarm, m);
         allTriggers |= triggers;
@@ -1566,7 +1397,7 @@ uint8_t DB::computeAlarmTriggers(Measurement const& m)
 
 uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     AlarmDescriptor const& ad = alarm.descriptor;
     if (ad.filterSensors)
@@ -1607,7 +1438,7 @@ uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
 //        }
 
     float alertLevelSignal = utils::k_alertSignalLevel * (utils::k_maxSignalLevel - utils::k_minSignalLevel) + utils::k_minSignalLevel;
-    if (ad.lowSignalWatch && m.combinedSignalStrength <= alertLevelSignal)
+    if (ad.lowSignalWatch && std::min(m.descriptor.signalStrength.b2s, m.descriptor.signalStrength.s2b) <= alertLevelSignal)
     {
         triggers |= AlarmTrigger::LowSignal;
     }
@@ -1655,26 +1486,26 @@ uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
 
 size_t DB::getReportCount() const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    return m_mainData.reports.size();
+    return m_data.reports.size();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 DB::Report const& DB::getReport(size_t index) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    assert(index < m_mainData.reports.size());
-    return m_mainData.reports[index];
+    assert(index < m_data.reports.size());
+    return m_data.reports[index];
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 Result<void> DB::addReport(ReportDescriptor const& descriptor)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     if (findReportIndexByName(descriptor.name) >= 0)
     {
@@ -1688,14 +1519,14 @@ Result<void> DB::addReport(ReportDescriptor const& descriptor)
         report.descriptor.sensors.clear();
     }
 
-    report.id = ++m_mainData.lastReportId;
+    report.id = ++m_data.lastReportId;
 
-    m_mainData.reports.push_back(report);
+    m_data.reports.push_back(report);
     emit reportAdded(report.id);
 
     s_logger.logInfo(QString("Added report '%1'").arg(descriptor.name.c_str()));
 
-    triggerDelayedSave(std::chrono::seconds(1));
+    save();
 
     return success;
 }
@@ -1704,7 +1535,7 @@ Result<void> DB::addReport(ReportDescriptor const& descriptor)
 
 Result<void> DB::setReport(ReportId id, ReportDescriptor const& descriptor)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     int32_t _index = findReportIndexByName(descriptor.name);
     if (_index >= 0 && getReport(static_cast<size_t>(_index)).id != id)
@@ -1719,12 +1550,12 @@ Result<void> DB::setReport(ReportId id, ReportDescriptor const& descriptor)
     }
 
     size_t index = static_cast<size_t>(_index);
-    m_mainData.reports[index].descriptor = descriptor;
+    m_data.reports[index].descriptor = descriptor;
     emit reportChanged(id);
 
     s_logger.logInfo(QString("Changed report '%1'").arg(descriptor.name.c_str()));
 
-    triggerDelayedSave(std::chrono::seconds(1));
+    save();
 
     return success;
 }
@@ -1733,52 +1564,52 @@ Result<void> DB::setReport(ReportId id, ReportDescriptor const& descriptor)
 
 void DB::removeReport(size_t index)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    assert(index < m_mainData.reports.size());
-    ReportId id = m_mainData.reports[index].id;
+    assert(index < m_data.reports.size());
+    ReportId id = m_data.reports[index].id;
 
-    s_logger.logInfo(QString("Removed report '%1'").arg(m_mainData.reports[index].descriptor.name.c_str()));
+    s_logger.logInfo(QString("Removed report '%1'").arg(m_data.reports[index].descriptor.name.c_str()));
 
-    m_mainData.reports.erase(m_mainData.reports.begin() + index);
+    m_data.reports.erase(m_data.reports.begin() + index);
     emit reportRemoved(id);
 
-    triggerDelayedSave(std::chrono::seconds(1));
+    save();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 int32_t DB::findReportIndexByName(std::string const& name) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    auto it = std::find_if(m_mainData.reports.begin(), m_mainData.reports.end(), [&name](Report const& report) { return report.descriptor.name == name; });
-    if (it == m_mainData.reports.end())
+    auto it = std::find_if(m_data.reports.begin(), m_data.reports.end(), [&name](Report const& report) { return report.descriptor.name == name; });
+    if (it == m_data.reports.end())
     {
         return -1;
     }
-    return std::distance(m_mainData.reports.begin(), it);
+    return std::distance(m_data.reports.begin(), it);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 int32_t DB::findReportIndexById(ReportId id) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    auto it = std::find_if(m_mainData.reports.begin(), m_mainData.reports.end(), [id](Report const& report) { return report.id == id; });
-    if (it == m_mainData.reports.end())
+    auto it = std::find_if(m_data.reports.begin(), m_data.reports.end(), [id](Report const& report) { return report.id == id; });
+    if (it == m_data.reports.end())
     {
         return -1;
     }
-    return std::distance(m_mainData.reports.begin(), it);
+    return std::distance(m_data.reports.begin(), it);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 bool DB::isReportTriggered(ReportId id) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     int32_t _index = findReportIndexById(id);
     if (_index < 0)
@@ -1787,7 +1618,7 @@ bool DB::isReportTriggered(ReportId id) const
     }
 
     size_t index = static_cast<size_t>(_index);
-    Report const& report = m_mainData.reports[index];
+    Report const& report = m_data.reports[index];
 
     if (report.descriptor.period == ReportDescriptor::Period::Daily)
     {
@@ -1836,7 +1667,7 @@ bool DB::isReportTriggered(ReportId id) const
 
 void DB::setReportExecuted(ReportId id)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     int32_t _index = findReportIndexById(id);
     if (_index < 0)
@@ -1845,26 +1676,26 @@ void DB::setReportExecuted(ReportId id)
     }
 
     size_t index = static_cast<size_t>(_index);
-    Report& report = m_mainData.reports[index];
+    Report& report = m_data.reports[index];
     report.lastTriggeredTimePoint = Clock::now();
 
-    triggerDelayedSave(std::chrono::seconds(1));
+    save();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 bool DB::addMeasurement(MeasurementDescriptor const& md)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    return _addMeasurements(md.sensorId, {md});
+    return _addMeasurements(md.sensorId, { md });
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::addMeasurements(std::vector<MeasurementDescriptor> const& mds)
+bool DB::addMeasurements(std::vector<MeasurementDescriptor> mds)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     std::map<SensorId, std::vector<MeasurementDescriptor>> mdPerSensor;
     for (MeasurementDescriptor const& md: mds)
@@ -1884,109 +1715,154 @@ bool DB::addMeasurements(std::vector<MeasurementDescriptor> const& mds)
 
 bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> mds)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::vector<Measurement> asyncMeasurements;
 
-    int32_t _sensorIndex = findSensorIndexById(sensorId);
-    if (_sensorIndex < 0)
-    {
-        return false;
-    }
-    size_t sensorIndex = static_cast<size_t>(_sensorIndex);
-    Sensor& sensor = m_mainData.sensors[sensorIndex];
+	{
+		std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    uint32_t rtIndex = computeNextRealTimeMeasurementIndex();
+		int32_t _sensorIndex = findSensorIndexById(sensorId);
+		if (_sensorIndex < 0)
+		{
+			return false;
+		}
+		size_t sensorIndex = static_cast<size_t>(_sensorIndex);
+		Sensor& sensor = m_data.sensors[sensorIndex];
 
-    //first remove already confirmed measurements or future measurements
-    mds.erase(std::remove_if(mds.begin(), mds.end(), [&sensor, rtIndex](MeasurementDescriptor const& d)
-    {
-        //leave some threshold for the RT check, to account for inaccuracies in time keeping
-        return d.index < sensor.lastConfirmedMeasurementIndex || d.index > rtIndex + 5;
-    }), mds.end());
+		uint32_t rtIndex = computeNextRealTimeMeasurementIndex();
 
-    if (mds.empty())
-    {
-        return true;
-    }
+		//first remove already confirmed measurements or future measurements
+		mds.erase(std::remove_if(mds.begin(), mds.end(), [&sensor, rtIndex](MeasurementDescriptor const& d)
+		{
+			//leave some threshold for the RT check, to account for inaccuracies in time keeping
+			return d.index < sensor.lastConfirmedMeasurementIndex || d.index > rtIndex + 5;
+		}), mds.end());
 
-    bool added = false;
-    uint32_t minIndex = std::numeric_limits<uint32_t>::max();
-    uint32_t maxIndex = std::numeric_limits<uint32_t>::lowest();
-    for (MeasurementDescriptor const& md: mds)
-    {
-        MeasurementId id = computeMeasurementId(md);
+		if (mds.empty())
+		{
+			return true;
+		}
 
-        //advance the last confirmed index
-        if (md.index == sensor.lastConfirmedMeasurementIndex + 1)
-        {
-            sensor.lastConfirmedMeasurementIndex = md.index;
-        }
+		{
+			for (MeasurementDescriptor const& md : mds)
+			{
+				MeasurementId id = computeMeasurementId(md);
 
-        //check for duplicates
-        auto it = std::lower_bound(m_mainData.sortedMeasurementIds.begin(), m_mainData.sortedMeasurementIds.end(), id);
-        if (it != m_mainData.sortedMeasurementIds.end() && *it == id)
-        {
-            continue;
-        }
+				//advance the last confirmed index
+				if (md.index == sensor.lastConfirmedMeasurementIndex + 1)
+				{
+					sensor.lastConfirmedMeasurementIndex = md.index;
+				}
 
-        Measurement measurement;
-        measurement.id = id;
-        measurement.descriptor = md;
-        measurement.timePoint = computeMeasurementTimepoint(md);
-        measurement.combinedSignalStrength = std::min(md.signalStrength.b2s, md.signalStrength.s2b);
-        measurement.alarmTriggers = computeAlarmTriggers(measurement);
+				Measurement measurement;
+				measurement.id = id;
+				measurement.descriptor = md;
+				measurement.timePoint = computeMeasurementTimepoint(md);
+				measurement.alarmTriggers = computeAlarmTriggers(measurement);
+                asyncMeasurements.emplace_back(measurement);
 
-        //this is also set in the setSensorInputDetails
-        if (!sensor.isMeasurementValid)
-        {
-            sensor.isMeasurementValid = true;
-            sensor.measurementTemperature = measurement.descriptor.temperature;
-            sensor.measurementHumidity = measurement.descriptor.humidity;
-            sensor.measurementVcc = measurement.descriptor.vcc;
-        }
+				//this is also set in the setSensorInputDetails
+				if (!sensor.isMeasurementValid)
+				{
+					sensor.isMeasurementValid = true;
+					sensor.measurementTemperature = md.temperature;
+					sensor.measurementHumidity = md.humidity;
+					sensor.measurementVcc = md.vcc;
+				}
+			}
+		}
+		if (asyncMeasurements.empty())
+		{
+			return true;
+		}
 
-        //insert sorted id
-        m_mainData.sortedMeasurementIds.insert(it, id);
+		emit sensorDataChanged(sensor.id);
+	}
 
-        //insert sorted data
-        {
-			PackedMeasurements& packedMeasurements = m_mainData.measurements[md.sensorId];
+	{
+		std::lock_guard<std::recursive_mutex> lg(m_asyncMeasurementsMutex);
+		m_asyncMeasurements = std::move(asyncMeasurements);
+	}
 
-            uint64_t mdtp = static_cast<uint64_t>(Clock::to_time_t(measurement.timePoint));
-			auto pmit = std::lower_bound(packedMeasurements.begin(), packedMeasurements.end(), mdtp, [](PackedMeasurement const& pm, uint64_t mdtp)
-            {
-                return pm.timePoint < mdtp;
-            });
-
-			packedMeasurements.insert(pmit, pack(measurement));
-        }
-        minIndex = std::min(minIndex, md.index);
-        maxIndex = std::max(maxIndex, md.index);
-        added = true;
-    }
-
-    if (!added)
-    {
-        return true;
-    }
-    s_logger.logVerbose(QString("Added measurement indices %1 to %2, sensor '%3'").arg(minIndex).arg(maxIndex).arg(sensor.descriptor.name.c_str()));
-
-    emit measurementsAdded(sensorId);
-
-    sensor.averageSignalStrength = computeAverageSignalStrength(sensor.id, m_mainData);
-    sensor.averageCombinedSignalStrength = std::min(sensor.averageSignalStrength.b2s, sensor.averageSignalStrength.s2b);
-
-    emit sensorDataChanged(sensor.id);
-
-    triggerDelayedSave(std::chrono::seconds(1));
+    scheduleSave();
 
     return true;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
+void DB::addAsyncMeasurements()
+{
+    struct SensorData
+    {
+		uint32_t minIndex = std::numeric_limits<uint32_t>::max();
+		uint32_t maxIndex = std::numeric_limits<uint32_t>::lowest();
+    };
+    std::map<SensorId, SensorData> sensorDatas;
+
+	{
+		std::lock_guard<std::recursive_mutex> lg(m_asyncMeasurementsMutex);
+		if (m_asyncMeasurements.empty())
+		{
+			return;
+		}
+
+		{
+			sqlite3_exec(m_sqlite, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+			utils::epilogue epi1([this] { sqlite3_exec(m_sqlite, "END TRANSACTION;", NULL, NULL, NULL); });
+
+			sqlite3_stmt* stmt = m_addMeasurementsStmt.get();
+			for (Measurement const& m : m_asyncMeasurements)
+			{
+				MeasurementDescriptor const& md = m.descriptor;
+
+				sqlite3_bind_int64(stmt, 1, m.id);
+				sqlite3_bind_int64(stmt, 2, Clock::to_time_t(m.timePoint));
+				sqlite3_bind_int64(stmt, 3, md.index);
+				sqlite3_bind_int64(stmt, 4, md.sensorId);
+				sqlite3_bind_double(stmt, 5, md.temperature);
+				sqlite3_bind_double(stmt, 6, md.humidity);
+				sqlite3_bind_double(stmt, 7, md.vcc);
+				sqlite3_bind_int64(stmt, 8, md.signalStrength.s2b);
+				sqlite3_bind_int64(stmt, 9, md.signalStrength.b2s);
+				sqlite3_bind_int64(stmt, 10, md.sensorErrors);
+				sqlite3_bind_int64(stmt, 11, m.alarmTriggers);
+				if (sqlite3_step(stmt) != SQLITE_DONE)
+				{
+					s_logger.logCritical(QString("Failed to save measurement: %1").arg(sqlite3_errmsg(m_sqlite)));
+				}
+				sqlite3_reset(stmt);
+
+                SensorData& sd = sensorDatas[md.sensorId];
+				sd.minIndex = std::min(sd.minIndex, md.index);
+				sd.maxIndex = std::max(sd.maxIndex, md.index);
+			}
+		}
+		m_asyncMeasurements.clear();
+	}
+
+	{
+		std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+		for (auto const& p : sensorDatas)
+		{
+			int32_t _sensorIndex = findSensorIndexById(p.first);
+			if (_sensorIndex >= 0)
+			{
+				size_t sensorIndex = static_cast<size_t>(_sensorIndex);
+				Sensor& sensor = m_data.sensors[sensorIndex];
+				sensor.averageSignalStrength = computeAverageSignalStrength(sensor.id, m_data);
+				emit sensorDataChanged(sensor.id);
+				s_logger.logVerbose(QString("Added measurement indices %1 to %2, sensor '%3'").arg(p.second.minIndex).arg(p.second.maxIndex).arg(sensor.descriptor.name.c_str()));
+			}
+			emit measurementsAdded(p.first);
+		}
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 DB::Clock::time_point DB::computeMeasurementTimepoint(MeasurementDescriptor const& md) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     SensorsConfig const& config = findSensorsConfigForMeasurementIndex(md.index);
     uint32_t index = md.index >= config.baselineMeasurementIndex ? md.index - config.baselineMeasurementIndex : 0;
@@ -1996,42 +1872,35 @@ DB::Clock::time_point DB::computeMeasurementTimepoint(MeasurementDescriptor cons
 
 //////////////////////////////////////////////////////////////////////////
 
-std::vector<DB::Measurement> DB::getAllMeasurements() const
-{
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
-
-    std::vector<DB::Measurement> result;
-    result.reserve(8192);
-
-    for (auto const& pair : m_mainData.measurements)
-    {
-		for (PackedMeasurement const& pm : pair.second)
-        {
-            result.push_back(unpack(pair.first, pm));
-        }
-    }
-    return result;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
 size_t DB::getAllMeasurementCount() const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    size_t count = 0;
-    for (auto const& pair : m_mainData.measurements)
+	const char* sql = "SELECT COUNT(*) FROM Measurements;";
+	sqlite3_stmt* stmt;
+	if (sqlite3_prepare_v2(m_sqlite, sql, -1, &stmt, 0) != SQLITE_OK)
+	{
+		const char* msg = sqlite3_errmsg(m_sqlite);
+		Q_ASSERT(false);
+		return 0;
+	}
+	utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+    if (sqlite3_step(stmt) != SQLITE_ROW)
     {
-        count += pair.second.size();
+        const char* msg = sqlite3_errmsg(m_sqlite);
+        Q_ASSERT(false);
+        return 0;
     }
-    return count;
+
+    return sqlite3_column_int64(stmt, 0);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 std::vector<DB::Measurement> DB::getFilteredMeasurements(Filter const& filter) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     std::vector<DB::Measurement> result;
     result.reserve(8192);
@@ -2043,71 +1912,120 @@ std::vector<DB::Measurement> DB::getFilteredMeasurements(Filter const& filter) c
 
 size_t DB::getFilteredMeasurementCount(Filter const& filter) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     return _getFilteredMeasurements(filter, nullptr);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
+static std::string getQueryWherePart(DB::Filter const& filter)
+{
+    std::string sql;
+
+    std::vector<std::string> conditions;
+
+	if (filter.useTimePointFilter)
+	{
+        std::string str = " timePoint >= ";
+        str += std::to_string(DB::Clock::to_time_t(filter.timePointFilter.min));
+        str += " AND timePoint <= ";
+        str += std::to_string(DB::Clock::to_time_t(filter.timePointFilter.max));
+        conditions.push_back(str);
+	}
+	if (filter.useSensorFilter)
+	{
+        std::string str;
+        for (DB::SensorId sensorId : filter.sensorIds)
+		{
+			if (!str.empty()) str += " OR";
+            str += " sensorId = " + std::to_string(sensorId);
+		}
+		conditions.push_back(str);
+	}
+	if (filter.useTemperatureFilter)
+	{
+		std::string str = " temperature >= ";
+		str += std::to_string(filter.temperatureFilter.min);
+		str += " AND temperature <= ";
+		str += std::to_string(filter.temperatureFilter.max);
+		conditions.push_back(str);
+	}
+	if (filter.useHumidityFilter)
+	{
+		std::string str = " humidity >= ";
+		str += std::to_string(filter.humidityFilter.min);
+		str += " AND humidity <= ";
+		str += std::to_string(filter.humidityFilter.max);
+		conditions.push_back(str);
+	}
+	if (filter.useVccFilter)
+	{
+		std::string str = " vcc >= ";
+		str += std::to_string(filter.vccFilter.min);
+		str += " AND vcc <= ";
+		str += std::to_string(filter.vccFilter.max);
+		conditions.push_back(str);
+	}
+	if (filter.useSignalStrengthFilter)
+	{
+		std::string str = " MIN(signalStrengthS2B, signalStrengthB2S) >= ";
+		str += std::to_string(filter.signalStrengthFilter.min);
+		str += " AND MIN(signalStrengthS2B, signalStrengthB2S) <= ";
+		str += std::to_string(filter.signalStrengthFilter.max);
+		conditions.push_back(str);
+	}
+
+	if (!conditions.empty())
+	{
+		sql += " WHERE";
+
+        bool first = true;
+        for (std::string const& str: conditions)
+		{
+            if (!first)
+            {
+				sql += " AND ";
+            }
+            first = false;
+			sql += " (";
+			sql += str;
+			sql += ")";
+		}
+	}
+    return sql;
+}
+
 size_t DB::_getFilteredMeasurements(Filter const& filter, std::vector<DB::Measurement>* out) const
 {
     Clock::time_point start = Clock::now();
 
     size_t count = 0;
-    for (auto const& pair : m_mainData.measurements)
-    {
-        SensorId sensorId = pair.first;
-        if (filter.useSensorFilter)
-        {
-            if (filter.sensorIds.find(sensorId) == filter.sensorIds.end())
-            {
-                continue;
-            }
-        }
 
-		PackedMeasurements const& packedMeasurements = pair.second;
+	{
+		std::string sql = "SELECT id, timePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggers "
+                          "FROM Measurements " + getQueryWherePart(filter);
+		sql += ";";
 
-        //find the first date
-        if (filter.useTimePointFilter)
-        {
-            uint64_t mintp = static_cast<uint64_t>(Clock::to_time_t(filter.timePointFilter.min));
-            uint64_t maxtp = static_cast<uint64_t>(Clock::to_time_t(filter.timePointFilter.max));
-			auto pmit = std::lower_bound(packedMeasurements.begin(), packedMeasurements.end(), mintp, [](PackedMeasurement const& pm, uint64_t mintp)
-            {
-                return pm.timePoint < mintp;
-            });
+		sqlite3_stmt* stmt;
+		if (sqlite3_prepare_v2(m_sqlite, sql.c_str(), -1, &stmt, 0) != SQLITE_OK)
+		{
+            const char* msg = sqlite3_errmsg(m_sqlite);
+			Q_ASSERT(false);
+			return {};
+		}
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
 
-            //get all results
-			for (auto it = pmit; it != packedMeasurements.end() && it->timePoint <= maxtp; ++it)
-            {
-                Measurement m = unpack(sensorId, *it);
-                if (cull(m, filter))
-                {
-                    if (out)
-                    {
-                        out->push_back(m);
-                    }
-                    count++;
-                }
-            }
-        }
-        else
-        {
-			for (PackedMeasurement const& pm : packedMeasurements)
-            {
-                Measurement m = unpack(sensorId, pm);
-                if (cull(m, filter))
-                {
-                    if (out)
-                    {
-                        out->push_back(m);
-                    }
-                    count++;
-                }
-            }
-        }
-    }
+		while (sqlite3_step(stmt) == SQLITE_ROW)
+		{
+			if (out)
+			{
+                Measurement m = unpack(stmt);
+				out->push_back(std::move(m));
+			}
+			count++;
+		}
+	}
     return count;
 }
 
@@ -2115,171 +2033,80 @@ size_t DB::_getFilteredMeasurements(Filter const& filter, std::vector<DB::Measur
 
 Result<DB::Measurement> DB::getLastMeasurementForSensor(SensorId sensorId) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    auto it = m_mainData.measurements.find(sensorId);
-    if (it == m_mainData.measurements.end())
-    {
-        return Error("Sensor not found");
-    }
+    QString sql = QString("SELECT id, timePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggers "
+                          "FROM Measurements "
+                          "WHERE sensorId = %1 "
+                          "ORDER BY idx DESC LIMIT 1;").arg(sensorId);
+	sqlite3_stmt* stmt;
+	if (sqlite3_prepare_v2(m_sqlite, sql.toUtf8().data(), -1, &stmt, 0) != SQLITE_OK)
+	{
+		const char* msg = sqlite3_errmsg(m_sqlite);
+		Q_ASSERT(false);
+		return Error(QString("Failed to get last measurement from the db: %1").arg(sqlite3_errmsg(m_sqlite)).toUtf8().data());
+	}
+	utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
 
-	const PackedMeasurements& packedMeasurements = it->second;
-    if (packedMeasurements.empty())
-    {
-        return Error("No data");
-    }
-    return unpack(sensorId, packedMeasurements.back());
+	while (sqlite3_step(stmt) == SQLITE_ROW)
+	{
+		return unpack(stmt);
+	}
+
+    return Error("No data");
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 Result<DB::Measurement> DB::findMeasurementById(MeasurementId id) const
 {
-    SensorId sensorId = getSensorIdFromMeasurementId(id);
-    auto it = m_mainData.measurements.find(sensorId);
-	if (it == m_mainData.measurements.end())
+	QString sql = QString("SELECT id, timePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggers "
+                          "FROM Measurements "
+                          "WHERE id = %1;").arg(id);
+	sqlite3_stmt* stmt;
+	if (sqlite3_prepare_v2(m_sqlite, sql.toUtf8().data(), -1, &stmt, 0) != SQLITE_OK)
 	{
-		return Error("Cannot find measurements for sensor");
+		const char* msg = sqlite3_errmsg(m_sqlite);
+		Q_ASSERT(false);
+		return Error(QString("Failed to get measurement from the db: %1").arg(sqlite3_errmsg(m_sqlite)).toUtf8().data());
 	}
-    
-	const PackedMeasurements& pm = it->second;
+	utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
 
-    auto pmit = std::find_if(pm.begin(), pm.end(), [id, sensorId](const PackedMeasurement& _pm) { return computeMeasurementId(sensorId, _pm) == id; });
-    if (pmit == pm.end())
-    {
-		return Error("Cannot find measurement");
-    }
-    return unpack(sensorId, *pmit);
+	while (sqlite3_step(stmt) == SQLITE_ROW)
+	{
+		return unpack(stmt);
+	}
+
+	return Error("Cannot find measurement");
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 Result<void> DB::setMeasurement(MeasurementId id, MeasurementDescriptor const& measurement)
 {
-	SensorId sensorId = getSensorIdFromMeasurementId(id);
-	auto it = m_mainData.measurements.find(sensorId);
-	if (it == m_mainData.measurements.end())
+	QString sql = QString("UPDATE Measurements "
+                          "SET temperature = ?1, humidity = ?2, vcc = ?3 "
+                          "WHERE id = ?4;").arg(id);
+	sqlite3_stmt* stmt;
+	if (sqlite3_prepare_v2(m_sqlite, sql.toUtf8().data(), -1, &stmt, 0) != SQLITE_OK)
 	{
-		return Error("Cannot find measurements for sensor");
+		const char* msg = sqlite3_errmsg(m_sqlite);
+		Q_ASSERT(false);
+		return Error(QString("Failed to get measurement from the db: %1").arg(sqlite3_errmsg(m_sqlite)).toUtf8().data());
+	}
+	utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+	sqlite3_bind_double(stmt, 1, measurement.temperature);
+	sqlite3_bind_double(stmt, 2, measurement.humidity);
+	sqlite3_bind_double(stmt, 3, measurement.vcc);
+	sqlite3_bind_int64(stmt, 4, id);
+	if (sqlite3_step(stmt) != SQLITE_DONE)
+	{
+		return Error(QString("Failed to set measurement: %1").arg(sqlite3_errmsg(m_sqlite)).toUtf8().data());
 	}
 
-    PackedMeasurements& pms = it->second;
-
-	auto pmit = std::find_if(pms.begin(), pms.end(), [id, sensorId](const PackedMeasurement& _pm) { return computeMeasurementId(sensorId, _pm) == id; });
-	if (pmit == pms.end())
-	{
-		return Error("Cannot find measurement");
-	}
-    PackedMeasurement& pm = *pmit;
-    Measurement m = unpack(sensorId, pm);
-    m.descriptor = measurement;
-    pm = pack(m);
-
-    emit measurementsChanged(sensorId);
-
+    emit measurementsChanged(getSensorIdFromMeasurementId(id));
     return success;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-bool DB::cull(Measurement const& m, Filter const& filter) const
-{
-//    if (filter.useSensorFilter)
-//    {
-//        if (std::find(filter.sensorIds.begin(), filter.sensorIds.end(), m.descriptor.sensorId) == filter.sensorIds.end())
-//        {
-//            return false;
-//        }
-//    }
-    if (filter.useIndexFilter)
-    {
-        if (m.descriptor.index < filter.indexFilter.min || m.descriptor.index > filter.indexFilter.max)
-        {
-            return false;
-        }
-    }
-//    if (filter.useTimePointFilter)
-//    {
-//        if (m.descriptor.timePoint < filter.timePointFilter.min || m.descriptor.timePoint > filter.timePointFilter.max)
-//        {
-//            return false;
-//        }
-//    }
-    if (filter.useTemperatureFilter)
-    {
-        if (m.descriptor.temperature < filter.temperatureFilter.min || m.descriptor.temperature > filter.temperatureFilter.max)
-        {
-            return false;
-        }
-    }
-    if (filter.useHumidityFilter)
-    {
-        if (m.descriptor.humidity < filter.humidityFilter.min || m.descriptor.humidity > filter.humidityFilter.max)
-        {
-            return false;
-        }
-    }
-    if (filter.useVccFilter)
-    {
-        if (m.descriptor.vcc < filter.vccFilter.min || m.descriptor.vcc > filter.vccFilter.max)
-        {
-            return false;
-        }
-    }
-    if (filter.useSignalStrengthFilter)
-    {
-        if (m.combinedSignalStrength < filter.signalStrengthFilter.min || m.combinedSignalStrength > filter.signalStrengthFilter.max)
-        {
-            return false;
-        }
-    }
-//    if (filter.useSensorErrorsFilter)
-//    {
-//        bool has_errors = m.descriptor.sensorErrors != 0;
-//        if (has_errors != filter.sensorErrorsFilter)
-//        {
-//            return false;
-//        }
-//    }
-
-    return true;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-inline DB::PackedMeasurement DB::pack(Measurement const& m)
-{
-    PackedMeasurement pm;
-    pm.index = m.descriptor.index;
-    pm.timePoint = static_cast<uint64_t>(Clock::to_time_t(m.timePoint));
-    pm.temperature = static_cast<int16_t>(std::max(std::min(m.descriptor.temperature, 100.f), -100.f) * 327.f + 0.5f);
-    pm.humidity = static_cast<int16_t>(std::max(std::min(m.descriptor.humidity, 100.f), 0.f) * 655.f + 0.5f);
-    pm.vcc = static_cast<uint8_t>(std::max(std::min((m.descriptor.vcc - 2.f), 2.54f), 0.f) * 100.f + 0.5f);
-    pm.b2s = m.descriptor.signalStrength.b2s;
-    pm.s2b = m.descriptor.signalStrength.s2b;
-    pm.sensorErrors = m.descriptor.sensorErrors;
-    pm.alarmTriggers = m.alarmTriggers;
-    return pm;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-inline DB::Measurement DB::unpack(SensorId sensorId, PackedMeasurement const& pm)
-{
-    Measurement m;
-    m.id = computeMeasurementId(sensorId, pm);
-    m.descriptor.sensorId = sensorId;
-    m.descriptor.index = pm.index;
-    m.timePoint = Clock::from_time_t(static_cast<time_t>(pm.timePoint));
-    m.descriptor.temperature = static_cast<float>(pm.temperature) / 327.f;
-    m.descriptor.humidity = static_cast<float>(pm.humidity) / 655.f;
-    m.descriptor.vcc = static_cast<float>(pm.vcc) / 100.f + 2.f;
-    m.descriptor.signalStrength.b2s = pm.b2s;
-    m.descriptor.signalStrength.s2b = pm.s2b;
-    m.combinedSignalStrength = std::min(pm.b2s, pm.s2b);
-    m.descriptor.sensorErrors = pm.sensorErrors;
-    m.alarmTriggers = pm.alarmTriggers;
-    return m;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -2298,262 +2125,278 @@ inline DB::MeasurementId DB::computeMeasurementId(MeasurementDescriptor const& m
 
 //////////////////////////////////////////////////////////////////////////
 
-inline DB::MeasurementId DB::computeMeasurementId(SensorId sensorId, PackedMeasurement const& m)
+DB::Measurement DB::unpack(sqlite3_stmt* stmt)
 {
-    return (MeasurementId(sensorId) << 32) | MeasurementId(m.index);
+	Measurement m;
+	m.id = sqlite3_column_int64(stmt, 0);
+	m.timePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 1));
+	m.descriptor.index = sqlite3_column_int64(stmt, 2);
+	m.descriptor.sensorId = (uint32_t)sqlite3_column_int64(stmt, 3);
+	m.descriptor.temperature = (float)sqlite3_column_double(stmt, 4);
+	m.descriptor.humidity = (float)sqlite3_column_double(stmt, 5);
+	m.descriptor.vcc = (float)sqlite3_column_double(stmt, 6);
+	m.descriptor.signalStrength.s2b = (int8_t)sqlite3_column_int(stmt, 7);
+	m.descriptor.signalStrength.b2s = (int8_t)sqlite3_column_int(stmt, 8);
+	m.descriptor.sensorErrors = (uint8_t)sqlite3_column_int(stmt, 9);
+	m.alarmTriggers = (uint8_t)sqlite3_column_int(stmt, 10);
+    return m;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 DB::SignalStrength DB::computeAverageSignalStrength(SensorId sensorId, Data const& data) const
 {
-    auto sit = data.measurements.find(sensorId);
-    if (sit == data.measurements.end())
-    {
-        int32_t sensorIndex = findSensorIndexById(sensorId);
-        if (sensorIndex >= 0)
-        {
-            Sensor const& sensor = getSensor((size_t)sensorIndex);
-            return { sensor.lastSignalStrengthB2S, sensor.lastSignalStrengthB2S };
-        }
+	QString sql = QString("SELECT id, timePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggers "
+                          "FROM Measurements "
+                          "WHERE sensorId = %1 AND signalStrengthS2B != 0 AND signalStrengthB2S != 0 "
+                          "ORDER BY idx DESC LIMIT 10;").arg(sensorId);
+	sqlite3_stmt* stmt;
+	if (sqlite3_prepare_v2(m_sqlite, sql.toUtf8().data(), -1, &stmt, 0) != SQLITE_OK)
+	{
+		const char* msg = sqlite3_errmsg(m_sqlite);
+		Q_ASSERT(false);
         return {};
-    }
+	}
+	utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
 
-    int64_t counts2b = 0;
     int64_t avgs2b = 0;
-    int64_t countb2s = 0;
     int64_t avgb2s = 0;
-    for (auto it = sit->second.rbegin(); it != sit->second.rend(); ++it)
-    {
-        Measurement m = unpack(sensorId, *it);
-        if (m.descriptor.signalStrength.b2s != 0)
-        {
-            avgb2s += m.descriptor.signalStrength.b2s;
-            countb2s++;
-        }
-        if (m.descriptor.signalStrength.s2b != 0)
-        {
-            avgs2b += m.descriptor.signalStrength.s2b;
-            counts2b++;
-        }
-        if (counts2b >= 10 && countb2s >= 10)
-        {
-            break;
-        }
-    }
+    int64_t count = 0;
 
-    if (countb2s > 0)
+	while (sqlite3_step(stmt) == SQLITE_ROW)
+	{
+		Measurement m = unpack(stmt);
+        avgb2s += m.descriptor.signalStrength.b2s;
+        avgs2b += m.descriptor.signalStrength.s2b;
+        count++;
+	}
+
+    if (count > 0)
     {
-        avgb2s /= countb2s;
+        avgb2s /= count;
+        avgs2b /= count;
     }
-    if (counts2b > 0)
+    else
     {
-        avgs2b /= counts2b;
+		int32_t sensorIndex = findSensorIndexById(sensorId);
+		if (sensorIndex >= 0)
+		{
+			Sensor const& sensor = getSensor((size_t)sensorIndex);
+			return { sensor.lastSignalStrengthB2S, sensor.lastSignalStrengthB2S };
+		}
     }
-    SignalStrength avg;
+	SignalStrength avg;
     avg.b2s = static_cast<int8_t>(avgb2s);
     avg.s2b = static_cast<int8_t>(avgs2b);
-    return avg;
+	return avg;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void DB::triggerSave()
+void DB::scheduleSave()
 {
-    {
-        std::lock_guard<std::mutex> lg(m_delayedTriggerSaveMutex);
-        m_delayedTriggerSave = false;
-    }
-
-    Data data;
-    {
-        std::lock_guard<std::recursive_mutex> lg(m_mainDataMutex);
-        data = m_mainData;
-    }
-
-    {
-        std::unique_lock<std::mutex> lg(m_storeMutex);
-        m_storeData = std::move(data);
-        m_storeThreadTriggered = true;
-    }
-    m_storeCV.notify_all();
-
-    //s_logger.logVerbose("DB save triggered");
+    m_saveScheduled = true;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void DB::triggerDelayedSave(Clock::duration i_dt)
+void DB::save()
 {
-    if (i_dt < std::chrono::milliseconds(100))
-    {
-        triggerSave();
-        return;
-    }
-
-    std::lock_guard<std::mutex> lg(m_delayedTriggerSaveMutex);
-    if (m_delayedTriggerSave && m_delayedTriggerSaveTP < Clock::now() + i_dt)
-    {
-        //if the previous schedule is sooner than the new one, leave the previous intact
-        return;
-    }
-
-    m_delayedTriggerSaveTP = Clock::now() + i_dt;
-    m_delayedTriggerSave = true;
+    addAsyncMeasurements();
+    save(m_data);
+    m_saveScheduled = false;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void DB::save(Data const& data) const
 {
-    bool dailyBackup = false;
-    bool weeklyBackup = false;
-    Clock::time_point now = Clock::now();
-    if (now - m_lastDailyBackupTP >= std::chrono::hours(24))
-    {
-        m_lastDailyBackupTP = now;
-        dailyBackup = true;
-    }
-    if (now - m_lastWeeklyBackupTP >= std::chrono::hours(24 * 7))
-    {
-        m_lastWeeklyBackupTP = now;
-        weeklyBackup = true;
-    }
+    Clock::time_point start = Clock::now();
 
-    std::string dataFilename = (s_dataFolder + "/" + m_dataName);
-    std::string dbFilename = (s_dataFolder + "/" + m_dbName);
+	sqlite3_exec(m_sqlite, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+	utils::epilogue epi([this] { sqlite3_exec(m_sqlite, "END TRANSACTION;", NULL, NULL, NULL); });
 
-    Clock::time_point start = now;
+ 	{
+	    {
+		    const char* sql = "DELETE FROM BaseStations;";
+		    if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
+		    {
+			    s_logger.logCritical(QString("Failed to clear base stations: %1").arg(sqlite3_errmsg(m_sqlite)));
+			    return;
+		    }
+	    }
+	    sqlite3_stmt* stmt = m_saveBaseStationsStmt.get();
+	    for (BaseStation const& bs : data.baseStations)
+	    {
+		    sqlite3_bind_int64(stmt, 1, bs.id);
+		    sqlite3_bind_text(stmt, 2, bs.descriptor.name.c_str(), -1, SQLITE_STATIC);
+		    sqlite3_bind_text(stmt, 3, getMacStr(bs.descriptor.mac).c_str(), -1, SQLITE_TRANSIENT);
+		    if (sqlite3_step(stmt) != SQLITE_DONE)
+		    {
+			    s_logger.logCritical(QString("Failed to save base station: %1").arg(sqlite3_errmsg(m_sqlite)));
+			    return;
+		    }
+		    sqlite3_reset(stmt);
+	    }
+ 	}
+ 	{
+		{
+			const char* sql = "DELETE FROM SensorsConfigs;";
+			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
+			{
+				s_logger.logCritical(QString("Failed to clear sensor configs: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+		}
+		sqlite3_stmt* stmt = m_saveSensorsConfigsStmt.get();
+		for (SensorsConfig const& sc: data.sensorsConfigs)
+		{
+			sqlite3_bind_int64(stmt, 1, Clock::to_time_t(sc.baselineMeasurementTimePoint));
+			sqlite3_bind_int64(stmt, 2, sc.baselineMeasurementIndex);
+            sqlite3_bind_int64(stmt, 3, sc.descriptor.sensorsPower);
+            sqlite3_bind_int64(stmt, 4, std::chrono::duration_cast<std::chrono::seconds>(sc.descriptor.measurementPeriod).count());
+            sqlite3_bind_int64(stmt, 5, std::chrono::duration_cast<std::chrono::seconds>(sc.descriptor.commsPeriod).count());
+			if (sqlite3_step(stmt) != SQLITE_DONE)
+			{
+				s_logger.logCritical(QString("Failed to save sensor config: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+			sqlite3_reset(stmt);
+		}
+	}
+ 	{
+		{
+			const char* sql = "DELETE FROM Sensors;";
+			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
+			{
+				s_logger.logCritical(QString("Failed to clear sensor configs: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+		}
+		sqlite3_stmt* stmt = m_saveSensorsStmt.get();
+		for (Sensor const& s : data.sensors)
+		{
+			sqlite3_bind_int64(stmt, 1, s.id);
+            sqlite3_bind_text(stmt, 2, s.descriptor.name.c_str(), -1, SQLITE_STATIC);
+            sqlite3_bind_int64(stmt, 3, s.address);
+            sqlite3_bind_int64(stmt, 4, s.deviceInfo.sensorType);
+            sqlite3_bind_int64(stmt, 5, s.deviceInfo.hardwareVersion);
+            sqlite3_bind_int64(stmt, 6, s.deviceInfo.softwareVersion);
 
-    {
-        std::stringstream jsonString;
-        {
-	        cereal::JSONOutputArchive archive(jsonString);
-	        archive(cereal::make_nvp("db", data));
-        }
+            sqlite3_bind_double(stmt, 7, s.calibration.temperatureBias);
+            sqlite3_bind_double(stmt, 8, s.calibration.humidityBias);
 
-        std::string tempFilename = (s_dataFolder + "/" + m_dataName + "_temp");
-        {
-            std::fstream file(tempFilename, std::ios_base::binary);
-            if (!file.is_open())
+			sqlite3_bind_int64(stmt, 9, s.serialNumber);
+			sqlite3_bind_int64(stmt, 10, (int)s.state);
+            sqlite3_bind_int(stmt, 11, s.shouldSleep ? 1 : 0);
+            sqlite3_bind_int64(stmt, 12, Clock::to_time_t(s.sleepStateTimePoint));
+
+			sqlite3_bind_int64(stmt, 13, s.errorCounters.comms);
+			sqlite3_bind_int64(stmt, 14, s.errorCounters.unknownReboots);
+			sqlite3_bind_int64(stmt, 15, s.errorCounters.powerOnReboots);
+			sqlite3_bind_int64(stmt, 16, s.errorCounters.resetReboots);
+			sqlite3_bind_int64(stmt, 17, s.errorCounters.brownoutReboots);
+			sqlite3_bind_int64(stmt, 18, s.errorCounters.watchdogReboots);
+
+            sqlite3_bind_int64(stmt, 19, Clock::to_time_t(s.lastCommsTimePoint));
+
+			sqlite3_bind_int64(stmt, 20, s.lastConfirmedMeasurementIndex);
+			sqlite3_bind_int64(stmt, 21, s.firstStoredMeasurementIndex);
+			sqlite3_bind_int64(stmt, 22, s.storedMeasurementCount);
+			sqlite3_bind_int64(stmt, 23, s.estimatedStoredMeasurementCount);
+			
+            sqlite3_bind_int64(stmt, 24, s.lastSignalStrengthB2S);
+			sqlite3_bind_int64(stmt, 25, s.averageSignalStrength.b2s);
+			sqlite3_bind_int64(stmt, 26, s.averageSignalStrength.s2b);
+
+            sqlite3_bind_int(stmt, 27, s.isMeasurementValid ? 1 : 0);
+			sqlite3_bind_double(stmt, 28, s.measurementTemperature);
+			sqlite3_bind_double(stmt, 29, s.measurementHumidity);
+			sqlite3_bind_double(stmt, 30, s.measurementVcc);
+			if (sqlite3_step(stmt) != SQLITE_DONE)
+			{
+				s_logger.logCritical(QString("Failed to save sensor: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+			sqlite3_reset(stmt);
+		}
+	}
+ 	{
+		{
+			const char* sql = "DELETE FROM Alarms;";
+			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
+			{
+				s_logger.logCritical(QString("Failed to clear alarms: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+		}
+		sqlite3_stmt* stmt = m_saveAlarmsStmt.get();
+		for (Alarm const& a : data.alarms)
+		{
+			sqlite3_bind_int64(stmt, 1, a.id);
+			sqlite3_bind_text(stmt, 2, a.descriptor.name.c_str(), -1, SQLITE_STATIC);
+			sqlite3_bind_int(stmt, 3, a.descriptor.filterSensors ? 1 : 0);
+            std::string sensors;
+            for (SensorId id : a.descriptor.sensors)
             {
-                s_logger.logCritical(QString("Failed to open '%1': %2").arg(tempFilename.c_str()).arg(std::strerror(errno)));
+                sensors += std::to_string(id) + ";";
             }
-            else
-            {
-                std::string str = jsonString.str();
-				Crypt crypt;
-				crypt.setCompressionLevel(-1); //default
-				crypt.setKey(k_fileEncryptionKey);
-#ifdef USE_DATA_ENCRYPTION
-				QByteArray dataToWrite = crypt.encryptToByteArray(QByteArray(str.data(), (int)str.size()));
-#else
-				QByteArray dataToWrite = QByteArray(str.data(), (int)str.size());
-#endif
-                file.write(dataToWrite.data(), dataToWrite.size());
-            }
-            file.flush();
-            file.close();
-        }
+			sqlite3_bind_text(stmt, 4, sensors.c_str(), -1, SQLITE_STATIC);
+			sqlite3_bind_int(stmt, 5, a.descriptor.lowTemperatureWatch ? 1 : 0);
+			sqlite3_bind_double(stmt, 6, a.descriptor.lowTemperature);
+			sqlite3_bind_int(stmt, 7, a.descriptor.highTemperatureWatch ? 1 : 0);
+			sqlite3_bind_double(stmt, 8, a.descriptor.highTemperature);
+			sqlite3_bind_int(stmt, 9, a.descriptor.lowHumidityWatch ? 1 : 0);
+			sqlite3_bind_double(stmt, 10, a.descriptor.lowHumidity);
+			sqlite3_bind_int(stmt, 11, a.descriptor.highHumidityWatch ? 1 : 0);
+			sqlite3_bind_double(stmt, 12, a.descriptor.highHumidity);
+			sqlite3_bind_int(stmt, 13, a.descriptor.lowVccWatch ? 1 : 0);
+			sqlite3_bind_int(stmt, 14, a.descriptor.lowSignalWatch ? 1 : 0);
+			sqlite3_bind_int(stmt, 15, a.descriptor.sendEmailAction ? 1 : 0);
+			if (sqlite3_step(stmt) != SQLITE_DONE)
+			{
+				s_logger.logCritical(QString("Failed to save alarms: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+			sqlite3_reset(stmt);
+		}
+	}
+ 	{
+		{
+			const char* sql = "DELETE FROM Reports;";
+			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
+			{
+				s_logger.logCritical(QString("Failed to clear reports: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+		}
+		sqlite3_stmt* stmt = m_saveReportsStmt.get();
+		for (Report const& r : data.reports)
+		{
+			sqlite3_bind_int64(stmt, 1, r.id);
+			sqlite3_bind_text(stmt, 2, r.descriptor.name.c_str(), -1, SQLITE_STATIC);
+			sqlite3_bind_int(stmt, 3, (int)r.descriptor.period);
+			sqlite3_bind_int64(stmt, 4, std::chrono::duration_cast<std::chrono::seconds>(r.descriptor.customPeriod).count());
+			sqlite3_bind_int(stmt, 5, (int)r.descriptor.data);
+			sqlite3_bind_int64(stmt, 6, r.descriptor.filterSensors ? 1 : 0);
+			std::string sensors;
+			for (SensorId id : r.descriptor.sensors)
+			{
+				sensors += std::to_string(id) + ";";
+			}
+			sqlite3_bind_text(stmt, 7, sensors.c_str(), -1, SQLITE_STATIC);
+			sqlite3_bind_int64(stmt, 8, Clock::to_time_t(r.lastTriggeredTimePoint));
+			if (sqlite3_step(stmt) != SQLITE_DONE)
+			{
+				s_logger.logCritical(QString("Failed to save report: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+			sqlite3_reset(stmt);
+		}
+	}
 
-        utils::copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/incremental", 50);
-
-        if (!utils::renameFile(tempFilename, dataFilename))
-        {
-            s_logger.logCritical(QString("Failed to rename file '%1' to '%2': %3").arg(tempFilename.c_str()).arg(dataFilename.c_str()).arg(utils::getLastErrorAsString().c_str()));
-        }
-    }
-
-    {
-        std::string buffer;
-        {
-            std::stringstream stream;
-            {
-                write(stream, static_cast<uint32_t>(data.measurements.size()));
-                for (auto const& pair: data.measurements)
-                {
-                    write(stream, static_cast<uint32_t>(pair.first));
-                    write(stream, static_cast<uint32_t>(pair.second.size()));
-					stream.write(reinterpret_cast<const char*>(pair.second.data()), pair.second.size() * sizeof(PackedMeasurement));
-                }
-            }
-            buffer = stream.str();
-        }
-
-        Crypt crypt;
-        crypt.setCompressionLevel(1);
-        crypt.setKey(k_fileEncryptionKey);
-#ifdef USE_DB_ENCRYPTION
-        QByteArray dataToWrite = crypt.encryptToByteArray(QByteArray(buffer.data(), (int)buffer.size()));
-#else
-        QByteArray dataToWrite = QByteArray(buffer.data(), (int)buffer.size());
-#endif
-
-        std::string tempFilename = (s_dataFolder + "/" + m_dbName + "_temp");
-        {
-            std::ofstream file(tempFilename, std::ios_base::binary);
-            if (!file.is_open())
-            {
-                s_logger.logCritical(QString("Failed to open '%1': %2").arg(tempFilename.c_str()).arg(std::strerror(errno)));
-            }
-            else
-            {
-                file.write(dataToWrite.data(), dataToWrite.size());
-            }
-            file.flush();
-            file.close();
-        }
-
-        utils::copyToBackup(m_dbName, dbFilename, s_dataFolder + "/backups/incremental", 50);
-
-        if (!utils::renameFile(tempFilename, dbFilename))
-        {
-            s_logger.logCritical(QString("Failed to rename file '%1' to '%2': %3").arg(tempFilename.c_str()).arg(dbFilename.c_str()).arg(utils::getLastErrorAsString().c_str()));
-        }
-    }
-
-    std::cout << QString("Done saving DB to '%1' & '%2'. Time: %3s\n").arg(m_dataName.c_str()).arg(m_dbName.c_str()).arg(std::chrono::duration<float>(Clock::now() - start).count()).toUtf8().data();
+    std::cout << QString("Done saving DB. Time: %3s\n").arg(std::chrono::duration<float>(Clock::now() - start).count()).toUtf8().data();
     std::cout.flush();
-
-    if (dailyBackup)
-    {
-        utils::copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/daily", 10);
-        utils::copyToBackup(m_dbName, dbFilename, s_dataFolder + "/backups/daily", 10);
-    }
-    if (weeklyBackup)
-    {
-        utils::copyToBackup(m_dataName, dataFilename, s_dataFolder + "/backups/weekly", 10);
-        utils::copyToBackup(m_dbName, dbFilename, s_dataFolder + "/backups/weekly", 10);
-    }
-}
-                                                                              
-//////////////////////////////////////////////////////////////////////////
-
-void DB::storeThreadProc()
-{
-    while (!m_threadsExit)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        Data data;
-        {
-            //wait for data
-            std::unique_lock<std::mutex> lg(m_storeMutex);
-            if (!m_storeThreadTriggered)
-            {
-                m_storeCV.wait(lg, [this]{ return m_storeThreadTriggered || m_threadsExit; });
-            }
-            if (m_threadsExit)
-            {
-                break;
-            }
-
-            data = std::move(m_storeData);
-            m_storeData = Data();
-            m_storeThreadTriggered = false;
-        }
-
-        save(data);
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////

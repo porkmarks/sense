@@ -132,7 +132,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Signal)
         {
-            return utils::getSignalLevel(measurement.combinedSignalStrength);
+			return utils::getSignalLevel(std::min(measurement.descriptor.signalStrength.s2b, measurement.descriptor.signalStrength.b2s));
         }
 //        else if (column == Column::SensorErrors)
 //        {
@@ -168,7 +168,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Signal)
         {
-            return utils::getSignalIcon(measurement.combinedSignalStrength);
+            return utils::getSignalIcon(std::min(measurement.descriptor.signalStrength.s2b, measurement.descriptor.signalStrength.b2s));
         }
     }
     else if (role == Qt::DisplayRole)
@@ -214,7 +214,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Signal)
         {
-            return QString("%1 %").arg(static_cast<int>(utils::getSignalLevel(measurement.combinedSignalStrength) * 100.f));
+            return QString("%1 %").arg(static_cast<int>(utils::getSignalLevel(std::min(measurement.descriptor.signalStrength.s2b, measurement.descriptor.signalStrength.b2s)) * 100.f));
             //return QString("%1 %").arg(static_cast<int>(measurement.descriptor.signalStrength.b2s));
             //return QString("%1 %").arg(std::min(measurement.descriptor.b2s, measurement.descriptor.s2b));
         }

@@ -404,7 +404,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                 }
                 else if (column == Column::Signal)
                 {
-                    return utils::getSignalIcon(sensor.averageCombinedSignalStrength);
+                    return utils::getSignalIcon(std::min(sensor.averageSignalStrength.s2b, sensor.averageSignalStrength.b2s));
                 }
                 else if (column == Column::Temperature)
                 {
@@ -489,7 +489,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                 }
                 else if (column == Column::Signal)
                 {
-                    int average = static_cast<int>(utils::getSignalLevel(sensor.averageCombinedSignalStrength) * 100.f);
+                    int average = static_cast<int>(utils::getSignalLevel(std::min(sensor.averageSignalStrength.s2b, sensor.averageSignalStrength.b2s)) * 100.f);
                     return QString("%1 %").arg(average);
                 }
             }

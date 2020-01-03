@@ -8,8 +8,6 @@
 #include <QDateTime>
 #include <QTimer>
 
-#include "cereal/archives/json.hpp"
-
 #include "Utils.h"
 #include "Crypt.h"
 #include "sqlite3.h"
@@ -49,46 +47,21 @@ Logger::Logger()
 
 Logger::~Logger()
 {
-	sqlite3_finalize(m_insertStmt);
-    shutdown();
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Logger::shutdown()
-{
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Logger::process()
-{
-//     bool trigger = false;
-//     {
-//         std::lock_guard<std::mutex> lg(m_delayedTriggerSaveMutex);
-//         if (m_delayedTriggerSave)
-//         {
-//             trigger = Clock::now() >= m_delayedTriggerSaveTP;
-//         }
-//     }
-// 
-//     if (trigger)
-//     {
-//         triggerSave();
-//     }
+	m_insertStmt = nullptr;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 Result<void> Logger::create(sqlite3& db)
 {
-	char* errorMsg = nullptr;
+	sqlite3_exec(&db, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+	utils::epilogue epi([&db] { sqlite3_exec(&db, "END TRANSACTION;", NULL, NULL, NULL); });
+
 	{
-		const char* sqlCreateTable = "CREATE TABLE Logs (id INTEGER PRIMARY KEY AUTOINCREMENT, timePoint DATETIME DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')), type INTEGER, message STRING);";
-		if (sqlite3_exec(&db, sqlCreateTable, NULL, NULL, &errorMsg))
+		const char* sql = "CREATE TABLE Logs (id INTEGER PRIMARY KEY AUTOINCREMENT, timePoint DATETIME DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')), type INTEGER, message STRING);";
+		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
-			sqlite3_free(errorMsg);
 			return error;
 		}
 	}
@@ -102,7 +75,14 @@ bool Logger::load(sqlite3& db)
 {
     m_sqlite = &db;
 
-	sqlite3_prepare_v2(m_sqlite, "INSERT INTO Logs (type, message) VALUES(?1, ?2);", -1, &m_insertStmt, NULL);
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(m_sqlite, "INSERT INTO Logs (type, message) VALUES(?1, ?2);", -1, &stmt, NULL) != SQLITE_OK)
+    {
+        Q_ASSERT(false);
+        return false;
+    }
+
+    m_insertStmt.reset(stmt, &sqlite3_finalize);
 
     return true;
 }
@@ -213,14 +193,14 @@ void Logger::logCritical(char const* message)
 
 void Logger::addToDB(std::string const& message, Type type)
 {
-	sqlite3_bind_int(m_insertStmt, 1, (int)type);
-	sqlite3_bind_text(m_insertStmt, 2, message.c_str(), -1, SQLITE_STATIC);
-	if (sqlite3_step(m_insertStmt) != SQLITE_DONE)
+	sqlite3_bind_int(m_insertStmt.get(), 1, (int)type);
+	sqlite3_bind_text(m_insertStmt.get(), 2, message.c_str(), -1, SQLITE_STATIC);
+	if (sqlite3_step(m_insertStmt.get()) != SQLITE_DONE)
 	{
         std::cerr << "Failed to add to db: " << sqlite3_errmsg(m_sqlite) << std::endl;
         Q_ASSERT(false);
 	}
-	sqlite3_reset(m_insertStmt);
+	sqlite3_reset(m_insertStmt.get());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -267,6 +247,8 @@ std::vector<Logger::LogLine> Logger::getFilteredLogLines(Filter const& filter) c
             Q_ASSERT(false);
             return {};
 		}
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
 		char buffer[128];
         time_t timet = Clock::to_time_t(filter.minTimePoint);
 		struct tm* timetm = gmtime(&timet);
@@ -288,7 +270,6 @@ std::vector<Logger::LogLine> Logger::getFilteredLogLines(Filter const& filter) c
 			line.message = (char const*)sqlite3_column_text(stmt, 3);
             result.push_back(std::move(line));
 		}
-		sqlite3_finalize(stmt);
 	}
 
     return std::move(result);

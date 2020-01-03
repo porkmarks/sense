@@ -12,11 +12,6 @@
 #include "Crypt.h"
 #include "Logger.h"
 
-#include "cereal/archives/json.hpp"
-#include "cereal/types/vector.hpp"
-#include "cereal/types/string.hpp"
-#include "cereal/types/chrono.hpp"
-#include "cereal/external/rapidjson/error/en.h"
 #include "PermissionsCheck.h"
 
 #include "sqlite3.h"
@@ -34,22 +29,10 @@
 
 extern Logger s_logger;
 
-extern std::string s_dataFolder;
-
-constexpr uint64_t k_fileEncryptionKey = 32455153254365ULL;
-//constexpr uint64_t k_emailEncryptionKey = 1735271834639209ULL;
-//constexpr uint64_t k_ftpEncryptionKey = 45235321231234ULL;
-
-//CEREAL_CLASS_VERSION(Settings::Data, 1);
-
-CEREAL_CLASS_VERSION(Settings::UserDescriptor, 1);
-
 //////////////////////////////////////////////////////////////////////////
 
 Settings::Settings()
 {
-    m_storeThread = std::thread(std::bind(&Settings::storeThreadProc, this));
-
     m_db = std::unique_ptr<DB>(new DB());
     m_emailer.reset(new Emailer(*this, *m_db));
 }
@@ -58,14 +41,6 @@ Settings::Settings()
 
 Settings::~Settings()
 {
-    m_threadsExit = true;
-
-    m_storeCV.notify_all();
-    if (m_storeThread.joinable())
-    {
-        m_storeThread.join();
-    }
-
     m_sqlite = nullptr;
 }
 
@@ -80,45 +55,42 @@ void Settings::process()
 
 Result<void> Settings::create(sqlite3& db)
 {
-    char* errorMsg = nullptr;
+	sqlite3_exec(&db, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+	utils::epilogue epi([&db] { sqlite3_exec(&db, "END TRANSACTION;", NULL, NULL, NULL); });
+
 	{
-		const char* sqlCreateTable = "CREATE TABLE EmailSettings (id INTEGER PRIMARY KEY, host STRING, port INTEGER, connection INTEGER, username STRING, password STRING, sender STRING, recipients STRING);";
-		if (sqlite3_exec(&db, sqlCreateTable, NULL, NULL, &errorMsg))
+		const char* sql = "CREATE TABLE EmailSettings (id INTEGER PRIMARY KEY, host STRING, port INTEGER, connection INTEGER, username STRING, password STRING, sender STRING, recipients STRING);";
+		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
-			sqlite3_free(errorMsg);
 			return error;
 		}
 		const char* sqlInsert = "INSERT INTO EmailSettings VALUES(0, '', 465, 0, '', '', '', '');";
-		if (sqlite3_exec(&db, sqlInsert, NULL, NULL, &errorMsg))
+		if (sqlite3_exec(&db, sqlInsert, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
-			sqlite3_free(errorMsg);
 			return error;
 		}
 	}
 	{
-		const char* sqlCreateTable = "CREATE TABLE FtpSettings (id INTEGER PRIMARY KEY, host STRING, port INTEGER, username STRING, password STRING, folder STRING, uploadBackups BOOLEAN, uploadPeriod INTEGER);";
-		if (sqlite3_exec(&db, sqlCreateTable, NULL, NULL, &errorMsg))
+		const char* sql = "CREATE TABLE FtpSettings (id INTEGER PRIMARY KEY, host STRING, port INTEGER, username STRING, password STRING, folder STRING, uploadBackups BOOLEAN, uploadPeriod INTEGER);";
+		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
-			sqlite3_free(errorMsg);
 			return error;
 		}
 		const char* sqlInsert = "INSERT INTO FtpSettings VALUES(0, '', 21, '', '', '', 0, 14400);";
-		if (sqlite3_exec(&db, sqlInsert, NULL, NULL, &errorMsg))
+		if (sqlite3_exec(&db, sqlInsert, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
-			sqlite3_free(errorMsg);
 			return error;
 		}
 	}
 	{
-		const char* sqlCreateTable = "CREATE TABLE Users (id INTEGER PRIMARY KEY, name STRING, passwordHash STRING, permissions INTEGER, type INTEGER, lastLogin DATETIME);";
-		if (sqlite3_exec(&db, sqlCreateTable, NULL, NULL, &errorMsg))
+		const char* sql = "CREATE TABLE Users (id INTEGER PRIMARY KEY, name STRING, passwordHash STRING, permissions INTEGER, type INTEGER, lastLogin DATETIME);";
+		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
-			sqlite3_free(errorMsg);
 			return error;
 		}
 	}
@@ -130,96 +102,93 @@ Result<void> Settings::create(sqlite3& db)
 bool Settings::load(sqlite3& db)
 {
 	Data data;
-	char* errorMsg = nullptr;
 	{
         //id INTEGER PRIMARY KEY, host STRING, port INTEGER, connection INTEGER, username STRING, password STRING, sender STRING, recipients STRING
 		const char* sql = "SELECT host, port, connection, username, password, sender, recipients FROM EmailSettings;";
-		sqlite3_stmt* res;
-		if (sqlite3_prepare_v2(&db, sql, -1, &res, 0) != SQLITE_OK) 
+		sqlite3_stmt* stmt;
+		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
         {
 			s_logger.logCritical(QString("Cannot load email settings: %1").arg(sqlite3_errmsg(&db)));
             return false;
 		}
-        if (sqlite3_step(res) != SQLITE_ROW)
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+        if (sqlite3_step(stmt) != SQLITE_ROW)
         {
-			sqlite3_finalize(res);
             s_logger.logCritical(QString("Cannot load email settings row: %1").arg(sqlite3_errmsg(&db)));
             return false;
         }
-		data.emailSettings.host = (char const*)sqlite3_column_text(res, 0);
-		data.emailSettings.port = sqlite3_column_int(res, 1);
-		data.emailSettings.connection = (EmailSettings::Connection)sqlite3_column_int(res, 2);
-		data.emailSettings.username = (char const*)sqlite3_column_text(res, 3);
-		data.emailSettings.password = (char const*)sqlite3_column_text(res, 4);
-		data.emailSettings.sender = (char const*)sqlite3_column_text(res, 5);
-		QString recipients = (char const*)sqlite3_column_text(res, 6);
+		data.emailSettings.host = (char const*)sqlite3_column_text(stmt, 0);
+		data.emailSettings.port = sqlite3_column_int(stmt, 1);
+		data.emailSettings.connection = (EmailSettings::Connection)sqlite3_column_int(stmt, 2);
+		data.emailSettings.username = (char const*)sqlite3_column_text(stmt, 3);
+		data.emailSettings.password = (char const*)sqlite3_column_text(stmt, 4);
+		data.emailSettings.sender = (char const*)sqlite3_column_text(stmt, 5);
+		QString recipients = (char const*)sqlite3_column_text(stmt, 6);
 
 		QStringList l = recipients.split(QChar(';'), QString::SkipEmptyParts);
 		for (QString str : l)
 		{
 			data.emailSettings.recipients.push_back(str.trimmed().toUtf8().data());
 		}
-		sqlite3_finalize(res);
 	}
 	{
         //FtpSettings (id INTEGER PRIMARY KEY, host STRING, port INTEGER, username STRING, password STRING, folder STRING, uploadBackups BOOLEAN, uploadPeriod INTEGER);";
 		const char* sql = "SELECT host, port, username, password, folder, uploadBackups, uploadPeriod FROM FtpSettings;";
-		sqlite3_stmt* res;
-		if (sqlite3_prepare_v2(&db, sql, -1, &res, 0) != SQLITE_OK)
+		sqlite3_stmt* stmt;
+		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
 		{
 			s_logger.logCritical(QString("Cannot load ftp settings: %1").arg(sqlite3_errmsg(&db)));
 			return false;
 		}
-		if (sqlite3_step(res) != SQLITE_ROW)
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+		if (sqlite3_step(stmt) != SQLITE_ROW)
 		{
-			sqlite3_finalize(res);
 			s_logger.logCritical(QString("Cannot load ftp settings row: %1").arg(sqlite3_errmsg(&db)));
 			return false;
 		}
 
-		data.ftpSettings.host = (char const*)sqlite3_column_text(res, 0);
-		data.ftpSettings.port = sqlite3_column_int(res, 1);
-		data.ftpSettings.username = (char const*)sqlite3_column_text(res, 2);
-		data.ftpSettings.password = (char const*)sqlite3_column_text(res, 3);
-		data.ftpSettings.folder = (char const*)sqlite3_column_text(res, 4);
-        data.ftpSettings.uploadBackups = sqlite3_column_int(res, 5) ? true : false;
-        data.ftpSettings.uploadBackupsPeriod = std::chrono::seconds(sqlite3_column_int64(res, 6));
-		sqlite3_finalize(res);
+		data.ftpSettings.host = (char const*)sqlite3_column_text(stmt, 0);
+		data.ftpSettings.port = sqlite3_column_int(stmt, 1);
+		data.ftpSettings.username = (char const*)sqlite3_column_text(stmt, 2);
+		data.ftpSettings.password = (char const*)sqlite3_column_text(stmt, 3);
+		data.ftpSettings.folder = (char const*)sqlite3_column_text(stmt, 4);
+        data.ftpSettings.uploadBackups = sqlite3_column_int(stmt, 5) ? true : false;
+        data.ftpSettings.uploadBackupsPeriod = std::chrono::seconds(sqlite3_column_int64(stmt, 6));
 	}
 	{
 		//Users (id INTEGER PRIMARY KEY, name STRING, passwordHash STRING, permissions INTEGER, type INTEGER, lastLogin DATETIME);";
 		const char* sql = "SELECT id, name, passwordHash, permissions, type, lastLogin FROM Users;";
-		sqlite3_stmt* res;
-		if (sqlite3_prepare_v2(&db, sql, -1, &res, 0) != SQLITE_OK)
+		sqlite3_stmt* stmt;
+		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
 		{
 			s_logger.logCritical(QString("Cannot load user settings: %1").arg(sqlite3_errmsg(&db)));
 			return false;
 		}
-        while (sqlite3_step(res) == SQLITE_ROW)
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+        while (sqlite3_step(stmt) == SQLITE_ROW)
         {
             User user;
-            user.id = sqlite3_column_int(res, 0);
-            user.descriptor.name = (char const*)sqlite3_column_text(res, 1);
-            user.descriptor.passwordHash = (char const*)sqlite3_column_text(res, 2);
-            user.descriptor.permissions = sqlite3_column_int(res, 3);
-            user.descriptor.type = (UserDescriptor::Type)sqlite3_column_int(res, 4);
-            user.lastLogin = Clock::from_time_t(sqlite3_column_int64(res, 5));
+            user.id = sqlite3_column_int(stmt, 0);
+            user.descriptor.name = (char const*)sqlite3_column_text(stmt, 1);
+            user.descriptor.passwordHash = (char const*)sqlite3_column_text(stmt, 2);
+            user.descriptor.permissions = sqlite3_column_int(stmt, 3);
+            user.descriptor.type = (UserDescriptor::Type)sqlite3_column_int(stmt, 4);
+            user.lastLogin = Clock::from_time_t(sqlite3_column_int64(stmt, 5));
             data.users.push_back(std::move(user));
         }
-		sqlite3_finalize(res);
 	}
 
-    if (m_db->load() != success)
+    Result<void> result = m_db->load(db);
+    if (result != success)
     {
-        if (m_db->create() != success)
-        {
-            s_logger.logCritical(QString("Cannot open nor create the DB"));
-            return false;
-        }
+        s_logger.logCritical(QString("Cannot load the DB: %1").arg(result.error().what().c_str()));
     }
 
 	m_sqlite = &db;
-    m_mainData = data;
+    m_data = data;
 
     return true;
 }
@@ -282,12 +251,12 @@ bool Settings::setEmailSettings(EmailSettings const& settings)
     }
 
     emit emailSettingsWillBeChanged();
-    m_mainData.emailSettings = settings;
+    m_data.emailSettings = settings;
     emit emailSettingsChanged();
 
     s_logger.logInfo("Changed email settings");
 
-    triggerSave();
+    save(m_data);
 
     return true;
 }
@@ -296,7 +265,7 @@ bool Settings::setEmailSettings(EmailSettings const& settings)
 
 Settings::EmailSettings const& Settings::getEmailSettings() const
 {
-    return m_mainData.emailSettings;
+    return m_data.emailSettings;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -321,12 +290,12 @@ bool Settings::setFtpSettings(FtpSettings const& settings)
     }
 
     emit ftpSettingsWillBeChanged();
-    m_mainData.ftpSettings = settings;
+    m_data.ftpSettings = settings;
     emit ftpSettingsChanged();
 
     s_logger.logInfo("Changed ftp settings");
 
-    triggerSave();
+    save(m_data);
 
     return true;
 }
@@ -335,22 +304,22 @@ bool Settings::setFtpSettings(FtpSettings const& settings)
 
 Settings::FtpSettings const& Settings::getFtpSettings() const
 {
-    return m_mainData.ftpSettings;
+    return m_data.ftpSettings;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 size_t Settings::getUserCount() const
 {
-    return m_mainData.users.size();
+    return m_data.users.size();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 Settings::User const& Settings::getUser(size_t index) const
 {
-    assert(index < m_mainData.users.size());
-    return m_mainData.users[index];
+    assert(index < m_data.users.size());
+    return m_data.users[index];
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -364,15 +333,15 @@ bool Settings::addUser(UserDescriptor const& descriptor)
 
     User user;
     user.descriptor = descriptor;
-    user.id = ++m_mainData.lastUserId;
+    user.id = ++m_data.lastUserId;
 
     emit userWillBeAdded(user.id);
-    m_mainData.users.push_back(user);
+    m_data.users.push_back(user);
     emit userAdded(user.id);
 
     s_logger.logInfo(QString("Added user '%1'").arg(descriptor.name.c_str()));
 
-    triggerSave();
+    save(m_data);
 
     return true;
 }
@@ -393,12 +362,12 @@ Result<void> Settings::setUser(UserId id, UserDescriptor const& descriptor)
 		return Error(QString("Cannot find user '%1' (internal inconsistency)").arg(descriptor.name.c_str()).toUtf8().data());
     }
 
-    User& user = m_mainData.users[static_cast<size_t>(index)];
+    User& user = m_data.users[static_cast<size_t>(index)];
 
     int32_t loggedInUserIndex = findUserIndexById(m_loggedInUserId);
     if (loggedInUserIndex >= 0)
     {
-		const User& loggedInUser = m_mainData.users[static_cast<size_t>(loggedInUserIndex)];
+		const User& loggedInUser = m_data.users[static_cast<size_t>(loggedInUserIndex)];
         if (loggedInUser.descriptor.type != UserDescriptor::Type::Admin)
 		{
 			if (user.descriptor.permissions != descriptor.permissions &&
@@ -426,7 +395,7 @@ Result<void> Settings::setUser(UserId id, UserDescriptor const& descriptor)
 
     s_logger.logInfo(QString("Changed user '%1'").arg(descriptor.name.c_str()));
 
-    triggerSave();
+    save(m_data);
 
     return success;
 }
@@ -435,64 +404,64 @@ Result<void> Settings::setUser(UserId id, UserDescriptor const& descriptor)
 
 void Settings::removeUser(size_t index)
 {
-    assert(index < m_mainData.users.size());
-    UserId id = m_mainData.users[index].id;
+    assert(index < m_data.users.size());
+    UserId id = m_data.users[index].id;
 
-    s_logger.logInfo(QString("Removed user '%1'").arg(m_mainData.users[index].descriptor.name.c_str()));
+    s_logger.logInfo(QString("Removed user '%1'").arg(m_data.users[index].descriptor.name.c_str()));
 
     emit userWillBeRemoved(id);
-    m_mainData.users.erase(m_mainData.users.begin() + index);
+    m_data.users.erase(m_data.users.begin() + index);
     emit userRemoved(id);
 
-    triggerSave();
+    save(m_data);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 int32_t Settings::findUserIndexByName(std::string const& name) const
 {
-    auto it = std::find_if(m_mainData.users.begin(), m_mainData.users.end(), [&name](User const& user)
+    auto it = std::find_if(m_data.users.begin(), m_data.users.end(), [&name](User const& user)
     {
         return strcasecmp(user.descriptor.name.c_str(), name.c_str()) == 0;
     });
 
-    if (it == m_mainData.users.end())
+    if (it == m_data.users.end())
     {
         return -1;
     }
-    return int32_t(std::distance(m_mainData.users.begin(), it));
+    return int32_t(std::distance(m_data.users.begin(), it));
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 int32_t Settings::findUserIndexById(UserId id) const
 {
-    auto it = std::find_if(m_mainData.users.begin(), m_mainData.users.end(), [id](User const& user) { return user.id == id; });
-    if (it == m_mainData.users.end())
+    auto it = std::find_if(m_data.users.begin(), m_data.users.end(), [id](User const& user) { return user.id == id; });
+    if (it == m_data.users.end())
     {
         return -1;
     }
-    return int32_t(std::distance(m_mainData.users.begin(), it));
+    return int32_t(std::distance(m_data.users.begin(), it));
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 int32_t Settings::findUserIndexByPasswordHash(std::string const& passwordHash) const
 {
-    auto it = std::find_if(m_mainData.users.begin(), m_mainData.users.end(), [&passwordHash](User const& user) { return user.descriptor.passwordHash == passwordHash; });
-    if (it == m_mainData.users.end())
+    auto it = std::find_if(m_data.users.begin(), m_data.users.end(), [&passwordHash](User const& user) { return user.descriptor.passwordHash == passwordHash; });
+    if (it == m_data.users.end())
     {
         return -1;
     }
-    return int32_t(std::distance(m_mainData.users.begin(), it));
+    return int32_t(std::distance(m_data.users.begin(), it));
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 bool Settings::needsAdmin() const
 {
-    auto it = std::find_if(m_mainData.users.begin(), m_mainData.users.end(), [](User const& user) { return user.descriptor.type == UserDescriptor::Type::Admin; });
-    if (it == m_mainData.users.end())
+    auto it = std::find_if(m_data.users.begin(), m_data.users.end(), [](User const& user) { return user.descriptor.type == UserDescriptor::Type::Admin; });
+    if (it == m_data.users.end())
     {
         return true;
     }
@@ -507,12 +476,12 @@ void Settings::setLoggedInUserId(UserId id)
     if (_index >= 0)
     {
         size_t index = static_cast<size_t>(_index);
-		s_logger.logInfo(QString("User '%1' logged in").arg(m_mainData.users[index].descriptor.name.c_str()));
+		s_logger.logInfo(QString("User '%1' logged in").arg(m_data.users[index].descriptor.name.c_str()));
 
-        for (size_t i = 0; i < 10000; i++)
-		{
-			s_logger.logInfo(QString("User '%1' logged in").arg(m_mainData.users[index].descriptor.name.c_str()));
-		}
+//         for (size_t i = 0; i < 10000; i++)
+// 		{
+// 			s_logger.logInfo(QString("User '%1' logged in").arg(m_mainData.users[index].descriptor.name.c_str()));
+// 		}
 
         m_loggedInUserId = id;
         emit userLoggedIn(id);
@@ -534,7 +503,7 @@ Settings::User const* Settings::getLoggedInUser() const
     if (_index >= 0)
     {
         size_t index = static_cast<size_t>(_index);
-        return &m_mainData.users[index];
+        return &m_data.users[index];
     }
     return nullptr;
 }
@@ -553,29 +522,20 @@ bool Settings::isLoggedInAsAdmin() const
 
 //////////////////////////////////////////////////////////////////////////
 
-void Settings::triggerSave()
-{
-    {
-        std::unique_lock<std::mutex> lg(m_storeMutex);
-        m_storeData = m_mainData;
-        m_storeThreadTriggered = true;
-    }
-    m_storeCV.notify_all();
-
-    //s_logger.logVerbose("Settings save triggered");
-}
-
-//////////////////////////////////////////////////////////////////////////
-
 void Settings::save(Data const& data) const
 {
     Clock::time_point now = Clock::now();
 
+    sqlite3_exec(m_sqlite, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+	utils::epilogue epi([this] { sqlite3_exec(m_sqlite, "END TRANSACTION;", NULL, NULL, NULL); });
+
 	{
 		sqlite3_stmt* stmt;
 		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO EmailSettings (id, host, port, connection, username, password, sender, recipients) VALUES (0, ?1, ?2, ?3, ?4, ?5, ?6, ?7);", -1, &stmt, NULL);
+        utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
 		sqlite3_bind_text(stmt, 1, data.emailSettings.host.c_str(), -1, SQLITE_STATIC);
-		sqlite3_bind_int(stmt, 2, data.emailSettings.port);
+        sqlite3_bind_int64(stmt, 2, data.emailSettings.port);
 		sqlite3_bind_int(stmt, 3, (int)data.emailSettings.connection);
 		sqlite3_bind_text(stmt, 4, data.emailSettings.username.c_str(), -1, SQLITE_STATIC);
 		sqlite3_bind_text(stmt, 5, data.emailSettings.password.c_str(), -1, SQLITE_STATIC);
@@ -585,7 +545,6 @@ void Settings::save(Data const& data) const
 		if (sqlite3_step(stmt) != SQLITE_DONE)
 		{
 			s_logger.logCritical(QString("Failed to save email settings: %1").arg(sqlite3_errmsg(m_sqlite)));
-			sqlite3_finalize(stmt);
 			return;
 		}
 	}
@@ -593,8 +552,10 @@ void Settings::save(Data const& data) const
 	{
 		sqlite3_stmt* stmt;
 		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO FtpSettings (id, host, port, username, password, folder, uploadBackups, uploadPeriod) VALUES (0, ?1, ?2, ?3, ?4, ?5, ?6, ?7);", -1, &stmt, NULL);
-		sqlite3_bind_text(stmt, 1, data.ftpSettings.host.c_str(), -1, SQLITE_STATIC);
-		sqlite3_bind_int(stmt, 2, data.ftpSettings.port);
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+        sqlite3_bind_text(stmt, 1, data.ftpSettings.host.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_int64(stmt, 2, data.ftpSettings.port);
 		sqlite3_bind_text(stmt, 3, data.ftpSettings.username.c_str(), -1, SQLITE_STATIC);
 		sqlite3_bind_text(stmt, 4, data.ftpSettings.password.c_str(), -1, SQLITE_STATIC);
         sqlite3_bind_text(stmt, 5, data.ftpSettings.folder.c_str(), -1, SQLITE_STATIC);
@@ -603,69 +564,40 @@ void Settings::save(Data const& data) const
 		if (sqlite3_step(stmt) != SQLITE_DONE)
 		{
 			s_logger.logCritical(QString("Failed to save ftp settings: %1").arg(sqlite3_errmsg(m_sqlite)));
-			sqlite3_finalize(stmt);
 			return;
 		}
 	}
 
 	{
 		{
-            char* errorMsg = nullptr;
-			const char* sqlCreateTable = "DELETE FROM Users;";
-			if (sqlite3_exec(m_sqlite, sqlCreateTable, NULL, NULL, &errorMsg))
+			const char* sql = "DELETE FROM Users;";
+			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
 			{
                 s_logger.logCritical(QString("Failed to clear users: %1").arg(sqlite3_errmsg(m_sqlite)));
 				return;
 			}
         }
+		sqlite3_stmt* stmt;
+		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO Users (id, name, passwordHash, permissions, type, lastLogin) VALUES(?1, ?2, ?3, ?4, ?5, ?6);", -1, &stmt, NULL);
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
         for (User const& user: data.users)
 		{
-			sqlite3_stmt* stmt;
-			sqlite3_prepare_v2(m_sqlite, "REPLACE INTO Users (id, name, passwordHash, permissions, type, lastLogin) VALUES(?1, ?2, ?3, ?4, ?5, ?6);", -1, &stmt, NULL);
-			sqlite3_bind_int(stmt, 1, user.id);
+            sqlite3_bind_int64(stmt, 1, user.id);
 			sqlite3_bind_text(stmt, 2, user.descriptor.name.c_str(), -1, SQLITE_STATIC);
 			sqlite3_bind_text(stmt, 3, user.descriptor.passwordHash.c_str(), -1, SQLITE_STATIC);
-			sqlite3_bind_int(stmt, 4, user.descriptor.permissions);
+            sqlite3_bind_int64(stmt, 4, user.descriptor.permissions);
 			sqlite3_bind_int(stmt, 5, (int)user.descriptor.type);
             sqlite3_bind_int64(stmt, 6, Clock::to_time_t(user.lastLogin));
 			if (sqlite3_step(stmt) != SQLITE_DONE)
 			{
 				s_logger.logCritical(QString("Failed to save user: %1").arg(sqlite3_errmsg(m_sqlite)));
-				sqlite3_finalize(stmt);
 				return;
 			}
+            sqlite3_reset(stmt);
 		}
 	}
 
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Settings::storeThreadProc()
-{
-    while (!m_threadsExit)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        Data data;
-        {
-            //wait for data
-            std::unique_lock<std::mutex> lg(m_storeMutex);
-            if (!m_storeThreadTriggered)
-            {
-                m_storeCV.wait(lg, [this]{ return m_storeThreadTriggered || m_threadsExit; });
-            }
-            if (m_threadsExit)
-            {
-                break;
-            }
-
-            data = std::move(m_storeData);
-            m_storeData = Data();
-            m_storeThreadTriggered = false;
-        }
-
-        save(data);
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////

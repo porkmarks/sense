@@ -23,6 +23,7 @@ private slots:
     void logout();
 
 private:
+    void processBackups();
     void process();
     void userLoggedIn(Settings::UserId id);
     void checkIfAdminExists();
@@ -41,6 +42,10 @@ private:
 
     Ui::Manager m_ui;
     int m_currentTabIndex = 0;
+
+    Settings::Clock::time_point m_lastHourlyBackupTP;
+    Settings::Clock::time_point m_lastDailyBackupTP;
+    Settings::Clock::time_point m_lastWeeklyBackupTP;
 
 	std::unique_ptr<sqlite3, int(*)(sqlite3*)> m_sqlite;
 };

@@ -105,6 +105,7 @@ void SensorsWidget::bindSensor()
     if (m_db->getBaseStationCount() == 0)
     {
         QMessageBox::critical(this, "Error", "No base stations active.");
+        return;
     }
 
     if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionAddRemoveSensors, this))

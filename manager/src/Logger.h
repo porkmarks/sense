@@ -22,10 +22,6 @@ public:
 
     typedef std::chrono::system_clock Clock;
 
-    void shutdown();
-
-    void process();
-
 	static Result<void> create(sqlite3& db);
     bool load(sqlite3& db);
 
@@ -80,6 +76,6 @@ private:
     void addToDB(std::string const& message, Type type);
 
     sqlite3* m_sqlite = nullptr;
-	sqlite3_stmt* m_insertStmt = nullptr;
+	std::shared_ptr<sqlite3_stmt> m_insertStmt;
 };
 
