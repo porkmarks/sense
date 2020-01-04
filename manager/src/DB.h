@@ -195,10 +195,11 @@ public:
 
         SignalStrength averageSignalStrength;
 
-        bool isMeasurementValid = false;
-        float measurementTemperature = 0;
-        float measurementHumidity = 0;
-        float measurementVcc = 0;
+        //real-time measurement. This represents what the sensor is seeing 'now' (at the last comms).
+        bool isRTMeasurementValid = false;
+        float rtMeasurementTemperature = 0;
+        float rtMeasurementHumidity = 0;
+        float rtMeasurementVcc = 0;
     };
 
     size_t getSensorCount() const;
@@ -313,13 +314,18 @@ public:
     {
         enum
         {
-            Temperature     = 1 << 0,
-            Humidity        = 1 << 1,
-            LowVcc          = 1 << 2,
-            LowSignal       = 1 << 3,
-//            SensorErrors    = 1 << 4,
+            LowTemperature  = 1 << 0,
+            HighTemperature = 1 << 1,
+            Temperature     = LowTemperature | HighTemperature,
 
-            All             = Temperature | Humidity | LowVcc | LowSignal/* | SensorErrors*/
+			LowHumidity     = 1 << 2,
+			HighHumidity    = 1 << 3,
+            Humidity        = LowHumidity | HighHumidity,
+
+            LowVcc          = 1 << 4,
+            LowSignal       = 1 << 5,
+
+            //All             = Temperature | Humidity | LowVcc | LowSignal
         };
     };
 
@@ -451,7 +457,7 @@ private:
 
     static inline MeasurementId computeMeasurementId(MeasurementDescriptor const& md);
     static inline SensorId getSensorIdFromMeasurementId(MeasurementId id);
-    static Measurement unpack(sqlite3_stmt* stmt);
+    static Measurement unpackMeasurement(sqlite3_stmt* stmt);
 
     Clock::time_point computeNextCommsTimePoint(Sensor const& sensor, size_t sensorIndex) const;
     Clock::time_point computeNextMeasurementTimePoint(Sensor const& sensor) const;

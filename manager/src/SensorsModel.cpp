@@ -396,11 +396,11 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         }
         else
         {
-            if (sensor.isMeasurementValid)
+            if (sensor.isRTMeasurementValid)
             {
                 if (column == Column::Battery)
                 {
-                    return utils::getBatteryIcon(sensor.measurementVcc);
+                    return utils::getBatteryIcon(sensor.rtMeasurementVcc);
                 }
                 else if (column == Column::Signal)
                 {
@@ -473,19 +473,19 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
 //        }
         else
         {
-            if (sensor.isMeasurementValid)
+            if (sensor.isRTMeasurementValid)
             {
                 if (column == Column::Temperature)
                 {
-                    return QString("%1 °C").arg(sensor.measurementTemperature, 0, 'f', 1);
+                    return QString("%1 °C").arg(sensor.rtMeasurementTemperature, 0, 'f', 1);
                 }
                 else if (column == Column::Humidity)
                 {
-                    return QString("%1 %RH").arg(sensor.measurementHumidity, 0, 'f', 1);
+                    return QString("%1 %RH").arg(sensor.rtMeasurementHumidity, 0, 'f', 1);
                 }
                 else if (column == Column::Battery)
                 {
-                    return QString("%1 %").arg(static_cast<int>(utils::getBatteryLevel(sensor.measurementVcc) * 100.f));
+                    return QString("%1 %").arg(static_cast<int>(utils::getBatteryLevel(sensor.rtMeasurementVcc) * 100.f));
                 }
                 else if (column == Column::Signal)
                 {

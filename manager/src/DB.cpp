@@ -62,7 +62,7 @@ Result<void> DB::create(sqlite3& db)
             "temperatureBias REAL, humidityBias REAL, serialNumber INTEGER, state INTEGER, shouldSleep BOOLEAN, sleepStateTimePoint DATETIME, commsErrorCounter INTEGER, "
             "unknownRebootsErrorCounter INTEGER, powerOnRebootsErrorCounter INTEGER, resetRebootsErrorCounter INTEGER, brownoutRebootsErrorCounter INTEGER, watchdogRebootsErrorCounter INTEGER, lastCommsTimePoint DATETIME, lastConfirmedMeasurementIndex INTEGER, "
             "firstStoredMeasurementIndex INTEGER, storedMeasurementCount INTEGER, estimatedStoredMeasurementCount INTEGER, lastSignalStrengthB2S INTEGER, averageSignalStrengthB2S INTEGER, averageSignalStrengthS2B INTEGER, "
-            "isMeasurementValid BOOLEAN, measurementTemperature REAL, measurementHumidity REAL, measurementVcc REAL);";
+            "isRTMeasurementValid BOOLEAN, rtMeasurementTemperature REAL, rtMeasurementHumidity REAL, rtMeasurementVcc REAL);";
 		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
@@ -133,7 +133,7 @@ Result<void> DB::load(sqlite3& db)
 						                       "temperatureBias, humidityBias, serialNumber, state, shouldSleep, sleepStateTimePoint, commsErrorCounter, "
 						                       "unknownRebootsErrorCounter, powerOnRebootsErrorCounter, resetRebootsErrorCounter, brownoutRebootsErrorCounter, watchdogRebootsErrorCounter, lastCommsTimePoint, lastConfirmedMeasurementIndex, "
 						                       "firstStoredMeasurementIndex, storedMeasurementCount, estimatedStoredMeasurementCount, lastSignalStrengthB2S, averageSignalStrengthB2S, averageSignalStrengthS2B, "
-						                       "isMeasurementValid, measurementTemperature, measurementHumidity, measurementVcc) "
+						                       "isRTMeasurementValid, rtMeasurementTemperature, rtMeasurementHumidity, rtMeasurementVcc) "
 						            "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30);", -1, &stmt, NULL) != SQLITE_OK)
 		{
 			return Error(QString("Cannot load base stations: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
@@ -226,7 +226,7 @@ Result<void> DB::load(sqlite3& db)
 			 			        "temperatureBias, humidityBias, serialNumber, state, shouldSleep, sleepStateTimePoint, commsErrorCounter, "
 			 			        "unknownRebootsErrorCounter, powerOnRebootsErrorCounter, resetRebootsErrorCounter, brownoutRebootsErrorCounter, watchdogRebootsErrorCounter, lastCommsTimePoint, lastConfirmedMeasurementIndex, "
 			 			        "firstStoredMeasurementIndex, storedMeasurementCount, estimatedStoredMeasurementCount, lastSignalStrengthB2S, averageSignalStrengthB2S, averageSignalStrengthS2B, "
-			 			        "isMeasurementValid, measurementTemperature, measurementHumidity, measurementVcc "
+			 			        "isRTMeasurementValid, rtMeasurementTemperature, rtMeasurementHumidity, rtMeasurementVcc "
                           "FROM Sensors;";
 		sqlite3_stmt* stmt;
 		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
@@ -264,10 +264,10 @@ Result<void> DB::load(sqlite3& db)
 			s.lastSignalStrengthB2S = (int8_t)sqlite3_column_int64(stmt, 23);
 			s.averageSignalStrength.b2s = (int8_t)sqlite3_column_int64(stmt, 24);
 			s.averageSignalStrength.s2b = (int8_t)sqlite3_column_int64(stmt, 25);
-			s.isMeasurementValid = sqlite3_column_int64(stmt, 26) ? true : false;
-			s.measurementTemperature = (float)sqlite3_column_double(stmt, 27);
-			s.measurementHumidity = (float)sqlite3_column_double(stmt, 28);
-			s.measurementVcc = (float)sqlite3_column_double(stmt, 29);
+			s.isRTMeasurementValid = sqlite3_column_int64(stmt, 26) ? true : false;
+			s.rtMeasurementTemperature = (float)sqlite3_column_double(stmt, 27);
+			s.rtMeasurementHumidity = (float)sqlite3_column_double(stmt, 28);
+			s.rtMeasurementVcc = (float)sqlite3_column_double(stmt, 29);
 			data.sensors.push_back(std::move(s));
 		}
 	}
@@ -1121,10 +1121,10 @@ bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
 
         if (d.hasMeasurement)
         {
-            sensor.isMeasurementValid = true;
-            sensor.measurementTemperature = d.measurementTemperature;
-            sensor.measurementHumidity = d.measurementHumidity;
-            sensor.measurementVcc = d.measurementVcc;
+            sensor.isRTMeasurementValid = true;
+            sensor.rtMeasurementTemperature = d.measurementTemperature;
+            sensor.rtMeasurementHumidity = d.measurementHumidity;
+            sensor.rtMeasurementVcc = d.measurementVcc;
         }
 
         emit sensorDataChanged(sensor.id);
@@ -1411,20 +1411,20 @@ uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
     uint8_t triggers = 0;
     if (ad.highTemperatureWatch && m.descriptor.temperature > ad.highTemperature)
     {
-        triggers |= AlarmTrigger::Temperature;
+        triggers |= AlarmTrigger::HighTemperature;
     }
     if (ad.lowTemperatureWatch && m.descriptor.temperature < ad.lowTemperature)
     {
-        triggers |= AlarmTrigger::Temperature;
+        triggers |= AlarmTrigger::LowTemperature;
     }
 
     if (ad.highHumidityWatch && m.descriptor.humidity > ad.highHumidity)
     {
-        triggers |= AlarmTrigger::Humidity;
+        triggers |= AlarmTrigger::HighHumidity;
     }
     if (ad.lowHumidityWatch && m.descriptor.humidity < ad.lowHumidity)
     {
-        triggers |= AlarmTrigger::Humidity;
+        triggers |= AlarmTrigger::LowHumidity;
     }
 
     float alertLevelVcc = utils::k_alertBatteryLevel * (utils::k_maxBatteryLevel - utils::k_minBatteryLevel) + utils::k_minBatteryLevel;
@@ -1432,10 +1432,6 @@ uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
     {
         triggers |= AlarmTrigger::LowVcc;
     }
-//        if (ad.sensorErrorsWatch && m.descriptor.sensorErrors != 0)
-//        {
-//            triggers |= AlarmTrigger::SensorErrors;
-//        }
 
     float alertLevelSignal = utils::k_alertSignalLevel * (utils::k_maxSignalLevel - utils::k_minSignalLevel) + utils::k_minSignalLevel;
     if (ad.lowSignalWatch && std::min(m.descriptor.signalStrength.b2s, m.descriptor.signalStrength.s2b) <= alertLevelSignal)
@@ -1761,12 +1757,12 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
                 asyncMeasurements.emplace_back(measurement);
 
 				//this is also set in the setSensorInputDetails
-				if (!sensor.isMeasurementValid)
+				if (!sensor.isRTMeasurementValid)
 				{
-					sensor.isMeasurementValid = true;
-					sensor.measurementTemperature = md.temperature;
-					sensor.measurementHumidity = md.humidity;
-					sensor.measurementVcc = md.vcc;
+					sensor.isRTMeasurementValid = true;
+					sensor.rtMeasurementTemperature = md.temperature;
+					sensor.rtMeasurementHumidity = md.humidity;
+					sensor.rtMeasurementVcc = md.vcc;
 				}
 			}
 		}
@@ -2020,7 +2016,7 @@ size_t DB::_getFilteredMeasurements(Filter const& filter, std::vector<DB::Measur
 		{
 			if (out)
 			{
-                Measurement m = unpack(stmt);
+                Measurement m = unpackMeasurement(stmt);
 				out->push_back(std::move(m));
 			}
 			count++;
@@ -2050,7 +2046,7 @@ Result<DB::Measurement> DB::getLastMeasurementForSensor(SensorId sensorId) const
 
 	while (sqlite3_step(stmt) == SQLITE_ROW)
 	{
-		return unpack(stmt);
+		return unpackMeasurement(stmt);
 	}
 
     return Error("No data");
@@ -2074,7 +2070,7 @@ Result<DB::Measurement> DB::findMeasurementById(MeasurementId id) const
 
 	while (sqlite3_step(stmt) == SQLITE_ROW)
 	{
-		return unpack(stmt);
+		return unpackMeasurement(stmt);
 	}
 
 	return Error("Cannot find measurement");
@@ -2125,7 +2121,7 @@ inline DB::MeasurementId DB::computeMeasurementId(MeasurementDescriptor const& m
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::Measurement DB::unpack(sqlite3_stmt* stmt)
+DB::Measurement DB::unpackMeasurement(sqlite3_stmt* stmt)
 {
 	Measurement m;
 	m.id = sqlite3_column_int64(stmt, 0);
@@ -2165,7 +2161,7 @@ DB::SignalStrength DB::computeAverageSignalStrength(SensorId sensorId, Data cons
 
 	while (sqlite3_step(stmt) == SQLITE_ROW)
 	{
-		Measurement m = unpack(stmt);
+		Measurement m = unpackMeasurement(stmt);
         avgb2s += m.descriptor.signalStrength.b2s;
         avgs2b += m.descriptor.signalStrength.s2b;
         count++;
@@ -2309,10 +2305,10 @@ void DB::save(Data const& data) const
 			sqlite3_bind_int64(stmt, 25, s.averageSignalStrength.b2s);
 			sqlite3_bind_int64(stmt, 26, s.averageSignalStrength.s2b);
 
-            sqlite3_bind_int(stmt, 27, s.isMeasurementValid ? 1 : 0);
-			sqlite3_bind_double(stmt, 28, s.measurementTemperature);
-			sqlite3_bind_double(stmt, 29, s.measurementHumidity);
-			sqlite3_bind_double(stmt, 30, s.measurementVcc);
+            sqlite3_bind_int(stmt, 27, s.isRTMeasurementValid ? 1 : 0);
+			sqlite3_bind_double(stmt, 28, s.rtMeasurementTemperature);
+			sqlite3_bind_double(stmt, 29, s.rtMeasurementHumidity);
+			sqlite3_bind_double(stmt, 30, s.rtMeasurementVcc);
 			if (sqlite3_step(stmt) != SQLITE_DONE)
 			{
 				s_logger.logCritical(QString("Failed to save sensor: %1").arg(sqlite3_errmsg(m_sqlite)));

@@ -112,10 +112,12 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
     auto toString = [](uint8_t triggers)
     {
         std::string str;
-        str += (triggers & DB::AlarmTrigger::Temperature) ? "Temperature, " : "";
-        str += (triggers & DB::AlarmTrigger::Humidity) ? "Humidity, " : "";
-        str += (triggers & DB::AlarmTrigger::LowVcc) ? "Battery, " : "";
-        str += (triggers & DB::AlarmTrigger::LowSignal) ? "Signal, " : "";
+        str += (triggers & DB::AlarmTrigger::LowTemperature) ? "Low Temperature, " : "";
+        str += (triggers & DB::AlarmTrigger::HighTemperature) ? "High Temperature, " : "";
+        str += (triggers & DB::AlarmTrigger::LowHumidity) ? "Low Humidity, " : "";
+        str += (triggers & DB::AlarmTrigger::HighHumidity) ? "High Humidity, " : "";
+        str += (triggers & DB::AlarmTrigger::LowVcc) ? "Low Battery, " : "";
+        str += (triggers & DB::AlarmTrigger::LowSignal) ? "Low Signal, " : "";
         if (!str.empty())
         {
             str.pop_back(); //' '

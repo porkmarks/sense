@@ -85,10 +85,10 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
         m_ui.sleepState->setText(QString("(scheduled to sleep)"));
     }
 
-    if (sensor.isMeasurementValid)
+    if (sensor.isRTMeasurementValid)
     {
 		{
-			float vcc = sensor.measurementVcc;
+			float vcc = sensor.rtMeasurementVcc;
 			m_ui.battery->setText(QString("%1% (%2V)").arg(static_cast<int>(utils::getBatteryLevel(vcc) * 100.f)).arg(vcc, 0, 'f', 2));
 			m_ui.batteryIcon->setPixmap(utils::getBatteryIcon(vcc).pixmap(24, 24));
 		}

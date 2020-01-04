@@ -79,7 +79,7 @@ int main(int, const char**)
 
     srand(time(nullptr));
 
-    //run_tests();
+    //run_tests();            
 
     if (gpioInitialise() < 0)
     {
