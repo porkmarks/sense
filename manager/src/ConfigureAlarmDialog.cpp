@@ -95,6 +95,8 @@ void ConfigureAlarmDialog::setAlarm(DB::Alarm const& alarm)
 
     m_ui.sendEmailAction->setChecked(descriptor.sendEmailAction);
 //    m_ui.emailRecipient->setText(descriptor.emailRecipient.c_str());
+
+    m_ui.resendValue->setValue(std::chrono::duration_cast<std::chrono::hours>(descriptor.resendPeriod).count());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -149,6 +151,7 @@ void ConfigureAlarmDialog::accept()
 
     descriptor.sendEmailAction = m_ui.sendEmailAction->isChecked();
 //    descriptor.emailRecipient = m_ui.emailRecipient->text().toUtf8().data();
+    descriptor.resendPeriod = std::chrono::hours(std::max(m_ui.resendValue->value(), 1));
 
     if (descriptor.name.empty())
     {

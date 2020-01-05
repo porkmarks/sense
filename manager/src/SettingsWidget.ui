@@ -195,59 +195,17 @@
           <property name="verticalSpacing">
            <number>6</number>
           </property>
-          <item row="0" column="0">
+          <item row="1" column="0">
            <widget class="QLabel" name="label">
             <property name="text">
              <string>SMTP server address:</string>
             </property>
            </widget>
           </item>
-          <item row="2" column="0">
-           <widget class="QLabel" name="label_2">
-            <property name="text">
-             <string>Username:</string>
-            </property>
-           </widget>
+          <item row="6" column="1" colspan="3">
+           <widget class="QListWidget" name="emailRecipientList"/>
           </item>
-          <item row="1" column="1" colspan="2">
-           <widget class="QSpinBox" name="emailPort">
-            <property name="maximum">
-             <number>65535</number>
-            </property>
-            <property name="value">
-             <number>465</number>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="0">
-           <widget class="QLabel" name="label_3">
-            <property name="text">
-             <string>Password:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="4" column="0">
-           <widget class="QLabel" name="label_8">
-            <property name="text">
-             <string>Sender:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="5" column="0">
-           <widget class="QLabel" name="label_4">
-            <property name="text">
-             <string>Recipients:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="0">
-           <widget class="QLabel" name="label_5">
-            <property name="text">
-             <string>SMTP Port:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="3">
+          <item row="2" column="3">
            <widget class="QComboBox" name="emailConnection">
             <property name="currentIndex">
              <number>0</number>
@@ -269,41 +227,24 @@
             </item>
            </widget>
           </item>
-          <item row="0" column="1" colspan="3">
+          <item row="1" column="1" colspan="3">
            <widget class="QLineEdit" name="emailHost">
             <property name="text">
              <string/>
             </property>
             <property name="placeholderText">
-             <string>smtp.gmail.com</string>
+             <string/>
             </property>
            </widget>
           </item>
-          <item row="2" column="1" colspan="3">
-           <widget class="QLineEdit" name="emailUsername">
-            <property name="placeholderText">
-             <string>you@company.com</string>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="1" colspan="3">
-           <widget class="QLineEdit" name="emailPassword">
-            <property name="echoMode">
-             <enum>QLineEdit::PasswordEchoOnEdit</enum>
-            </property>
-           </widget>
-          </item>
-          <item row="4" column="1" colspan="3">
-           <widget class="QLineEdit" name="emailSender">
+          <item row="6" column="0">
+           <widget class="QLabel" name="label_4">
             <property name="text">
-             <string>Sense Monitoring System</string>
+             <string>Recipients:</string>
             </property>
            </widget>
           </item>
-          <item row="5" column="1" colspan="3">
-           <widget class="QListWidget" name="emailRecipientList"/>
-          </item>
-          <item row="6" column="1" colspan="3">
+          <item row="7" column="1" colspan="3">
            <widget class="QWidget" name="widget_8" native="true">
             <layout class="QHBoxLayout" name="horizontalLayout_5">
              <property name="leftMargin">
@@ -366,6 +307,86 @@
               </spacer>
              </item>
             </layout>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="label_5">
+            <property name="text">
+             <string>SMTP Port:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="1" colspan="3">
+           <widget class="QLineEdit" name="emailSender">
+            <property name="text">
+             <string>Sense Monitoring System</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1" colspan="3">
+           <widget class="QLineEdit" name="emailPassword">
+            <property name="echoMode">
+             <enum>QLineEdit::PasswordEchoOnEdit</enum>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="0">
+           <widget class="QLabel" name="label_8">
+            <property name="text">
+             <string>Sender:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QLabel" name="label_3">
+            <property name="text">
+             <string>Password:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="label_2">
+            <property name="text">
+             <string>Username:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1" colspan="2">
+           <widget class="QSpinBox" name="emailPort">
+            <property name="maximum">
+             <number>65535</number>
+            </property>
+            <property name="value">
+             <number>465</number>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1" colspan="3">
+           <widget class="QLineEdit" name="emailUsername">
+            <property name="placeholderText">
+             <string/>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_19">
+            <property name="text">
+             <string>SMTP Provider:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QComboBox" name="emailSmtpProviderPreset">
+            <item>
+             <property name="text">
+              <string>Custom</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Gmail</string>
+             </property>
+            </item>
            </widget>
           </item>
          </layout>

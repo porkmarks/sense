@@ -94,6 +94,11 @@ void SettingsWidget::init(Comms& comms, Settings& settings)
     m_uiConnections.push_back(connect(m_ui.batteryCapacity, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
 
     setEmailSettings(m_settings->getEmailSettings());
+    m_uiConnections.push_back(connect(m_ui.emailHost, &QLineEdit::textChanged, this, &SettingsWidget::resetEmailProviderPreset));
+    m_uiConnections.push_back(connect(m_ui.emailPort, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, &SettingsWidget::resetEmailProviderPreset));
+    m_uiConnections.push_back(connect(m_ui.emailConnection, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &SettingsWidget::resetEmailProviderPreset));
+
+	m_uiConnections.push_back(connect(m_ui.emailSmtpProviderPreset, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &SettingsWidget::emailSmtpProviderPresetChanged));
     m_uiConnections.push_back(connect(m_ui.emailAddRecipient, &QPushButton::released, this, &SettingsWidget::addEmailRecipient));
     m_uiConnections.push_back(connect(m_ui.emailRemoveRecipient, &QPushButton::released, this, &SettingsWidget::removeEmailRecipient));
     m_uiConnections.push_back(connect(m_ui.emailApply, &QPushButton::released, this, &SettingsWidget::applyEmailSettings));
@@ -147,6 +152,40 @@ void SettingsWidget::setPermissions()
     m_ui.ftpPage->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeFtpSettings));
 	m_ui.sensorsPower->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensors));
 	m_ui.batteryCapacity->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensors));
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::resetEmailProviderPreset()
+{
+    m_ui.emailSmtpProviderPreset->setCurrentIndex(0);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::emailSmtpProviderPresetChanged()
+{
+    if (m_ui.emailSmtpProviderPreset->currentIndex() == 0)
+    {
+        return;
+    }
+
+    if (m_ui.emailSmtpProviderPreset->currentIndex() == 1) //gmail
+    {
+        m_ui.emailHost->blockSignals(true);
+        m_ui.emailHost->setText("smtp.gmail.com");
+        m_ui.emailHost->blockSignals(false);
+
+        m_ui.emailPort->blockSignals(true);
+        m_ui.emailPort->setValue(587);
+        m_ui.emailPort->blockSignals(false);
+
+        m_ui.emailConnection->blockSignals(true);
+        m_ui.emailConnection->setCurrentIndex((int)Settings::EmailSettings::Connection::Tls);
+        m_ui.emailConnection->blockSignals(false);
+
+        m_ui.emailUsername->setPlaceholderText("example@gmail.com");
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -422,7 +461,7 @@ void SettingsWidget::sendTestEmail()
         else
         {
             std::lock_guard<std::mutex> lg(errorMessageMutex);
-            progress.setLabelText(QString("Error: %1").arg(errorMessage.isEmpty() ? QString("Unknown") : errorMessage));
+            progress.setLabelText(QString("Error: %1\nSSL Info: %2").arg(errorMessage.isEmpty() ? QString("Unknown") : errorMessage).arg(QSslSocket::sslLibraryBuildVersionString()));
             progress.setValue(progress.maximum());
         }
         QApplication::processEvents();

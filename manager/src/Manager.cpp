@@ -65,7 +65,7 @@ Manager::Manager(QWidget *parent)
 
 // 			sqlite3_exec(db, "PRAGMA synchronous = OFF;", NULL, NULL, nullptr);
 // 			sqlite3_exec(db, "PRAGMA journal_mode = MEMORY;", NULL, NULL, nullptr);
- 			sqlite3_exec(db, "PRAGMA main.locking_mode = EXCLUSIVE;", NULL, NULL, nullptr);
+// 			sqlite3_exec(db, "PRAGMA main.locking_mode = EXCLUSIVE;", NULL, NULL, nullptr);
 
             Result<void> result = Logger::create(*db);
             if (result != success)

@@ -108,11 +108,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
     //code to skip over disabled columns
     Column column = static_cast<Column>(index.column());
 
-    if (role == UserRole::RealColumnRole)
-    {
-        return QVariant(static_cast<qlonglong>(column));
-    }
-    else if (role == UserRole::SortingRole)
+    if (role == UserRole::SortingRole)
     {
         if (column == Column::Timestamp)
         {
@@ -134,10 +130,6 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         {
 			return utils::getSignalLevel(std::min(measurement.descriptor.signalStrength.s2b, measurement.descriptor.signalStrength.b2s));
         }
-//        else if (column == Column::SensorErrors)
-//        {
-//            return static_cast<uint32_t>(std::bitset<8>(measurement.descriptor.sensorErrors).count());
-//        }
         else if (column == Column::Alarms)
         {
             return static_cast<uint32_t>(std::bitset<8>(measurement.alarmTriggers).count());
@@ -218,10 +210,6 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
             //return QString("%1 %").arg(static_cast<int>(measurement.descriptor.signalStrength.b2s));
             //return QString("%1 %").arg(std::min(measurement.descriptor.b2s, measurement.descriptor.s2b));
         }
-//        else if (column == Column::SensorErrors)
-//        {
-//            return measurement.descriptor.sensorErrors;
-//        }
         else if (column == Column::Alarms)
         {
             return measurement.alarmTriggers;

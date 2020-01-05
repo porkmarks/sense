@@ -411,7 +411,7 @@ void PlotWidget::createPlotWidgets()
         }
         {
             m_plot->yAxis->setTickLabelFont(font);
-            m_plot->yAxis->setLabel(u8"°C");
+            m_plot->yAxis->setLabel("°C");
             m_plot->yAxis->setNumberFormat("gb");
             m_plot->yAxis->ticker()->setTickStepStrategy(QCPAxisTicker::TickStepStrategy::tssReadability);
             m_plot->yAxis->ticker()->setTickCount(20);
@@ -419,7 +419,7 @@ void PlotWidget::createPlotWidgets()
         }
         {
             m_plot->yAxis2->setTickLabelFont(font);
-            m_plot->yAxis2->setLabel(u8"%RH");
+            m_plot->yAxis2->setLabel("%RH");
             m_plot->yAxis2->setNumberFormat("gb");
             m_plot->yAxis2->ticker()->setTickStepStrategy(QCPAxisTicker::TickStepStrategy::tssReadability);
             m_plot->yAxis2->ticker()->setTickCount(20);

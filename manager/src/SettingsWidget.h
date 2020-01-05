@@ -31,6 +31,8 @@ private slots:
     void applySensorsConfig();
     void addEmailRecipient();
     void removeEmailRecipient();
+    void emailSmtpProviderPresetChanged();
+    void resetEmailProviderPreset();
 
 private:
     void setEmailSettings(Settings::EmailSettings const& settings);

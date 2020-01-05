@@ -81,7 +81,7 @@ SensorsModel::SensorsModel(DB& db)
     connect(&m_db, &DB::sensorAdded, this, &SensorsModel::sensorAdded);
     connect(&m_db, &DB::sensorBound, this, &SensorsModel::sensorChanged);
     connect(&m_db, &DB::sensorChanged, this, &SensorsModel::sensorChanged);
-    connect(&m_db, &DB::sensorDataChanged, this, &SensorsModel::sensorChanged);
+    connect(&m_db, &DB::sensorDataChanged, this, &SensorsModel::sensorChanged, Qt::QueuedConnection);
     connect(&m_db, &DB::sensorRemoved, this, &SensorsModel::sensorRemoved);
 
     size_t sensorCount = m_db.getSensorCount();
@@ -467,10 +467,6 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
             Result<DB::Measurement> res = m_db.getLastMeasurementForSensor(sensor.id);
             return (res == success) ? res.payload().alarmTriggers : -1;
         }
-//        else if (column == Column::SensorErrors)
-//        {
-//            return sensor.isLastMeasurementValid ? sensor.lastMeasurement.descriptor.sensorErrors : -1;
-//        }
         else
         {
             if (sensor.isRTMeasurementValid)

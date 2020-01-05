@@ -289,6 +289,8 @@ public:
 //        bool sensorErrorsWatch = false;
 
         bool sendEmailAction = false;
+
+		Clock::duration resendPeriod = std::chrono::hours(1 * 24);
     };
 
     typedef uint32_t AlarmId;
@@ -298,6 +300,7 @@ public:
         AlarmId id = 0;
 
         std::map<SensorId, uint8_t> triggersPerSensor;
+        Clock::time_point lastTriggeredTimePoint = Clock::time_point(Clock::duration::zero());
     };
 
     size_t getAlarmCount() const;
@@ -449,8 +452,10 @@ signals:
     void measurementsRemoved(SensorId id);
 
    void alarmTriggersChanged(AlarmId alarmId, Measurement const& m, uint8_t oldTriggers, uint8_t newTriggers, uint8_t addedTriggers, uint8_t removedTriggers);
+   void alarmStillTriggered(AlarmId alarmId);
 
 private:
+    void checkRepetitiveAlarms();
     uint8_t _computeAlarmTriggers(Alarm& alarm, Measurement const& m);
     bool _addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> mds);
     size_t _getFilteredMeasurements(Filter const& filter, std::vector<Measurement>* result) const;

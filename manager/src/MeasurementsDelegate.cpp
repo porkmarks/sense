@@ -32,7 +32,7 @@ void MeasurementsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& 
         return QStyledItemDelegate::paint(painter, option, index);
     }
 
-    MeasurementsModel::Column column = static_cast<MeasurementsModel::Column>(m_model.data(index, MeasurementsModel::RealColumnRole).toULongLong());
+    MeasurementsModel::Column column = static_cast<MeasurementsModel::Column>(index.column());
     if (column == MeasurementsModel::Column::Alarms)
     {
         uint8_t alarmTriggers = static_cast<uint8_t>(m_model.data(index).toUInt());
@@ -97,7 +97,7 @@ QSize MeasurementsDelegate::sizeHint(const QStyleOptionViewItem& option, const Q
         return QStyledItemDelegate::sizeHint(option, index);
     }
 
-    MeasurementsModel::Column column = static_cast<MeasurementsModel::Column>(m_model.data(index, MeasurementsModel::RealColumnRole).toULongLong());
+	MeasurementsModel::Column column = static_cast<MeasurementsModel::Column>(index.column());
     if (column == MeasurementsModel::Column::Alarms)
     {
         uint8_t alarmTriggers = static_cast<uint8_t>(m_model.data(index).toUInt());
@@ -132,22 +132,6 @@ QSize MeasurementsDelegate::sizeHint(const QStyleOptionViewItem& option, const Q
 
         return QSize(width, iconSize);
     }
-//    else if (column == MeasurementsModel::Column::SensorErrors)
-//    {
-//        uint8_t sensorErrors = m_model.data(index).toUInt();
-
-//        int32_t width = 0;
-//        if (sensorErrors & DB::SensorErrors::Comms)
-//        {
-//            width += iconSize + k_iconMargin.width();
-//        }
-//        if (sensorErrors & DB::SensorErrors::Hardware)
-//        {
-//            width += k_iconSize.width() + k_iconMargin;
-//        }
-
-//        return QSize(width, k_iconSize.height());
-//    }
 
     return QStyledItemDelegate::sizeHint(option, index);
 }

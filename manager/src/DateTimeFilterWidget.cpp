@@ -185,7 +185,8 @@ void DateTimeFilterWidget::setPresetThisWeek()
 
     QDateTime dt = QDateTime::currentDateTime();
 
-    dt.setDate(dt.date().addDays(-dt.date().dayOfWeek()));
+    int dof = std::clamp(dt.date().dayOfWeek() - 1, 0, 6); //Monday is 1, Sunday is 7
+    dt.setDate(dt.date().addDays(-dof));
     dt.setTime(QTime(0, 0));
     m_ui.from->blockSignals(true);
     m_ui.from->setDateTime(dt);
@@ -212,7 +213,8 @@ void DateTimeFilterWidget::setPresetLastWeek()
 
     QDateTime dt = QDateTime::currentDateTime();
 
-    dt.setDate(dt.date().addDays(-dt.date().dayOfWeek()).addDays(-7));
+    int dof = std::clamp(dt.date().dayOfWeek() - 1, 0, 6); //Monday is 1, Sunday is 7
+    dt.setDate(dt.date().addDays(-dof).addDays(-7));
     dt.setTime(QTime(0, 0));
     m_ui.from->blockSignals(true);
     m_ui.from->setDateTime(dt);

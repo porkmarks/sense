@@ -42,7 +42,6 @@ public:
     enum UserRole
     {
         SortingRole = Qt::UserRole + 5,
-        RealColumnRole = Qt::UserRole + 6,
     };
 
 public slots:

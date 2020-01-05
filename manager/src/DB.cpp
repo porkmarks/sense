@@ -1,7 +1,6 @@
 #include "DB.h"
 #include <algorithm>
 #include <functional>
-#include <cassert>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -72,8 +71,7 @@ Result<void> DB::create(sqlite3& db)
 	{
 		const char* sql = "CREATE TABLE Alarms (id INTEGER PRIMARY KEY, name STRING, filterSensors BOOLEAN, sensors STRING, lowTemperatureWatch BOOLEAN, lowTemperature REAL, highTemperatureWatch BOOLEAN, highTemperature REAL, "
             "lowHumidityWatch BOOLEAN, lowHumidity REAL, highHumidityWatch BOOLEAN, highHumidity REAL, "
-            "lowVccWatch BOOLEAN, lowSignalWatch BOOLEAN, "
-            "sendEmailAction BOOLEAN);";
+            "lowVccWatch BOOLEAN, lowSignalWatch BOOLEAN, sendEmailAction BOOLEAN, triggersPerSensor STRING, lastTriggeredTimePoint DATETIME);";
 		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
@@ -144,9 +142,8 @@ Result<void> DB::load(sqlite3& db)
 		sqlite3_stmt* stmt;
 		if (sqlite3_prepare_v2(&db, "REPLACE INTO Alarms (id, name, filterSensors, sensors, lowTemperatureWatch, lowTemperature, highTemperatureWatch, highTemperature, "
 						                       "lowHumidityWatch, lowHumidity, highHumidityWatch, highHumidity, "
-						                       "lowVccWatch, lowSignalWatch, "
-						                       "sendEmailAction) "
-							        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15);", -1, &stmt, NULL) != SQLITE_OK)
+						                       "lowVccWatch, lowSignalWatch, sendEmailAction, triggersPerSensor, lastTriggeredTimePoint) "
+							        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17);", -1, &stmt, NULL) != SQLITE_OK)
 		{
 			return Error(QString("Cannot load base stations: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -279,7 +276,7 @@ Result<void> DB::load(sqlite3& db)
 // 			"sendEmailAction BOOLEAN);";
 		const char* sql = "SELECT id, name, filterSensors, sensors, lowTemperatureWatch, lowTemperature, highTemperatureWatch, highTemperature, "
 			 			            "lowHumidityWatch, lowHumidity, highHumidityWatch, highHumidity, "
-			 			            "lowVccWatch, lowSignalWatch, sendEmailAction "
+			 			            "lowVccWatch, lowSignalWatch, sendEmailAction, triggersPerSensor, lastTriggeredTimePoint "
                           "FROM Alarms;";
 		sqlite3_stmt* stmt;
 		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
@@ -294,11 +291,13 @@ Result<void> DB::load(sqlite3& db)
             a.id = sqlite3_column_int64(stmt, 0);
 			a.descriptor.name = (char const*)sqlite3_column_text(stmt, 1);
             a.descriptor.filterSensors = sqlite3_column_int64(stmt, 2) ? true : false;
-			QString sensors = (char const*)sqlite3_column_text(stmt, 3);
-			QStringList l = sensors.split(QChar(';'), QString::SkipEmptyParts);
-			for (QString str : l)
 			{
-				a.descriptor.sensors.insert(atoll(str.trimmed().toUtf8().data()));
+				QString sensors = (char const*)sqlite3_column_text(stmt, 3);
+				QStringList l = sensors.split(QChar(';'), QString::SkipEmptyParts);
+				for (QString str : l)
+				{
+					a.descriptor.sensors.insert(atoll(str.trimmed().toUtf8().data()));
+				}
 			}
             a.descriptor.lowTemperatureWatch = sqlite3_column_int64(stmt, 4) ? true : false;
             a.descriptor.lowTemperature = (float)sqlite3_column_double(stmt, 5);
@@ -311,6 +310,23 @@ Result<void> DB::load(sqlite3& db)
 			a.descriptor.lowVccWatch = sqlite3_column_int64(stmt, 12);
 			a.descriptor.lowSignalWatch = sqlite3_column_int64(stmt, 13);
 			a.descriptor.sendEmailAction = sqlite3_column_int64(stmt, 14);
+			{
+				QString triggers = (char const*)sqlite3_column_text(stmt, 15);
+				QStringList l = triggers.split(QChar(';'), QString::SkipEmptyParts);
+				for (QString str : l)
+				{
+                    QStringList l2 = str.trimmed().split(QChar('/'), QString::SkipEmptyParts);
+                    if (l2.size() == 2)
+                    {
+					    a.triggersPerSensor.emplace(atoll(l2[0].trimmed().toUtf8().data()), atoi(l2[1].trimmed().toUtf8().data()));
+                    }
+                    else
+                    {
+                        Q_ASSERT(false);
+                    }
+				}
+			}
+            a.lastTriggeredTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 16));
 			data.alarms.push_back(std::move(a));
 		}
 	}
@@ -402,12 +418,30 @@ Result<void> DB::load(sqlite3& db)
 
 //////////////////////////////////////////////////////////////////////////
 
+void DB::checkRepetitiveAlarms()
+{
+	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+
+	for (Alarm& alarm : m_data.alarms)
+	{
+        if (!alarm.triggersPerSensor.empty() && Clock::now() - alarm.lastTriggeredTimePoint >= alarm.descriptor.resendPeriod)
+        {
+            emit alarmStillTriggered(alarm.id);
+            alarm.lastTriggeredTimePoint = Clock::now();
+        }
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void DB::process()
 {
     if (m_saveScheduled)
     {
         save();
     }
+
+    checkRepetitiveAlarms();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -474,7 +508,7 @@ DB::BaseStation const& DB::getBaseStation(size_t index) const
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    assert(index < m_data.baseStations.size());
+    Q_ASSERT(index < m_data.baseStations.size());
     return m_data.baseStations[index];
 }
 
@@ -559,7 +593,7 @@ void DB::removeBaseStation(size_t index)
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    assert(index < m_data.baseStations.size());
+    Q_ASSERT(index < m_data.baseStations.size());
     BaseStationId id = m_data.baseStations[index].id;
 
     BaseStationDescriptor const& descriptor = m_data.baseStations[index].descriptor;
@@ -626,7 +660,7 @@ size_t DB::getSensorCount() const
 DB::Sensor const& DB::getSensor(size_t index) const
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
-    assert(index < m_data.sensors.size());
+    Q_ASSERT(index < m_data.sensors.size());
     Sensor const& sensor = m_data.sensors[index];
     return sensor;
 }
@@ -775,7 +809,7 @@ size_t DB::getSensorsConfigCount() const
 DB::SensorsConfig const& DB::getSensorsConfig(size_t index) const
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
-    assert(index < m_data.sensorsConfigs.size());
+    Q_ASSERT(index < m_data.sensorsConfigs.size());
     return m_data.sensorsConfigs[index];
 }
 
@@ -1141,7 +1175,7 @@ void DB::removeSensor(size_t index)
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    assert(index < m_data.sensors.size());
+    Q_ASSERT(index < m_data.sensors.size());
 
     SensorId sensorId = m_data.sensors[index].id;
 
@@ -1268,7 +1302,7 @@ DB::Alarm const& DB::getAlarm(size_t index) const
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    assert(index < m_data.alarms.size());
+    Q_ASSERT(index < m_data.alarms.size());
     return m_data.alarms[index];
 }
 
@@ -1337,7 +1371,7 @@ void DB::removeAlarm(size_t index)
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    assert(index < m_data.alarms.size());
+    Q_ASSERT(index < m_data.alarms.size());
     AlarmId id = m_data.alarms[index].id;
 
     s_logger.logInfo(QString("Removed alarm '%1'").arg(m_data.alarms[index].descriptor.name.c_str()));
@@ -1493,7 +1527,7 @@ DB::Report const& DB::getReport(size_t index) const
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    assert(index < m_data.reports.size());
+    Q_ASSERT(index < m_data.reports.size());
     return m_data.reports[index];
 }
 
@@ -1562,7 +1596,7 @@ void DB::removeReport(size_t index)
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    assert(index < m_data.reports.size());
+    Q_ASSERT(index < m_data.reports.size());
     ReportId id = m_data.reports[index].id;
 
     s_logger.logInfo(QString("Removed report '%1'").arg(m_data.reports[index].descriptor.name.c_str()));
@@ -2349,6 +2383,13 @@ void DB::save(Data const& data) const
 			sqlite3_bind_int(stmt, 13, a.descriptor.lowVccWatch ? 1 : 0);
 			sqlite3_bind_int(stmt, 14, a.descriptor.lowSignalWatch ? 1 : 0);
 			sqlite3_bind_int(stmt, 15, a.descriptor.sendEmailAction ? 1 : 0);
+			std::string triggers;
+			for (auto p : a.triggersPerSensor)
+			{
+                triggers += std::to_string(p.first) + "/" + std::to_string(p.second) + ";";
+			}
+			sqlite3_bind_text(stmt, 16, triggers.c_str(), -1, SQLITE_STATIC);
+            sqlite3_bind_int64(stmt, 17, Clock::to_time_t(a.lastTriggeredTimePoint));
 			if (sqlite3_step(stmt) != SQLITE_DONE)
 			{
 				s_logger.logCritical(QString("Failed to save alarms: %1").arg(sqlite3_errmsg(m_sqlite)));

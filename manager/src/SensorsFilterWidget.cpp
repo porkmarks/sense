@@ -15,7 +15,7 @@ void SensorsFilterWidget::init(DB& db)
 
     m_model.reset(new SensorsModel(*m_db));
     m_model->setShowCheckboxes(true);
-
+    
     m_sortingModel.reset(new QSortFilterProxyModel(this));
     m_sortingModel->setSourceModel(m_model.get());
 
@@ -59,6 +59,12 @@ void SensorsFilterWidget::init(DB& db)
         QSettings settings;
         m_ui.list->header()->restoreState(settings.value("sensorFilter/list/state").toByteArray());
     }
+
+	m_ui.list->header()->setSectionHidden((int)SensorsModel::Column::Battery, true);
+	m_ui.list->header()->setSectionHidden((int)SensorsModel::Column::Signal, true);
+	m_ui.list->header()->setSectionHidden((int)SensorsModel::Column::NextComms, true);
+	m_ui.list->header()->setSectionHidden((int)SensorsModel::Column::Stored, true);
+	m_ui.list->header()->setSectionHidden((int)SensorsModel::Column::Alarms, true);
 }
 
 SensorsModel& SensorsFilterWidget::getSensorModel()

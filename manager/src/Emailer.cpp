@@ -40,7 +40,8 @@ Emailer::Emailer(Settings& settings, DB& db)
 {
     m_emailThread = std::thread(std::bind(&Emailer::emailThreadProc, this));
 
-    connect(&m_db, &DB::alarmTriggersChanged, this, &Emailer::alarmTriggersChanged);
+    connect(&m_db, &DB::alarmTriggersChanged, this, &Emailer::alarmTriggersChanged, Qt::QueuedConnection);
+	connect(&m_db, &DB::alarmStillTriggered, this, &Emailer::alarmStillTriggered, Qt::QueuedConnection);
 
     m_timer.setSingleShot(false);
     m_timer.setInterval(60 * 1000); //every minute
@@ -103,6 +104,26 @@ void Emailer::alarmTriggersChanged(DB::AlarmId alarmId, DB::Measurement const& m
             sendAlarmEmail(alarm, sensor, m, oldTriggers, newTriggers, addedTriggers, Action::Trigger);
         }
     }
+}
+
+
+//////////////////////////////////////////////////////////////////////////
+
+void Emailer::alarmStillTriggered(DB::AlarmId alarmId)
+{
+	int32_t alarmIndex = m_db.findAlarmIndexById(alarmId);
+	if (alarmIndex < 0)
+	{
+		assert(false);
+		return;
+	}
+
+	DB::Alarm const& alarm = m_db.getAlarm(static_cast<size_t>(alarmIndex));
+
+	if (alarm.descriptor.sendEmailAction)
+	{
+		sendAlarmRetriggerEmail(alarm);
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -202,6 +223,59 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
             .toUtf8().data();
 
     sendEmail(email);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Emailer::sendAlarmRetriggerEmail(DB::Alarm const& alarm)
+{
+	auto toString = [](uint8_t triggers)
+	{
+		std::string str;
+		str += (triggers & DB::AlarmTrigger::LowTemperature) ? "Low Temperature, " : "";
+		str += (triggers & DB::AlarmTrigger::HighTemperature) ? "High Temperature, " : "";
+		str += (triggers & DB::AlarmTrigger::LowHumidity) ? "Low Humidity, " : "";
+		str += (triggers & DB::AlarmTrigger::HighHumidity) ? "High Humidity, " : "";
+		str += (triggers & DB::AlarmTrigger::LowVcc) ? "Low Battery, " : "";
+		str += (triggers & DB::AlarmTrigger::LowSignal) ? "Low Signal, " : "";
+		if (!str.empty())
+		{
+			str.pop_back(); //' '
+			str.pop_back(); //','
+		}
+		return str;
+	};
+
+    uint8_t triggers = 0;
+    for (auto p: alarm.triggersPerSensor)
+    { 
+        triggers |= p.second;
+    }
+
+	Email email;
+
+	///////////////////////////////
+	// SUBJECT
+	email.subject = "ALARM '" + alarm.descriptor.name + "' still triggered: " + toString(triggers);
+
+	///////////////////////////////
+	// BODY
+	for (auto p : alarm.triggersPerSensor)
+	{
+        DB::SensorId sensorId = p.first;
+        int32_t sensorIndex = m_db.findSensorIndexById(sensorId);
+        if (sensorIndex >= 0)
+		{
+            DB::Sensor const& sensor = m_db.getSensor((size_t)sensorIndex);
+			email.body += "\n<p>Sensor '<strong>" + sensor.descriptor.name + "</strong>': " + toString(p.second) + "</p>";
+		}
+	}
+	
+	email.settings = m_settings.getEmailSettings();
+
+	s_logger.logInfo(QString("Sending alarm email'"));
+
+	sendEmail(email);
 }
 
 //////////////////////////////////////////////////////////////////////////
