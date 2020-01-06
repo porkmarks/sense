@@ -625,6 +625,20 @@ void Comms::processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequ
 
 //////////////////////////////////////////////////////////////////////////
 
+size_t Comms::getDiscoveredBaseStationCount() const
+{
+    return m_discoveredBaseStations.size();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+const Comms::BaseStationDescriptor& Comms::getDiscoveredBaseStation(size_t index) const
+{
+    return m_discoveredBaseStations[index];
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void Comms::process()
 {
 //    static DB::Clock::time_point lastFakeDiscovery = DB::Clock::now();

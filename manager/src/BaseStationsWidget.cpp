@@ -111,6 +111,12 @@ void BaseStationsWidget::init(Comms& comms, Settings& settings)
         m_baseStationDescriptors.push_back(bs.descriptor);
     }
 
+	for (size_t i = 0; i < m_comms->getDiscoveredBaseStationCount(); i++)
+	{
+		Comms::BaseStationDescriptor const& bsd = m_comms->getDiscoveredBaseStation(i);
+        baseStationDiscovered(bsd);
+	}
+
     setPermissions();
     m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &BaseStationsWidget::setPermissions));
 }
@@ -212,7 +218,7 @@ void BaseStationsWidget::baseStationConnected(Comms::BaseStationDescriptor const
     {
         size_t bsIndex = static_cast<size_t>(_bsIndex);
         //DB::BaseStation const& bs = db.getBaseStation(bsIndex);
-        setStatus(bsIndex, "Added / Connected");
+        setStatus(bsIndex, "Connected");
         setAddress(bsIndex, commsBS.address);
         return;
     }
@@ -228,7 +234,7 @@ void BaseStationsWidget::baseStationDisconnected(Comms::BaseStationDescriptor co
     {
         size_t bsIndex = static_cast<size_t>(_bsIndex);
         DB::BaseStation const& bs = db.getBaseStation(bsIndex);
-        setStatus(bsIndex, "Added / Disconnected");
+        setStatus(bsIndex, "Disconnected");
         setAddress(bsIndex, commsBS.address);
         showDisconnectionMessageBox(bs, commsBS.address);
         return;

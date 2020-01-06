@@ -35,6 +35,9 @@ public:
         bool operator==(BaseStationDescriptor const& other) const { return mac == other.mac && address == other.address; }
     };
 
+    size_t getDiscoveredBaseStationCount() const;
+    const BaseStationDescriptor& getDiscoveredBaseStation(size_t index) const;
+
     void process();
 
 signals:

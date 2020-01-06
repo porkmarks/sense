@@ -190,16 +190,16 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
     if (newTriggers & DB::AlarmTrigger::Temperature)
 	{
 		if (newTriggers & DB::AlarmTrigger::HighTemperatureHard)
-			temperatureStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor, 0, 16).arg("Very High: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
+			temperatureStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0x00FFFFFF, 0, 16).arg("Very High: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
 		else if (newTriggers & DB::AlarmTrigger::HighTemperatureSoft)
-			temperatureStr = QString(alertTemplateStr).arg(utils::k_highThresholdSoftColor, 0, 16).arg("High: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
+			temperatureStr = QString(alertTemplateStr).arg(utils::k_highThresholdSoftColor & 0x00FFFFFF, 0, 16).arg("High: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
 		else if (newTriggers & DB::AlarmTrigger::LowTemperatureHard)
-			temperatureStr = QString(alertTemplateStr).arg(utils::k_lowThresholdHardColor, 0, 16).arg("Very Low: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
+			temperatureStr = QString(alertTemplateStr).arg(utils::k_lowThresholdHardColor & 0x00FFFFFF, 0, 16).arg("Very Low: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
 		else if (newTriggers & DB::AlarmTrigger::LowTemperatureSoft)
-			temperatureStr = QString(alertTemplateStr).arg(utils::k_lowThresholdSoftColor, 0, 16).arg("Low: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
+			temperatureStr = QString(alertTemplateStr).arg(utils::k_lowThresholdSoftColor & 0x00FFFFFF, 0, 16).arg("Low: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
 	}
     else if (oldTriggers & DB::AlarmTrigger::Temperature)
-		temperatureStr = QString(alertTemplateStr).arg(utils::k_inRangeColor, 0, 16).arg("Recovered: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
+		temperatureStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0x00FFFFFF, 0, 16).arg("Recovered: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
     else 
         temperatureStr = QString(R"X(%1&deg;C)X").arg(m.descriptor.temperature, 0, 'f', 1);
 
@@ -207,34 +207,34 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
 	if (newTriggers & DB::AlarmTrigger::Humidity)
 	{
 		if (newTriggers & DB::AlarmTrigger::HighHumidityHard)
-            humidityStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor, 0, 16).arg("Very High: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
+            humidityStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0x00FFFFFF, 0, 16).arg("Very High: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
 	    else if (newTriggers & DB::AlarmTrigger::HighHumiditySoft)
-            humidityStr = QString(alertTemplateStr).arg(utils::k_highThresholdSoftColor, 0, 16).arg("High: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
+            humidityStr = QString(alertTemplateStr).arg(utils::k_highThresholdSoftColor & 0x00FFFFFF, 0, 16).arg("High: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
 	    else if (newTriggers & DB::AlarmTrigger::LowHumidityHard)
-            humidityStr = QString(alertTemplateStr).arg(utils::k_lowThresholdHardColor, 0, 16).arg("Very Low: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
+            humidityStr = QString(alertTemplateStr).arg(utils::k_lowThresholdHardColor & 0x00FFFFFF, 0, 16).arg("Very Low: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
 	    else if (newTriggers & DB::AlarmTrigger::LowHumiditySoft)
-            humidityStr = QString(alertTemplateStr).arg(utils::k_lowThresholdSoftColor, 0, 16).arg("Low: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
+            humidityStr = QString(alertTemplateStr).arg(utils::k_lowThresholdSoftColor & 0x00FFFFFF, 0, 16).arg("Low: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
 	}
 	else if (oldTriggers & DB::AlarmTrigger::Humidity)
-        humidityStr = QString(alertTemplateStr).arg(utils::k_inRangeColor, 0, 16).arg("Recovered: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
+        humidityStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0x00FFFFFF, 0, 16).arg("Recovered: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
 	else
         humidityStr = QString(R"X(%1&deg;C)X").arg(m.descriptor.humidity, 0, 'f', 1);
 
 	QString batteryStr;
     int batteryPercentage = static_cast<int>(utils::getBatteryLevel(m.descriptor.vcc) * 100.f);
 	if (newTriggers & DB::AlarmTrigger::LowVcc)
-        batteryStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor, 0, 16).arg("Very Low: ").arg(batteryPercentage).arg("%");
+        batteryStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0x00FFFFFF, 0, 16).arg("Very Low: ").arg(batteryPercentage).arg("%");
 	else if (oldTriggers & DB::AlarmTrigger::LowVcc)
-        batteryStr = QString(alertTemplateStr).arg(utils::k_inRangeColor, 0, 16).arg("Recovered: ").arg(batteryPercentage).arg("%");
+        batteryStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0x00FFFFFF, 0, 16).arg("Recovered: ").arg(batteryPercentage).arg("%");
 	else
         batteryStr = QString(R"X(%1%)X").arg(batteryPercentage);
 
 	QString signalStrengthStr;
     int signalStrengthPercentage = static_cast<int>(utils::getSignalLevel(std::min(m.descriptor.signalStrength.s2b, m.descriptor.signalStrength.b2s)) * 100.f);
 	if (newTriggers & DB::AlarmTrigger::LowSignal)
-        signalStrengthStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor, 0, 16).arg("Very Low: ").arg(signalStrengthPercentage).arg("%");
+        signalStrengthStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0x00FFFFFF, 0, 16).arg("Very Low: ").arg(signalStrengthPercentage).arg("%");
 	else if (oldTriggers & DB::AlarmTrigger::LowSignal)
-        signalStrengthStr = QString(alertTemplateStr).arg(utils::k_inRangeColor, 0, 16).arg("Recovered: ").arg(signalStrengthPercentage).arg("%");
+        signalStrengthStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0x00FFFFFF, 0, 16).arg("Recovered: ").arg(signalStrengthPercentage).arg("%");
 	else
         signalStrengthStr = QString(R"X(%1%)X").arg(signalStrengthPercentage);
 
