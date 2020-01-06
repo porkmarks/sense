@@ -193,20 +193,20 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Temperature)
         {
-            return QString("%1 °C").arg(measurement.descriptor.temperature, 0, 'f', 1);
+            return QString("%1°C").arg(measurement.descriptor.temperature, 0, 'f', 1);
         }
         else if (column == Column::Humidity)
         {
-            return QString("%1 %RH").arg(measurement.descriptor.humidity, 0, 'f', 1);
+            return QString("%1%").arg(measurement.descriptor.humidity, 0, 'f', 1);
         }
         else if (column == Column::Battery)
         {
-            return QString("%1 %").arg(static_cast<int>(utils::getBatteryLevel(measurement.descriptor.vcc) * 100.f));
+            return QString("%1%").arg(static_cast<int>(utils::getBatteryLevel(measurement.descriptor.vcc) * 100.f));
             //return QString("%1 %").arg(static_cast<int>(measurement.descriptor.signalStrength.s2b));
         }
         else if (column == Column::Signal)
         {
-            return QString("%1 %").arg(static_cast<int>(utils::getSignalLevel(std::min(measurement.descriptor.signalStrength.s2b, measurement.descriptor.signalStrength.b2s)) * 100.f));
+            return QString("%1%").arg(static_cast<int>(utils::getSignalLevel(std::min(measurement.descriptor.signalStrength.s2b, measurement.descriptor.signalStrength.b2s)) * 100.f));
             //return QString("%1 %").arg(static_cast<int>(measurement.descriptor.signalStrength.b2s));
             //return QString("%1 %").arg(std::min(measurement.descriptor.b2s, measurement.descriptor.s2b));
         }

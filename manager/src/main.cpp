@@ -61,6 +61,15 @@ int main(int argc, char *argv[])
 
     QApplication a(argc, argv);
 
+	qRegisterMetaType<int8_t>("int8_t");
+	qRegisterMetaType<uint8_t>("uint8_t");
+	qRegisterMetaType<int16_t>("int16_t");
+	qRegisterMetaType<uint16_t>("uint16_t");
+	qRegisterMetaType<int32_t>("int32_t");
+	qRegisterMetaType<uint32_t>("uint32_t");
+	qRegisterMetaType<size_t>("size_t");
+
+
     s_programFolder = a.applicationDirPath().toUtf8().data();
     s_dataFolder = s_programFolder + "/data";
     QDir().mkpath(s_dataFolder.c_str());

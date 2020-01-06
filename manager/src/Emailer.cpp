@@ -174,29 +174,157 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
     // SUBJECT
     if (action == Action::Trigger)
     {
-        email.subject = "ALARM - Sensor '" + sensor.descriptor.name + "' triggered alarm '" + alarm.descriptor.name + "': " + toString(triggers);
+        email.subject = "SENSE - Sensor '" + sensor.descriptor.name + "' THRESHOLD ALERT for '" + alarm.descriptor.name + "'";
     }
     else
     {
-        email.subject = "RECOVERY - Sensor '" + sensor.descriptor.name + "' recovered from alarm '" + alarm.descriptor.name + "': " + toString(triggers);
+        email.subject = "SENSE - Sensor '" + sensor.descriptor.name + "' THRESHOLD RECOVERY for '" + alarm.descriptor.name + "'";
     }
 
     ///////////////////////////////
     // BODY
-    email.body = "<p>Sensor '<strong>" + sensor.descriptor.name + "</strong>' / alarm '<strong>" + alarm.descriptor.name + "</strong>'.</p>";
 
-    email.settings = m_settings.getEmailSettings();
+    const char* alertTemplateStr = R"X(<table style="border-style: solid; border-width: 2px; border-color: #%1;"><tbody><tr><td><strong>%2%3%4</strong></td></tr></tbody></table>)X";
 
-    s_logger.logInfo(QString("Sending alarm email'"));
+    QString temperatureStr;
+    if (newTriggers & DB::AlarmTrigger::Temperature)
+	{
+		if (newTriggers & DB::AlarmTrigger::HighTemperatureHard)
+			temperatureStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor, 0, 16).arg("Very High: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
+		else if (newTriggers & DB::AlarmTrigger::HighTemperatureSoft)
+			temperatureStr = QString(alertTemplateStr).arg(utils::k_highThresholdSoftColor, 0, 16).arg("High: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
+		else if (newTriggers & DB::AlarmTrigger::LowTemperatureHard)
+			temperatureStr = QString(alertTemplateStr).arg(utils::k_lowThresholdHardColor, 0, 16).arg("Very Low: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
+		else if (newTriggers & DB::AlarmTrigger::LowTemperatureSoft)
+			temperatureStr = QString(alertTemplateStr).arg(utils::k_lowThresholdSoftColor, 0, 16).arg("Low: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
+	}
+    else if (oldTriggers & DB::AlarmTrigger::Temperature)
+		temperatureStr = QString(alertTemplateStr).arg(utils::k_inRangeColor, 0, 16).arg("Recovered: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
+    else 
+        temperatureStr = QString(R"X(%1&deg;C)X").arg(m.descriptor.temperature, 0, 'f', 1);
 
-    QDateTime dt;
-    dt.setTime_t(DB::Clock::to_time_t(m.timePoint));
+	QString humidityStr;
+	if (newTriggers & DB::AlarmTrigger::Humidity)
+	{
+		if (newTriggers & DB::AlarmTrigger::HighHumidityHard)
+            humidityStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor, 0, 16).arg("Very High: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
+	    else if (newTriggers & DB::AlarmTrigger::HighHumiditySoft)
+            humidityStr = QString(alertTemplateStr).arg(utils::k_highThresholdSoftColor, 0, 16).arg("High: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
+	    else if (newTriggers & DB::AlarmTrigger::LowHumidityHard)
+            humidityStr = QString(alertTemplateStr).arg(utils::k_lowThresholdHardColor, 0, 16).arg("Very Low: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
+	    else if (newTriggers & DB::AlarmTrigger::LowHumiditySoft)
+            humidityStr = QString(alertTemplateStr).arg(utils::k_lowThresholdSoftColor, 0, 16).arg("Low: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
+	}
+	else if (oldTriggers & DB::AlarmTrigger::Humidity)
+        humidityStr = QString(alertTemplateStr).arg(utils::k_inRangeColor, 0, 16).arg("Recovered: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
+	else
+        humidityStr = QString(R"X(%1&deg;C)X").arg(m.descriptor.humidity, 0, 'f', 1);
+
+	QString batteryStr;
+    int batteryPercentage = static_cast<int>(utils::getBatteryLevel(m.descriptor.vcc) * 100.f);
+	if (newTriggers & DB::AlarmTrigger::LowVcc)
+        batteryStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor, 0, 16).arg("Very Low: ").arg(batteryPercentage).arg("%");
+	else if (oldTriggers & DB::AlarmTrigger::LowVcc)
+        batteryStr = QString(alertTemplateStr).arg(utils::k_inRangeColor, 0, 16).arg("Recovered: ").arg(batteryPercentage).arg("%");
+	else
+        batteryStr = QString(R"X(%1%)X").arg(batteryPercentage);
+
+	QString signalStrengthStr;
+    int signalStrengthPercentage = static_cast<int>(utils::getSignalLevel(std::min(m.descriptor.signalStrength.s2b, m.descriptor.signalStrength.b2s)) * 100.f);
+	if (newTriggers & DB::AlarmTrigger::LowSignal)
+        signalStrengthStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor, 0, 16).arg("Very Low: ").arg(signalStrengthPercentage).arg("%");
+	else if (oldTriggers & DB::AlarmTrigger::LowSignal)
+        signalStrengthStr = QString(alertTemplateStr).arg(utils::k_inRangeColor, 0, 16).arg("Recovered: ").arg(signalStrengthPercentage).arg("%");
+	else
+        signalStrengthStr = QString(R"X(%1%)X").arg(signalStrengthPercentage);
+
+    email.body += QString(R"X(
+<table>
+<tbody>
+<tr><td><strong>Sensor:</strong></td>           <td>%1</td></tr>
+<tr><td><strong>S/N:</strong></td>              <td>%2</td></tr>
+<tr><td><strong>Measurement Time:</strong></td> <td>%3</td></tr>
+<tr><td><strong>Received Time:</strong></td>    <td>%4</td></tr>
+<tr><td><strong>Temperature:</strong></td>      <td>%5</td></tr>
+<tr><td><strong>Humidity:</strong></td>         <td>%6</td></tr>
+<tr><td><strong>Battery:</strong></td>          <td>%7</td></tr>
+<tr><td><strong>Signal Strength:</strong></td>  <td>%8</td></tr>
+</tbody>
+</table>
+    )X").arg(sensor.descriptor.name.c_str())
+        .arg(sensor.serialNumber, 8, 16, QChar('0'))
+        .arg(QDateTime::fromTime_t(DB::Clock::to_time_t(m.timePoint)).toString("dd-MM-yyyy HH:mm"))
+        .arg(QDateTime::fromTime_t(DB::Clock::to_time_t(m.receivedTimePoint)).toString("dd-MM-yyyy HH:mm"))
+        .arg(temperatureStr)
+        .arg(humidityStr)
+        .arg(batteryStr)
+        .arg(signalStrengthStr)
+        .toUtf8().data();
+
+
+    if (alarm.descriptor.lowTemperatureWatch || alarm.descriptor.highTemperatureWatch)
+	{
+        QString lowTemperatureStr;
+        if (alarm.descriptor.lowTemperatureWatch)
+		{
+            lowTemperatureStr = QString(R"X(<strong><span style="color: #011fff;">%1</span>&nbsp;|&nbsp;<span style="color: #004a96;">%2</span>&nbsp;|&nbsp;)X").arg(alarm.descriptor.lowTemperatureHard, 0, 'f', 1).arg(alarm.descriptor.lowTemperatureSoft, 0, 'f', 1);
+		}
+		QString highTemperatureStr;
+		if (alarm.descriptor.highTemperatureWatch)
+		{
+			highTemperatureStr = QString(R"X(&nbsp;|&nbsp;<span style="color: #f37736;">%1</span>&nbsp;|&nbsp;<span style="color: #ff2015;">%2</span>)X").arg(alarm.descriptor.highTemperatureSoft, 0, 'f', 1).arg(alarm.descriptor.highTemperatureHard, 0, 'f', 1);
+		}
+        email.body += QString(R"X(<p><strong>Temperature Thresholds</strong><strong>&nbsp;(&deg;C):&nbsp;</strong>%1<span style="color: #339966;">OK</span>%2</p>)X").arg(lowTemperatureStr).arg(highTemperatureStr).toUtf8().data();
+	}
+	if (alarm.descriptor.lowHumidityWatch || alarm.descriptor.highHumidityWatch)
+	{
+		QString lowHumidityStr;
+		if (alarm.descriptor.lowHumidityWatch)
+		{
+			lowHumidityStr = QString(R"X(<strong><span style="color: #011fff;">%1</span>&nbsp;|&nbsp;<span style="color: #004a96;">%2</span>&nbsp;|&nbsp;)X").arg(alarm.descriptor.lowHumidityHard, 0, 'f', 1).arg(alarm.descriptor.lowHumiditySoft, 0, 'f', 1);
+		}
+		QString highHumidityStr;
+		if (alarm.descriptor.highHumidityWatch)
+		{
+			highHumidityStr = QString(R"X(&nbsp;|&nbsp;<span style="color: #f37736;">%1</span>&nbsp;|&nbsp;<span style="color: #ff2015;">%2</span>)X").arg(alarm.descriptor.highHumiditySoft, 0, 'f', 1).arg(alarm.descriptor.highHumidityHard, 0, 'f', 1);
+		}
+		email.body += QString(R"X(<p><strong>Humidity Thresholds</strong><strong>&nbsp;(&deg;C):&nbsp;</strong>%1<span style="color: #339966;">OK</span>%2</p>)X").arg(lowHumidityStr).arg(highHumidityStr).toUtf8().data();
+	}
+    if (alarm.descriptor.lowVccWatch)
+	{
+		email.body += QString(R"X(<p><strong>Battery Threshold</strong><strong>&nbsp;(%):&nbsp;</strong><strong><span style="color: #339966;">OK</span>&nbsp;|&nbsp;<span style="color: #ff2015;">%1</span></strong></p>)X")
+            .arg(static_cast<int>(m_db.getSensorSettings().alertBatteryLevel * 100.f))
+            .toUtf8().data();
+	}
+	if (alarm.descriptor.lowSignalWatch)
+	{
+		email.body += QString(R"X(<p><strong>Signal Strength Threshold</strong><strong>&nbsp;(%):&nbsp;</strong><strong><span style="color: #339966;">OK</span>&nbsp;|&nbsp;<span style="color: #ff2015;">%1</span></strong></p>)X")
+			.arg(static_cast<int>(m_db.getSensorSettings().alertSignalStrengthLevel * 100.f))
+			.toUtf8().data();
+	}
+	email.body += QString(R"X(
+<p>&nbsp;</p>
+<p><strong>Date/Time Format: DD-MM-YYYY hh:mm:ss</strong></p>
+<p>&nbsp;</p>)X").toUtf8().data();
+
+	email.settings = m_settings.getEmailSettings();
+
+	s_logger.logInfo(QString("Sending alarm email"));
+
+
+				 /*
+
+
+
+
+
+
 
     email.body += QString(R"X(
                           <p>Measurement:</p>
                           <ul>
                           <li><span style="color:%1">Temperature: <strong>%2 &deg;C</strong> (%3)</span></li>
-                          <li><span style="color:%4">Humidity: <strong>%5 %RH</strong> (%6)</span></li>
+                          <li><span style="color:%4">Humidity: <strong>%5 %</strong> (%6)</span></li>
                           <li><span style="color:%7">Battery: <strong>%8 %</strong> (%9)</span></li>
                           <li><span style="color:%10">Signal: <strong>%11 %</strong> (%12)</span></li>
                           </ul>
@@ -220,7 +348,7 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
             .arg(getStatus(DB::AlarmTrigger::LowSignal))
 
             .arg(dt.toString("dd-MM-yyyy HH:mm"))
-            .toUtf8().data();
+            .toUtf8().data();*/
 
     sendEmail(email);
 }
@@ -232,10 +360,14 @@ void Emailer::sendAlarmRetriggerEmail(DB::Alarm const& alarm)
 	auto toString = [](uint32_t triggers)
 	{
 		std::string str;
-		str += (triggers & DB::AlarmTrigger::LowTemperature) ? "Low Temperature, " : "";
-		str += (triggers & DB::AlarmTrigger::HighTemperature) ? "High Temperature, " : "";
-		str += (triggers & DB::AlarmTrigger::LowHumidity) ? "Low Humidity, " : "";
-		str += (triggers & DB::AlarmTrigger::HighHumidity) ? "High Humidity, " : "";
+		str += (triggers & DB::AlarmTrigger::LowTemperatureSoft) ? "Low Temperature, " : "";
+		str += (triggers & DB::AlarmTrigger::LowTemperatureHard) ? "Low Temperature, " : "";
+		str += (triggers & DB::AlarmTrigger::HighTemperatureSoft) ? "High Temperature, " : "";
+		str += (triggers & DB::AlarmTrigger::HighTemperatureHard) ? "High Temperature, " : "";
+		str += (triggers & DB::AlarmTrigger::LowHumiditySoft) ? "Low Humidity, " : "";
+		str += (triggers & DB::AlarmTrigger::LowHumidityHard) ? "Low Humidity, " : "";
+		str += (triggers & DB::AlarmTrigger::HighHumiditySoft) ? "High Humidity, " : "";
+		str += (triggers & DB::AlarmTrigger::HighHumidityHard) ? "High Humidity, " : "";
 		str += (triggers & DB::AlarmTrigger::LowVcc) ? "Low Battery, " : "";
 		str += (triggers & DB::AlarmTrigger::LowSignal) ? "Low Signal, " : "";
 		if (!str.empty())
@@ -423,8 +555,8 @@ void Emailer::sendReportEmail(DB::Report const& report)
                                       <td style="width: 80.6667px;">%1</td>
                                       <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%2 &deg;C</td>
                                       <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%3 &deg;C</td>
-                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%4 %RH</td>
-                                      <td style="width: 81.3333px; text-align: right; white-space: nowrap;">%5 %RH</td>
+                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%4 %</td>
+                                      <td style="width: 81.3333px; text-align: right; white-space: nowrap;">%5 %</td>
                                       <td style="width: 81.3333px; text-align: right; white-space: nowrap;">%6</td>
                                       </tr>
                                       )X")
@@ -485,7 +617,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
                                       <td style="width: 80.6667px;">%1</td>
                                       <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%2</td>
                                       <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%3 &deg;C</td>
-                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%4 %RH</td>
+                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%4 %</td>
                                       <td style="width: 81.3333px; text-align: right; white-space: nowrap;">%5</td>
                                   </tr>)X").arg(sensorName.c_str())
                     .arg(dt.toString("dd-MM-yyyy HH:mm"))

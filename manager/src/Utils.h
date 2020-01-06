@@ -26,6 +26,7 @@ static uint32_t k_lowThresholdSoftColor = 0xFF004a96;
 static uint32_t k_lowThresholdHardColor = 0xFF011fFF;
 static uint32_t k_highThresholdSoftColor = 0xFFf37736;
 static uint32_t k_highThresholdHardColor = 0xFFff2015;
+static uint32_t k_inRangeColor = 0xFF00b159;
 
 float getBatteryLevel(float vcc);
 QIcon getBatteryIcon(DB::SensorSettings const& settings, float vcc);

@@ -21,10 +21,20 @@ const DB::Clock::duration COMMS_DURATION = std::chrono::seconds(10);
 
 extern std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac);
 
+Q_DECLARE_METATYPE(DB::Measurement);
+
 //////////////////////////////////////////////////////////////////////////
 
 DB::DB()
 {
+    qRegisterMetaType<BaseStationId>("BaseStationId");
+	qRegisterMetaType<SensorId>("SensorId");
+	qRegisterMetaType<SensorAddress>("SensorAddress");
+	qRegisterMetaType<SensorSerialNumber>("SensorSerialNumber");
+	qRegisterMetaType<MeasurementId>("MeasurementId");
+	qRegisterMetaType<AlarmId>("AlarmId");
+	qRegisterMetaType<ReportId>("ReportId");
+	qRegisterMetaType<Measurement>("Measurement");
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -101,7 +111,7 @@ Result<void> DB::create(sqlite3& db)
 		}
 	} 
     {
-		const char* sql = "CREATE TABLE Measurements (id INTEGER PRIMARY KEY, timePoint DATETIME, idx INTEGER, sensorId INTEGER, temperature REAL, humidity REAL, vcc REAL, signalStrengthS2B INTEGER, signalStrengthB2S INTEGER, "
+		const char* sql = "CREATE TABLE Measurements (id INTEGER PRIMARY KEY, timePoint DATETIME, receivedTimePoint DATETIME, idx INTEGER, sensorId INTEGER, temperature REAL, humidity REAL, vcc REAL, signalStrengthS2B INTEGER, signalStrengthB2S INTEGER, "
             "sensorErrors INTEGER, alarmTriggers INTEGER);";
 		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
@@ -183,8 +193,8 @@ Result<void> DB::load(sqlite3& db)
     }
     {
 		sqlite3_stmt* stmt;
-        if (sqlite3_prepare_v2(&db, "REPLACE INTO Measurements (id, timePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggers) "
-							        "VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11);", -1, &stmt, NULL) != SQLITE_OK)
+        if (sqlite3_prepare_v2(&db, "REPLACE INTO Measurements (id, timePoint, receivedTimePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggers) "
+							        "VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12);", -1, &stmt, NULL) != SQLITE_OK)
 		{
 			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -1930,6 +1940,7 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
 				measurement.id = id;
 				measurement.descriptor = md;
 				measurement.timePoint = computeMeasurementTimepoint(md);
+                measurement.receivedTimePoint = Clock::now();
 				measurement.alarmTriggers = computeAlarmTriggers(measurement);
                 asyncMeasurements.emplace_back(measurement);
 
@@ -1990,15 +2001,16 @@ void DB::addAsyncMeasurements()
 
 				sqlite3_bind_int64(stmt, 1, m.id);
 				sqlite3_bind_int64(stmt, 2, Clock::to_time_t(m.timePoint));
-				sqlite3_bind_int64(stmt, 3, md.index);
-				sqlite3_bind_int64(stmt, 4, md.sensorId);
-				sqlite3_bind_double(stmt, 5, md.temperature);
-				sqlite3_bind_double(stmt, 6, md.humidity);
-				sqlite3_bind_double(stmt, 7, md.vcc);
-				sqlite3_bind_int64(stmt, 8, md.signalStrength.s2b);
-				sqlite3_bind_int64(stmt, 9, md.signalStrength.b2s);
-				sqlite3_bind_int64(stmt, 10, md.sensorErrors);
-				sqlite3_bind_int64(stmt, 11, m.alarmTriggers);
+                sqlite3_bind_int64(stmt, 3, Clock::to_time_t(m.receivedTimePoint));
+				sqlite3_bind_int64(stmt, 4, md.index);
+				sqlite3_bind_int64(stmt, 5, md.sensorId);
+				sqlite3_bind_double(stmt, 6, md.temperature);
+				sqlite3_bind_double(stmt, 7, md.humidity);
+				sqlite3_bind_double(stmt, 8, md.vcc);
+				sqlite3_bind_int64(stmt, 9, md.signalStrength.s2b);
+				sqlite3_bind_int64(stmt, 10, md.signalStrength.b2s);
+				sqlite3_bind_int64(stmt, 11, md.sensorErrors);
+				sqlite3_bind_int64(stmt, 12, m.alarmTriggers);
 				if (sqlite3_step(stmt) != SQLITE_DONE)
 				{
 					s_logger.logCritical(QString("Failed to save measurement: %1").arg(sqlite3_errmsg(m_sqlite)));
@@ -2176,7 +2188,7 @@ size_t DB::_getFilteredMeasurements(Filter const& filter, std::vector<DB::Measur
     size_t count = 0;
 
 	{
-		std::string sql = "SELECT id, timePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggers "
+		std::string sql = "SELECT id, timePoint, receivedTimePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggers "
                           "FROM Measurements " + getQueryWherePart(filter);
 		sql += ";";
 
@@ -2208,7 +2220,7 @@ Result<DB::Measurement> DB::getLastMeasurementForSensor(SensorId sensorId) const
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    QString sql = QString("SELECT id, timePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggers "
+    QString sql = QString("SELECT id, timePoint, receivedTimePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggers "
                           "FROM Measurements "
                           "WHERE sensorId = %1 "
                           "ORDER BY idx DESC LIMIT 1;").arg(sensorId);
@@ -2233,7 +2245,7 @@ Result<DB::Measurement> DB::getLastMeasurementForSensor(SensorId sensorId) const
 
 Result<DB::Measurement> DB::findMeasurementById(MeasurementId id) const
 {
-	QString sql = QString("SELECT id, timePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggers "
+	QString sql = QString("SELECT id, timePoint, receivedTimePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggers "
                           "FROM Measurements "
                           "WHERE id = %1;").arg(id);
 	sqlite3_stmt* stmt;
@@ -2303,15 +2315,16 @@ DB::Measurement DB::unpackMeasurement(sqlite3_stmt* stmt)
 	Measurement m;
 	m.id = sqlite3_column_int64(stmt, 0);
 	m.timePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 1));
-	m.descriptor.index = sqlite3_column_int64(stmt, 2);
-	m.descriptor.sensorId = (uint32_t)sqlite3_column_int64(stmt, 3);
-	m.descriptor.temperature = (float)sqlite3_column_double(stmt, 4);
-	m.descriptor.humidity = (float)sqlite3_column_double(stmt, 5);
-	m.descriptor.vcc = (float)sqlite3_column_double(stmt, 6);
-	m.descriptor.signalStrength.s2b = (int8_t)sqlite3_column_int(stmt, 7);
-	m.descriptor.signalStrength.b2s = (int8_t)sqlite3_column_int(stmt, 8);
-	m.descriptor.sensorErrors = (uint32_t)sqlite3_column_int(stmt, 9);
-	m.alarmTriggers = (uint32_t)sqlite3_column_int(stmt, 10);
+	m.receivedTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 2));
+	m.descriptor.index = sqlite3_column_int64(stmt, 3);
+	m.descriptor.sensorId = (uint32_t)sqlite3_column_int64(stmt, 4);
+	m.descriptor.temperature = (float)sqlite3_column_double(stmt, 5);
+	m.descriptor.humidity = (float)sqlite3_column_double(stmt, 6);
+	m.descriptor.vcc = (float)sqlite3_column_double(stmt, 7);
+	m.descriptor.signalStrength.s2b = (int8_t)sqlite3_column_int(stmt, 8);
+	m.descriptor.signalStrength.b2s = (int8_t)sqlite3_column_int(stmt, 9);
+	m.descriptor.sensorErrors = (uint32_t)sqlite3_column_int(stmt, 10);
+	m.alarmTriggers = (uint32_t)sqlite3_column_int(stmt, 11);
     return m;
 }
 
@@ -2319,7 +2332,7 @@ DB::Measurement DB::unpackMeasurement(sqlite3_stmt* stmt)
 
 DB::SignalStrength DB::computeAverageSignalStrength(SensorId sensorId, Data const& data) const
 {
-	QString sql = QString("SELECT id, timePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggers "
+	QString sql = QString("SELECT id, timePoint, receivedTimePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggers "
                           "FROM Measurements "
                           "WHERE sensorId = %1 AND signalStrengthS2B != 0 AND signalStrengthB2S != 0 "
                           "ORDER BY idx DESC LIMIT 10;").arg(sensorId);

@@ -359,7 +359,7 @@
       <item row="1" column="1">
        <widget class="QDoubleSpinBox" name="humidityBias">
         <property name="suffix">
-         <string> % RH</string>
+         <string>%</string>
         </property>
         <property name="minimum">
          <double>-15.000000000000000</double>
@@ -372,7 +372,7 @@
       <item row="0" column="1">
        <widget class="QDoubleSpinBox" name="temperatureBias">
         <property name="suffix">
-         <string> °C</string>
+         <string>°C</string>
         </property>
         <property name="minimum">
          <double>-5.000000000000000</double>

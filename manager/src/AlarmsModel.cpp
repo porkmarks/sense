@@ -141,8 +141,8 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
             QString str;
             if (descriptor.lowTemperatureWatch)
             {
-                str += QString("&lt; <font color=\"#%2\">%1 °C</font>").arg(descriptor.lowTemperatureHard, 0, 'f', 1).arg(utils::k_lowThresholdHardColor, 0, 16);
-                str += QString("<br>&lt; <font color=\"#%2\">%1 °C</font>").arg(descriptor.lowTemperatureSoft, 0, 'f', 1).arg(utils::k_lowThresholdSoftColor, 0, 16);
+                str += QString("&lt; <font color=\"#%2\">%1°C</font>").arg(descriptor.lowTemperatureHard, 0, 'f', 1).arg(utils::k_lowThresholdHardColor, 0, 16);
+                str += QString("<br>&lt; <font color=\"#%2\">%1°C</font>").arg(descriptor.lowTemperatureSoft, 0, 'f', 1).arg(utils::k_lowThresholdSoftColor, 0, 16);
             }
             if (descriptor.highTemperatureWatch)
             {
@@ -150,8 +150,8 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
                 {
                     str += "<br>";
                 }
-				str += QString("&gt; <font color=\"#%2\">%1 °C</font>").arg(descriptor.highTemperatureSoft, 0, 'f', 1).arg(utils::k_highThresholdSoftColor, 0, 16);
-				str += QString("<br>&gt; <font color=\"#%2\">%1 °C</font>").arg(descriptor.highTemperatureHard, 0, 'f', 1).arg(utils::k_highThresholdHardColor, 0, 16);
+				str += QString("&gt; <font color=\"#%2\">%1°C</font>").arg(descriptor.highTemperatureSoft, 0, 'f', 1).arg(utils::k_highThresholdSoftColor, 0, 16);
+				str += QString("<br>&gt; <font color=\"#%2\">%1°C</font>").arg(descriptor.highTemperatureHard, 0, 'f', 1).arg(utils::k_highThresholdHardColor, 0, 16);
             }
             return str;
         }
@@ -160,8 +160,8 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
 			QString str;
 			if (descriptor.lowHumidityWatch)
 			{
-				str += QString("&lt; <font color=\"#%2\">%1 %RH</font>").arg(descriptor.lowHumidityHard, 0, 'f', 1).arg(utils::k_lowThresholdHardColor, 0, 16);
-				str += QString("<br>&lt; <font color=\"#%2\">%1 %RH</font>").arg(descriptor.lowHumiditySoft, 0, 'f', 1).arg(utils::k_lowThresholdSoftColor, 0, 16);
+				str += QString("&lt; <font color=\"#%2\">%1%</font>").arg(descriptor.lowHumidityHard, 0, 'f', 1).arg(utils::k_lowThresholdHardColor, 0, 16);
+				str += QString("<br>&lt; <font color=\"#%2\">%1%</font>").arg(descriptor.lowHumiditySoft, 0, 'f', 1).arg(utils::k_lowThresholdSoftColor, 0, 16);
 			}
 			if (descriptor.highHumidityWatch)
 			{
@@ -169,8 +169,8 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
 				{
 					str += "<br>";
 				}
-				str += QString("&gt; <font color=\"#%2\">%1 %RH</font>").arg(descriptor.highHumiditySoft, 0, 'f', 1).arg(utils::k_highThresholdSoftColor, 0, 16);
-				str += QString("<br>&gt; <font color=\"#%2\">%1 %RH</font>").arg(descriptor.highHumidityHard, 0, 'f', 1).arg(utils::k_highThresholdHardColor, 0, 16);
+				str += QString("&gt; <font color=\"#%2\">%1%</font>").arg(descriptor.highHumiditySoft, 0, 'f', 1).arg(utils::k_highThresholdSoftColor, 0, 16);
+				str += QString("<br>&gt; <font color=\"#%2\">%1%</font>").arg(descriptor.highHumidityHard, 0, 'f', 1).arg(utils::k_highThresholdHardColor, 0, 16);
 			}
 			return str;
         }

@@ -33,6 +33,8 @@ extern Logger s_logger;
 
 Settings::Settings()
 {
+	qRegisterMetaType<UserId>("UserId");
+
     m_db = std::unique_ptr<DB>(new DB());
     m_emailer.reset(new Emailer(*this, *m_db));
 }

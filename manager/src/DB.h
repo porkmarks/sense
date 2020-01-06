@@ -132,6 +132,7 @@ public:
         MeasurementId id = 0;
         MeasurementDescriptor descriptor;
         Clock::time_point timePoint;
+        Clock::time_point receivedTimePoint;
         uint32_t alarmTriggers = 0;
     };
 

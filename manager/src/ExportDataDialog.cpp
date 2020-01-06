@@ -344,7 +344,7 @@ bool ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount, bool show
             stream << std::fixed << std::setprecision(decimalPlaces) << m.descriptor.temperature;
             if (unitsFormat == UnitsFormat::Embedded)
             {
-                stream << " °C";
+                stream << "°C";
             }
             stream << separator;
             if (unitsFormat == UnitsFormat::SeparateColumn)
@@ -358,12 +358,12 @@ bool ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount, bool show
             stream << std::fixed << std::setprecision(decimalPlaces) << m.descriptor.humidity;
             if (unitsFormat == UnitsFormat::Embedded)
             {
-                stream << " %RH";
+                stream << "%";
             }
             stream << separator;
             if (unitsFormat == UnitsFormat::SeparateColumn)
             {
-                stream << "%RH";
+                stream << "%";
                 stream << separator;
             }
         }
@@ -372,7 +372,7 @@ bool ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount, bool show
             stream << std::fixed << std::setprecision(decimalPlaces) << utils::getBatteryLevel(m.descriptor.vcc) * 100.f;
             if (unitsFormat == UnitsFormat::Embedded)
             {
-                stream << " %";
+                stream << "%";
             }
             stream << separator;
             if (unitsFormat == UnitsFormat::SeparateColumn)
@@ -386,7 +386,7 @@ bool ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount, bool show
             stream << std::fixed << std::setprecision(decimalPlaces) << utils::getSignalLevel(std::min(m.descriptor.signalStrength.s2b, m.descriptor.signalStrength.b2s)) * 100.f;
             if (unitsFormat == UnitsFormat::Embedded)
             {
-                stream << " %";
+                stream << "%";
             }
             stream << separator;
             if (unitsFormat == UnitsFormat::SeparateColumn)

@@ -419,7 +419,7 @@ void PlotWidget::createPlotWidgets()
         }
         {
             m_plot->yAxis2->setTickLabelFont(font);
-            m_plot->yAxis2->setLabel("%RH");
+            m_plot->yAxis2->setLabel("%");
             m_plot->yAxis2->setNumberFormat("gb");
             m_plot->yAxis2->ticker()->setTickStepStrategy(QCPAxisTicker::TickStepStrategy::tssReadability);
             m_plot->yAxis2->ticker()->setTickCount(20);
@@ -620,7 +620,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
             //pen.setWidth(2);
             pen.setColor(color);
             graph->setPen(pen);
-            graph->setName(QString("%1 °C").arg(graphData.sensor.descriptor.name.c_str()));
+            graph->setName(QString("%1°C").arg(graphData.sensor.descriptor.name.c_str()));
 
             QVector<double> const& keys = graphData.temperatureKeys;
             QVector<double> const& values = graphData.temperatureValues;
@@ -636,7 +636,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
             pen.setColor(color);
             pen.setStyle(Qt::DotLine);
             graph->setPen(pen);
-            graph->setName(QString("%1 %RH").arg(graphData.sensor.descriptor.name.c_str()));
+            graph->setName(QString("%1%").arg(graphData.sensor.descriptor.name.c_str()));
 
             QVector<double> const& keys = graphData.humidityKeys;
             QVector<double> const& values = graphData.humidityValues;
@@ -896,7 +896,7 @@ void PlotWidget::createAnnotation(DB::SensorId sensorId, QPointF point, double k
     dt.setSecsSinceEpoch(static_cast<int64_t>(key));
     if (temperature)
     {
-        m_annotation.toolTip->setText(graph, QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Temperature: <b>%3 °C</b>")
+        m_annotation.toolTip->setText(graph, QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Temperature: <b>%3&deg;C</b>")
                                       .arg(sensor.descriptor.name.c_str())
                                       .arg(dt.toString("dd-MM-yyyy h:mm"))
                                       .arg(value, 0, 'f', 1)
@@ -904,7 +904,7 @@ void PlotWidget::createAnnotation(DB::SensorId sensorId, QPointF point, double k
     }
     else
     {
-        m_annotation.toolTip->setText(graph, QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Humidity: <b>%3 %RH</b>")
+        m_annotation.toolTip->setText(graph, QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Humidity: <b>%3%</b>")
                                       .arg(sensor.descriptor.name.c_str())
                                       .arg(dt.toString("dd-MM-yyyy h:mm"))
                                       .arg(value, 0, 'f', 1)

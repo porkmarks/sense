@@ -92,7 +92,7 @@
          <item>
           <widget class="QDoubleSpinBox" name="humidityRW">
            <property name="suffix">
-            <string> % RH</string>
+            <string>%</string>
            </property>
            <property name="decimals">
             <number>1</number>
@@ -267,7 +267,7 @@
          <item>
           <widget class="QDoubleSpinBox" name="temperatureRW">
            <property name="suffix">
-            <string> °C</string>
+            <string>°C</string>
            </property>
            <property name="decimals">
             <number>1</number>
@@ -379,8 +379,8 @@
    <slot>accept()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>259</x>
-     <y>866</y>
+     <x>265</x>
+     <y>244</y>
     </hint>
     <hint type="destinationlabel">
      <x>157</x>
@@ -395,8 +395,8 @@
    <slot>reject()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>327</x>
-     <y>866</y>
+     <x>295</x>
+     <y>244</y>
     </hint>
     <hint type="destinationlabel">
      <x>286</x>
