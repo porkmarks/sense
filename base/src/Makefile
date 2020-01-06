@@ -11,7 +11,7 @@ SRCS	:= ../src/main.cpp \
 	../../sensor/firmware/Radio.cpp \
 	../../sensor/firmware/Storage.cpp \
 	../../sensor/firmware/CRC.cpp \
-	../../common/src/spi.cpp \
+	../../sensor/firmware/spi_rpi.cpp \
 	../src/pigpio.c \
 	../src/command.c
 
