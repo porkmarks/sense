@@ -11,6 +11,56 @@ ConfigureAlarmDialog::ConfigureAlarmDialog(DB& db, QWidget* parent)
     m_ui.setupUi(this);
     m_ui.sensorFilter->init(db);
 
+    connect(m_ui.highTemperatureHard, &QDoubleSpinBox::editingFinished, this, [this]() 
+    {
+        m_ui.highTemperatureSoft->setValue(std::min(m_ui.highTemperatureSoft->value(), m_ui.highTemperatureHard->value()));
+		m_ui.lowTemperatureSoft->setValue(std::min(m_ui.lowTemperatureSoft->value(), m_ui.highTemperatureSoft->value() - 1.f));
+		m_ui.lowTemperatureHard->setValue(std::min(m_ui.lowTemperatureHard->value(), m_ui.lowTemperatureSoft->value()));
+    });
+	connect(m_ui.highTemperatureSoft, &QDoubleSpinBox::editingFinished, this, [this]()
+	{
+        m_ui.highTemperatureHard->setValue(std::max(m_ui.highTemperatureHard->value(), m_ui.highTemperatureSoft->value()));
+		m_ui.lowTemperatureSoft->setValue(std::min(m_ui.lowTemperatureSoft->value(), m_ui.highTemperatureSoft->value() - 1.f));
+		m_ui.lowTemperatureHard->setValue(std::min(m_ui.lowTemperatureHard->value(), m_ui.lowTemperatureSoft->value()));
+	});
+	connect(m_ui.lowTemperatureSoft, &QDoubleSpinBox::editingFinished, this, [this]()
+	{
+		m_ui.lowTemperatureHard->setValue(std::min(m_ui.lowTemperatureHard->value(), m_ui.lowTemperatureSoft->value()));
+		m_ui.highTemperatureSoft->setValue(std::max(m_ui.highTemperatureSoft->value(), m_ui.lowTemperatureSoft->value() + 1.f));
+		m_ui.highTemperatureHard->setValue(std::max(m_ui.highTemperatureHard->value(), m_ui.highTemperatureSoft->value()));
+	});
+	connect(m_ui.lowTemperatureHard, &QDoubleSpinBox::editingFinished, this, [this]()
+	{
+		m_ui.lowTemperatureSoft->setValue(std::max(m_ui.lowTemperatureSoft->value(), m_ui.lowTemperatureHard->value()));
+		m_ui.highTemperatureSoft->setValue(std::max(m_ui.highTemperatureSoft->value(), m_ui.lowTemperatureSoft->value() + 1.f));
+		m_ui.highTemperatureHard->setValue(std::max(m_ui.highTemperatureHard->value(), m_ui.highTemperatureSoft->value()));
+	});
+
+	connect(m_ui.highHumidityHard, &QDoubleSpinBox::editingFinished, this, [this]()
+	{
+		m_ui.highHumiditySoft->setValue(std::min(m_ui.highHumiditySoft->value(), m_ui.highHumidityHard->value()));
+		m_ui.lowHumiditySoft->setValue(std::min(m_ui.lowHumiditySoft->value(), m_ui.highHumiditySoft->value() - 1.f));
+		m_ui.lowHumidityHard->setValue(std::min(m_ui.lowHumidityHard->value(), m_ui.lowHumiditySoft->value()));
+	});
+	connect(m_ui.highHumiditySoft, &QDoubleSpinBox::editingFinished, this, [this]()
+	{
+		m_ui.highHumidityHard->setValue(std::max(m_ui.highHumidityHard->value(), m_ui.highHumiditySoft->value()));
+		m_ui.lowHumiditySoft->setValue(std::min(m_ui.lowHumiditySoft->value(), m_ui.highHumiditySoft->value() - 1.f));
+		m_ui.lowHumidityHard->setValue(std::min(m_ui.lowHumidityHard->value(), m_ui.lowHumiditySoft->value()));
+	});
+	connect(m_ui.lowHumiditySoft, &QDoubleSpinBox::editingFinished, this, [this]()
+	{
+		m_ui.lowHumidityHard->setValue(std::min(m_ui.lowHumidityHard->value(), m_ui.lowHumiditySoft->value()));
+		m_ui.highHumiditySoft->setValue(std::max(m_ui.highHumiditySoft->value(), m_ui.lowHumiditySoft->value() + 1.f));
+		m_ui.highHumidityHard->setValue(std::max(m_ui.highHumidityHard->value(), m_ui.highHumiditySoft->value()));
+	});
+	connect(m_ui.lowHumidityHard, &QDoubleSpinBox::editingFinished, this, [this]()
+	{
+		m_ui.lowHumiditySoft->setValue(std::max(m_ui.lowHumiditySoft->value(), m_ui.lowHumidityHard->value()));
+		m_ui.highHumiditySoft->setValue(std::max(m_ui.highHumiditySoft->value(), m_ui.lowHumiditySoft->value() + 1.f));
+		m_ui.highHumidityHard->setValue(std::max(m_ui.highHumidityHard->value(), m_ui.highHumiditySoft->value()));
+	});
+
     adjustSize();
     loadSettings();
 }
@@ -81,14 +131,18 @@ void ConfigureAlarmDialog::setAlarm(DB::Alarm const& alarm)
     }
 
     m_ui.highTemperatureWatch->setChecked(descriptor.highTemperatureWatch);
-    m_ui.highTemperature->setValue(descriptor.highTemperature);
+    m_ui.highTemperatureSoft->setValue(descriptor.highTemperatureSoft);
+    m_ui.highTemperatureHard->setValue(descriptor.highTemperatureHard);
     m_ui.lowTemperatureWatch->setChecked(descriptor.lowTemperatureWatch);
-    m_ui.lowTemperature->setValue(descriptor.lowTemperature);
+    m_ui.lowTemperatureSoft->setValue(descriptor.lowTemperatureSoft);
+    m_ui.lowTemperatureHard->setValue(descriptor.lowTemperatureHard);
 
     m_ui.highHumidityWatch->setChecked(descriptor.highHumidityWatch);
-    m_ui.highHumidity->setValue(descriptor.highHumidity);
+    m_ui.highHumiditySoft->setValue(descriptor.highHumiditySoft);
+    m_ui.highHumidityHard->setValue(descriptor.highHumidityHard);
     m_ui.lowHumidityWatch->setChecked(descriptor.lowHumidityWatch);
-    m_ui.lowHumidity->setValue(descriptor.lowHumidity);
+    m_ui.lowHumiditySoft->setValue(descriptor.lowHumiditySoft);
+    m_ui.lowHumidityHard->setValue(descriptor.lowHumidityHard);
 
     m_ui.lowSignalWatch->setChecked(descriptor.lowSignalWatch);
     m_ui.lowBatteryWatch->setChecked(descriptor.lowVccWatch);
@@ -137,14 +191,18 @@ void ConfigureAlarmDialog::accept()
     }
 
     descriptor.highTemperatureWatch = m_ui.highTemperatureWatch->isChecked();
-    descriptor.highTemperature = static_cast<float>(m_ui.highTemperature->value());
+    descriptor.highTemperatureSoft = static_cast<float>(m_ui.highTemperatureSoft->value());
+    descriptor.highTemperatureHard = static_cast<float>(m_ui.highTemperatureHard->value());
     descriptor.lowTemperatureWatch = m_ui.lowTemperatureWatch->isChecked();
-    descriptor.lowTemperature = static_cast<float>(m_ui.lowTemperature->value());
+    descriptor.lowTemperatureSoft = static_cast<float>(m_ui.lowTemperatureSoft->value());
+    descriptor.lowTemperatureHard = static_cast<float>(m_ui.lowTemperatureHard->value());
 
     descriptor.highHumidityWatch = m_ui.highHumidityWatch->isChecked();
-    descriptor.highHumidity = static_cast<float>(m_ui.highHumidity->value());
+    descriptor.highHumiditySoft = static_cast<float>(m_ui.highHumiditySoft->value());
+    descriptor.highHumidityHard = static_cast<float>(m_ui.highHumidityHard->value());
     descriptor.lowHumidityWatch = m_ui.lowHumidityWatch->isChecked();
-    descriptor.lowHumidity = static_cast<float>(m_ui.lowHumidity->value());
+    descriptor.lowHumiditySoft = static_cast<float>(m_ui.lowHumiditySoft->value());
+    descriptor.lowHumidityHard = static_cast<float>(m_ui.lowHumidityHard->value());
 
     descriptor.lowSignalWatch = m_ui.lowSignalWatch->isChecked();
     descriptor.lowVccWatch = m_ui.lowBatteryWatch->isChecked();

@@ -195,7 +195,7 @@
        <number>0</number>
       </property>
       <item>
-       <widget class="QTreeView" name="list">
+       <widget class="TreeView" name="list">
         <property name="alternatingRowColors">
          <bool>true</bool>
         </property>
@@ -215,6 +215,11 @@
    <extends>QWidget</extends>
    <header>DateTimeFilterWidget.h</header>
    <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>TreeView</class>
+   <extends>QTreeView</extends>
+   <header>TreeView.h</header>
   </customwidget>
  </customwidgets>
  <tabstops>

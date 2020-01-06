@@ -408,7 +408,7 @@ void Comms::processSensorReq(InitializedBaseStation& cbs, SensorRequest const& r
 }
 
 
-static void fillConfig(data::sensor::Config_Response& config, DB::SensorsConfig const& sensorsConfig, DB::Sensor const& sensor, DB::SensorOutputDetails const& sensorOutputDetails, DB::Sensor::Calibration const& reportedCalibration)
+static void fillConfig(data::sensor::Config_Response& config, DB::SensorSettings const& sensorSettings, DB::Sensor const& sensor, DB::SensorOutputDetails const& sensorOutputDetails, DB::Sensor::Calibration const& reportedCalibration)
 {
     DB::Clock::time_point now = DB::Clock::now();
 
@@ -427,7 +427,7 @@ static void fillConfig(data::sensor::Config_Response& config, DB::SensorsConfig 
     config.last_confirmed_measurement_index = sensor.lastConfirmedMeasurementIndex;
     config.calibration.temperature_bias = static_cast<int16_t>((sensor.calibration.temperatureBias) * 100.f);
     config.calibration.humidity_bias = static_cast<int16_t>((sensor.calibration.humidityBias) * 100.f);
-    config.power = sensorsConfig.descriptor.sensorsPower;
+    config.power = sensorSettings.radioPower;
     config.sleeping = sensor.shouldSleep;
 }
 
@@ -524,13 +524,13 @@ void Comms::processSensorReq_ConfigRequest(InitializedBaseStation& cbs, SensorRe
     DB::SensorInputDetails details = createSensorInputDetails(sensor, configRequest);
     cbs.db.setSensorInputDetails(details);
 
-    DB::SensorsConfig const& sensorsConfig = cbs.db.getLastSensorsConfig();
+	DB::SensorSettings const& sensorSettings = cbs.db.getSensorSettings();
     DB::SensorOutputDetails outputDetails = cbs.db.computeSensorOutputDetails(sensor.id);
     DB::Sensor::Calibration reportedCalibration{ static_cast<float>(configRequest.calibration.temperature_bias) / 100.f,
                 static_cast<float>(configRequest.calibration.humidity_bias) / 100.f};
 
     data::sensor::Config_Response response;
-    fillConfig(response, sensorsConfig, sensor, outputDetails, reportedCalibration);
+	fillConfig(response, sensorSettings, sensor, outputDetails, reportedCalibration);
 
     sendSensorResponse(cbs, request, data::sensor::Type::CONFIG_RESPONSE, request.address, response);
 
@@ -572,9 +572,9 @@ void Comms::processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, Sen
     cbs.db.setSensorInputDetails(details);
 
     {
-        DB::SensorsConfig const& sensorsConfig = cbs.db.getLastSensorsConfig();
+		DB::SensorSettings const& sensorSettings = cbs.db.getSensorSettings();
         DB::SensorOutputDetails outputDetails = cbs.db.computeSensorOutputDetails(sensor.id);
-        fillConfig(response, sensorsConfig, sensor, outputDetails, sensor.calibration);
+		fillConfig(response, sensorSettings, sensor, outputDetails, sensor.calibration);
     }
 
     sendSensorResponse(cbs, request, data::sensor::Type::FIRST_CONFIG_RESPONSE, request.address, response);

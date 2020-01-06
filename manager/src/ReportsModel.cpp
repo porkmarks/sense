@@ -153,7 +153,7 @@ QVariant ReportsModel::data(QModelIndex const& index, int role) const
     }
     else if (role == Qt::DecorationRole)
     {
-        if (column == Column::Id)
+        if (column == Column::Name)
         {
             return QIcon(":/icons/ui/report.png");
         }

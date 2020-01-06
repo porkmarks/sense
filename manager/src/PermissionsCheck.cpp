@@ -23,8 +23,8 @@ bool adminCheck(Settings& settings, QWidget* parent)
     QDialog dialog(parent);
     Ui::LoginDialog ui;
     ui.setupUi(&dialog);
-    ui.info->setText("The operation you're trying to do needs a user with more permissions or an admin.\nPlease login again to proceed, or press cancel to go back.");
-    dialog.setWindowTitle("Login");
+    ui.info->setText("The operation you're trying to do needs a user with more permissions or an admin.\nNOTE: you will not be logged out after this. This test is for the current operation only.");
+    dialog.setWindowTitle("Admin Credentials Needed");
     dialog.adjustSize();
 
     int result = dialog.exec();

@@ -3,8 +3,9 @@
 #include <array>
 #include <QWidget>
 #include <QIcon>
+#include "Utils.h"
 
-static std::array<const char*, 8> s_headerNames = {"Id", "Name", "Temperature", "Humidity", "Low Battery", "Low Signal", "Action"};
+static std::array<const char*, 8> s_headerNames = {"Id", "Name", "Temperature", "Humidity", "Low Battery", "Low Signal"};
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -140,41 +141,38 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
             QString str;
             if (descriptor.lowTemperatureWatch)
             {
-                str += QString("< %1 °C").arg(descriptor.lowTemperature, 0, 'f', 1);
+                str += QString("&lt; <font color=\"#%2\">%1 °C</font>").arg(descriptor.lowTemperatureHard, 0, 'f', 1).arg(utils::k_lowThresholdHardColor, 0, 16);
+                str += QString("<br>&lt; <font color=\"#%2\">%1 °C</font>").arg(descriptor.lowTemperatureSoft, 0, 'f', 1).arg(utils::k_lowThresholdSoftColor, 0, 16);
             }
             if (descriptor.highTemperatureWatch)
             {
                 if (!str.isEmpty())
                 {
-                    str += " and ";
+                    str += "<br>";
                 }
-                str += QString("> %1 °C").arg(descriptor.highTemperature, 0, 'f', 1);
+				str += QString("&gt; <font color=\"#%2\">%1 °C</font>").arg(descriptor.highTemperatureSoft, 0, 'f', 1).arg(utils::k_highThresholdSoftColor, 0, 16);
+				str += QString("<br>&gt; <font color=\"#%2\">%1 °C</font>").arg(descriptor.highTemperatureHard, 0, 'f', 1).arg(utils::k_highThresholdHardColor, 0, 16);
             }
             return str;
         }
         else if (column == Column::Humidity)
         {
-            QString str;
-            if (descriptor.lowHumidityWatch)
-            {
-                str += QString("< %1 %RH").arg(descriptor.lowHumidity, 0, 'f', 1);
-            }
-            if (descriptor.highHumidityWatch)
-            {
-                if (!str.isEmpty())
-                {
-                    str += " and ";
-                }
-                str += QString("> %1 %RH").arg(descriptor.highHumidity, 0, 'f', 1);
-            }
-            return str;
-        }
-        else if (column == Column::Action)
-        {
-            if (descriptor.sendEmailAction)
-            {
-                return "Send Email";
-            }
+			QString str;
+			if (descriptor.lowHumidityWatch)
+			{
+				str += QString("&lt; <font color=\"#%2\">%1 %RH</font>").arg(descriptor.lowHumidityHard, 0, 'f', 1).arg(utils::k_lowThresholdHardColor, 0, 16);
+				str += QString("<br>&lt; <font color=\"#%2\">%1 %RH</font>").arg(descriptor.lowHumiditySoft, 0, 'f', 1).arg(utils::k_lowThresholdSoftColor, 0, 16);
+			}
+			if (descriptor.highHumidityWatch)
+			{
+				if (!str.isEmpty())
+				{
+					str += "<br>";
+				}
+				str += QString("&gt; <font color=\"#%2\">%1 %RH</font>").arg(descriptor.highHumiditySoft, 0, 'f', 1).arg(utils::k_highThresholdSoftColor, 0, 16);
+				str += QString("<br>&gt; <font color=\"#%2\">%1 %RH</font>").arg(descriptor.highHumidityHard, 0, 'f', 1).arg(utils::k_highThresholdHardColor, 0, 16);
+			}
+			return str;
         }
     }
     else if (role == Qt::DecorationRole)
@@ -198,13 +196,6 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
         else if (column == Column::LowSignal && descriptor.lowSignalWatch)
         {
             return QIcon(":/icons/ui/signal-0.png");
-        }
-        else if (column == Column::Action)
-        {
-            if (descriptor.sendEmailAction)
-            {
-                return QIcon(":/icons/ui/email.png");
-            }
         }
     }
 

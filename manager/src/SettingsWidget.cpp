@@ -14,7 +14,7 @@ extern std::pair<std::string, int32_t> computeDurationString(DB::Clock::duration
 DB::Clock::duration computeBatteryLife(float capacity, DB::Clock::duration measurementPeriod, DB::Clock::duration commsPeriod, float power, uint8_t hardwareVersion)
 {
     float idleMAh = 0.01f;
-    float powerMu = std::min(std::max(float(power), 0.f), 20.f) / 20.f;
+    float powerMu = std::clamp(power, -3.f, 17.f) / 20.f;
     float commsMAh = 0;
     float measurementMAh = 0;
     if (hardwareVersion == 3)
@@ -60,6 +60,9 @@ SettingsWidget::SettingsWidget(QWidget *parent)
 {
     m_ui.setupUi(this);
     //setEnabled(false);
+
+	m_ui.batteryIcon->setPixmap(QIcon(":/icons/ui/battery-0.png").pixmap(24, 24));
+	m_ui.signalStrengthIcon->setPixmap(QIcon(":/icons/ui/signal-0.png").pixmap(24, 24));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -83,12 +86,9 @@ void SettingsWidget::init(Comms& comms, Settings& settings)
     m_settings = &settings;
     m_db = nullptr;
 
-    m_ui.baseStationsWidget->init(comms, settings);
-    m_ui.usersWidget->init(settings);
-
     m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &SettingsWidget::setPermissions));
 
-    m_uiConnections.push_back(connect(m_ui.sensorsPower, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
+    m_uiConnections.push_back(connect(m_ui.radioPower, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
     m_uiConnections.push_back(connect(m_ui.sensorsMeasurementPeriod, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
     m_uiConnections.push_back(connect(m_ui.sensorsCommsPeriod, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
     m_uiConnections.push_back(connect(m_ui.batteryCapacity, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
@@ -101,27 +101,28 @@ void SettingsWidget::init(Comms& comms, Settings& settings)
 	m_uiConnections.push_back(connect(m_ui.emailSmtpProviderPreset, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &SettingsWidget::emailSmtpProviderPresetChanged));
     m_uiConnections.push_back(connect(m_ui.emailAddRecipient, &QPushButton::released, this, &SettingsWidget::addEmailRecipient));
     m_uiConnections.push_back(connect(m_ui.emailRemoveRecipient, &QPushButton::released, this, &SettingsWidget::removeEmailRecipient));
-    m_uiConnections.push_back(connect(m_ui.emailApply, &QPushButton::released, this, &SettingsWidget::applyEmailSettings));
-    m_uiConnections.push_back(connect(m_ui.emailReset, &QPushButton::released, [this]() { setEmailSettings(m_settings->getEmailSettings()); }));
+    //m_uiConnections.push_back(connect(m_ui.emailApply, &QPushButton::released, this, &SettingsWidget::applyEmailSettings));
+    //m_uiConnections.push_back(connect(m_ui.emailReset, &QPushButton::released, [this]() { setEmailSettings(m_settings->getEmailSettings()); }));
     m_uiConnections.push_back(connect(m_ui.emailTest, &QPushButton::released, this, &SettingsWidget::sendTestEmail));
 
-    m_uiConnections.push_back(connect(m_ui.ftpApply, &QPushButton::released, this, &SettingsWidget::applyFtpSettings));
-    m_uiConnections.push_back(connect(m_ui.ftpReset, &QPushButton::released, [this]() { setFtpSettings(m_settings->getFtpSettings()); }));
+    //m_uiConnections.push_back(connect(m_ui.ftpApply, &QPushButton::released, this, &SettingsWidget::applyFtpSettings));
+    //m_uiConnections.push_back(connect(m_ui.ftpReset, &QPushButton::released, [this]() { setFtpSettings(m_settings->getFtpSettings()); }));
     m_uiConnections.push_back(connect(m_ui.ftpTest, &QPushButton::released, this, &SettingsWidget::testFtpSettings));
 
-    m_uiConnections.push_back(connect(m_ui.sensorsApply, &QPushButton::released, this, &SettingsWidget::applySensorsConfig));
-    m_uiConnections.push_back(connect(m_ui.sensorsReset, &QPushButton::released, [this]() { if (m_db) setSensorsConfig(m_db->getLastSensorsConfig()); }));
-    m_uiConnections.push_back(connect(m_ui.list, &QTreeWidget::currentItemChanged, [this](QTreeWidgetItem* current, QTreeWidgetItem* previous)
-    {
-        m_ui.stackedWidget->setCurrentIndex(m_ui.list->indexOfTopLevelItem(current));
-    }));
-    m_ui.list->setCurrentItem(m_ui.list->topLevelItem(0));
+    //m_uiConnections.push_back(connect(m_ui.sensorsApply, &QPushButton::released, this, &SettingsWidget::applySensorTimeConfig));
+    //m_uiConnections.push_back(connect(m_ui.sensorsReset, &QPushButton::released, [this]() { if (m_db) setSensorTimeConfig(m_db->getLastSensorTimeConfig()); }));
+//     m_uiConnections.push_back(connect(m_ui.list, &QTreeWidget::currentItemChanged, [this](QTreeWidgetItem* current, QTreeWidgetItem* previous)
+//     {
+//         m_ui.stackedWidget->setCurrentIndex(m_ui.list->indexOfTopLevelItem(current));
+//     }));
+//     m_ui.list->setCurrentItem(m_ui.list->topLevelItem(0));
 
     m_db = &m_settings->getDB();
-    m_ui.reportsWidget->init(*m_settings);
 
-    setSensorsConfig(m_db->getLastSensorsConfig());
-    m_dbConnections.push_back(connect(m_db, &DB::sensorsConfigChanged, [this]() { if (m_db) setSensorsConfig(m_db->getLastSensorsConfig()); }));
+    setSensorSettings(m_db->getSensorSettings());
+    setSensorTimeConfig(m_db->getLastSensorTimeConfig());
+    m_dbConnections.push_back(connect(m_db, &DB::sensorSettingsChanged, [this]() { if (m_db) setSensorSettings(m_db->getSensorSettings()); }));
+    m_dbConnections.push_back(connect(m_db, &DB::sensorTimeConfigChanged, [this]() { if (m_db) setSensorTimeConfig(m_db->getLastSensorTimeConfig()); }));
 
     setPermissions();
 }
@@ -139,19 +140,28 @@ void SettingsWidget::shutdown()
         QObject::disconnect(connection);
     }
     m_dbConnections.clear();
+}
 
-//    m_ui.baseStationsWidget->shutdown();
-    m_ui.usersWidget->shutdown();
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::save()
+{
+    applyEmailSettings();
+    applyFtpSettings();
+    applySensorTimeConfig();
+    applySensorSettings();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void SettingsWidget::setPermissions()
 {
-	m_ui.emailPage->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeEmailSettings));
-    m_ui.ftpPage->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeFtpSettings));
-	m_ui.sensorsPower->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensors));
+	m_ui.emailTab->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeEmailSettings));
+    m_ui.ftpTab->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeFtpSettings));
 	m_ui.batteryCapacity->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensors));
+	m_ui.radioPower->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensors));
+	m_ui.batteryAlertThreshold->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensors));
+	m_ui.signalStrengthAlertThreshold->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensors));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -586,22 +596,20 @@ void SettingsWidget::testFtpSettings()
 
 //////////////////////////////////////////////////////////////////////////
 
-void SettingsWidget::setSensorsConfig(DB::SensorsConfig const& config)
+void SettingsWidget::setSensorTimeConfig(DB::SensorTimeConfig const& config)
 {
     m_ui.sensorsMeasurementPeriod->setValue(std::chrono::duration<float>(config.descriptor.measurementPeriod).count() / 60.f);
     m_ui.sensorsCommsPeriod->setValue(std::chrono::duration<float>(config.descriptor.commsPeriod).count() / 60.f);
     m_ui.sensorsComputedCommsPeriod->setText(QString("%1 minutes").arg(std::chrono::duration<float>(config.computedCommsPeriod).count() / 60.f, 0, 'f', 1));
-    m_ui.sensorsPower->setValue(config.descriptor.sensorsPower);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-Result<DB::SensorsConfigDescriptor> SettingsWidget::getSensorsConfig() const
+Result<DB::SensorTimeConfigDescriptor> SettingsWidget::getSensorTimeConfig() const
 {
-    DB::SensorsConfigDescriptor descriptor;
+    DB::SensorTimeConfigDescriptor descriptor;
     descriptor.measurementPeriod = std::chrono::seconds(static_cast<size_t>(m_ui.sensorsMeasurementPeriod->value() * 60.0));
     descriptor.commsPeriod = std::chrono::seconds(static_cast<size_t>(m_ui.sensorsCommsPeriod->value() * 60.0));
-    descriptor.sensorsPower = static_cast<int8_t>(m_ui.sensorsPower->value());
 
     if (descriptor.commsPeriod.count() == 0)
     {
@@ -620,27 +628,72 @@ Result<DB::SensorsConfigDescriptor> SettingsWidget::getSensorsConfig() const
 
 //////////////////////////////////////////////////////////////////////////
 
-void SettingsWidget::applySensorsConfig()
+void SettingsWidget::applySensorTimeConfig()
 {
     if (!m_db)
     {
         return;
     }
 
-    Result<DB::SensorsConfigDescriptor> result = getSensorsConfig();
+    Result<DB::SensorTimeConfigDescriptor> result = getSensorTimeConfig();
     if (result != success)
     {
         QMessageBox::critical(this, "Error", result.error().what().c_str());
         return;
     }
 
-    Result<void> applyResult = m_db->addSensorsConfig(result.payload());
+    Result<void> applyResult = m_db->addSensorTimeConfig(result.payload());
     if (applyResult != success)
     {
         QMessageBox::critical(this, "Error", QString("Cannot set sensor settings: %1").arg(applyResult.error().what().c_str()));
     }
-    setSensorsConfig(m_db->getLastSensorsConfig());
+    setSensorTimeConfig(m_db->getLastSensorTimeConfig());
     computeBatteryLife();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::setSensorSettings(DB::SensorSettings const& settings)
+{
+	m_ui.radioPower->setValue(settings.radioPower);
+    m_ui.batteryAlertThreshold->setValue(std::clamp(settings.alertBatteryLevel * 100.f, 0.f, 100.f));
+    m_ui.signalStrengthAlertThreshold->setValue(std::clamp(settings.alertSignalStrengthLevel * 100.f, 0.f, 100.f));
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+Result<DB::SensorSettings> SettingsWidget::getSensorSettings() const
+{
+    DB::SensorSettings settings = m_db->getSensorSettings();
+	settings.radioPower = static_cast<int8_t>(m_ui.radioPower->value());
+    settings.alertBatteryLevel = std::clamp((float)m_ui.batteryAlertThreshold->value() / 100.f, 0.f, 1.f);
+    settings.alertSignalStrengthLevel = std::clamp((float)m_ui.signalStrengthAlertThreshold->value() / 100.f, 0.f, 1.f);
+    return settings;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::applySensorSettings()
+{
+	if (!m_db)
+	{
+		return;
+	}
+
+	Result<DB::SensorSettings> result = getSensorSettings();
+	if (result != success)
+	{
+		QMessageBox::critical(this, "Error", result.error().what().c_str());
+		return;
+	}
+
+	Result<void> applyResult = m_db->setSensorSettings(result.payload());
+	if (applyResult != success)
+	{
+		QMessageBox::critical(this, "Error", QString("Cannot set sensor settings: %1").arg(applyResult.error().what().c_str()));
+	}
+	setSensorSettings(m_db->getSensorSettings());
+	computeBatteryLife();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -651,23 +704,29 @@ void SettingsWidget::computeBatteryLife()
     {
         return;
     }
-    Result<DB::SensorsConfigDescriptor> result = getSensorsConfig();
-    if (result == success)
+    Result<DB::SensorTimeConfigDescriptor> timeConfigResult = getSensorTimeConfig();
+    if (timeConfigResult != success)
     {
-        DB::SensorsConfigDescriptor descriptor = result.extract_payload();
-        DB::Clock::duration d = ::computeBatteryLife(m_ui.batteryCapacity->value(),
-                                                     descriptor.measurementPeriod,
-                                                     m_db->computeActualCommsPeriod(descriptor),
-                                                     descriptor.sensorsPower,
-                                                     1);
+		m_ui.batteryLife->setText(QString("Error: %1").arg(timeConfigResult.error().what().c_str()));
+        return;
+    }
+	Result<DB::SensorSettings> settingsResult = getSensorSettings();
+	if (settingsResult != success)
+	{
+		m_ui.batteryLife->setText(QString("Error: %1").arg(settingsResult.error().what().c_str()));
+        return;
+	}
 
-        int64_t seconds = std::chrono::duration_cast<std::chrono::seconds>(d).count();
-        int64_t days = seconds / (24 * 3600);
-        m_ui.batteryLife->setText(QString("~%1 days").arg(days));
-    }
-    else
-    {
-        m_ui.batteryLife->setText(QString("Error: %1").arg(result.error().what().c_str()));
-    }
+    DB::SensorTimeConfigDescriptor descriptor = timeConfigResult.extract_payload();
+    DB::SensorSettings settings = settingsResult.extract_payload();
+    DB::Clock::duration d = ::computeBatteryLife(m_ui.batteryCapacity->value(),
+                                                    descriptor.measurementPeriod,
+                                                    m_db->computeActualCommsPeriod(descriptor),
+                                                    settings.radioPower,
+                                                    1);
+
+    int64_t seconds = std::chrono::duration_cast<std::chrono::seconds>(d).count();
+    int64_t days = seconds / (24 * 3600);
+    m_ui.batteryLife->setText(QString("~%1 days").arg(days));
 }
 

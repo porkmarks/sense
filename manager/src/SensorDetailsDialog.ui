@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>731</width>
-    <height>869</height>
+    <width>593</width>
+    <height>583</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -433,7 +433,7 @@
       <item row="0" column="0">
        <widget class="QLabel" name="label_20">
         <property name="text">
-         <string>Type</string>
+         <string>Type:</string>
         </property>
        </widget>
       </item>
@@ -461,7 +461,7 @@
      </property>
      <layout class="QGridLayout" name="gridLayout_2">
       <property name="spacing">
-       <number>6</number>
+       <number>4</number>
       </property>
       <item row="6" column="3">
        <widget class="QLabel" name="resets">

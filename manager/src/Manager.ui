@@ -77,15 +77,6 @@
         <string>Alarms</string>
        </attribute>
       </widget>
-      <widget class="SettingsWidget" name="settingsWidget">
-       <attribute name="icon">
-        <iconset resource="../res/res.qrc">
-         <normaloff>:/icons/ui/setup.png</normaloff>:/icons/ui/setup.png</iconset>
-       </attribute>
-       <attribute name="title">
-        <string>Settings</string>
-       </attribute>
-      </widget>
       <widget class="LogsWidget" name="logsWidget">
        <attribute name="icon">
         <iconset resource="../res/res.qrc">
@@ -123,7 +114,18 @@
     </property>
     <addaction name="actionAbout"/>
    </widget>
+   <widget class="QMenu" name="menuTools">
+    <property name="title">
+     <string>Tools</string>
+    </property>
+    <addaction name="actionUsers"/>
+    <addaction name="actionBaseStations"/>
+    <addaction name="actionReports"/>
+    <addaction name="separator"/>
+    <addaction name="actionSettings"/>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuTools"/>
    <addaction name="menuHelp"/>
   </widget>
   <action name="actionLogout">
@@ -132,6 +134,10 @@
    </property>
   </action>
   <action name="actionExit">
+   <property name="icon">
+    <iconset resource="../res/res.qrc">
+     <normaloff>:/icons/ui/arrow-right.png</normaloff>:/icons/ui/arrow-right.png</iconset>
+   </property>
    <property name="text">
     <string>Exit</string>
    </property>
@@ -139,6 +145,42 @@
   <action name="actionAbout">
    <property name="text">
     <string>About</string>
+   </property>
+  </action>
+  <action name="actionSettings">
+   <property name="icon">
+    <iconset resource="../res/res.qrc">
+     <normaloff>:/icons/ui/setup.png</normaloff>:/icons/ui/setup.png</iconset>
+   </property>
+   <property name="text">
+    <string>Settings</string>
+   </property>
+  </action>
+  <action name="actionUsers">
+   <property name="icon">
+    <iconset resource="../res/res.qrc">
+     <normaloff>:/icons/ui/users.png</normaloff>:/icons/ui/users.png</iconset>
+   </property>
+   <property name="text">
+    <string>Users</string>
+   </property>
+  </action>
+  <action name="actionBaseStations">
+   <property name="icon">
+    <iconset resource="../res/res.qrc">
+     <normaloff>:/icons/ui/station.png</normaloff>:/icons/ui/station.png</iconset>
+   </property>
+   <property name="text">
+    <string>Base Stations</string>
+   </property>
+  </action>
+  <action name="actionReports">
+   <property name="icon">
+    <iconset resource="../res/res.qrc">
+     <normaloff>:/icons/ui/report.png</normaloff>:/icons/ui/report.png</iconset>
+   </property>
+   <property name="text">
+    <string>Automatic Reports</string>
    </property>
   </action>
  </widget>
@@ -165,12 +207,6 @@
    <class>PlotWidget</class>
    <extends>QWidget</extends>
    <header>PlotWidget.h</header>
-   <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>SettingsWidget</class>
-   <extends>QWidget</extends>
-   <header>SettingsWidget.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>

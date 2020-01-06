@@ -212,7 +212,7 @@ std::vector<Logger::LogLine> Logger::getFilteredLogLines(Filter const& filter) c
 
 	{
 		//Logs (id INTEGER PRIMARY KEY AUTOINCREMENT, timePoint DATETIME DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')), type INTEGER, message STRING)
-		std::string sql = "SELECT id, timePoint, type, message FROM Logs WHERE timePoint >= ?1 AND timePoint <= ?2";
+		std::string sql = "SELECT id, datetime(timePoint, 'localtime'), type, message FROM Logs WHERE timePoint >= ?1 AND timePoint <= ?2";
         std::string typeFilter;
         if (filter.allowVerbose)
         {
@@ -265,7 +265,7 @@ std::vector<Logger::LogLine> Logger::getFilteredLogLines(Filter const& filter) c
 		{
 			LogLine line;
 			line.index = sqlite3_column_int64(stmt, 0);
-			line.timePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 1));
+			line.timePoint = Clock::from_time_t(QDateTime::fromString((const char*)sqlite3_column_text(stmt, 1), QString("yyyy-MM-dd HH:mm:ss")).toTime_t());
 			line.type = (Type)sqlite3_column_int(stmt, 2);
 			line.message = (char const*)sqlite3_column_text(stmt, 3);
             result.push_back(std::move(line));

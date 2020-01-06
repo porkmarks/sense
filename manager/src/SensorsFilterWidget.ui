@@ -66,10 +66,17 @@
     </widget>
    </item>
    <item>
-    <widget class="QTreeView" name="list"/>
+    <widget class="TreeView" name="list"/>
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>TreeView</class>
+   <extends>QTreeView</extends>
+   <header>TreeView.h</header>
+  </customwidget>
+ </customwidgets>
  <tabstops>
   <tabstop>selectAll</tabstop>
   <tabstop>selectNone</tabstop>

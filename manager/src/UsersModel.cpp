@@ -126,10 +126,14 @@ QVariant UsersModel::data(QModelIndex const& index, int role) const
     }
     else if (role == Qt::DecorationRole)
     {
-        if (column == Column::Id)
-        {
-            return QIcon(":/icons/ui/user.png");
-        }
+        if (column == Column::Name)
+		{
+			if (user.descriptor.type == Settings::UserDescriptor::Type::Admin)
+			{
+				return QIcon(":/icons/ui/admin.png");
+			}
+			return QIcon(":/icons/ui/users.png");
+		}
     }
 
     return QVariant();

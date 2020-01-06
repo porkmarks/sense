@@ -6,6 +6,10 @@
 
 #include "ui_LoginDialog.h"
 #include "ui_AboutDialog.h"
+#include "ui_SettingsDialog.h"
+#include "ui_BaseStationsDialog.h"
+#include "ui_UsersDialog.h"
+#include "ui_ReportsDialog.h"
 #include "Crypt.h"
 #include "Logger.h"
 #include "Settings.h"
@@ -110,7 +114,7 @@ Manager::Manager(QWidget *parent)
         exit(1);
     }
 
-    m_ui.settingsWidget->init(m_comms, m_settings);
+    //m_ui.settingsWidget->init(m_comms, m_settings);
     m_ui.logsWidget->init();
 
     m_ui.sensorsWidget->init(m_settings);
@@ -129,6 +133,10 @@ Manager::Manager(QWidget *parent)
     timer->start(1);
     connect(timer, &QTimer::timeout, this, &Manager::process, Qt::QueuedConnection);
 
+    connect(m_ui.actionSettings, &QAction::triggered, this, &Manager::showSettingsDialog);
+    connect(m_ui.actionBaseStations, &QAction::triggered, this, &Manager::showBaseStationsDialog);
+    connect(m_ui.actionUsers, &QAction::triggered, this, &Manager::showUsersDialog);
+    connect(m_ui.actionReports, &QAction::triggered, this, &Manager::showReportsDialog);
     connect(m_ui.actionExit, &QAction::triggered, this, &Manager::exitAction);
     connect(m_ui.actionAbout, &QAction::triggered, this, &Manager::showAbout);
     connect(m_ui.actionLogout, &QAction::triggered, this, &Manager::logout);
@@ -141,6 +149,7 @@ Manager::Manager(QWidget *parent)
     show();
 
     connect(&m_settings, &Settings::userLoggedIn, this, &Manager::userLoggedIn);
+    connect(&m_comms, &Comms::baseStationDiscovered, this, &Manager::baseStationDiscovered);
 
     checkIfAdminExists();
 
@@ -295,6 +304,89 @@ void Manager::showAbout()
 
 //////////////////////////////////////////////////////////////////////////
 
+void Manager::showSettingsDialog()
+{
+	QDialog dialog(this);
+	Ui::SettingsDialog ui;
+	ui.setupUi(&dialog);
+	ui.settingsWidget->init(m_comms, m_settings);
+
+	QSettings settings;
+    if (settings.contains("settingsDialogGeometry"))
+	{
+		dialog.restoreGeometry(settings.value("settingsDialogGeometry").toByteArray());
+	}
+
+    if (dialog.exec() == QDialog::Accepted)
+    {
+        ui.settingsWidget->save();
+    }
+
+	settings.setValue("settingsDialogGeometry", dialog.saveGeometry());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Manager::showBaseStationsDialog()
+{
+	QDialog dialog(this);
+	Ui::BaseStationsDialog ui;
+	ui.setupUi(&dialog);
+	ui.baseStationsWidget->init(m_comms, m_settings);
+
+	QSettings settings;
+	if (settings.contains("baseStationsDialogGeometry"))
+	{
+		dialog.restoreGeometry(settings.value("baseStationsDialogGeometry").toByteArray());
+	}
+
+    dialog.exec();
+
+	settings.setValue("baseStationsDialogGeometry", dialog.saveGeometry());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Manager::showUsersDialog()
+{
+	QDialog dialog(this);
+	Ui::UsersDialog ui;
+	ui.setupUi(&dialog);
+	ui.usersWidget->init(m_settings);
+
+	QSettings settings;
+	if (settings.contains("usersDialogGeometry"))
+	{
+		dialog.restoreGeometry(settings.value("usersDialogGeometry").toByteArray());
+	}
+
+	dialog.exec();
+
+	settings.setValue("usersDialogGeometry", dialog.saveGeometry());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Manager::showReportsDialog()
+{
+	QDialog dialog(this);
+	Ui::ReportsDialog ui;
+	ui.setupUi(&dialog);
+	ui.reportsWidget->init(m_settings);
+
+	QSettings settings;
+	if (settings.contains("reportsDialogGeometry"))
+	{
+		dialog.restoreGeometry(settings.value("reportsDialogGeometry").toByteArray());
+	}
+
+	dialog.exec();
+	
+	settings.setValue("reportsDialogGeometry", dialog.saveGeometry());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void Manager::exitAction()
 {
     exit(0);
@@ -315,6 +407,20 @@ void Manager::userLoggedIn(Settings::UserId id)
         Settings::User const& user = m_settings.getUser(index);
         setWindowTitle(QString("Manager (%1)").arg(user.descriptor.name.c_str()));
     }
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Manager::baseStationDiscovered(Comms::BaseStationDescriptor const& commsBS)
+{
+	DB& db = m_settings.getDB();
+	int32_t _bsIndex = db.findBaseStationIndexByMac(commsBS.mac);
+	if (_bsIndex >= 0)
+	{
+		size_t bsIndex = static_cast<size_t>(_bsIndex);
+		DB::BaseStation const& bs = db.getBaseStation(static_cast<size_t>(bsIndex));
+		m_comms.connectToBaseStation(db, bs.descriptor.mac);
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////

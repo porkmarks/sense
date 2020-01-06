@@ -59,7 +59,8 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
     m_sensor = sensor;
     DB::SensorDescriptor descriptor = m_sensor.descriptor;
 
-    DB::SensorsConfig config = m_db.getLastSensorsConfig();
+    DB::SensorSettings sensorSettings = m_db.getSensorSettings();
+	//DB::SensorTimeConfig sensorTimeConfig = m_db.getLastSensorTimeConfig();
 
     m_ui.name->setText(descriptor.name.c_str());
     m_ui.serialNumber->setText(QString("%1").arg(sensor.serialNumber, 8, 16, QChar('0')));
@@ -90,18 +91,18 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
 		{
 			float vcc = sensor.rtMeasurementVcc;
 			m_ui.battery->setText(QString("%1% (%2V)").arg(static_cast<int>(utils::getBatteryLevel(vcc) * 100.f)).arg(vcc, 0, 'f', 2));
-			m_ui.batteryIcon->setPixmap(utils::getBatteryIcon(vcc).pixmap(24, 24));
+			m_ui.batteryIcon->setPixmap(utils::getBatteryIcon(m_db.getSensorSettings(), vcc).pixmap(24, 24));
 		}
 
 		{
 			int8_t signal = static_cast<int8_t>(utils::getSignalLevel(m_sensor.averageSignalStrength.b2s) * 100.f);
 			m_ui.signalStrengthB2S->setText(QString("%1% (%2 dBm)").arg(signal).arg(m_sensor.averageSignalStrength.b2s));
-			m_ui.signalStrengthIconB2S->setPixmap(utils::getSignalIcon(signal).pixmap(24, 24));
+			m_ui.signalStrengthIconB2S->setPixmap(utils::getSignalIcon(m_db.getSensorSettings(), signal).pixmap(24, 24));
 		}
 		{
 			int8_t signal = static_cast<int8_t>(utils::getSignalLevel(m_sensor.averageSignalStrength.s2b) * 100.f);
 			m_ui.signalStrengthS2B->setText(QString("%1% (%2 dBm)").arg(signal).arg(m_sensor.averageSignalStrength.s2b));
-			m_ui.signalStrengthIconS2B->setPixmap(utils::getSignalIcon(signal).pixmap(24, 24));
+			m_ui.signalStrengthIconS2B->setPixmap(utils::getSignalIcon(m_db.getSensorSettings(), signal).pixmap(24, 24));
 		}
     }
     else
@@ -111,7 +112,7 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
         m_ui.signalStrengthB2S->setText(QString("N/A"));
     }
 
-    m_ui.power->setText(QString("%1 dBm").arg(config.descriptor.sensorsPower));
+    m_ui.power->setText(QString("%1 dBm").arg(sensorSettings.radioPower));
     {
         uint32_t capacity = getSensorStorageCapacity(m_sensor);
         if (capacity == 0)

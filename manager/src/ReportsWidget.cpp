@@ -64,6 +64,8 @@ void ReportsWidget::init(Settings& settings)
         m_ui.list->header()->restoreState(settings.value("reports/list/state").toByteArray());
     }
 
+	m_ui.list->header()->setSectionHidden((int)ReportsModel::Column::Id, true);
+
     setPermissions();
     m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &ReportsWidget::setPermissions));
 }

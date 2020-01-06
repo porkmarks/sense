@@ -3,12 +3,13 @@
 #include <QDateTime>
 #include <QSettings>
 #include "Utils.h"
+#include "PermissionsCheck.h"
 
 //////////////////////////////////////////////////////////////////////////
 
-MeasurementDetailsDialog::MeasurementDetailsDialog(DB& db, QWidget* parent)
+MeasurementDetailsDialog::MeasurementDetailsDialog(Settings& settings, QWidget* parent)
     : QDialog(parent)
-    , m_db(db)
+    , m_settings(settings)
 {
     m_ui.setupUi(this);
     adjustSize();
@@ -55,13 +56,14 @@ void MeasurementDetailsDialog::setMeasurement(DB::Measurement const& measurement
 {
     m_measurement = measurement;
     DB::MeasurementDescriptor descriptor = m_measurement.descriptor;
+	DB& db = m_settings.getDB();
 
     m_ui.id->setText(QString("%1").arg(m_measurement.id));
 
-    int32_t sensorIndex = m_db.findSensorIndexById(m_measurement.descriptor.sensorId);
+    int32_t sensorIndex = m_settings.getDB().findSensorIndexById(m_measurement.descriptor.sensorId);
     if (sensorIndex >= 0)
 	{
-        DB::Sensor const& sensor = m_db.getSensor((size_t)sensorIndex);
+        DB::Sensor const& sensor = m_settings.getDB().getSensor((size_t)sensorIndex);
 		m_ui.sensor->setText(QString("%1 (S/N %2)").arg(sensor.descriptor.name.c_str()).arg(sensor.serialNumber, 8, 16, QChar('0')));
 	}
     else
@@ -78,22 +80,34 @@ void MeasurementDetailsDialog::setMeasurement(DB::Measurement const& measurement
 	{
 		float vcc = m_measurement.descriptor.vcc;
 		m_ui.battery->setText(QString("%1% (%2V)").arg(static_cast<int>(utils::getBatteryLevel(vcc) * 100.f)).arg(vcc, 0, 'f', 2));
-		m_ui.batteryIcon->setPixmap(utils::getBatteryIcon(vcc).pixmap(24, 24));
+		m_ui.batteryIcon->setPixmap(utils::getBatteryIcon(db.getSensorSettings(), vcc).pixmap(24, 24));
 
 		{
 			int8_t signal = static_cast<int8_t>(utils::getSignalLevel(m_measurement.descriptor.signalStrength.b2s) * 100.f);
 			m_ui.signalStrengthB2S->setText(QString("%1% (%2 dBm)").arg(signal).arg(m_measurement.descriptor.signalStrength.b2s));
-			m_ui.signalStrengthIconB2S->setPixmap(utils::getSignalIcon(signal).pixmap(24, 24));
+			m_ui.signalStrengthIconB2S->setPixmap(utils::getSignalIcon(db.getSensorSettings(), signal).pixmap(24, 24));
 		}
 		{
 			int8_t signal = static_cast<int8_t>(utils::getSignalLevel(m_measurement.descriptor.signalStrength.s2b) * 100.f);
 			m_ui.signalStrengthS2B->setText(QString("%1% (%2 dBm)").arg(signal).arg(m_measurement.descriptor.signalStrength.s2b));
-			m_ui.signalStrengthIconS2B->setPixmap(utils::getSignalIcon(signal).pixmap(24, 24));
+			m_ui.signalStrengthIconS2B->setPixmap(utils::getSignalIcon(db.getSensorSettings(), signal).pixmap(24, 24));
 		}
 	}
 
-    m_ui.temperature->setValue(m_measurement.descriptor.temperature);
-    m_ui.humidity->setValue(m_measurement.descriptor.humidity);
+    if (hasPermission(m_settings, Settings::UserDescriptor::PermissionChangeMeasurements))
+	{
+		m_ui.temperatureRW->setValue(m_measurement.descriptor.temperature);
+		m_ui.humidityRW->setValue(m_measurement.descriptor.humidity);
+		m_ui.temperatureRO->setVisible(false);
+		m_ui.humidityRO->setVisible(false);
+	}
+    else
+    {
+		m_ui.temperatureRW->setVisible(false);
+		m_ui.humidityRW->setVisible(false);
+		m_ui.temperatureRO->setText(QString(u8"%1 °C").arg(m_measurement.descriptor.temperature, 0, 'f', 1));
+		m_ui.humidityRO->setText(QString("%1 % RH").arg(m_measurement.descriptor.humidity, 0, 'f', 1));
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -108,8 +122,11 @@ void MeasurementDetailsDialog::done(int result)
 
 void MeasurementDetailsDialog::accept()
 {
-    m_measurement.descriptor.temperature = static_cast<float>(m_ui.temperature->value());
-    m_measurement.descriptor.humidity = static_cast<float>(m_ui.humidity->value());
+    if (hasPermission(m_settings, Settings::UserDescriptor::PermissionChangeMeasurements))
+	{
+		m_measurement.descriptor.temperature = static_cast<float>(m_ui.temperatureRW->value());
+		m_measurement.descriptor.humidity = static_cast<float>(m_ui.humidityRW->value());
+	}
 
     QDialog::accept();
 }

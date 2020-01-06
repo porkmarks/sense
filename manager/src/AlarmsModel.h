@@ -19,7 +19,6 @@ public:
         Humidity,
         LowBattery,
         LowSignal,
-        Action
     };
 
     void refresh();

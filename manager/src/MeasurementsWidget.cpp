@@ -486,12 +486,6 @@ void MeasurementsWidget::selectSensors()
 
 void MeasurementsWidget::configureMeasurement(QModelIndex const& index)
 {
-	if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionChangeMeasurements, this))
-	{
-        QMessageBox::critical(this, "Error", "You don't have permission to change measurements.");
-		return;
-	}
-
 	QModelIndex mi = m_sortingModel.mapToSource(index);
 	Result<DB::Measurement> result = m_model->getMeasurement(mi);
 	if (result != success)
@@ -502,7 +496,7 @@ void MeasurementsWidget::configureMeasurement(QModelIndex const& index)
 
     DB::Measurement measurement = result.payload();
 
-	MeasurementDetailsDialog dialog(*m_db, this);
+	MeasurementDetailsDialog dialog(*m_settings, this);
 	dialog.setMeasurement(measurement);
 
 	do

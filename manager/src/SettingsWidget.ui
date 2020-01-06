@@ -6,188 +6,54 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>834</width>
-    <height>980</height>
+    <width>578</width>
+    <height>377</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
   <layout class="QHBoxLayout" name="horizontalLayout_2">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
    <item>
-    <widget class="QTreeWidget" name="list">
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Fixed" vsizetype="MinimumExpanding">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
+    <widget class="QTabWidget" name="tabWidget">
+     <property name="currentIndex">
+      <number>0</number>
      </property>
-     <property name="showDropIndicator" stdset="0">
-      <bool>false</bool>
-     </property>
-     <property name="alternatingRowColors">
-      <bool>true</bool>
-     </property>
-     <property name="rootIsDecorated">
-      <bool>false</bool>
-     </property>
-     <property name="uniformRowHeights">
-      <bool>true</bool>
-     </property>
-     <property name="itemsExpandable">
-      <bool>false</bool>
-     </property>
-     <attribute name="headerVisible">
-      <bool>false</bool>
-     </attribute>
-     <column>
-      <property name="text">
-       <string>1</string>
-      </property>
-     </column>
-     <item>
-      <property name="text">
-       <string>Base Stations</string>
-      </property>
-      <property name="icon">
-       <iconset resource="../res/res.qrc">
-        <normaloff>:/icons/ui/station.png</normaloff>:/icons/ui/station.png</iconset>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>Users</string>
-      </property>
-      <property name="icon">
-       <iconset resource="../res/res.qrc">
-        <normaloff>:/icons/ui/users.png</normaloff>:/icons/ui/users.png</iconset>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>Reports</string>
-      </property>
-      <property name="icon">
-       <iconset resource="../res/res.qrc">
-        <normaloff>:/icons/ui/report.png</normaloff>:/icons/ui/report.png</iconset>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>Email</string>
-      </property>
-      <property name="icon">
+     <widget class="QWidget" name="emailTab">
+      <attribute name="icon">
        <iconset resource="../res/res.qrc">
         <normaloff>:/icons/ui/email.png</normaloff>:/icons/ui/email.png</iconset>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>FTP</string>
-      </property>
-      <property name="icon">
-       <iconset resource="../res/res.qrc">
-        <normaloff>:/icons/ui/ftp.png</normaloff>:/icons/ui/ftp.png</iconset>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>Sensors</string>
-      </property>
-      <property name="icon">
-       <iconset resource="../res/res.qrc">
-        <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
-      </property>
-     </item>
-    </widget>
-   </item>
-   <item>
-    <widget class="QStackedWidget" name="stackedWidget">
-     <property name="currentIndex">
-      <number>3</number>
-     </property>
-     <widget class="QWidget" name="baseStationsPage">
-      <layout class="QVBoxLayout" name="verticalLayout_3">
-       <property name="spacing">
-        <number>0</number>
-       </property>
-       <property name="leftMargin">
-        <number>0</number>
-       </property>
-       <property name="topMargin">
-        <number>0</number>
-       </property>
-       <property name="rightMargin">
-        <number>0</number>
-       </property>
-       <property name="bottomMargin">
-        <number>0</number>
-       </property>
-       <item>
-        <widget class="BaseStationsWidget" name="baseStationsWidget" native="true"/>
-       </item>
-      </layout>
-     </widget>
-     <widget class="QWidget" name="usersPage">
-      <layout class="QVBoxLayout" name="verticalLayout_6">
-       <property name="spacing">
-        <number>0</number>
-       </property>
-       <property name="leftMargin">
-        <number>0</number>
-       </property>
-       <property name="topMargin">
-        <number>0</number>
-       </property>
-       <property name="rightMargin">
-        <number>0</number>
-       </property>
-       <property name="bottomMargin">
-        <number>0</number>
-       </property>
-       <item>
-        <widget class="UsersWidget" name="usersWidget" native="true"/>
-       </item>
-      </layout>
-     </widget>
-     <widget class="QWidget" name="reportsPage">
-      <layout class="QVBoxLayout" name="verticalLayout_4">
-       <property name="spacing">
-        <number>0</number>
-       </property>
-       <property name="leftMargin">
-        <number>0</number>
-       </property>
-       <property name="topMargin">
-        <number>0</number>
-       </property>
-       <property name="rightMargin">
-        <number>0</number>
-       </property>
-       <property name="bottomMargin">
-        <number>0</number>
-       </property>
-       <item>
-        <widget class="ReportsWidget" name="reportsWidget" native="true"/>
-       </item>
-      </layout>
-     </widget>
-     <widget class="QWidget" name="emailPage">
+      </attribute>
+      <attribute name="title">
+       <string>Email</string>
+      </attribute>
       <layout class="QVBoxLayout" name="verticalLayout_7">
        <property name="spacing">
-        <number>0</number>
+        <number>2</number>
        </property>
        <property name="leftMargin">
-        <number>0</number>
+        <number>4</number>
        </property>
        <property name="topMargin">
-        <number>0</number>
+        <number>4</number>
        </property>
        <property name="rightMargin">
-        <number>0</number>
+        <number>4</number>
        </property>
        <property name="bottomMargin">
-        <number>0</number>
+        <number>4</number>
        </property>
        <item>
         <widget class="QWidget" name="widget" native="true">
@@ -428,41 +294,34 @@
             </property>
            </widget>
           </item>
-          <item>
-           <widget class="QPushButton" name="emailApply">
-            <property name="text">
-             <string>Apply</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="emailReset">
-            <property name="text">
-             <string>Reset</string>
-            </property>
-           </widget>
-          </item>
          </layout>
         </widget>
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="ftpPage">
+     <widget class="QWidget" name="ftpTab">
+      <attribute name="icon">
+       <iconset resource="../res/res.qrc">
+        <normaloff>:/icons/ui/ftp.png</normaloff>:/icons/ui/ftp.png</iconset>
+      </attribute>
+      <attribute name="title">
+       <string>FTP</string>
+      </attribute>
       <layout class="QVBoxLayout" name="verticalLayout_11">
        <property name="spacing">
-        <number>0</number>
+        <number>2</number>
        </property>
        <property name="leftMargin">
-        <number>0</number>
+        <number>4</number>
        </property>
        <property name="topMargin">
-        <number>0</number>
+        <number>4</number>
        </property>
        <property name="rightMargin">
-        <number>0</number>
+        <number>4</number>
        </property>
        <property name="bottomMargin">
-        <number>0</number>
+        <number>4</number>
        </property>
        <item>
         <widget class="QWidget" name="widget_2" native="true">
@@ -623,299 +482,408 @@
             </property>
            </widget>
           </item>
-          <item>
-           <widget class="QPushButton" name="ftpApply">
-            <property name="text">
-             <string>Apply</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="ftpReset">
-            <property name="text">
-             <string>Reset</string>
-            </property>
-           </widget>
-          </item>
          </layout>
         </widget>
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="sensorsPage">
+     <widget class="QWidget" name="sensorsTab">
+      <attribute name="icon">
+       <iconset resource="../res/res.qrc">
+        <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
+      </attribute>
+      <attribute name="title">
+       <string>Sensors</string>
+      </attribute>
       <layout class="QVBoxLayout" name="verticalLayout_12">
        <property name="spacing">
-        <number>0</number>
+        <number>2</number>
        </property>
        <property name="leftMargin">
-        <number>0</number>
+        <number>4</number>
        </property>
        <property name="topMargin">
-        <number>0</number>
+        <number>4</number>
        </property>
        <property name="rightMargin">
-        <number>0</number>
+        <number>4</number>
        </property>
        <property name="bottomMargin">
-        <number>0</number>
+        <number>4</number>
        </property>
-       <item>
-        <widget class="QWidget" name="widget_6" native="true">
-         <layout class="QFormLayout" name="formLayout_5">
-          <property name="verticalSpacing">
-           <number>6</number>
-          </property>
-          <item row="0" column="0">
-           <widget class="QLabel" name="label_6">
-            <property name="text">
-             <string>Measurement Period</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1">
-           <widget class="QDoubleSpinBox" name="sensorsMeasurementPeriod">
-            <property name="suffix">
-             <string> minutes</string>
-            </property>
-            <property name="decimals">
-             <number>1</number>
-            </property>
-            <property name="minimum">
-             <double>0.100000000000000</double>
-            </property>
-            <property name="value">
-             <double>5.000000000000000</double>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="0">
-           <widget class="QLabel" name="label_7">
-            <property name="text">
-             <string>Comms Period</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <widget class="QDoubleSpinBox" name="sensorsCommsPeriod">
-            <property name="suffix">
-             <string> minutes</string>
-            </property>
-            <property name="decimals">
-             <number>1</number>
-            </property>
-            <property name="minimum">
-             <double>0.100000000000000</double>
-            </property>
-            <property name="value">
-             <double>15.000000000000000</double>
-            </property>
-           </widget>
-          </item>
-          <item row="4" column="0">
-           <widget class="QLabel" name="label_9">
-            <property name="text">
-             <string>Actual Comms Period</string>
-            </property>
-           </widget>
-          </item>
-          <item row="5" column="0" colspan="2">
-           <widget class="QLabel" name="label_16">
-            <property name="font">
-             <font>
-              <pointsize>7</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>The actual comms period takes into account the number or sensors so that each sensor has about 10 seconds or time to communicate. It can result in comms periods larger that the one configured.</string>
-            </property>
-            <property name="wordWrap">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item row="6" column="0">
-           <widget class="QLabel" name="label_15">
-            <property name="text">
-             <string>Transmission Power</string>
-            </property>
-           </widget>
-          </item>
-          <item row="6" column="1">
-           <widget class="QSpinBox" name="sensorsPower">
-            <property name="suffix">
-             <string> dBm</string>
-            </property>
-            <property name="minimum">
-             <number>-3</number>
-            </property>
-            <property name="maximum">
-             <number>17</number>
-            </property>
-            <property name="value">
-             <number>10</number>
-            </property>
-           </widget>
-          </item>
-          <item row="7" column="0" colspan="2">
-           <widget class="QLabel" name="label_18">
-            <property name="font">
-             <font>
-              <pointsize>7</pointsize>
-             </font>
-            </property>
-            <property name="text">
-             <string>Transmission Power severy affects the sensor battery life and range. Every 6 dBm roughly double the line-of-sight range. Walls and obstacles reduce the range significantly.</string>
-            </property>
-            <property name="wordWrap">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item row="4" column="1">
-           <widget class="QLabel" name="sensorsComputedCommsPeriod">
-            <property name="text">
-             <string>1.0</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item>
-        <widget class="Line" name="line">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QWidget" name="widget_3" native="true">
-         <layout class="QGridLayout" name="gridLayout_3">
-          <item row="1" column="1">
-           <widget class="QLabel" name="batteryLife">
-            <property name="text">
-             <string>1 day</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="0">
-           <widget class="QLabel" name="label_17">
-            <property name="text">
-             <string>Estimated Battery Life:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="0">
-           <widget class="QLabel" name="label_23">
-            <property name="text">
-             <string>Battery Capacity:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1">
-           <widget class="QSpinBox" name="batteryCapacity">
-            <property name="suffix">
-             <string> mAh</string>
-            </property>
-            <property name="minimum">
-             <number>100</number>
-            </property>
-            <property name="maximum">
-             <number>3000</number>
-            </property>
-            <property name="value">
-             <number>1300</number>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLabel" name="label_20">
-         <property name="font">
-          <font>
-           <pointsize>7</pointsize>
-          </font>
-         </property>
-         <property name="text">
-          <string>Note #1: The battery life is an estimation based on the current settings (Actual Comms Period, Measurement Period &amp; Transmission Power).</string>
-         </property>
-         <property name="wordWrap">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLabel" name="label_21">
-         <property name="font">
-          <font>
-           <pointsize>7</pointsize>
-          </font>
-         </property>
-         <property name="text">
-          <string>Note #2: Battery capacity varies a lot with temperature: low temperatures reduce the battery capacity.</string>
-         </property>
-         <property name="wordWrap">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLabel" name="label_22">
-         <property name="font">
-          <font>
-           <pointsize>7</pointsize>
-          </font>
-         </property>
-         <property name="text">
-          <string>Note #3: Check the datasheet of your battery to find out the capacity and enter that value in the box above for more accurate estimations.</string>
-         </property>
-         <property name="wordWrap">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <spacer name="verticalSpacer">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>40</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
        <item>
         <widget class="QWidget" name="widget_7" native="true">
          <layout class="QHBoxLayout" name="horizontalLayout">
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
           <item>
-           <spacer name="horizontalSpacer">
-            <property name="orientation">
-             <enum>Qt::Horizontal</enum>
+           <widget class="QWidget" name="widget_6" native="true">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
             </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>40</width>
-              <height>20</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
-          <item>
-           <widget class="QPushButton" name="sensorsApply">
-            <property name="text">
-             <string>Apply</string>
-            </property>
+            <layout class="QFormLayout" name="formLayout_5">
+             <property name="verticalSpacing">
+              <number>6</number>
+             </property>
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_6">
+               <property name="text">
+                <string>Measurement Period</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QDoubleSpinBox" name="sensorsMeasurementPeriod">
+               <property name="suffix">
+                <string> minutes</string>
+               </property>
+               <property name="decimals">
+                <number>1</number>
+               </property>
+               <property name="minimum">
+                <double>0.100000000000000</double>
+               </property>
+               <property name="value">
+                <double>5.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="label_7">
+               <property name="text">
+                <string>Comms Period</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QDoubleSpinBox" name="sensorsCommsPeriod">
+               <property name="suffix">
+                <string> minutes</string>
+               </property>
+               <property name="decimals">
+                <number>1</number>
+               </property>
+               <property name="minimum">
+                <double>0.100000000000000</double>
+               </property>
+               <property name="value">
+                <double>15.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="0">
+              <widget class="QLabel" name="label_9">
+               <property name="text">
+                <string>Actual Comms Period</string>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="0" colspan="2">
+              <widget class="QLabel" name="label_16">
+               <property name="font">
+                <font>
+                 <pointsize>7</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>The actual comms period takes into account the number or sensors so that each sensor has about 10 seconds or time to communicate. It can result in comms periods larger that the one configured.</string>
+               </property>
+               <property name="wordWrap">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="0">
+              <widget class="QLabel" name="label_15">
+               <property name="text">
+                <string>Transmission Power</string>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="1">
+              <widget class="QSpinBox" name="radioPower">
+               <property name="suffix">
+                <string> dBm</string>
+               </property>
+               <property name="minimum">
+                <number>-3</number>
+               </property>
+               <property name="maximum">
+                <number>17</number>
+               </property>
+               <property name="value">
+                <number>10</number>
+               </property>
+              </widget>
+             </item>
+             <item row="7" column="0" colspan="2">
+              <widget class="QLabel" name="label_18">
+               <property name="font">
+                <font>
+                 <pointsize>7</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>Transmission Power severy affects the sensor battery life and range. Every 6 dBm roughly double the line-of-sight range. Walls and obstacles reduce the range significantly.</string>
+               </property>
+               <property name="wordWrap">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="1">
+              <widget class="QLabel" name="sensorsComputedCommsPeriod">
+               <property name="text">
+                <string>1.0</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
            </widget>
           </item>
           <item>
-           <widget class="QPushButton" name="sensorsReset">
+           <widget class="QWidget" name="widget_3" native="true">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <layout class="QFormLayout" name="formLayout">
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_23">
+               <property name="text">
+                <string>Battery Capacity:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QSpinBox" name="batteryCapacity">
+               <property name="suffix">
+                <string> mAh</string>
+               </property>
+               <property name="minimum">
+                <number>100</number>
+               </property>
+               <property name="maximum">
+                <number>3000</number>
+               </property>
+               <property name="value">
+                <number>1300</number>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="label_17">
+               <property name="text">
+                <string>Estimated Battery Life:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QLabel" name="batteryLife">
+               <property name="text">
+                <string>1 day</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0" colspan="2">
+              <widget class="QLabel" name="label_20">
+               <property name="font">
+                <font>
+                 <pointsize>7</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>Note #1: The battery life is an estimation based on the current settings (Actual Comms Period, Measurement Period &amp; Transmission Power).</string>
+               </property>
+               <property name="wordWrap">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="0" colspan="2">
+              <widget class="QLabel" name="label_21">
+               <property name="font">
+                <font>
+                 <pointsize>7</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>Note #2: Battery capacity varies a lot with temperature: low temperatures reduce the battery capacity.</string>
+               </property>
+               <property name="wordWrap">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="0" colspan="2">
+              <widget class="QLabel" name="label_22">
+               <property name="font">
+                <font>
+                 <pointsize>7</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>Note #3: Check the datasheet of your battery to find out the capacity and enter that value in the box above for more accurate estimations.</string>
+               </property>
+               <property name="wordWrap">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="0" colspan="2">
+              <spacer name="verticalSpacer">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QWidget" name="widget_9" native="true">
+         <layout class="QFormLayout" name="formLayout_2">
+          <item row="0" column="0">
+           <widget class="QWidget" name="widget_10" native="true">
+            <layout class="QHBoxLayout" name="horizontalLayout_6">
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="batteryIcon">
+               <property name="text">
+                <string/>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="label_25">
+               <property name="text">
+                <string>Battery Alert Threshold:</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QDoubleSpinBox" name="batteryAlertThreshold">
+            <property name="suffix">
+             <string> %</string>
+            </property>
+            <property name="decimals">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <double>80.000000000000000</double>
+            </property>
+            <property name="value">
+             <double>10.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QWidget" name="widget_11" native="true">
+            <layout class="QHBoxLayout" name="horizontalLayout_7">
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="signalStrengthIcon">
+               <property name="text">
+                <string/>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="label_27">
+               <property name="text">
+                <string>Signal Strength Alert Threshold:</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QDoubleSpinBox" name="signalStrengthAlertThreshold">
+            <property name="suffix">
+             <string> %</string>
+            </property>
+            <property name="decimals">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <double>80.000000000000000</double>
+            </property>
+            <property name="value">
+             <double>10.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0" colspan="2">
+           <widget class="QLabel" name="label_24">
+            <property name="font">
+             <font>
+              <pointsize>7</pointsize>
+             </font>
+            </property>
             <property name="text">
-             <string>Reset</string>
+             <string>Alarms will be triggered when the battery level drops under tis percentage.</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0" colspan="2">
+           <widget class="QLabel" name="label_26">
+            <property name="font">
+             <font>
+              <pointsize>7</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>Alarms will be triggered when the average sensor signal strength drops under this percentage.</string>
             </property>
            </widget>
           </item>
@@ -928,27 +896,8 @@
    </item>
   </layout>
  </widget>
- <customwidgets>
-  <customwidget>
-   <class>BaseStationsWidget</class>
-   <extends>QWidget</extends>
-   <header>BaseStationsWidget.h</header>
-   <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>ReportsWidget</class>
-   <extends>QWidget</extends>
-   <header>ReportsWidget.h</header>
-   <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>UsersWidget</class>
-   <extends>QWidget</extends>
-   <header>UsersWidget.h</header>
-   <container>1</container>
-  </customwidget>
- </customwidgets>
  <tabstops>
+  <tabstop>emailSmtpProviderPreset</tabstop>
   <tabstop>emailHost</tabstop>
   <tabstop>emailPort</tabstop>
   <tabstop>emailConnection</tabstop>
@@ -959,8 +908,6 @@
   <tabstop>emailAddRecipient</tabstop>
   <tabstop>emailRemoveRecipient</tabstop>
   <tabstop>emailTest</tabstop>
-  <tabstop>emailApply</tabstop>
-  <tabstop>emailReset</tabstop>
   <tabstop>ftpHost</tabstop>
   <tabstop>ftpPort</tabstop>
   <tabstop>ftpUsername</tabstop>
@@ -970,14 +917,13 @@
   <tabstop>ftpUploadBackups</tabstop>
   <tabstop>ftpBackupPeriod</tabstop>
   <tabstop>ftpTest</tabstop>
-  <tabstop>ftpApply</tabstop>
-  <tabstop>ftpReset</tabstop>
-  <tabstop>stackedWidget</tabstop>
   <tabstop>sensorsMeasurementPeriod</tabstop>
   <tabstop>sensorsCommsPeriod</tabstop>
-  <tabstop>sensorsPower</tabstop>
-  <tabstop>sensorsApply</tabstop>
-  <tabstop>sensorsReset</tabstop>
+  <tabstop>radioPower</tabstop>
+  <tabstop>batteryCapacity</tabstop>
+  <tabstop>batteryAlertThreshold</tabstop>
+  <tabstop>signalStrengthAlertThreshold</tabstop>
+  <tabstop>tabWidget</tabstop>
  </tabstops>
  <resources>
   <include location="../res/res.qrc"/>

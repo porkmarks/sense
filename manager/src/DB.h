@@ -63,16 +63,25 @@ public:
 
     ////////////////////////////////////////////////////////////////////////////
 
-    struct SensorsConfigDescriptor
+	struct SensorSettings
+	{
+		int8_t radioPower = 10; //dBm. 0 means invalid
+		float alertBatteryLevel = 0.1f; //0 - 1 mu
+		float alertSignalStrengthLevel = 0.1f; //0 - 1 mu
+	};
+
+	Result<void> setSensorSettings(SensorSettings const& settings);
+    SensorSettings const& getSensorSettings() const;
+
+    struct SensorTimeConfigDescriptor
     {
-        int8_t sensorsPower = 10;
         Clock::duration measurementPeriod = std::chrono::minutes(5);
         Clock::duration commsPeriod = std::chrono::minutes(10);
     };
 
-    struct SensorsConfig
+    struct SensorTimeConfig
     {
-        SensorsConfigDescriptor descriptor;
+        SensorTimeConfigDescriptor descriptor;
         Clock::duration computedCommsPeriod = std::chrono::minutes(10);
         //when did this config become active?
         Clock::time_point baselineMeasurementTimePoint = Clock::time_point(Clock::duration::zero());
@@ -80,17 +89,17 @@ public:
     };
 
 
-    Result<void> addSensorsConfig(SensorsConfigDescriptor const& descriptor);
-    Result<void> setSensorsConfigs(std::vector<SensorsConfig> const& configs);
+    Result<void> addSensorTimeConfig(SensorTimeConfigDescriptor const& descriptor);
+    Result<void> setSensorTimeConfigs(std::vector<SensorTimeConfig> const& configs);
 
-    size_t getSensorsConfigCount() const;
-    SensorsConfig const& getSensorsConfig(size_t index) const;
-    SensorsConfig const& getLastSensorsConfig() const;
-    Clock::duration computeActualCommsPeriod(SensorsConfigDescriptor const& descriptor) const;
+    size_t getSensorTimeConfigCount() const;
+    SensorTimeConfig const& getSensorTimeConfig(size_t index) const;
+    SensorTimeConfig const& getLastSensorTimeConfig() const;
+    Clock::duration computeActualCommsPeriod(SensorTimeConfigDescriptor const& descriptor) const;
 
     struct SensorErrors
     {
-        enum type : uint8_t
+        enum type : uint32_t
         {
             Hardware    = 1 << 0,
             Comms       = 1 << 1
@@ -116,14 +125,14 @@ public:
         float humidity = 0;
         float vcc = 0;
         SignalStrength signalStrength;
-        uint8_t sensorErrors = 0;
+        uint32_t sensorErrors = 0;
     };
     struct Measurement
     {
         MeasurementId id = 0;
         MeasurementDescriptor descriptor;
         Clock::time_point timePoint;
-        uint8_t alarmTriggers = 0;
+        uint32_t alarmTriggers = 0;
     };
 
     struct ErrorCounters
@@ -273,16 +282,20 @@ public:
         std::set<SensorId> sensors;
 
         bool lowTemperatureWatch = false;
-        float lowTemperature = 0;
+        float lowTemperatureSoft = 0;
+        float lowTemperatureHard = 0;
 
         bool highTemperatureWatch = false;
-        float highTemperature = 0;
+        float highTemperatureSoft = 0;
+        float highTemperatureHard = 0;
 
         bool lowHumidityWatch = false;
-        float lowHumidity = 0;
+        float lowHumiditySoft = 0;
+        float lowHumidityHard = 0;
 
         bool highHumidityWatch = false;
-        float highHumidity = 0;
+        float highHumiditySoft = 0;
+        float highHumidityHard = 0;
 
         bool lowVccWatch = false;
         bool lowSignalWatch = false;
@@ -299,7 +312,7 @@ public:
         AlarmDescriptor descriptor;
         AlarmId id = 0;
 
-        std::map<SensorId, uint8_t> triggersPerSensor;
+        std::map<SensorId, uint32_t> triggersPerSensor;
         Clock::time_point lastTriggeredTimePoint = Clock::time_point(Clock::duration::zero());
     };
 
@@ -317,18 +330,24 @@ public:
     {
         enum
         {
-            LowTemperature  = 1 << 0,
-            HighTemperature = 1 << 1,
-            Temperature     = LowTemperature | HighTemperature,
+            LowTemperatureSoft  = 1 << 0,
+            LowTemperatureHard  = 1 << 1,
+            LowTemperature      = LowTemperatureSoft | LowTemperatureHard,
+            HighTemperatureSoft = 1 << 2,
+            HighTemperatureHard = 1 << 3,
+            HighTemperature     = HighTemperatureSoft | HighTemperatureHard,
+            Temperature         = LowTemperature | HighTemperature,
 
-			LowHumidity     = 1 << 2,
-			HighHumidity    = 1 << 3,
-            Humidity        = LowHumidity | HighHumidity,
+			LowHumiditySoft     = 1 << 4,
+			LowHumidityHard     = 1 << 5,
+			LowHumidity         = LowHumiditySoft | LowHumidityHard,
+			HighHumiditySoft    = 1 << 6,
+			HighHumidityHard    = 1 << 7,
+			HighHumidity        = HighHumiditySoft | HighHumidityHard,
+            Humidity            = LowHumidity | HighHumidity,
 
-            LowVcc          = 1 << 4,
-            LowSignal       = 1 << 5,
-
-            //All             = Temperature | Humidity | LowVcc | LowSignal
+            LowVcc              = 1 << 8,
+            LowSignal           = 1 << 9,
         };
     };
 
@@ -430,8 +449,10 @@ signals:
     void baseStationRemoved(BaseStationId id);
     void baseStationChanged(BaseStationId id);
 
-    void sensorsConfigAdded();
-    void sensorsConfigChanged();
+    void sensorTimeConfigAdded();
+    void sensorTimeConfigChanged();
+
+    void sensorSettingsChanged();
 
     void sensorAdded(SensorId id);
     void sensorBound(SensorId id);
@@ -451,12 +472,13 @@ signals:
     void measurementsChanged(SensorId id);
     void measurementsRemoved(SensorId id);
 
-   void alarmTriggersChanged(AlarmId alarmId, Measurement const& m, uint8_t oldTriggers, uint8_t newTriggers, uint8_t addedTriggers, uint8_t removedTriggers);
+   void alarmTriggersChanged(AlarmId alarmId, Measurement const& m, uint32_t oldTriggers, uint32_t newTriggers, uint32_t addedTriggers, uint32_t removedTriggers);
    void alarmStillTriggered(AlarmId alarmId);
 
 private:
+    Result<void> checkAlarmDescriptor(AlarmDescriptor const& descriptor) const;
     void checkRepetitiveAlarms();
-    uint8_t _computeAlarmTriggers(Alarm& alarm, Measurement const& m);
+    uint32_t _computeAlarmTriggers(Alarm& alarm, Measurement const& m);
     bool _addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> mds);
     size_t _getFilteredMeasurements(Filter const& filter, std::vector<Measurement>* result) const;
 
@@ -468,17 +490,18 @@ private:
     Clock::time_point computeNextMeasurementTimePoint(Sensor const& sensor) const;
     uint32_t computeNextMeasurementIndex(Sensor const& sensor) const;
     uint32_t computeNextRealTimeMeasurementIndex() const;
-    SensorsConfig const& findSensorsConfigForMeasurementIndex(uint32_t index) const;
+    SensorTimeConfig const& findSensorTimeConfigForMeasurementIndex(uint32_t index) const;
     Clock::time_point computeMeasurementTimepoint(MeasurementDescriptor const& md) const;
-    uint8_t computeAlarmTriggers(Measurement const& m);
+    uint32_t computeAlarmTriggers(Measurement const& m);
 
     struct Data
     {
         std::vector<BaseStation> baseStations;
-        std::vector<SensorsConfig> sensorsConfigs;
+        std::vector<SensorTimeConfig> sensorTimeConfigs;
         std::vector<Sensor> sensors;
         std::vector<Alarm> alarms;
         std::vector<Report> reports;
+        SensorSettings sensorSettings;
 
         BaseStationId lastBaseStationId = 0;
         SensorId lastSensorId = 0;
@@ -490,7 +513,8 @@ private:
 
 	sqlite3* m_sqlite = nullptr;
 	std::shared_ptr<sqlite3_stmt> m_saveBaseStationsStmt;
-	std::shared_ptr<sqlite3_stmt> m_saveSensorsConfigsStmt;
+	std::shared_ptr<sqlite3_stmt> m_saveSensorTimeConfigsStmt;
+	std::shared_ptr<sqlite3_stmt> m_saveSensorSettingsStmt;
 	std::shared_ptr<sqlite3_stmt> m_saveSensorsStmt;
 	std::shared_ptr<sqlite3_stmt> m_saveAlarmsStmt;
 	std::shared_ptr<sqlite3_stmt> m_saveReportsStmt;

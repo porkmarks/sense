@@ -43,7 +43,7 @@ public:
     };
 
 private slots:
-    void alarmTriggersChanged(DB::AlarmId alarmId, DB::Measurement const& m, uint8_t oldTriggers, uint8_t newTriggers, uint8_t addedTriggers, uint8_t removedTriggers);
+    void alarmTriggersChanged(DB::AlarmId alarmId, DB::Measurement const& m, uint32_t oldTriggers, uint32_t newTriggers, uint32_t addedTriggers, uint32_t removedTriggers);
 	void alarmStillTriggered(DB::AlarmId alarmId);
 
 private:
@@ -69,7 +69,7 @@ private:
         Recovery
     };
 
-    void sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m, uint8_t oldTriggers, uint8_t newTriggers, uint8_t triggers, Action action);
+    void sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m, uint32_t oldTriggers, uint32_t newTriggers, uint32_t triggers, Action action);
     void sendAlarmRetriggerEmail(DB::Alarm const& alarm);
     void sendEmail(Email const& email);
     void emailThreadProc();

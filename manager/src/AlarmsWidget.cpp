@@ -6,6 +6,7 @@
 
 #include <QMessageBox>
 #include <QSettings>
+#include "HTMLItemDelegate.h"
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -44,7 +45,7 @@ void AlarmsWidget::init(Settings& settings)
 
     m_model.reset(new AlarmsModel(*m_db));
     m_ui.list->setModel(m_model.get());
-    m_ui.list->setUniformRowHeights(true);
+    m_ui.list->setItemDelegate(new HtmlItemDelegate());
 
     connect(m_ui.list->header(), &QHeaderView::sectionResized, [this]()
     {
@@ -64,6 +65,8 @@ void AlarmsWidget::init(Settings& settings)
         QSettings settings;
         m_ui.list->header()->restoreState(settings.value("alarms/list/state").toByteArray());
     }
+
+	m_ui.list->header()->setSectionHidden((int)AlarmsModel::Column::Id, true);
 
     setPermissions();
     m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &AlarmsWidget::setPermissions));

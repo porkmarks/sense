@@ -285,6 +285,20 @@
   <tabstop>name</tabstop>
   <tabstop>password1</tabstop>
   <tabstop>password2</tabstop>
+  <tabstop>administrator</tabstop>
+  <tabstop>addRemoveUsers</tabstop>
+  <tabstop>changeUsers</tabstop>
+  <tabstop>addRemoveReports</tabstop>
+  <tabstop>changeReports</tabstop>
+  <tabstop>addRemoveAlarms</tabstop>
+  <tabstop>changeAlarms</tabstop>
+  <tabstop>addRemoveSensors</tabstop>
+  <tabstop>changeSensors</tabstop>
+  <tabstop>addRemoveBaseStations</tabstop>
+  <tabstop>changeBaseStations</tabstop>
+  <tabstop>changeFtpSettings</tabstop>
+  <tabstop>changeEmailSettings</tabstop>
+  <tabstop>changeMeasurements</tabstop>
  </tabstops>
  <resources/>
  <connections>

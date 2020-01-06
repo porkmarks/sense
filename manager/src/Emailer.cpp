@@ -10,7 +10,7 @@ extern Logger s_logger;
 
 //////////////////////////////////////////////////////////////////////////
 
-//static std::string getSensorErrors(uint8_t errors)
+//static std::string getSensorErrors(uint32_t errors)
 //{
 //    std::string sensorErrors;
 //    if (errors & DB::SensorErrors::Comms)
@@ -80,7 +80,7 @@ void Emailer::checkReports()
 
 //////////////////////////////////////////////////////////////////////////
 
-void Emailer::alarmTriggersChanged(DB::AlarmId alarmId, DB::Measurement const& m, uint8_t oldTriggers, uint8_t newTriggers, uint8_t addedTriggers, uint8_t removedTriggers)
+void Emailer::alarmTriggersChanged(DB::AlarmId alarmId, DB::Measurement const& m, uint32_t oldTriggers, uint32_t newTriggers, uint32_t addedTriggers, uint32_t removedTriggers)
 {
     int32_t alarmIndex = m_db.findAlarmIndexById(alarmId);
     int32_t sensorIndex = m_db.findSensorIndexById(m.descriptor.sensorId);
@@ -128,9 +128,9 @@ void Emailer::alarmStillTriggered(DB::AlarmId alarmId)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m, uint8_t oldTriggers, uint8_t newTriggers, uint8_t triggers, Action action)
+void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m, uint32_t oldTriggers, uint32_t newTriggers, uint32_t triggers, Action action)
 {
-    auto toString = [](uint8_t triggers)
+    auto toString = [](uint32_t triggers)
     {
         std::string str;
         str += (triggers & DB::AlarmTrigger::LowTemperature) ? "Low Temperature, " : "";
@@ -146,7 +146,7 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
         }
         return str;
     };
-    auto getColor = [action, triggers, oldTriggers](uint8_t trigger)
+    auto getColor = [action, triggers, oldTriggers](uint32_t trigger)
     {
         return (action == Action::Trigger && (triggers & trigger)) ? "red" :
                 (action == Action::Recovery && (triggers & trigger)) ? "green" :
@@ -159,7 +159,7 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
     //      "back to normal" when a trigger dies
     //      "" for old triggers
     //      "normal" for untriggered stuff
-    auto getStatus = [action, triggers, oldTriggers](uint8_t trigger)
+    auto getStatus = [action, triggers, oldTriggers](uint32_t trigger)
     {
         return (action == Action::Trigger && (triggers & trigger)) ? "triggered now" :
                 (action == Action::Recovery && (triggers & trigger)) ? "back to normal" :
@@ -229,7 +229,7 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
 
 void Emailer::sendAlarmRetriggerEmail(DB::Alarm const& alarm)
 {
-	auto toString = [](uint8_t triggers)
+	auto toString = [](uint32_t triggers)
 	{
 		std::string str;
 		str += (triggers & DB::AlarmTrigger::LowTemperature) ? "Low Temperature, " : "";
@@ -246,7 +246,7 @@ void Emailer::sendAlarmRetriggerEmail(DB::Alarm const& alarm)
 		return str;
 	};
 
-    uint8_t triggers = 0;
+    uint32_t triggers = 0;
     for (auto p: alarm.triggersPerSensor)
     { 
         triggers |= p.second;
@@ -385,7 +385,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
             float maxTemperature = std::numeric_limits<float>::lowest();
             float minHumidity = std::numeric_limits<float>::max();
             float maxHumidity = std::numeric_limits<float>::lowest();
-            uint8_t alarmTriggers = 0;
+            uint32_t alarmTriggers = 0;
         };
 
         std::vector<SensorData> sensorDatas;

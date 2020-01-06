@@ -181,6 +181,11 @@ bool Settings::load(sqlite3& db)
         }
 	}
 
+	for (const User& user : data.users)
+	{
+		data.lastUserId = std::max(data.lastUserId, user.id);
+	}
+
     Result<void> result = m_db->load(db);
     if (result != success)
     {
@@ -250,7 +255,6 @@ bool Settings::setEmailSettings(EmailSettings const& settings)
         return false;
     }
 
-    emit emailSettingsWillBeChanged();
     m_data.emailSettings = settings;
     emit emailSettingsChanged();
 
@@ -289,7 +293,6 @@ bool Settings::setFtpSettings(FtpSettings const& settings)
         return false;
     }
 
-    emit ftpSettingsWillBeChanged();
     m_data.ftpSettings = settings;
     emit ftpSettingsChanged();
 
@@ -335,7 +338,6 @@ bool Settings::addUser(UserDescriptor const& descriptor)
     user.descriptor = descriptor;
     user.id = ++m_data.lastUserId;
 
-    emit userWillBeAdded(user.id);
     m_data.users.push_back(user);
     emit userAdded(user.id);
 
@@ -409,7 +411,6 @@ void Settings::removeUser(size_t index)
 
     s_logger.logInfo(QString("Removed user '%1'").arg(m_data.users[index].descriptor.name.c_str()));
 
-    emit userWillBeRemoved(id);
     m_data.users.erase(m_data.users.begin() + index);
     emit userRemoved(id);
 

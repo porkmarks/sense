@@ -35,7 +35,7 @@ void MeasurementsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& 
     MeasurementsModel::Column column = static_cast<MeasurementsModel::Column>(index.column());
     if (column == MeasurementsModel::Column::Alarms)
     {
-        uint8_t alarmTriggers = static_cast<uint8_t>(m_model.data(index).toUInt());
+        uint32_t alarmTriggers = static_cast<uint32_t>(m_model.data(index).toUInt());
 
         QApplication::style()->drawControl(QStyle::CE_ItemViewItem, &option, painter);
 
@@ -100,7 +100,7 @@ QSize MeasurementsDelegate::sizeHint(const QStyleOptionViewItem& option, const Q
 	MeasurementsModel::Column column = static_cast<MeasurementsModel::Column>(index.column());
     if (column == MeasurementsModel::Column::Alarms)
     {
-        uint8_t alarmTriggers = static_cast<uint8_t>(m_model.data(index).toUInt());
+        uint32_t alarmTriggers = static_cast<uint32_t>(m_model.data(index).toUInt());
 
         int32_t width = 0;
         int32_t iconSize = option.rect.height();

@@ -63,6 +63,8 @@ void UsersWidget::init(Settings& settings)
         m_ui.list->header()->restoreState(settings.value("users/list/state").toByteArray());
     }
 
+	m_ui.list->header()->setSectionHidden((int)UsersModel::Column::Id, true);
+
     setPermissions();
     m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &UsersWidget::setPermissions));
 }

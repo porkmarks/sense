@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>941</width>
-    <height>849</height>
+    <width>577</width>
+    <height>379</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -484,8 +484,8 @@
   <tabstop>fitMeasurements</tabstop>
   <tabstop>minTemperature</tabstop>
   <tabstop>maxTemperature</tabstop>
-  <tabstop>maxHumidity</tabstop>
   <tabstop>minHumidity</tabstop>
+  <tabstop>maxHumidity</tabstop>
   <tabstop>showTemperature</tabstop>
   <tabstop>showHumidity</tabstop>
   <tabstop>useSmoothing</tabstop>

@@ -16,8 +16,11 @@ public:
     ~Manager();
 
 private slots:
-    void activateBaseStation(DB::BaseStationId id);
-    void deactivateBaseStation(DB::BaseStationId id);
+    void baseStationDiscovered(Comms::BaseStationDescriptor const& commsBS);
+    void showSettingsDialog();
+    void showBaseStationsDialog();
+    void showUsersDialog();
+    void showReportsDialog();
     void showAbout();
     void exitAction();
     void logout();

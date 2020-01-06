@@ -105,8 +105,8 @@ void BaseStationsWidget::init(Comms& comms, Settings& settings)
         QHostAddress address = m_comms->getBaseStationAddress(bs.descriptor.mac);
         setAddress(i, address);
 
-        bool connected = m_comms->connectToBaseStation(db, bs.descriptor.mac);
-        setStatus(i, connected ? "Added / Connected" : "Added / Disconnected");
+        bool connected = m_comms->isBaseStationConnected(bs.descriptor.mac);
+        setStatus(i, connected ? "Connected" : "Disconnected");
 
         m_baseStationDescriptors.push_back(bs.descriptor);
     }
@@ -188,7 +188,7 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
         {
             size_t bsIndex = static_cast<size_t>(_bsIndex);
             bool connected = m_comms->connectToBaseStation(db, descriptor.mac);
-            setStatus(bsIndex, connected ? "Added / Connected" : "Added / Disconnected");
+            setStatus(bsIndex, connected ? "Connected" : "Disconnected");
             setName(bsIndex, descriptor.name);
         }
         else
@@ -256,19 +256,9 @@ void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor cons
     {
         size_t bsIndex = static_cast<size_t>(_bsIndex);
         DB::BaseStation const& bs = db.getBaseStation(static_cast<size_t>(bsIndex));
-
-        bool connected = m_comms->connectToBaseStation(db, bs.descriptor.mac);
-//        if (m_settings->getActiveBaseStationId() == bs.id)
-//        {
-//            setStatus(bsIndex, connected ? "Active / Connected" : "Active / Disconnected");
-//        }
-//        else
-        {
-            setStatus(bsIndex, connected ? "Added / Connected" : "Added / Disconnected");
-        }
-
+        bool connected = m_comms->isBaseStationConnected(bs.descriptor.mac);
+        setStatus(bsIndex, connected ? "Connected" : "Disconnected");
         setAddress(bsIndex, commsBS.address);
-
         return;
     }
 

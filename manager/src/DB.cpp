@@ -49,8 +49,22 @@ Result<void> DB::create(sqlite3& db)
 		}
 	}
 	{
-		const char* sql = "CREATE TABLE SensorsConfigs (baselineMeasurementTimePoint DATETIME, baselineMeasurementIndex INTEGER, sensorsPower INTEGER, measurementPeriod INTEGER, commsPeriod INTEGER);";
+		const char* sql = "CREATE TABLE SensorTimeConfigs (baselineMeasurementTimePoint DATETIME, baselineMeasurementIndex INTEGER, measurementPeriod INTEGER, commsPeriod INTEGER);";
 		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
+		{
+			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			return error;
+		}
+	}
+	{
+		const char* sql = "CREATE TABLE SensorSettings (id INTEGER PRIMARY KEY, radioPower INTEGER, alertBatteryLevel REAL, alertSignalStrengthLevel REAL);";
+		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
+		{
+			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			return error;
+		}
+		const char* sqlInsert = "INSERT INTO SensorSettings VALUES(0, 0, 0.1, 0.1);";
+		if (sqlite3_exec(&db, sqlInsert, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
@@ -69,9 +83,9 @@ Result<void> DB::create(sqlite3& db)
 		}
 	}
 	{
-		const char* sql = "CREATE TABLE Alarms (id INTEGER PRIMARY KEY, name STRING, filterSensors BOOLEAN, sensors STRING, lowTemperatureWatch BOOLEAN, lowTemperature REAL, highTemperatureWatch BOOLEAN, highTemperature REAL, "
-            "lowHumidityWatch BOOLEAN, lowHumidity REAL, highHumidityWatch BOOLEAN, highHumidity REAL, "
-            "lowVccWatch BOOLEAN, lowSignalWatch BOOLEAN, sendEmailAction BOOLEAN, triggersPerSensor STRING, lastTriggeredTimePoint DATETIME);";
+		const char* sql = "CREATE TABLE Alarms (id INTEGER PRIMARY KEY, name STRING, filterSensors BOOLEAN, sensors STRING, lowTemperatureWatch BOOLEAN, lowTemperatureSoft REAL, lowTemperatureHard REAL, highTemperatureWatch BOOLEAN, highTemperatureSoft REAL, highTemperatureHard REAL, "
+            "lowHumidityWatch BOOLEAN, lowHumiditySoft REAL, lowHumidityHard REAL, highHumidityWatch BOOLEAN, highHumiditySoft REAL, highHumidityHard REAL, "
+            "lowVccWatch BOOLEAN, lowSignalWatch BOOLEAN, sendEmailAction BOOLEAN, resendPeriod INTEGER, triggersPerSensor STRING, lastTriggeredTimePoint DATETIME);";
 		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
@@ -112,18 +126,27 @@ Result<void> DB::load(sqlite3& db)
         if (sqlite3_prepare_v2(&db, "REPLACE INTO BaseStations (id, name, mac) "
                                     "VALUES (?1, ?2, ?3);", -1, &stmt, NULL) != SQLITE_OK)
 		{
-			return Error(QString("Cannot load base stations: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
         m_saveBaseStationsStmt.reset(stmt, &sqlite3_finalize);
     }
 	{
 		sqlite3_stmt* stmt;
-        if (sqlite3_prepare_v2(&db, "INSERT INTO SensorsConfigs (baselineMeasurementTimePoint, baselineMeasurementIndex, sensorsPower, measurementPeriod, commsPeriod) "
-						            "VALUES (?1, ?2, ?3, ?4, ?5);", -1, &stmt, NULL) != SQLITE_OK)
+        if (sqlite3_prepare_v2(&db, "INSERT INTO SensorTimeConfigs (baselineMeasurementTimePoint, baselineMeasurementIndex, measurementPeriod, commsPeriod) "
+						            "VALUES (?1, ?2, ?3, ?4);", -1, &stmt, NULL) != SQLITE_OK)
 		{
-			return Error(QString("Cannot load base stations: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
-		m_saveSensorsConfigsStmt.reset(stmt, &sqlite3_finalize);
+		m_saveSensorTimeConfigsStmt.reset(stmt, &sqlite3_finalize);
+	}
+	{
+		sqlite3_stmt* stmt;
+		if (sqlite3_prepare_v2(&db, "REPLACE INTO SensorSettings (id, radioPower, alertBatteryLevel, alertSignalStrengthLevel) "
+							   "VALUES (0, ?1, ?2, ?3);", -1, &stmt, NULL) != SQLITE_OK)
+		{
+			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+		}
+		m_saveSensorSettingsStmt.reset(stmt, &sqlite3_finalize);
 	}
 	{
 		sqlite3_stmt* stmt;
@@ -134,18 +157,18 @@ Result<void> DB::load(sqlite3& db)
 						                       "isRTMeasurementValid, rtMeasurementTemperature, rtMeasurementHumidity, rtMeasurementVcc) "
 						            "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30);", -1, &stmt, NULL) != SQLITE_OK)
 		{
-			return Error(QString("Cannot load base stations: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
 		m_saveSensorsStmt.reset(stmt, &sqlite3_finalize);
 	}
 	{
 		sqlite3_stmt* stmt;
-		if (sqlite3_prepare_v2(&db, "REPLACE INTO Alarms (id, name, filterSensors, sensors, lowTemperatureWatch, lowTemperature, highTemperatureWatch, highTemperature, "
-						                       "lowHumidityWatch, lowHumidity, highHumidityWatch, highHumidity, "
-						                       "lowVccWatch, lowSignalWatch, sendEmailAction, triggersPerSensor, lastTriggeredTimePoint) "
-							        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17);", -1, &stmt, NULL) != SQLITE_OK)
+		if (sqlite3_prepare_v2(&db, "REPLACE INTO Alarms (id, name, filterSensors, sensors, lowTemperatureWatch, lowTemperatureSoft, lowTemperatureHard, highTemperatureWatch, highTemperatureSoft, highTemperatureHard, "
+						                       "lowHumidityWatch, lowHumiditySoft, lowHumidityHard, highHumidityWatch, highHumiditySoft, highHumidityHard, "
+						                       "lowVccWatch, lowSignalWatch, sendEmailAction, resendPeriod, triggersPerSensor, lastTriggeredTimePoint) "
+							        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22);", -1, &stmt, NULL) != SQLITE_OK)
 		{
-			return Error(QString("Cannot load base stations: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
 		m_saveAlarmsStmt.reset(stmt, &sqlite3_finalize);
 	}
@@ -154,7 +177,7 @@ Result<void> DB::load(sqlite3& db)
 		if (sqlite3_prepare_v2(&db, "REPLACE INTO Reports (id, name, period, customPeriod, data, filterSensors, sensors, lastTriggeredTimePoint) "
 							        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8);", -1, &stmt, NULL) != SQLITE_OK)
 		{
-			return Error(QString("Cannot load base stations: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
 		m_saveReportsStmt.reset(stmt, &sqlite3_finalize);
     }
@@ -163,7 +186,7 @@ Result<void> DB::load(sqlite3& db)
         if (sqlite3_prepare_v2(&db, "REPLACE INTO Measurements (id, timePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggers) "
 							        "VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11);", -1, &stmt, NULL) != SQLITE_OK)
 		{
-			return Error(QString("Cannot load base stations: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
 		m_addMeasurementsStmt.reset(stmt, &sqlite3_finalize);
     }
@@ -175,7 +198,7 @@ Result<void> DB::load(sqlite3& db)
 		sqlite3_stmt* stmt;
 		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
 		{
-			return Error(QString("Cannot load base stations: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
 		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
 
@@ -196,9 +219,8 @@ Result<void> DB::load(sqlite3& db)
 	}
 
 	{
-		//const char* sql = "CREATE TABLE SensorsConfigs (baselineMeasurementTimePoint DATETIME, baselineMeasurementIndex INTEGER, sensorsPower INTEGER, measurementPeriod INTEGER, commsPeriod INTEGER);";
-		const char* sql = "SELECT baselineMeasurementTimePoint, baselineMeasurementIndex, sensorsPower, measurementPeriod, commsPeriod "
-                          "FROM SensorsConfigs;";
+		const char* sql = "SELECT baselineMeasurementTimePoint, baselineMeasurementIndex, measurementPeriod, commsPeriod "
+                          "FROM SensorTimeConfigs;";
 		sqlite3_stmt* stmt;
 		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
 		{
@@ -208,14 +230,35 @@ Result<void> DB::load(sqlite3& db)
 
 		while (sqlite3_step(stmt) == SQLITE_ROW)
 		{
-            SensorsConfig sc;
+            SensorTimeConfig sc;
 			sc.baselineMeasurementTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 0));
 			sc.baselineMeasurementIndex = sqlite3_column_int64(stmt, 1);
-			sc.descriptor.sensorsPower = (int8_t)sqlite3_column_int64(stmt, 2);
-			sc.descriptor.measurementPeriod = std::chrono::seconds(sqlite3_column_int64(stmt, 3));
-			sc.descriptor.commsPeriod = std::chrono::seconds(sqlite3_column_int64(stmt, 4));
-			data.sensorsConfigs.push_back(std::move(sc));
+			sc.descriptor.measurementPeriod = std::chrono::seconds(sqlite3_column_int64(stmt, 2));
+			sc.descriptor.commsPeriod = std::chrono::seconds(sqlite3_column_int64(stmt, 3));
+			data.sensorTimeConfigs.push_back(std::move(sc));
 		}
+	}
+
+	{
+		const char* sql = "SELECT radioPower, alertBatteryLevel, alertSignalStrengthLevel "
+			              "FROM SensorSettings;";
+		sqlite3_stmt* stmt;
+		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
+		{
+			return Error(QString("Cannot load sensors configs: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+		}
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+		if (sqlite3_step(stmt) != SQLITE_ROW)
+		{
+            return Error(QString("Cannot load sensor config: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+		}
+
+        SensorSettings ss;
+		ss.radioPower = (int8_t)sqlite3_column_int64(stmt, 0);
+		ss.alertBatteryLevel = std::clamp((float)sqlite3_column_double(stmt, 1), 0.f, 1.f);
+		ss.alertSignalStrengthLevel = std::clamp((float)sqlite3_column_double(stmt, 2), 0.f, 1.f);
+		data.sensorSettings = ss;
 	}
 
 	{
@@ -270,13 +313,9 @@ Result<void> DB::load(sqlite3& db)
 	}
 
 	{
-// 		const char* sql = "CREATE TABLE Alarms (id INTEGER PRIMARY KEY, name, filterSensors BOOLEAN, sensors STRING, lowTemperatureWatch BOOLEAN, lowTemperature REAL, highTemperatureWatch BOOLEAN, highTemperature REAL, "
-// 			"lowHumidityWatch BOOLEAN, lowHumidity REAL, highHumidityWatch BOOLEAN, highHumidity REAL, "
-// 			"lowVccWatch BOOLEAN, lowSignalWatch BOOLEAN, "
-// 			"sendEmailAction BOOLEAN);";
-		const char* sql = "SELECT id, name, filterSensors, sensors, lowTemperatureWatch, lowTemperature, highTemperatureWatch, highTemperature, "
-			 			            "lowHumidityWatch, lowHumidity, highHumidityWatch, highHumidity, "
-			 			            "lowVccWatch, lowSignalWatch, sendEmailAction, triggersPerSensor, lastTriggeredTimePoint "
+		const char* sql = "SELECT id, name, filterSensors, sensors, lowTemperatureWatch, lowTemperatureSoft, lowTemperatureHard, highTemperatureWatch, highTemperatureSoft, highTemperatureHard, "
+			 			            "lowHumidityWatch, lowHumiditySoft, lowHumidityHard, highHumidityWatch, highHumiditySoft, highHumidityHard, "
+			 			            "lowVccWatch, lowSignalWatch, sendEmailAction, resendPeriod, triggersPerSensor, lastTriggeredTimePoint "
                           "FROM Alarms;";
 		sqlite3_stmt* stmt;
 		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
@@ -300,18 +339,27 @@ Result<void> DB::load(sqlite3& db)
 				}
 			}
             a.descriptor.lowTemperatureWatch = sqlite3_column_int64(stmt, 4) ? true : false;
-            a.descriptor.lowTemperature = (float)sqlite3_column_double(stmt, 5);
-			a.descriptor.highTemperatureWatch = sqlite3_column_int64(stmt, 6) ? true : false;
-			a.descriptor.highTemperature = (float)sqlite3_column_double(stmt, 7);
-			a.descriptor.lowHumidityWatch = sqlite3_column_int64(stmt, 8) ? true : false;
-			a.descriptor.lowHumidity = (float)sqlite3_column_double(stmt, 9);
-			a.descriptor.highHumidityWatch = sqlite3_column_int64(stmt, 10) ? true : false;
-			a.descriptor.highHumidity = (float)sqlite3_column_double(stmt, 11);
-			a.descriptor.lowVccWatch = sqlite3_column_int64(stmt, 12);
-			a.descriptor.lowSignalWatch = sqlite3_column_int64(stmt, 13);
-			a.descriptor.sendEmailAction = sqlite3_column_int64(stmt, 14);
+            a.descriptor.lowTemperatureSoft = (float)sqlite3_column_double(stmt, 5);
+            a.descriptor.lowTemperatureHard = (float)sqlite3_column_double(stmt, 6);
+            std::tie(a.descriptor.lowTemperatureHard, a.descriptor.lowTemperatureSoft) = std::minmax(a.descriptor.lowTemperatureSoft, a.descriptor.lowTemperatureHard);
+			a.descriptor.highTemperatureWatch = sqlite3_column_int64(stmt, 7) ? true : false;
+			a.descriptor.highTemperatureSoft = (float)sqlite3_column_double(stmt, 8);
+			a.descriptor.highTemperatureHard = (float)sqlite3_column_double(stmt, 9);
+			std::tie(a.descriptor.highTemperatureSoft, a.descriptor.highTemperatureHard) = std::minmax(a.descriptor.highTemperatureSoft, a.descriptor.highTemperatureHard);
+			a.descriptor.lowHumidityWatch = sqlite3_column_int64(stmt, 10) ? true : false;
+			a.descriptor.lowHumiditySoft = (float)sqlite3_column_double(stmt, 11);
+			a.descriptor.lowHumidityHard = (float)sqlite3_column_double(stmt, 12);
+			std::tie(a.descriptor.lowHumidityHard, a.descriptor.lowHumiditySoft) = std::minmax(a.descriptor.lowHumiditySoft, a.descriptor.lowHumidityHard);
+			a.descriptor.highHumidityWatch = sqlite3_column_int64(stmt, 13) ? true : false;
+			a.descriptor.highHumiditySoft = (float)sqlite3_column_double(stmt, 14);
+			a.descriptor.highHumidityHard = (float)sqlite3_column_double(stmt, 15);
+			std::tie(a.descriptor.highHumiditySoft, a.descriptor.highHumidityHard) = std::minmax(a.descriptor.highHumiditySoft, a.descriptor.highHumidityHard);
+			a.descriptor.lowVccWatch = sqlite3_column_int64(stmt, 16);
+			a.descriptor.lowSignalWatch = sqlite3_column_int64(stmt, 17);
+			a.descriptor.sendEmailAction = sqlite3_column_int64(stmt, 18);
+            a.descriptor.resendPeriod = std::chrono::seconds(sqlite3_column_int64(stmt, 19));
 			{
-				QString triggers = (char const*)sqlite3_column_text(stmt, 15);
+				QString triggers = (char const*)sqlite3_column_text(stmt, 20);
 				QStringList l = triggers.split(QChar(';'), QString::SkipEmptyParts);
 				for (QString str : l)
 				{
@@ -326,13 +374,12 @@ Result<void> DB::load(sqlite3& db)
                     }
 				}
 			}
-            a.lastTriggeredTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 16));
+            a.lastTriggeredTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 21));
 			data.alarms.push_back(std::move(a));
 		}
 	}
 	{
-		//const char* sql = "CREATE TABLE Reports (id INTEGER PRIMARY KEY, name STRING, period INTEGER, customPeriod INTEGER, data INTEGER, filterSensors BOOLEAN, sensors STRING, lastTriggeredTimePoint DATETIME);";
-		const char* sql = "SELECT id, name, period, data, filterSensors, sensors, lastTriggeredTimePoint "
+		const char* sql = "SELECT id, name, period, customPeriod, data, filterSensors, sensors, lastTriggeredTimePoint "
                           "FROM Reports;";
 		sqlite3_stmt* stmt;
 		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
@@ -393,9 +440,9 @@ Result<void> DB::load(sqlite3& db)
 		}
 
         //refresh computed comms period
-        if (!m_data.sensorsConfigs.empty())
+        if (!m_data.sensorTimeConfigs.empty())
         {
-            SensorsConfig& config = m_data.sensorsConfigs.back();
+            SensorTimeConfig& config = m_data.sensorTimeConfigs.back();
             config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
         }
 
@@ -444,9 +491,43 @@ void DB::process()
     checkRepetitiveAlarms();
 }
 
+//////////////////////////////////////////////////////////////////////////
+
+Result<void> DB::setSensorSettings(SensorSettings const& settings)
+{
+	if (settings.radioPower < -3 || settings.radioPower > 20)
+	{
+		return Error("Invalid radio power value");
+	}
+	if (settings.alertBatteryLevel < 0.f || settings.alertBatteryLevel >= 1.f)
+	{
+		return Error("Invalid alert battery level");
+	}
+	if (settings.alertSignalStrengthLevel < 0.f || settings.alertSignalStrengthLevel >= 1.f)
+	{
+		return Error("Invalid alert signal strength level");
+	}
+
+	m_data.sensorSettings = settings;
+	emit sensorSettingsChanged();
+
+	s_logger.logInfo("Changed sensor settings");
+
+	save(m_data);
+
+	return success;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+DB::SensorSettings const& DB::getSensorSettings() const
+{
+	return m_data.sensorSettings;
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-DB::Clock::duration DB::computeActualCommsPeriod(SensorsConfigDescriptor const& config) const
+DB::Clock::duration DB::computeActualCommsPeriod(SensorTimeConfigDescriptor const& config) const
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
@@ -460,7 +541,7 @@ DB::Clock::duration DB::computeActualCommsPeriod(SensorsConfigDescriptor const& 
 DB::Clock::time_point DB::computeNextMeasurementTimePoint(Sensor const& sensor) const
 {
     uint32_t nextMeasurementIndex = computeNextMeasurementIndex(sensor);
-    SensorsConfig const& config = findSensorsConfigForMeasurementIndex(nextMeasurementIndex);
+    SensorTimeConfig const& config = findSensorTimeConfigForMeasurementIndex(nextMeasurementIndex);
 
     uint32_t index = nextMeasurementIndex >= config.baselineMeasurementIndex ? nextMeasurementIndex - config.baselineMeasurementIndex : 0;
     Clock::time_point tp = config.baselineMeasurementTimePoint + config.descriptor.measurementPeriod * index;
@@ -471,7 +552,7 @@ DB::Clock::time_point DB::computeNextMeasurementTimePoint(Sensor const& sensor) 
 
 DB::Clock::time_point DB::computeNextCommsTimePoint(Sensor const& /*sensor*/, size_t sensorIndex) const
 {
-    SensorsConfig const& config = getLastSensorsConfig();
+    SensorTimeConfig const& config = getLastSensorTimeConfig();
     Clock::duration period = computeActualCommsPeriod(config.descriptor);
 
     Clock::time_point now = Clock::now();
@@ -679,7 +760,7 @@ DB::SensorOutputDetails DB::computeSensorOutputDetails(SensorId id) const
 
     size_t index = static_cast<size_t>(_index);
     Sensor const& sensor = m_data.sensors[index];
-    SensorsConfig const& config = getLastSensorsConfig();
+    SensorTimeConfig const& config = getLastSensorTimeConfig();
 
     SensorOutputDetails details;
     details.commsPeriod = computeActualCommsPeriod(config.descriptor);
@@ -695,7 +776,7 @@ DB::SensorOutputDetails DB::computeSensorOutputDetails(SensorId id) const
 
 uint32_t DB::computeNextRealTimeMeasurementIndex() const
 {
-    SensorsConfig const& config = getLastSensorsConfig();
+    SensorTimeConfig const& config = getLastSensorTimeConfig();
     Clock::time_point now = Clock::now();
     uint32_t index = static_cast<uint32_t>(std::ceil((now - config.baselineMeasurementTimePoint) / config.descriptor.measurementPeriod)) + config.baselineMeasurementIndex;
     return index;
@@ -703,7 +784,7 @@ uint32_t DB::computeNextRealTimeMeasurementIndex() const
 
 //////////////////////////////////////////////////////////////////////////
 
-Result<void> DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
+Result<void> DB::addSensorTimeConfig(SensorTimeConfigDescriptor const& descriptor)
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
@@ -720,21 +801,21 @@ Result<void> DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
         return Error("Comms period cannot be lower than the measurement period");
     }
 
-    SensorsConfig config;
+    SensorTimeConfig config;
     config.descriptor = descriptor;
 
-    if (!m_data.sensorsConfigs.empty())
+    if (!m_data.sensorTimeConfigs.empty())
     {
         uint32_t nextRealTimeMeasurementIndex = computeNextRealTimeMeasurementIndex();
 
-        SensorsConfig const& c = findSensorsConfigForMeasurementIndex(nextRealTimeMeasurementIndex);
+        SensorTimeConfig const& c = findSensorTimeConfigForMeasurementIndex(nextRealTimeMeasurementIndex);
         uint32_t index = nextRealTimeMeasurementIndex >= c.baselineMeasurementIndex ? nextRealTimeMeasurementIndex - c.baselineMeasurementIndex : 0;
         Clock::time_point nextMeasurementTP = c.baselineMeasurementTimePoint + c.descriptor.measurementPeriod * index;
 
-        m_data.sensorsConfigs.erase(std::remove_if(m_data.sensorsConfigs.begin(), m_data.sensorsConfigs.end(), [&nextRealTimeMeasurementIndex](SensorsConfig const& c)
+        m_data.sensorTimeConfigs.erase(std::remove_if(m_data.sensorTimeConfigs.begin(), m_data.sensorTimeConfigs.end(), [&nextRealTimeMeasurementIndex](SensorTimeConfig const& c)
         {
             return c.baselineMeasurementIndex == nextRealTimeMeasurementIndex;
-        }), m_data.sensorsConfigs.end());
+        }), m_data.sensorTimeConfigs.end());
         config.baselineMeasurementIndex = nextRealTimeMeasurementIndex;
         config.baselineMeasurementTimePoint = nextMeasurementTP;
     }
@@ -744,14 +825,14 @@ Result<void> DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
         config.baselineMeasurementTimePoint = Clock::now();
     }
 
-    m_data.sensorsConfigs.push_back(config);
-    while (m_data.sensorsConfigs.size() > 100)
+    m_data.sensorTimeConfigs.push_back(config);
+    while (m_data.sensorTimeConfigs.size() > 100)
     {
-        m_data.sensorsConfigs.erase(m_data.sensorsConfigs.begin());
+        m_data.sensorTimeConfigs.erase(m_data.sensorTimeConfigs.begin());
     }
-    m_data.sensorsConfigs.back().computedCommsPeriod = computeActualCommsPeriod(m_data.sensorsConfigs.back().descriptor); //make sure the computed commd config is up-to-date
+    m_data.sensorTimeConfigs.back().computedCommsPeriod = computeActualCommsPeriod(m_data.sensorTimeConfigs.back().descriptor); //make sure the computed commd config is up-to-date
 
-    emit sensorsConfigAdded();
+    emit sensorTimeConfigAdded();
 
     s_logger.logInfo("Added sensors config");
 
@@ -762,22 +843,22 @@ Result<void> DB::addSensorsConfig(SensorsConfigDescriptor const& descriptor)
 
 //////////////////////////////////////////////////////////////////////////
 
-Result<void> DB::setSensorsConfigs(std::vector<SensorsConfig> const& configs)
+Result<void> DB::setSensorTimeConfigs(std::vector<SensorTimeConfig> const& configs)
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    m_data.sensorsConfigs = configs;
-    for (SensorsConfig& config: m_data.sensorsConfigs)
+	m_data.sensorTimeConfigs = configs;
+	for (SensorTimeConfig& config : m_data.sensorTimeConfigs)
     {
         config.computedCommsPeriod = config.descriptor.commsPeriod;
     }
-    if (!m_data.sensorsConfigs.empty())
+    if (!m_data.sensorTimeConfigs.empty())
     {
-        SensorsConfig& config = m_data.sensorsConfigs.back();
+		SensorTimeConfig& config = m_data.sensorTimeConfigs.back();
         config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
     }
 
-    emit sensorsConfigChanged();
+	emit sensorTimeConfigChanged();
 
     s_logger.logInfo("Changed sensors configs");
 
@@ -788,46 +869,46 @@ Result<void> DB::setSensorsConfigs(std::vector<SensorsConfig> const& configs)
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::SensorsConfig const& DB::getLastSensorsConfig() const
+DB::SensorTimeConfig const& DB::getLastSensorTimeConfig() const
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    static SensorsConfig s_empty;
-    return m_data.sensorsConfigs.empty() ? s_empty : m_data.sensorsConfigs.back();
+    static SensorTimeConfig s_empty;
+	return m_data.sensorTimeConfigs.empty() ? s_empty : m_data.sensorTimeConfigs.back();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-size_t DB::getSensorsConfigCount() const
+size_t DB::getSensorTimeConfigCount() const
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
-    return m_data.sensorsConfigs.size();
+	return m_data.sensorTimeConfigs.size();
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::SensorsConfig const& DB::getSensorsConfig(size_t index) const
+DB::SensorTimeConfig const& DB::getSensorTimeConfig(size_t index) const
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
-    Q_ASSERT(index < m_data.sensorsConfigs.size());
-    return m_data.sensorsConfigs[index];
+	Q_ASSERT(index < m_data.sensorTimeConfigs.size());
+    return m_data.sensorTimeConfigs[index];
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::SensorsConfig const& DB::findSensorsConfigForMeasurementIndex(uint32_t index) const
+DB::SensorTimeConfig const& DB::findSensorTimeConfigForMeasurementIndex(uint32_t index) const
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    for (auto it = m_data.sensorsConfigs.rbegin(); it != m_data.sensorsConfigs.rend(); ++it)
+	for (auto it = m_data.sensorTimeConfigs.rbegin(); it != m_data.sensorTimeConfigs.rend(); ++it)
     {
-        SensorsConfig const& c = *it;
+		SensorTimeConfig const& c = *it;
         if (index >= c.baselineMeasurementIndex)
         {
             return c;
         }
     }
-    return getLastSensorsConfig();
+    return getLastSensorTimeConfig();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -859,11 +940,11 @@ Result<void> DB::addSensor(SensorDescriptor const& descriptor)
     }
 
     //refresh computed comms period as new sensors are added
-    if (!m_data.sensorsConfigs.empty())
+    if (!m_data.sensorTimeConfigs.empty())
     {
-        SensorsConfig& config = m_data.sensorsConfigs.back();
+		SensorTimeConfig& config = m_data.sensorTimeConfigs.back();
         config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
-        emit sensorsConfigChanged();
+        emit sensorTimeConfigChanged();
     }
 
     save();
@@ -933,11 +1014,11 @@ Result<DB::SensorId> DB::bindSensor(uint32_t serialNumber, uint8_t sensorType, u
     s_logger.logInfo(QString("Sensor '%1' bound to address %2").arg(sensor.descriptor.name.c_str()).arg(sensor.address));
 
     //refresh computed comms period as new sensors are added
-    if (!m_data.sensorsConfigs.empty())
+    if (!m_data.sensorTimeConfigs.empty())
     {
-        SensorsConfig& config = m_data.sensorsConfigs.back();
+		SensorTimeConfig& config = m_data.sensorTimeConfigs.back();
         config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
-        emit sensorsConfigChanged();
+        emit sensorTimeConfigChanged();
     }
 
     save();
@@ -997,7 +1078,7 @@ Result<void> DB::setSensorSleep(SensorId id, bool sleep)
         return success;
     }
 
-    DB::SensorsConfig config = getLastSensorsConfig();
+	DB::SensorTimeConfig config = getLastSensorTimeConfig();
     bool hasMeasurements = sensor.estimatedStoredMeasurementCount > 0;
     bool commedRecently = (DB::Clock::now() - sensor.lastCommsTimePoint) < config.descriptor.commsPeriod * 2;
     bool allowedToSleep = !hasMeasurements && commedRecently;
@@ -1207,11 +1288,11 @@ void DB::removeSensor(size_t index)
     emit sensorRemoved(sensorId);
 
     //refresh computed comms period as new sensors are removed
-    if (!m_data.sensorsConfigs.empty())
+	if (!m_data.sensorTimeConfigs.empty())
     {
-        SensorsConfig& config = m_data.sensorsConfigs.back();
+		SensorTimeConfig& config = m_data.sensorTimeConfigs.back();
         config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
-        emit sensorsConfigChanged();
+        emit sensorTimeConfigChanged();
     }
 
     save();
@@ -1308,6 +1389,40 @@ DB::Alarm const& DB::getAlarm(size_t index) const
 
 //////////////////////////////////////////////////////////////////////////
 
+Result<void> DB::checkAlarmDescriptor(AlarmDescriptor const& descriptor) const
+{
+    if (descriptor.highTemperatureWatch && descriptor.highTemperatureSoft > descriptor.highTemperatureHard)
+    {
+        return Error(QString("High temperature soft threshold (%1) is bigger than the hard threshold (%2)").arg(descriptor.highTemperatureSoft).arg(descriptor.highTemperatureHard).toUtf8().data());
+    }
+	if (descriptor.lowTemperatureWatch && descriptor.lowTemperatureSoft < descriptor.lowTemperatureHard)
+	{
+		return Error(QString("Low temperature soft threshold (%1) is smaller than the hard threshold (%2)").arg(descriptor.lowTemperatureSoft).arg(descriptor.lowTemperatureHard).toUtf8().data());
+	}
+    if (descriptor.highTemperatureWatch && descriptor.lowTemperatureWatch && descriptor.highTemperatureHard <= descriptor.lowTemperatureHard)
+    {
+		return Error(QString("High temperature threshold (%1) is smaller than the low threshold (%2)").arg(descriptor.highTemperatureHard).arg(descriptor.lowTemperatureHard).toUtf8().data());
+    }
+
+
+	if (descriptor.highHumidityWatch && descriptor.highHumiditySoft > descriptor.highHumidityHard)
+	{
+		return Error(QString("High humidity soft threshold (%1) is bigger than the hard threshold (%2)").arg(descriptor.highHumiditySoft).arg(descriptor.highHumidityHard).toUtf8().data());
+	}
+	if (descriptor.lowHumidityWatch && descriptor.lowHumiditySoft < descriptor.lowHumidityHard)
+	{
+		return Error(QString("Low humidity soft threshold (%1) is smaller than the hard threshold (%2)").arg(descriptor.lowHumiditySoft).arg(descriptor.lowHumidityHard).toUtf8().data());
+	}
+	if (descriptor.highHumidityWatch && descriptor.lowHumidityWatch && descriptor.highHumidityHard <= descriptor.lowHumidityHard)
+	{
+		return Error(QString("High humidity threshold (%1) is smaller than the low threshold (%2)").arg(descriptor.highHumidityHard).arg(descriptor.lowHumidityHard).toUtf8().data());
+	}
+
+	return success;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 Result<void> DB::addAlarm(AlarmDescriptor const& descriptor)
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
@@ -1315,6 +1430,12 @@ Result<void> DB::addAlarm(AlarmDescriptor const& descriptor)
     if (findAlarmIndexByName(descriptor.name) >= 0)
     {
         return Error("Name '" + descriptor.name + "' already in use");
+    }
+
+    Result<void> result = checkAlarmDescriptor(descriptor);
+    if (result != success)
+    {
+        return result;
     }
 
     Alarm alarm;
@@ -1353,6 +1474,12 @@ Result<void> DB::setAlarm(AlarmId id, AlarmDescriptor const& descriptor)
     {
         return Error("Trying to change non-existing alarm");
     }
+
+	Result<void> result = checkAlarmDescriptor(descriptor);
+	if (result != success)
+	{
+		return result;
+	}
 
     size_t index = static_cast<size_t>(_index);
     m_data.alarms[index].descriptor = descriptor;
@@ -1412,15 +1539,15 @@ int32_t DB::findAlarmIndexById(AlarmId id) const
 
 //////////////////////////////////////////////////////////////////////////
 
-uint8_t DB::computeAlarmTriggers(Measurement const& m)
+uint32_t DB::computeAlarmTriggers(Measurement const& m)
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    uint8_t allTriggers = 0;
+    uint32_t allTriggers = 0;
 
     for (Alarm& alarm: m_data.alarms)
     {
-        uint8_t triggers = _computeAlarmTriggers(alarm, m);
+        uint32_t triggers = _computeAlarmTriggers(alarm, m);
         allTriggers |= triggers;
     }
 
@@ -1429,7 +1556,7 @@ uint8_t DB::computeAlarmTriggers(Measurement const& m)
 
 //////////////////////////////////////////////////////////////////////////
 
-uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
+uint32_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
@@ -1442,38 +1569,54 @@ uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
         }
     }
 
-    uint8_t triggers = 0;
-    if (ad.highTemperatureWatch && m.descriptor.temperature > ad.highTemperature)
+    uint32_t triggers = 0;
+    if (ad.highTemperatureWatch && m.descriptor.temperature > ad.highTemperatureSoft)
     {
-        triggers |= AlarmTrigger::HighTemperature;
+        triggers |= AlarmTrigger::HighTemperatureSoft;
     }
-    if (ad.lowTemperatureWatch && m.descriptor.temperature < ad.lowTemperature)
+	if (ad.highTemperatureWatch && m.descriptor.temperature > ad.highTemperatureHard)
+	{
+		triggers |= AlarmTrigger::HighTemperatureHard;
+	}
+    if (ad.lowTemperatureWatch && m.descriptor.temperature < ad.lowTemperatureSoft)
     {
-        triggers |= AlarmTrigger::LowTemperature;
+        triggers |= AlarmTrigger::LowTemperatureSoft;
     }
+	if (ad.lowTemperatureWatch && m.descriptor.temperature < ad.lowTemperatureHard)
+	{
+		triggers |= AlarmTrigger::LowTemperatureHard;
+	}
 
-    if (ad.highHumidityWatch && m.descriptor.humidity > ad.highHumidity)
+    if (ad.highHumidityWatch && m.descriptor.humidity > ad.highHumiditySoft)
     {
-        triggers |= AlarmTrigger::HighHumidity;
+        triggers |= AlarmTrigger::HighHumiditySoft;
     }
-    if (ad.lowHumidityWatch && m.descriptor.humidity < ad.lowHumidity)
+	if (ad.highHumidityWatch && m.descriptor.humidity > ad.highHumidityHard)
+	{
+		triggers |= AlarmTrigger::HighHumidityHard;
+	}
+    if (ad.lowHumidityWatch && m.descriptor.humidity < ad.lowHumiditySoft)
     {
-        triggers |= AlarmTrigger::LowHumidity;
+        triggers |= AlarmTrigger::LowHumiditySoft;
     }
+	if (ad.lowHumidityWatch && m.descriptor.humidity < ad.lowHumidityHard)
+	{
+		triggers |= AlarmTrigger::LowHumidityHard;
+	}
 
-    float alertLevelVcc = utils::k_alertBatteryLevel * (utils::k_maxBatteryLevel - utils::k_minBatteryLevel) + utils::k_minBatteryLevel;
+    float alertLevelVcc = m_data.sensorSettings.alertBatteryLevel * (utils::k_maxBatteryLevel - utils::k_minBatteryLevel) + utils::k_minBatteryLevel;
     if (ad.lowVccWatch && m.descriptor.vcc <= alertLevelVcc)
     {
         triggers |= AlarmTrigger::LowVcc;
     }
 
-    float alertLevelSignal = utils::k_alertSignalLevel * (utils::k_maxSignalLevel - utils::k_minSignalLevel) + utils::k_minSignalLevel;
+    float alertLevelSignal = m_data.sensorSettings.alertSignalStrengthLevel * (utils::k_maxSignalLevel - utils::k_minSignalLevel) + utils::k_minSignalLevel;
     if (ad.lowSignalWatch && std::min(m.descriptor.signalStrength.b2s, m.descriptor.signalStrength.s2b) <= alertLevelSignal)
     {
         triggers |= AlarmTrigger::LowSignal;
     }
 
-    uint8_t oldTriggers = 0;
+    uint32_t oldTriggers = 0;
     auto it = alarm.triggersPerSensor.find(m.descriptor.sensorId);
     if (it != alarm.triggersPerSensor.end())
     {
@@ -1492,11 +1635,11 @@ uint8_t DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
         }
     }
 
-    uint8_t diff = oldTriggers ^ triggers;
+    uint32_t diff = oldTriggers ^ triggers;
     if (diff != 0)
     {
-        uint8_t removed = diff & oldTriggers;
-        uint8_t added = diff & triggers;
+        uint32_t removed = diff & oldTriggers;
+        uint32_t added = diff & triggers;
 
         s_logger.logInfo(QString("Alarm '%1' triggers for measurement index %2 have changed: old %3, new %4, added %5, removed %6")
                          .arg(ad.name.c_str())
@@ -1894,7 +2037,7 @@ DB::Clock::time_point DB::computeMeasurementTimepoint(MeasurementDescriptor cons
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    SensorsConfig const& config = findSensorsConfigForMeasurementIndex(md.index);
+	SensorTimeConfig const& config = findSensorTimeConfigForMeasurementIndex(md.index);
     uint32_t index = md.index >= config.baselineMeasurementIndex ? md.index - config.baselineMeasurementIndex : 0;
     Clock::time_point tp = config.baselineMeasurementTimePoint + config.descriptor.measurementPeriod * index;
     return tp;
@@ -2167,8 +2310,8 @@ DB::Measurement DB::unpackMeasurement(sqlite3_stmt* stmt)
 	m.descriptor.vcc = (float)sqlite3_column_double(stmt, 6);
 	m.descriptor.signalStrength.s2b = (int8_t)sqlite3_column_int(stmt, 7);
 	m.descriptor.signalStrength.b2s = (int8_t)sqlite3_column_int(stmt, 8);
-	m.descriptor.sensorErrors = (uint8_t)sqlite3_column_int(stmt, 9);
-	m.alarmTriggers = (uint8_t)sqlite3_column_int(stmt, 10);
+	m.descriptor.sensorErrors = (uint32_t)sqlite3_column_int(stmt, 9);
+	m.alarmTriggers = (uint32_t)sqlite3_column_int(stmt, 10);
     return m;
 }
 
@@ -2271,21 +2414,20 @@ void DB::save(Data const& data) const
  	}
  	{
 		{
-			const char* sql = "DELETE FROM SensorsConfigs;";
+			const char* sql = "DELETE FROM SensorTimeConfigs;";
 			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
 			{
 				s_logger.logCritical(QString("Failed to clear sensor configs: %1").arg(sqlite3_errmsg(m_sqlite)));
 				return;
 			}
 		}
-		sqlite3_stmt* stmt = m_saveSensorsConfigsStmt.get();
-		for (SensorsConfig const& sc: data.sensorsConfigs)
+		sqlite3_stmt* stmt = m_saveSensorTimeConfigsStmt.get();
+		for (SensorTimeConfig const& sc : data.sensorTimeConfigs)
 		{
 			sqlite3_bind_int64(stmt, 1, Clock::to_time_t(sc.baselineMeasurementTimePoint));
 			sqlite3_bind_int64(stmt, 2, sc.baselineMeasurementIndex);
-            sqlite3_bind_int64(stmt, 3, sc.descriptor.sensorsPower);
-            sqlite3_bind_int64(stmt, 4, std::chrono::duration_cast<std::chrono::seconds>(sc.descriptor.measurementPeriod).count());
-            sqlite3_bind_int64(stmt, 5, std::chrono::duration_cast<std::chrono::seconds>(sc.descriptor.commsPeriod).count());
+            sqlite3_bind_int64(stmt, 3, std::chrono::duration_cast<std::chrono::seconds>(sc.descriptor.measurementPeriod).count());
+            sqlite3_bind_int64(stmt, 4, std::chrono::duration_cast<std::chrono::seconds>(sc.descriptor.commsPeriod).count());
 			if (sqlite3_step(stmt) != SQLITE_DONE)
 			{
 				s_logger.logCritical(QString("Failed to save sensor config: %1").arg(sqlite3_errmsg(m_sqlite)));
@@ -2294,12 +2436,28 @@ void DB::save(Data const& data) const
 			sqlite3_reset(stmt);
 		}
 	}
+	{
+        sqlite3_stmt* stmt = m_saveSensorSettingsStmt.get();
+
+		sqlite3_bind_int64(stmt, 1, data.sensorSettings.radioPower);
+		sqlite3_bind_double(stmt, 2, data.sensorSettings.alertBatteryLevel);
+		sqlite3_bind_double(stmt, 3, data.sensorSettings.alertSignalStrengthLevel);
+
+		const char* xx = sqlite3_expanded_sql(stmt);
+
+		if (sqlite3_step(stmt) != SQLITE_DONE)
+		{
+			s_logger.logCritical(QString("Failed to save sensor settings: %1").arg(sqlite3_errmsg(m_sqlite)));
+			return;
+		}
+		sqlite3_reset(stmt);
+	}
  	{
 		{
 			const char* sql = "DELETE FROM Sensors;";
 			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
 			{
-				s_logger.logCritical(QString("Failed to clear sensor configs: %1").arg(sqlite3_errmsg(m_sqlite)));
+				s_logger.logCritical(QString("Failed to clear sensors: %1").arg(sqlite3_errmsg(m_sqlite)));
 				return;
 			}
 		}
@@ -2373,23 +2531,28 @@ void DB::save(Data const& data) const
             }
 			sqlite3_bind_text(stmt, 4, sensors.c_str(), -1, SQLITE_STATIC);
 			sqlite3_bind_int(stmt, 5, a.descriptor.lowTemperatureWatch ? 1 : 0);
-			sqlite3_bind_double(stmt, 6, a.descriptor.lowTemperature);
-			sqlite3_bind_int(stmt, 7, a.descriptor.highTemperatureWatch ? 1 : 0);
-			sqlite3_bind_double(stmt, 8, a.descriptor.highTemperature);
-			sqlite3_bind_int(stmt, 9, a.descriptor.lowHumidityWatch ? 1 : 0);
-			sqlite3_bind_double(stmt, 10, a.descriptor.lowHumidity);
-			sqlite3_bind_int(stmt, 11, a.descriptor.highHumidityWatch ? 1 : 0);
-			sqlite3_bind_double(stmt, 12, a.descriptor.highHumidity);
-			sqlite3_bind_int(stmt, 13, a.descriptor.lowVccWatch ? 1 : 0);
-			sqlite3_bind_int(stmt, 14, a.descriptor.lowSignalWatch ? 1 : 0);
-			sqlite3_bind_int(stmt, 15, a.descriptor.sendEmailAction ? 1 : 0);
+			sqlite3_bind_double(stmt, 6, a.descriptor.lowTemperatureSoft);
+			sqlite3_bind_double(stmt, 7, a.descriptor.lowTemperatureHard);
+			sqlite3_bind_int(stmt, 8, a.descriptor.highTemperatureWatch ? 1 : 0);
+			sqlite3_bind_double(stmt, 9, a.descriptor.highTemperatureSoft);
+			sqlite3_bind_double(stmt, 10, a.descriptor.highTemperatureHard);
+			sqlite3_bind_int(stmt, 11, a.descriptor.lowHumidityWatch ? 1 : 0);
+			sqlite3_bind_double(stmt, 12, a.descriptor.lowHumiditySoft);
+			sqlite3_bind_double(stmt, 13, a.descriptor.lowHumidityHard);
+			sqlite3_bind_int(stmt, 14, a.descriptor.highHumidityWatch ? 1 : 0);
+			sqlite3_bind_double(stmt, 15, a.descriptor.highHumiditySoft);
+			sqlite3_bind_double(stmt, 16, a.descriptor.highHumidityHard);
+			sqlite3_bind_int(stmt, 17, a.descriptor.lowVccWatch ? 1 : 0);
+			sqlite3_bind_int(stmt, 18, a.descriptor.lowSignalWatch ? 1 : 0);
+			sqlite3_bind_int(stmt, 19, a.descriptor.sendEmailAction ? 1 : 0);
+            sqlite3_bind_int64(stmt, 20, std::chrono::duration_cast<std::chrono::seconds>(a.descriptor.resendPeriod).count());
 			std::string triggers;
 			for (auto p : a.triggersPerSensor)
 			{
                 triggers += std::to_string(p.first) + "/" + std::to_string(p.second) + ";";
 			}
-			sqlite3_bind_text(stmt, 16, triggers.c_str(), -1, SQLITE_STATIC);
-            sqlite3_bind_int64(stmt, 17, Clock::to_time_t(a.lastTriggeredTimePoint));
+			sqlite3_bind_text(stmt, 21, triggers.c_str(), -1, SQLITE_STATIC);
+            sqlite3_bind_int64(stmt, 22, Clock::to_time_t(a.lastTriggeredTimePoint));
 			if (sqlite3_step(stmt) != SQLITE_DONE)
 			{
 				s_logger.logCritical(QString("Failed to save alarms: %1").arg(sqlite3_errmsg(m_sqlite)));

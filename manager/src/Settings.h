@@ -122,15 +122,10 @@ public:
     ////////////////////////////////////////////////////////////////////////////
 
 signals:
-    void emailSettingsWillBeChanged();
     void emailSettingsChanged();
-
-    void ftpSettingsWillBeChanged();
     void ftpSettingsChanged();
 
-    void userWillBeAdded(UserId id);
     void userAdded(UserId id);
-    void userWillBeRemoved(UserId id);
     void userRemoved(UserId id);
     void userChanged(UserId id);
     void userLoggedIn(UserId id);

@@ -19,6 +19,7 @@ public:
 
     void init(Comms& comms, Settings& settings);
     void shutdown();
+    void save();
 
 signals:
 
@@ -28,7 +29,8 @@ private slots:
     void testFtpSettings();
     void applyEmailSettings();
     void applyFtpSettings();
-    void applySensorsConfig();
+    void applySensorTimeConfig();
+    void applySensorSettings();
     void addEmailRecipient();
     void removeEmailRecipient();
     void emailSmtpProviderPresetChanged();
@@ -41,8 +43,11 @@ private:
     void setFtpSettings(Settings::FtpSettings const& settings);
     bool getFtpSettings(Settings::FtpSettings& settings);
 
-    void setSensorsConfig(DB::SensorsConfig const& config);
-    Result<DB::SensorsConfigDescriptor> getSensorsConfig() const;
+    void setSensorTimeConfig(DB::SensorTimeConfig const& config);
+    Result<DB::SensorTimeConfigDescriptor> getSensorTimeConfig() const;
+
+	void setSensorSettings(DB::SensorSettings const& config);
+	Result<DB::SensorSettings> getSensorSettings() const;
 
     void computeBatteryLife();
 

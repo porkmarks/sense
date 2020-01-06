@@ -156,11 +156,11 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Battery)
         {
-            return utils::getBatteryIcon(measurement.descriptor.vcc);
+            return utils::getBatteryIcon(m_db.getSensorSettings(), measurement.descriptor.vcc);
         }
         else if (column == Column::Signal)
         {
-            return utils::getSignalIcon(std::min(measurement.descriptor.signalStrength.s2b, measurement.descriptor.signalStrength.b2s));
+            return utils::getSignalIcon(m_db.getSensorSettings(), std::min(measurement.descriptor.signalStrength.s2b, measurement.descriptor.signalStrength.b2s));
         }
     }
     else if (role == Qt::DisplayRole)

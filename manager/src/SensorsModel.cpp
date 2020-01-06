@@ -343,7 +343,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
             {
                 if (sensor.lastCommsTimePoint.time_since_epoch().count() != 0)
                 {
-                    auto p = computeRelativeTimePointString(sensor.lastCommsTimePoint + m_db.getLastSensorsConfig().computedCommsPeriod);
+                    auto p = computeRelativeTimePointString(sensor.lastCommsTimePoint + m_db.getLastSensorTimeConfig().computedCommsPeriod);
                     if (p.second < k_imminentMaxSecond && p.second > k_imminentMinSecond)
                     {
                         return QVariant(QColor(255, 255, 150));
@@ -400,11 +400,11 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
             {
                 if (column == Column::Battery)
                 {
-                    return utils::getBatteryIcon(sensor.rtMeasurementVcc);
+                    return utils::getBatteryIcon(m_db.getSensorSettings(), sensor.rtMeasurementVcc);
                 }
                 else if (column == Column::Signal)
                 {
-                    return utils::getSignalIcon(std::min(sensor.averageSignalStrength.s2b, sensor.averageSignalStrength.b2s));
+                    return utils::getSignalIcon(m_db.getSensorSettings(), std::min(sensor.averageSignalStrength.s2b, sensor.averageSignalStrength.b2s));
                 }
                 else if (column == Column::Temperature)
                 {
@@ -447,7 +447,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
             {
                 if (sensor.lastCommsTimePoint.time_since_epoch().count() != 0)
                 {
-                    auto p = computeRelativeTimePointString(sensor.lastCommsTimePoint + m_db.getLastSensorsConfig().computedCommsPeriod);
+                    auto p = computeRelativeTimePointString(sensor.lastCommsTimePoint + m_db.getLastSensorTimeConfig().computedCommsPeriod);
                     std::string str = p.first;
                     str = (p.second > 0) ? "In " + str : str + " ago";
                     if (p.second < k_imminentMaxSecond && p.second > k_imminentMinSecond)

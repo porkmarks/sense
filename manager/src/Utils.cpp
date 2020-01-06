@@ -185,7 +185,7 @@ float getBatteryLevel(float vcc)
     return level;
 }
 
-QIcon getBatteryIcon(float vcc)
+QIcon getBatteryIcon(DB::SensorSettings const& settings, float vcc)
 {
     static const QIcon k_alertIcon = QIcon(":/icons/ui/battery-0.png");
     const static std::array<QIcon, 5> k_icons =
@@ -198,13 +198,13 @@ QIcon getBatteryIcon(float vcc)
     };
 
     float level = getBatteryLevel(vcc);
-    if (level <= k_alertBatteryLevel)
+    if (level <= settings.alertBatteryLevel)
     {
         return k_alertIcon;
     }
 
     //renormalize the remaining range
-    level = (level - k_alertBatteryLevel) / (1.f - k_alertBatteryLevel);
+    level = (level - settings.alertBatteryLevel) / (1.f - settings.alertBatteryLevel);
 
     size_t index = std::min(static_cast<size_t>(level * static_cast<float>(k_icons.size())), k_icons.size() - 1);
     return k_icons[index];
@@ -220,7 +220,7 @@ float getSignalLevel(int8_t dBm)
     return level;
 }
 
-QIcon getSignalIcon(int8_t dBm)
+QIcon getSignalIcon(DB::SensorSettings const& settings, int8_t dBm)
 {
     static const QIcon k_alertIcon = QIcon(":/icons/ui/signal-0.png");
     const static std::array<QIcon, 5> k_icons =
@@ -233,13 +233,13 @@ QIcon getSignalIcon(int8_t dBm)
     };
 
     float level = getSignalLevel(dBm);
-    if (level <= k_alertSignalLevel)
+    if (level <= settings.alertSignalStrengthLevel)
     {
         return k_alertIcon;
     }
 
     //renormalize the remaining range
-    level = (level - k_alertSignalLevel) / (1.f - k_alertSignalLevel);
+    level = (level - settings.alertSignalStrengthLevel) / (1.f - settings.alertSignalStrengthLevel);
 
     size_t index = std::min(static_cast<size_t>(level * static_cast<float>(k_icons.size())), k_icons.size() - 1);
     return k_icons[index];
