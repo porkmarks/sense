@@ -77,6 +77,7 @@ void ConfigureUserDialog::setUser(Settings::User const& user)
         m_ui.changeMeasurements->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeMeasurements);
 		m_ui.changeEmailSettings->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeEmailSettings);
 		m_ui.changeFtpSettings->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeFtpSettings);
+		m_ui.changeSensorSettings->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeSensorSettings);
     }
 
     if (!hasPermission(m_settings, Settings::UserDescriptor::PermissionChangeUsers))
@@ -132,6 +133,7 @@ void ConfigureUserDialog::accept()
 	descriptor.permissions |= m_ui.changeMeasurements->isChecked() ? Settings::UserDescriptor::PermissionChangeMeasurements : 0;
 	descriptor.permissions |= m_ui.changeEmailSettings->isChecked() ? Settings::UserDescriptor::PermissionChangeEmailSettings : 0;
 	descriptor.permissions |= m_ui.changeFtpSettings->isChecked() ? Settings::UserDescriptor::PermissionChangeFtpSettings : 0;
+	descriptor.permissions |= m_ui.changeSensorSettings->isChecked() ? Settings::UserDescriptor::PermissionChangeSensorSettings : 0;
 
     if (m_ui.password1->text().isEmpty() && m_ui.password2->text().isEmpty())
     {

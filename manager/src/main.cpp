@@ -85,6 +85,10 @@ int main(int argc, char *argv[])
     _set_abort_behavior(0, _WRITE_ABORT_MSG);
 #endif
 
+#ifndef NDEBUG
+     ShowWindow(GetConsoleWindow(), SW_SHOW);
+#endif
+
     //delete reinterpret_cast<QString*>(0xFEE1DEAD);
 
     QString lockFileName = (s_dataFolder + "/lock").c_str();

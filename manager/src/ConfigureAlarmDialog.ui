@@ -783,10 +783,18 @@
  </customwidgets>
  <tabstops>
   <tabstop>name</tabstop>
+  <tabstop>lowTemperatureWatch</tabstop>
   <tabstop>lowTemperatureSoft</tabstop>
+  <tabstop>lowTemperatureHard</tabstop>
+  <tabstop>highTemperatureWatch</tabstop>
   <tabstop>highTemperatureSoft</tabstop>
+  <tabstop>highTemperatureHard</tabstop>
+  <tabstop>lowHumidityWatch</tabstop>
   <tabstop>lowHumiditySoft</tabstop>
+  <tabstop>lowHumidityHard</tabstop>
+  <tabstop>highHumidityWatch</tabstop>
   <tabstop>highHumiditySoft</tabstop>
+  <tabstop>highHumidityHard</tabstop>
   <tabstop>lowBatteryWatch</tabstop>
   <tabstop>lowSignalWatch</tabstop>
   <tabstop>sendEmailAction</tabstop>

@@ -19,7 +19,6 @@ uint8_t packet_raw_size(uint8_t payload_size)
     return uint8_t(sizeof(Radio::Header)) + payload_size;
 }
 
-constexpr chrono::millis k_ack_jitter(30);
 constexpr chrono::millis k_minimum_duration_before_sending(200);
 
 Radio::Radio()
@@ -64,10 +63,9 @@ bool Radio::init(uint8_t retries, int8_t power_dBm)
     }
 
     //chrono::time_ms start = chrono::now();
-    //send_ack(Header());
-    chrono::millis d = m_lora.computeAirTimeUpperBound(ACK_BUFFER_SIZE);
-    m_acks_send_duration = k_ack_jitter + d + k_ack_jitter;
-    LOG(PSTR("ACK duration: %ldms\n"), m_acks_send_duration.count);
+//    chrono::millis d = m_lora.computeAirTimeUpperBound(ACK_BUFFER_SIZE);
+//    m_acks_send_duration = k_ack_jitter + d + k_ack_jitter;
+//    LOG(PSTR("ACK duration: %ldms\n"), m_acks_send_duration.count);
 
     sleep();
 
@@ -201,28 +199,6 @@ void Radio::wait_minimum_time() const
     }
 }
 
-void Radio::send_ack(const Header& header)
-{
-    uint8_t ack_buffer[ACK_BUFFER_SIZE];// = { 0 };
-    uint8_t* ptr = ack_buffer;
-
-    Header* header_ptr = reinterpret_cast<Header*>(ptr);
-    header_ptr->source_address = m_address;
-    header_ptr->destination_address = header.source_address;
-    header_ptr->type = static_cast<uint8_t>(data::sensor::Type::ACK);
-    header_ptr->req_id = ++m_last_req_id;
-    header_ptr->crc = 0;
-
-    data::sensor::Ack* ack_ptr = reinterpret_cast<data::sensor::Ack*>(ptr + sizeof(Header));
-    ack_ptr->ack = 1;
-    ack_ptr->req_id = header.req_id;
-
-    uint32_t crc = crc32(ptr, ACK_BUFFER_SIZE);
-    header_ptr->crc = crc;
-
-    m_lora.transmit(ack_buffer, ACK_BUFFER_SIZE);
-}
-
 bool Radio::send_packet(uint8_t* raw_buffer, uint8_t packet_size, bool _wait_minimum_time)
 {
     //LOG(PSTR("SP\n"));
@@ -239,50 +215,15 @@ bool Radio::send_packet(uint8_t* raw_buffer, uint8_t packet_size, bool _wait_min
         wait_minimum_time();
     }
 
-    uint8_t ack_buffer[ACK_BUFFER_SIZE + 1] = { 0 };
-
     //LOG(PSTR("SP tr\n"));
-    //m_rf22.send_raw(raw_buffer, sizeof(Header) + packet_size, 100);
     int16_t state = m_lora.transmit(raw_buffer, sizeof(Header) + packet_size);
-    if (state == ERR_NONE)
-    {
-        chrono::time_ms start = chrono::now();
-        chrono::millis d = chrono::now() - start;
-        do
-        {
-            //LOG(PSTR("SP ra\n"));
-            uint8_t size = ACK_BUFFER_SIZE;
-            state = m_lora.receive(ack_buffer, size, m_acks_send_duration - d);
-            if (state == ERR_NONE && size > 0)
-            {
-                auto_sleep();
-                if (validate_packet(ack_buffer, size, sizeof(data::sensor::Ack)))
-                {
-                    //LOG(PSTR("SP ra done\n"));
-                    data::sensor::Ack* ack_ptr = reinterpret_cast<data::sensor::Ack*>(ack_buffer + sizeof(Header));
-                    if (ack_ptr->req_id == header_ptr->req_id && ack_ptr->ack != 0)
-                    {
-                        m_last_send_time_point = chrono::now();
-                        return true;
-                    }
-                }
-                else
-                {
-//                    LOG(PSTR("SP ra fail\n"));
-                }
-            }
-            d = chrono::now() - start;
-        } while (d < m_acks_send_duration);
-
-        LOG(PSTR("noack\n"));
-    }
-    else
-    {
-        LOG(PSTR("txerr %d\n"), (int)state);
-    }
-
     auto_sleep();
     m_last_send_time_point = chrono::now();
+    if (state == ERR_NONE)
+    {
+        return true;
+    }
+    LOG(PSTR("txerr %d\n"), (int)state);
     return false;
 }
 
@@ -301,21 +242,12 @@ uint8_t* Radio::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size, chrono
             Header* header_ptr = reinterpret_cast<Header*>(raw_buffer);
             if (validate_packet(raw_buffer, size, 0))
             {
-//                LOG(PSTR("RP re done\n"));
-                if (get_rx_packet_type(raw_buffer) != static_cast<uint8_t>(data::sensor::Type::ACK)) //ignore protocol packets
-                {
-                    chrono::delay(k_ack_jitter - (chrono::now() - receive_tp)); //to allow the sender to go in receive mode
+//                LOG(PSTR("RP se done\n"));
 
-//                    LOG(PSTR("RP se\n"));
-                    send_ack(*header_ptr);
-                    auto_sleep();
-//                    LOG(PSTR("RP se done\n"));
-
-                    m_last_rssi = rssi;
-                    m_last_receive_time_point = chrono::now();
-                    packet_size = size - sizeof(Header);
-                    return raw_buffer;
-                }
+                m_last_rssi = rssi;
+                m_last_receive_time_point = chrono::now();
+                packet_size = size - sizeof(Header);
+                return raw_buffer;
             }
             else
             {
@@ -355,21 +287,13 @@ uint8_t* Radio::async_receive_packet(uint8_t* raw_buffer, uint8_t& packet_size)
     Header* header_ptr = reinterpret_cast<Header*>(raw_buffer);
     if (validate_packet(raw_buffer, size, 0))
     {
-//                LOG(PSTR("RP re done\n"));
-        if (get_rx_packet_type(raw_buffer) != static_cast<uint8_t>(data::sensor::Type::ACK)) //ignore protocol packets
-        {
-            chrono::delay(k_ack_jitter - (chrono::now() - receive_tp)); //to allow the sender to go in receive mode
+//                LOG(PSTR("RP se done\n"));
 
-//                    LOG(PSTR("RP se\n"));
-            send_ack(*header_ptr);
-//                    LOG(PSTR("RP se done\n"));
-
-            m_last_receive_time_point = chrono::now();
-            packet_size = size - sizeof(Header);
-            m_last_rssi = m_lora.getRSSI();
-            stop_async_receive();
-            return raw_buffer;
-        }
+        m_last_receive_time_point = chrono::now();
+        packet_size = size - sizeof(Header);
+        m_last_rssi = m_lora.getRSSI();
+        stop_async_receive();
+        return raw_buffer;
     }
     else
     {

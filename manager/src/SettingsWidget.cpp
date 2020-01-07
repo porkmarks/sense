@@ -158,10 +158,12 @@ void SettingsWidget::setPermissions()
 {
 	m_ui.emailTab->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeEmailSettings));
     m_ui.ftpTab->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeFtpSettings));
-	m_ui.batteryCapacity->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensors));
-	m_ui.radioPower->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensors));
-	m_ui.batteryAlertThreshold->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensors));
-	m_ui.signalStrengthAlertThreshold->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensors));
+	m_ui.batteryCapacity->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensorSettings));
+	m_ui.radioPower->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensorSettings));
+	m_ui.batteryAlertThreshold->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensorSettings));
+	m_ui.signalStrengthAlertThreshold->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensorSettings));
+	m_ui.sensorsCommsPeriod->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensorSettings));
+	m_ui.sensorsMeasurementPeriod->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensorSettings));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -417,7 +419,7 @@ void SettingsWidget::sendTestEmail()
         MimeHtml body;
         body.setHtml(QString::fromUtf8(
                          "<p><span style=\"color: #ff0000; font-size: 12pt;\">&lt;&lt;&lt; This is a test email! &gt;&gt;&gt;</span></p>"
-                         "<p>Alarm '<strong>Alarm1</strong>' was triggered by sensor '<strong>Sensor1</strong>.</p>"
+                         "<p>Alarm '<strong>Alarm1</strong>' was triggered by sensor '<strong>Sensor1</strong>'.</p>"
                          "<p>Measurement:</p>"
                          "<ul>"
                          "<li>Temperature: <strong>23&deg;C</strong></li>"

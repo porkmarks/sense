@@ -83,15 +83,11 @@ private:
     uint16_t m_last_req_id = 0;
 
     void wait_minimum_time() const;
-    chrono::millis m_acks_send_duration = chrono::millis(100);
     chrono::time_ms m_last_send_time_point;
     chrono::time_ms m_last_receive_time_point;
 
-    static const uint8_t ACK_BUFFER_SIZE = sizeof(Header) + sizeof(data::sensor::Ack);
-
     bool validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload_size);
 
-    void send_ack(const Header& header);
     void auto_sleep();
 
     uint8_t m_offset = 0;

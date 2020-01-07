@@ -26,13 +26,6 @@ enum class Type : uint8_t
 #   pragma pack(push, 1) // exact fit - no padding
 #endif
 
-struct Ack
-{
-    uint16_t ack : 1;
-    uint16_t req_id : 15;
-};
-static_assert(sizeof(Ack) == 2, "");
-
 struct Measurement
 {
     void pack(float humidity, float temperature)

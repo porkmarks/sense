@@ -450,7 +450,11 @@ Result<void> DB::load(sqlite3& db)
 		}
 
         //refresh computed comms period
-        if (!m_data.sensorTimeConfigs.empty())
+        if (m_data.sensorTimeConfigs.empty())
+        {
+            addSensorTimeConfig(SensorTimeConfigDescriptor()).ignore();
+        }
+        else
         {
             SensorTimeConfig& config = m_data.sensorTimeConfigs.back();
             config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);

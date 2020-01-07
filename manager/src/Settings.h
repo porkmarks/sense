@@ -65,26 +65,23 @@ public:
         std::string name;
         std::string passwordHash;
 
+        //do not change the order of these!!!!
         enum Permissions
         {
             PermissionAddRemoveSensors = 1 << 0,
             PermissionChangeSensors = 1 << 1,
-
             PermissionAddRemoveBaseStations = 1 << 2,
             PermissionChangeBaseStations = 1 << 3,
-
             PermissionChangeMeasurements = 1 << 4,
             PermissionChangeEmailSettings = 1 << 5,
             PermissionChangeFtpSettings = 1 << 6,
-
             PermissionAddRemoveAlarms = 1 << 7,
             PermissionChangeAlarms = 1 << 8,
-
             PermissionAddRemoveReports = 1 << 9,
             PermissionChangeReports = 1 << 10,
-
             PermissionAddRemoveUsers = 1 << 11,
             PermissionChangeUsers = 1 << 12,
+			PermissionChangeSensorSettings = 1 << 13,
         };
 
         uint32_t permissions = 0;
