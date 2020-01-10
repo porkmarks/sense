@@ -178,6 +178,18 @@ std::string getLastErrorAsString()
 #endif
 }
 
+QString getQDateTimeFormatString(Settings::DateTimeFormat format, bool millis)
+{
+    switch (format)
+	{
+    case Settings::DateTimeFormat::DD_MM_YYYY_Dash: return QString("dd-MM-yyyy HH:mm%1").arg(millis ? ".zzz" : "");
+    case Settings::DateTimeFormat::YYYY_MM_DD_Slash: return QString("yyyy/MM/dd HH:mm%1").arg(millis ? ".zzz" : "");
+    case Settings::DateTimeFormat::YYYY_MM_DD_Dash: return QString("yyyy-MM-dd HH:mm%1").arg(millis ? ".zzz" : "");
+    case Settings::DateTimeFormat::MM_DD_YYYY_Slash: return QString("MM/dd/yyyy HH:mm%1").arg(millis ? ".zzz" : "");
+	}
+	return QString("dd-MM-yyyy HH:mm").arg(millis ? ".zzz" : "");
+}
+
 float getBatteryLevel(float vcc)
 {
     float level = std::max(std::min(vcc, k_maxBatteryLevel) - k_minBatteryLevel, 0.f) / (k_maxBatteryLevel - k_minBatteryLevel);

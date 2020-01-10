@@ -147,7 +147,7 @@
                   <string>&gt;=  </string>
                  </property>
                  <property name="suffix">
-                  <string>%</string>
+                  <string> %RH</string>
                  </property>
                  <property name="decimals">
                   <number>1</number>
@@ -166,7 +166,7 @@
                   <string>&lt;= </string>
                  </property>
                  <property name="suffix">
-                  <string>%</string>
+                  <string> %RH</string>
                  </property>
                  <property name="decimals">
                   <number>1</number>

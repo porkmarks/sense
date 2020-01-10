@@ -35,6 +35,54 @@ public:
     DB const& getDB() const;
     DB& getDB();
 
+	////////////////////////////////////////////////////////////////////////////
+
+	enum class DateTimeFormat
+	{
+		DD_MM_YYYY_Dash,
+		YYYY_MM_DD_Slash,
+		YYYY_MM_DD_Dash,
+		MM_DD_YYYY_Slash
+	};
+
+	struct GeneralSettings
+	{
+        DateTimeFormat dateTimeFormat = DateTimeFormat::DD_MM_YYYY_Dash;
+	};
+
+	bool setGeneralSettings(GeneralSettings const& settings);
+    GeneralSettings const& getGeneralSettings() const;
+
+	////////////////////////////////////////////////////////////////////////////
+
+	struct CsvSettings
+	{
+		enum class UnitsFormat
+		{
+			None,
+			Embedded,
+			SeparateColumn
+		};
+
+		std::optional<DateTimeFormat> dateTimeFormatOverride;
+        UnitsFormat unitsFormat = UnitsFormat::Embedded;
+        bool exportId = true;
+		bool exportIndex = true;
+		bool exportSensorName = true;
+		bool exportSensorSN = true;
+		bool exportTimePoint = true;
+		bool exportReceivedTimePoint = true;
+		bool exportTemperature = true;
+		bool exportHumidity = true;
+		bool exportBattery = true;
+		bool exportSignal = true;
+		uint32_t decimalPlaces = 1;
+        std::string separator = ",";
+	};
+
+	bool setCsvSettings(CsvSettings const& settings);
+    CsvSettings const& getCsvSettings() const;
+
     ////////////////////////////////////////////////////////////////////////////
 
     typedef Emailer::EmailSettings EmailSettings;
@@ -119,6 +167,8 @@ public:
     ////////////////////////////////////////////////////////////////////////////
 
 signals:
+    void generalSettingsChanged();
+    void csvSettingsChanged();
     void emailSettingsChanged();
     void ftpSettingsChanged();
 
@@ -133,6 +183,8 @@ private:
 
     struct Data
     {
+        GeneralSettings generalSettings;
+        CsvSettings csvSettings;
         EmailSettings emailSettings;
         FtpSettings ftpSettings;
         std::vector<User> users;

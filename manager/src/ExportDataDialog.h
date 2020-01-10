@@ -20,7 +20,7 @@ private:
     void saveSettings();
 
     void refreshPreview();
-    bool exportTo(std::ostream& stream, size_t maxCount, bool showProgress);
+    bool exportTo(std::ostream& stream, size_t maxCount, bool unicode, bool showProgress);
 
     Ui::ExportDataDialog m_ui;
     DB& m_db;

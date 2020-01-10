@@ -1,0 +1,6 @@
+Add counters for:
+- ms alive
+- ms sleeping
+- comms TX + RX
+- measurements
+

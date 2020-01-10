@@ -113,6 +113,7 @@
       <ShowIncludes>false</ShowIncludes>
       <Verbose>true</Verbose>
       <PreprocessorDefinitions>RASPBERRY_PI</PreprocessorDefinitions>
+      <Optimization>Disabled</Optimization>
     </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

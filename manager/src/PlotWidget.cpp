@@ -7,6 +7,7 @@
 #include "SensorsModel.h"
 #include "SensorsDelegate.h"
 #include "ui_SensorsFilterDialog.h"
+#include "Utils.h"
 
 
 static std::array<uint32_t, 128> k_colors =
@@ -45,7 +46,7 @@ PlotWidget::PlotWidget(QWidget* parent)
 
 //////////////////////////////////////////////////////////////////////////
 
-void PlotWidget::init(DB& db)
+void PlotWidget::init(Settings& settings, DB& db)
 {
     for (const QMetaObject::Connection& connection: m_uiConnections)
     {
@@ -54,6 +55,7 @@ void PlotWidget::init(DB& db)
     m_uiConnections.clear();
 
     setEnabled(true);
+    m_settings = &settings;
     m_db = &db;
 
     m_uiConnections.push_back(connect(m_ui.clearAnnotations, &QPushButton::released, this, &PlotWidget::clearAnnotations));
@@ -419,7 +421,7 @@ void PlotWidget::createPlotWidgets()
         }
         {
             m_plot->yAxis2->setTickLabelFont(font);
-            m_plot->yAxis2->setLabel("%");
+            m_plot->yAxis2->setLabel("%RH");
             m_plot->yAxis2->setNumberFormat("gb");
             m_plot->yAxis2->ticker()->setTickStepStrategy(QCPAxisTicker::TickStepStrategy::tssReadability);
             m_plot->yAxis2->ticker()->setTickCount(20);
@@ -636,7 +638,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
             pen.setColor(color);
             pen.setStyle(Qt::DotLine);
             graph->setPen(pen);
-            graph->setName(QString("%1%").arg(graphData.sensor.descriptor.name.c_str()));
+            graph->setName(QString("%1 %RH").arg(graphData.sensor.descriptor.name.c_str()));
 
             QVector<double> const& keys = graphData.humidityKeys;
             QVector<double> const& values = graphData.humidityValues;
@@ -645,20 +647,19 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         }
     }
 
-    m_graphsLayer->replot();
-    m_plot->replot();
-
 	{
 		//clear invalid annotations
-		for (auto it = m_annotations.begin(); it != m_annotations.end();)
+		std::vector<Annotation> annotations = std::move(m_annotations);
+		for (Annotation& annotation : annotations)
 		{
-			if (!findAnnotationGraph(*it))
+			QCPGraph* graph = findAnnotationGraph(annotation);
+			if (graph)
 			{
-				it = m_annotations.erase(it);
-			}
-			else
-			{
-				++it;
+				annotation.toolTip->refresh(graph);
+				if (annotation.toolTip->isOpen())
+				{
+					m_annotations.push_back(std::move(annotation));
+				}
 			}
 		}
 		m_draggedAnnotationIndex = -1;
@@ -666,6 +667,9 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
 		m_ui.clearAnnotations->setEnabled(!m_annotations.empty());
 		m_annotationsLayer->replot();
 	}
+
+    m_graphsLayer->replot();
+    m_plot->replot();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -892,21 +896,21 @@ void PlotWidget::createAnnotation(DB::SensorId sensorId, QPointF point, double k
     }
 
     QColor color = graph->pen().color();
-    QDateTime dt;
-    dt.setSecsSinceEpoch(static_cast<int64_t>(key));
+    QDateTime dt = QDateTime::fromSecsSinceEpoch(static_cast<int64_t>(key));
+	QString dateTimeFormatStr = utils::getQDateTimeFormatString(m_settings->getGeneralSettings().dateTimeFormat);
     if (temperature)
     {
         m_annotation.toolTip->setText(graph, QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Temperature: <b>%3&deg;C</b>")
                                       .arg(sensor.descriptor.name.c_str())
-                                      .arg(dt.toString("dd-MM-yyyy h:mm"))
+                                      .arg(dt.toString(dateTimeFormatStr))
                                       .arg(value, 0, 'f', 1)
                                       .arg(color.name()));
     }
     else
     {
-        m_annotation.toolTip->setText(graph, QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Humidity: <b>%3%</b>")
+        m_annotation.toolTip->setText(graph, QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Humidity: <b>%3 %RH</b>")
                                       .arg(sensor.descriptor.name.c_str())
-                                      .arg(dt.toString("dd-MM-yyyy h:mm"))
+                                      .arg(dt.toString(dateTimeFormatStr))
                                       .arg(value, 0, 'f', 1)
                                       .arg(color.name()));
     }

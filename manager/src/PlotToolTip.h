@@ -23,8 +23,7 @@ public:
 
     void refresh(QCPGraph* graph);
 
-//    QRectF boundingRect() const;
-//    void paint(QPainter* painter, const QStyleOptionGraphicsItem* option,QWidget* widget);
+    bool isOpen() const;
 
 signals:
     void closeMe();
@@ -40,6 +39,7 @@ private:
     QCPLayer* m_layer = nullptr;
 
     bool m_isFixed = false;
+    bool m_isOpen = true;
 
     QString m_text;
     QPointF m_textLabelDelta;

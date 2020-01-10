@@ -6,13 +6,15 @@
 
 #include <bitset>
 #include <array>
+#include "Utils.h"
 
 static std::array<const char*, 3> s_headerNames = {"Timestamp", "Type", "Message"};
 
 //////////////////////////////////////////////////////////////////////////
 
-LogsModel::LogsModel(Logger& logger)
-    : m_logger(logger)
+LogsModel::LogsModel(Settings& settings, Logger& logger)
+    : m_settings(settings)
+    , m_logger(logger)
 {
     m_refreshTimer = new QTimer(this);
     m_refreshTimer->setSingleShot(true);
@@ -159,9 +161,7 @@ QVariant LogsModel::data(QModelIndex const& index, int role) const
     {
         if (column == Column::Timestamp)
         {
-            QDateTime dt;
-            dt.setTime_t(Logger::Clock::to_time_t(line.timePoint));
-            return dt.toString("dd-MM-yyyy HH:mm:ss");
+            return utils::toString<Logger::Clock>(line.timePoint, m_settings.getGeneralSettings().dateTimeFormat);
         }
         else if (column == Column::Type)
         {

@@ -15,8 +15,9 @@ static std::array<const char*, 10> s_headerNames = {"Id", "Sensor", "Index", "Ti
 
 //////////////////////////////////////////////////////////////////////////
 
-MeasurementsModel::MeasurementsModel(DB& db)
-    : m_db(db)
+MeasurementsModel::MeasurementsModel(Settings& settings, DB& db)
+    : m_settings(settings)
+    , m_db(db)
 {
     m_refreshTimer = new QTimer(this);
     m_refreshTimer->setSingleShot(true);
@@ -187,9 +188,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Timestamp)
         {
-            QDateTime dt;
-            dt.setTime_t(DB::Clock::to_time_t(measurement.timePoint));
-            return dt.toString("dd-MM-yyyy HH:mm");
+            return utils::toString<DB::Clock>(measurement.timePoint, m_settings.getGeneralSettings().dateTimeFormat);
         }
         else if (column == Column::Temperature)
         {
@@ -197,7 +196,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Humidity)
         {
-            return QString("%1%").arg(measurement.descriptor.humidity, 0, 'f', 1);
+            return QString("%1 %RH").arg(measurement.descriptor.humidity, 0, 'f', 1);
         }
         else if (column == Column::Battery)
         {
@@ -242,6 +241,13 @@ void MeasurementsModel::setFilter(DB::Filter const& filter)
 
 //////////////////////////////////////////////////////////////////////////
 
+DB::Filter const& MeasurementsModel::getFilter() const
+{
+    return m_filter;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void MeasurementsModel::refresh()
 {
     beginResetModel();
@@ -253,30 +259,22 @@ void MeasurementsModel::refresh()
 
 //////////////////////////////////////////////////////////////////////////
 
-void MeasurementsModel::startSlowAutoRefresh(DB::SensorId sensorId)
+void MeasurementsModel::startSlowAutoRefresh()
 {
-	startAutoRefresh(sensorId, std::chrono::milliseconds(5000));
+	startAutoRefresh(std::chrono::milliseconds(5000));
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void MeasurementsModel::startFastAutoRefresh(DB::SensorId sensorId)
+void MeasurementsModel::startFastAutoRefresh()
 {
-    startAutoRefresh(sensorId, std::chrono::milliseconds(1000));
+    startAutoRefresh(std::chrono::milliseconds(1000));
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void MeasurementsModel::startAutoRefresh(DB::SensorId sensorId, DB::Clock::duration timer)
+void MeasurementsModel::startAutoRefresh(DB::Clock::duration timer)
 {
-	//see if the sensor is in the filter
-	if (m_filter.useSensorFilter)
-	{
-		if (m_filter.sensorIds.find(sensorId) == m_filter.sensorIds.end())
-		{
-			return;
-		}
-	}
 	m_refreshTimer->start(std::chrono::duration_cast<std::chrono::milliseconds>(timer).count());
 }
 

@@ -477,7 +477,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                 }
                 else if (column == Column::Humidity)
                 {
-                    return QString("%1%").arg(sensor.rtMeasurementHumidity, 0, 'f', 1);
+                    return QString("%1 %RH").arg(sensor.rtMeasurementHumidity, 0, 'f', 1);
                 }
                 else if (column == Column::Battery)
                 {

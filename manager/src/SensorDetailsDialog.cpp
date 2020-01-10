@@ -9,8 +9,9 @@ extern uint32_t getSensorStorageCapacity(DB::Sensor const& sensor);
 
 //////////////////////////////////////////////////////////////////////////
 
-SensorDetailsDialog::SensorDetailsDialog(DB& db, QWidget* parent)
+SensorDetailsDialog::SensorDetailsDialog(Settings& settings, DB& db, QWidget* parent)
     : QDialog(parent)
+    , m_settings(settings)
     , m_db(db)
 {
     m_ui.setupUi(this);
@@ -73,13 +74,10 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
     }
     else if (m_sensor.state == DB::Sensor::State::Sleeping)
     {
-        QDateTime dt;
-        dt.setTime_t(DB::Clock::to_time_t(m_sensor.sleepStateTimePoint));
-
         auto pair = computeRelativeTimePointString(m_sensor.sleepStateTimePoint);
         std::string str = pair.first;
         str = (pair.second > 0) ? "In " + str : str + " ago";
-        m_ui.sleepState->setText(QString("(sleeping since %1, %2)").arg(dt.toString("dd-MM-yyyy HH:mm")).arg(str.c_str()));
+        m_ui.sleepState->setText(QString("(sleeping since %1, %2)").arg(utils::toString<DB::Clock>(m_sensor.sleepStateTimePoint, m_settings.getGeneralSettings().dateTimeFormat)).arg(str.c_str()));
     }
     else if (m_sensor.state == DB::Sensor::State::Active)
     {
@@ -130,13 +128,11 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
 
     if (DB::Clock::to_time_t(m_sensor.lastCommsTimePoint) > 0)
     {
-        QDateTime dt;
-        dt.setTime_t(DB::Clock::to_time_t(m_sensor.lastCommsTimePoint));
-
         auto pair = computeRelativeTimePointString(m_sensor.lastCommsTimePoint);
         std::string str = pair.first;
         str = (pair.second > 0) ? "In " + str : str + " ago";
-        m_ui.lastComms->setText(QString("%1 (%2)").arg(dt.toString("dd-MM-yyyy HH:mm")).arg(str.c_str()));
+
+        m_ui.lastComms->setText(QString("%1 (%2)").arg(utils::toString<DB::Clock>(m_sensor.lastCommsTimePoint, m_settings.getGeneralSettings().dateTimeFormat)).arg(str.c_str()));
     }
     else
     {
@@ -165,7 +161,8 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
 
 void SensorDetailsDialog::setupErrorCountersUI()
 {
-	m_ui.commsErrors->setText(QString("%1").arg(m_sensor.errorCounters.comms));
+	m_ui.commsBlackouts->setText(QString("%1").arg(m_sensor.errorCounters.commsBlackouts));
+	m_ui.commsFailures->setText(QString("%1").arg(m_sensor.errorCounters.commsFailures));
 	m_ui.unknownReboots->setText(QString("%1").arg(m_sensor.errorCounters.unknownReboots));
 	m_ui.brownoutReboots->setText(QString("%1").arg(m_sensor.errorCounters.brownoutReboots));
 	m_ui.watchdogReboots->setText(QString("%1").arg(m_sensor.errorCounters.watchdogReboots));

@@ -639,6 +639,10 @@ static bool request_config()
                 return apply_config(*ptr);
             }
         }
+        else
+        {
+            s_comms_errors++;
+        }
     }
     else
     {

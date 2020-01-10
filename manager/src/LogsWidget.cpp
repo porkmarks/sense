@@ -28,8 +28,9 @@ LogsWidget::~LogsWidget()
 
 //////////////////////////////////////////////////////////////////////////
 
-void LogsWidget::init()
+void LogsWidget::init(Settings& settings)
 {
+    m_settings = &settings;
     for (const QMetaObject::Connection& connection: m_uiConnections)
     {
         QObject::disconnect(connection);
@@ -38,7 +39,7 @@ void LogsWidget::init()
 
     setEnabled(true);
 
-    m_model.reset(new LogsModel(s_logger));
+    m_model.reset(new LogsModel(*m_settings, s_logger));
     m_sortingModel.setSourceModel(m_model.get());
     m_sortingModel.setSortRole(Qt::UserRole + 5);
 

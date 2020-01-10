@@ -8,6 +8,7 @@
 #include <QTimer>
 
 #include "DB.h"
+#include "Settings.h"
 
 class MeasurementsWidget;
 
@@ -16,10 +17,11 @@ class MeasurementsModel : public QAbstractItemModel
     friend class MeasurementsWidget;
 public:
 
-    MeasurementsModel(DB& db);
+	MeasurementsModel(Settings& settings, DB& db);
     ~MeasurementsModel();
 
     void setFilter(DB::Filter const& filter);
+    DB::Filter const& getFilter() const;
 
     size_t getMeasurementCount() const;
     DB::Measurement const& getMeasurement(size_t index) const;
@@ -66,13 +68,14 @@ private:
     bool insertRows(int position, int rows, QModelIndex const& parent = QModelIndex()) override;
     bool removeRows(int position, int rows, QModelIndex const& parent = QModelIndex()) override;
 
-    void startAutoRefresh(DB::SensorId sensorId, DB::Clock::duration timer);
+    void startAutoRefresh(DB::Clock::duration timer);
 
 private slots:
-	void startSlowAutoRefresh(DB::SensorId sensorId);
-	void startFastAutoRefresh(DB::SensorId sensorId);
+	void startSlowAutoRefresh();
+	void startFastAutoRefresh();
 
 private:
+    Settings& m_settings;
     DB& m_db;
     DB::Filter m_filter;
     std::vector<DB::Measurement> m_measurements;

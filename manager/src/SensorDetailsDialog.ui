@@ -359,7 +359,7 @@
       <item row="1" column="1">
        <widget class="QDoubleSpinBox" name="humidityBias">
         <property name="suffix">
-         <string>%</string>
+         <string> %RH</string>
         </property>
         <property name="minimum">
          <double>-15.000000000000000</double>
@@ -463,31 +463,10 @@
       <property name="spacing">
        <number>4</number>
       </property>
-      <item row="6" column="3">
-       <widget class="QLabel" name="resets">
+      <item row="2" column="1">
+       <widget class="QLabel" name="measurementErrors">
         <property name="text">
          <string>0</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="2">
-       <widget class="QLabel" name="label_16">
-        <property name="text">
-         <string>Brownout Reboots:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="label_23">
-        <property name="text">
-         <string>Measurement Errors:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="7" column="2">
-       <widget class="QLabel" name="label_18">
-        <property name="text">
-         <string>Power On Reboots</string>
         </property>
        </widget>
       </item>
@@ -498,57 +477,8 @@
         </property>
        </widget>
       </item>
-      <item row="0" column="3">
-       <widget class="QLabel" name="unknownReboots">
-        <property name="text">
-         <string>0</string>
-        </property>
-       </widget>
-      </item>
-      <item row="7" column="3">
-       <widget class="QLabel" name="powerOnReboots">
-        <property name="text">
-         <string>0</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <widget class="QLabel" name="measurementErrors">
-        <property name="text">
-         <string>0</string>
-        </property>
-       </widget>
-      </item>
-      <item row="6" column="2">
-       <widget class="QLabel" name="label_15">
-        <property name="text">
-         <string>Manual Reboots:</string>
-        </property>
-       </widget>
-      </item>
       <item row="0" column="1">
-       <widget class="QLabel" name="commsErrors">
-        <property name="text">
-         <string>0</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="3">
-       <widget class="QLabel" name="brownoutReboots">
-        <property name="text">
-         <string>0</string>
-        </property>
-       </widget>
-      </item>
-      <item row="5" column="2">
-       <widget class="QLabel" name="label_17">
-        <property name="text">
-         <string>Watchdog Reboots:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="5" column="3">
-       <widget class="QLabel" name="watchdogReboots">
+       <widget class="QLabel" name="commsBlackouts">
         <property name="text">
          <string>0</string>
         </property>
@@ -557,11 +487,25 @@
       <item row="0" column="0">
        <widget class="QLabel" name="label_11">
         <property name="text">
-         <string>Comms Errors:</string>
+         <string>Comms Blackouts:</string>
         </property>
        </widget>
       </item>
-      <item row="8" column="0" colspan="4">
+      <item row="0" column="3">
+       <widget class="QLabel" name="unknownReboots">
+        <property name="text">
+         <string>0</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="label_23">
+        <property name="text">
+         <string>Measurement Errors:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="9" column="0" colspan="4">
        <widget class="QWidget" name="widget_6" native="true">
         <layout class="QHBoxLayout" name="horizontalLayout_5">
          <property name="leftMargin">
@@ -610,6 +554,76 @@
           </spacer>
          </item>
         </layout>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_24">
+        <property name="text">
+         <string>Comms Failures:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="2">
+       <widget class="QLabel" name="label_16">
+        <property name="text">
+         <string>Brownout Reboots:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="2">
+       <widget class="QLabel" name="label_17">
+        <property name="text">
+         <string>Watchdog Reboots:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="6" column="2">
+       <widget class="QLabel" name="label_15">
+        <property name="text">
+         <string>Manual Reboots:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="7" column="2">
+       <widget class="QLabel" name="label_18">
+        <property name="text">
+         <string>Power On Reboots</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="3">
+       <widget class="QLabel" name="brownoutReboots">
+        <property name="text">
+         <string>0</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="3">
+       <widget class="QLabel" name="watchdogReboots">
+        <property name="text">
+         <string>0</string>
+        </property>
+       </widget>
+      </item>
+      <item row="6" column="3">
+       <widget class="QLabel" name="resets">
+        <property name="text">
+         <string>0</string>
+        </property>
+       </widget>
+      </item>
+      <item row="7" column="3">
+       <widget class="QLabel" name="powerOnReboots">
+        <property name="text">
+         <string>0</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QLabel" name="commsFailures">
+        <property name="text">
+         <string>0</string>
+        </property>
        </widget>
       </item>
      </layout>

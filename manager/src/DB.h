@@ -138,8 +138,10 @@ public:
 
     struct ErrorCounters
     {
-        uint32_t comms = 0;
-        uint32_t unknownReboots = 0;
+        uint32_t commsBlackouts = 0; //skipped coms cycles
+        uint32_t commsFailures = 0; //generic comms failures reported by the sensor
+        //various reboot reasons
+        uint32_t unknownReboots = 0; 
         uint32_t powerOnReboots = 0;
         uint32_t resetReboots = 0;
         uint32_t brownoutReboots = 0;
@@ -470,8 +472,8 @@ signals:
     void reportChanged(ReportId id);
 
     void measurementsAdded(SensorId id);
-    void measurementsChanged(SensorId id);
     void measurementsRemoved(SensorId id);
+    void measurementsChanged();
 
    void alarmTriggersChanged(AlarmId alarmId, Measurement const& m, uint32_t oldTriggers, uint32_t newTriggers, uint32_t addedTriggers, uint32_t removedTriggers);
    void alarmStillTriggered(AlarmId alarmId);
@@ -483,8 +485,8 @@ private:
     bool _addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> mds);
     size_t _getFilteredMeasurements(Filter const& filter, std::vector<Measurement>* result) const;
 
-    static inline MeasurementId computeMeasurementId(MeasurementDescriptor const& md);
-    static inline SensorId getSensorIdFromMeasurementId(MeasurementId id);
+    //static inline MeasurementId computeMeasurementId(MeasurementDescriptor const& md);
+    //static inline SensorId getSensorIdFromMeasurementId(MeasurementId id);
     static Measurement unpackMeasurement(sqlite3_stmt* stmt);
 
     Clock::time_point computeNextCommsTimePoint(Sensor const& sensor, size_t sensorIndex) const;

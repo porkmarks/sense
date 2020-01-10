@@ -473,7 +473,7 @@ Server::Result Server::send_sensor_message(Sensor_Request const& request, Sensor
         return Result::Ok;
     }
 
-    if (wait_for_message(data::Server_Message::SENSOR_RES, std::chrono::milliseconds(200)))
+    if (wait_for_message(data::Server_Message::SENSOR_RES, std::chrono::milliseconds(1000)))
     {
         size_t max_size = 0;
         bool ok = m_channel.unpack_fixed(buffer, max_size) == Channel::Unpack_Result::OK;

@@ -41,6 +41,10 @@ DB::DB()
 
 DB::~DB()
 {
+	if (m_saveScheduled)
+	{
+		save();
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -82,7 +86,7 @@ Result<void> DB::create(sqlite3& db)
 	}
 	{
 		const char* sql = "CREATE TABLE Sensors (id INTEGER PRIMARY KEY, name STRING, address INTEGER, sensorType INTEGER, hardwareVersion INTEGER, softwareVersion INTEGER, "
-            "temperatureBias REAL, humidityBias REAL, serialNumber INTEGER, state INTEGER, shouldSleep BOOLEAN, sleepStateTimePoint DATETIME, commsErrorCounter INTEGER, "
+            "temperatureBias REAL, humidityBias REAL, serialNumber INTEGER, state INTEGER, shouldSleep BOOLEAN, sleepStateTimePoint DATETIME, commsBlackoutsCounter INTEGER, commsFailuresCounter INTEGER, "
             "unknownRebootsErrorCounter INTEGER, powerOnRebootsErrorCounter INTEGER, resetRebootsErrorCounter INTEGER, brownoutRebootsErrorCounter INTEGER, watchdogRebootsErrorCounter INTEGER, lastCommsTimePoint DATETIME, lastConfirmedMeasurementIndex INTEGER, "
             "firstStoredMeasurementIndex INTEGER, storedMeasurementCount INTEGER, estimatedStoredMeasurementCount INTEGER, lastSignalStrengthB2S INTEGER, averageSignalStrengthB2S INTEGER, averageSignalStrengthS2B INTEGER, "
             "isRTMeasurementValid BOOLEAN, rtMeasurementTemperature REAL, rtMeasurementHumidity REAL, rtMeasurementVcc REAL);";
@@ -111,8 +115,16 @@ Result<void> DB::create(sqlite3& db)
 		}
 	} 
     {
-		const char* sql = "CREATE TABLE Measurements (id INTEGER PRIMARY KEY, timePoint DATETIME, receivedTimePoint DATETIME, idx INTEGER, sensorId INTEGER, temperature REAL, humidity REAL, vcc REAL, signalStrengthS2B INTEGER, signalStrengthB2S INTEGER, "
-            "sensorErrors INTEGER, alarmTriggers INTEGER);";
+		const char* sql = "CREATE TABLE Measurements (id INTEGER PRIMARY KEY AUTOINCREMENT, timePoint DATETIME, receivedTimePoint DATETIME, idx INTEGER, sensorId INTEGER, temperature REAL, humidity REAL, vcc REAL, signalStrengthS2B INTEGER, signalStrengthB2S INTEGER, "
+                                                     "sensorErrors INTEGER, alarmTriggers INTEGER, UNIQUE(idx, sensorId));";
+		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
+		{
+			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			return error;
+		}
+	}
+	{
+		const char* sql = "CREATE INDEX measurementsIdx ON Measurements(idx);";
 		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
@@ -161,11 +173,11 @@ Result<void> DB::load(sqlite3& db)
 	{
 		sqlite3_stmt* stmt;
 		if (sqlite3_prepare_v2(&db, "REPLACE INTO Sensors (id, name, address, sensorType, hardwareVersion, softwareVersion, "
-						                       "temperatureBias, humidityBias, serialNumber, state, shouldSleep, sleepStateTimePoint, commsErrorCounter, "
+						                       "temperatureBias, humidityBias, serialNumber, state, shouldSleep, sleepStateTimePoint, commsBlackoutsCounter, commsFailuresCounter, "
 						                       "unknownRebootsErrorCounter, powerOnRebootsErrorCounter, resetRebootsErrorCounter, brownoutRebootsErrorCounter, watchdogRebootsErrorCounter, lastCommsTimePoint, lastConfirmedMeasurementIndex, "
 						                       "firstStoredMeasurementIndex, storedMeasurementCount, estimatedStoredMeasurementCount, lastSignalStrengthB2S, averageSignalStrengthB2S, averageSignalStrengthS2B, "
 						                       "isRTMeasurementValid, rtMeasurementTemperature, rtMeasurementHumidity, rtMeasurementVcc) "
-						            "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30);", -1, &stmt, NULL) != SQLITE_OK)
+						            "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31);", -1, &stmt, NULL) != SQLITE_OK)
 		{
 			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -193,8 +205,8 @@ Result<void> DB::load(sqlite3& db)
     }
     {
 		sqlite3_stmt* stmt;
-        if (sqlite3_prepare_v2(&db, "REPLACE INTO Measurements (id, timePoint, receivedTimePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggers) "
-							        "VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12);", -1, &stmt, NULL) != SQLITE_OK)
+        if (sqlite3_prepare_v2(&db, "INSERT OR IGNORE INTO Measurements (timePoint, receivedTimePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggers) "
+							        "VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11);", -1, &stmt, NULL) != SQLITE_OK)
 		{
 			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -273,7 +285,7 @@ Result<void> DB::load(sqlite3& db)
 
 	{
 		const char* sql = "SELECT id, name, address, sensorType, hardwareVersion, softwareVersion, "
-			 			        "temperatureBias, humidityBias, serialNumber, state, shouldSleep, sleepStateTimePoint, commsErrorCounter, "
+			 			        "temperatureBias, humidityBias, serialNumber, state, shouldSleep, sleepStateTimePoint, commsBlackoutsCounter, commsFailuresCounter, "
 			 			        "unknownRebootsErrorCounter, powerOnRebootsErrorCounter, resetRebootsErrorCounter, brownoutRebootsErrorCounter, watchdogRebootsErrorCounter, lastCommsTimePoint, lastConfirmedMeasurementIndex, "
 			 			        "firstStoredMeasurementIndex, storedMeasurementCount, estimatedStoredMeasurementCount, lastSignalStrengthB2S, averageSignalStrengthB2S, averageSignalStrengthS2B, "
 			 			        "isRTMeasurementValid, rtMeasurementTemperature, rtMeasurementHumidity, rtMeasurementVcc "
@@ -300,24 +312,25 @@ Result<void> DB::load(sqlite3& db)
 			s.state = (Sensor::State)sqlite3_column_int64(stmt, 9);
 			s.shouldSleep = sqlite3_column_int64(stmt, 10) ? true : false;
 			s.sleepStateTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 11));
-			s.errorCounters.comms = (uint32_t)sqlite3_column_int64(stmt, 12);
-			s.errorCounters.unknownReboots = (uint32_t)sqlite3_column_int64(stmt, 13);
-			s.errorCounters.powerOnReboots = (uint32_t)sqlite3_column_int64(stmt, 14);
-			s.errorCounters.resetReboots = (uint32_t)sqlite3_column_int64(stmt, 15);
-			s.errorCounters.brownoutReboots = (uint32_t)sqlite3_column_int64(stmt, 16);
-			s.errorCounters.watchdogReboots = (uint32_t)sqlite3_column_int64(stmt, 17);
-			s.lastCommsTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 18));
-			s.lastConfirmedMeasurementIndex = (uint32_t)sqlite3_column_int64(stmt, 19);
-			s.firstStoredMeasurementIndex = (uint32_t)sqlite3_column_int64(stmt, 20);
-			s.storedMeasurementCount = (uint32_t)sqlite3_column_int64(stmt, 21);
-			s.estimatedStoredMeasurementCount = (uint32_t)sqlite3_column_int64(stmt, 22);
-			s.lastSignalStrengthB2S = (int8_t)sqlite3_column_int64(stmt, 23);
-			s.averageSignalStrength.b2s = (int8_t)sqlite3_column_int64(stmt, 24);
-			s.averageSignalStrength.s2b = (int8_t)sqlite3_column_int64(stmt, 25);
-			s.isRTMeasurementValid = sqlite3_column_int64(stmt, 26) ? true : false;
-			s.rtMeasurementTemperature = (float)sqlite3_column_double(stmt, 27);
-			s.rtMeasurementHumidity = (float)sqlite3_column_double(stmt, 28);
-			s.rtMeasurementVcc = (float)sqlite3_column_double(stmt, 29);
+			s.errorCounters.commsBlackouts = (uint32_t)sqlite3_column_int64(stmt, 12);
+			s.errorCounters.commsFailures = (uint32_t)sqlite3_column_int64(stmt, 13);
+			s.errorCounters.unknownReboots = (uint32_t)sqlite3_column_int64(stmt, 14);
+			s.errorCounters.powerOnReboots = (uint32_t)sqlite3_column_int64(stmt, 15);
+			s.errorCounters.resetReboots = (uint32_t)sqlite3_column_int64(stmt, 16);
+			s.errorCounters.brownoutReboots = (uint32_t)sqlite3_column_int64(stmt, 17);
+			s.errorCounters.watchdogReboots = (uint32_t)sqlite3_column_int64(stmt, 18);
+			s.lastCommsTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 19));
+			s.lastConfirmedMeasurementIndex = (uint32_t)sqlite3_column_int64(stmt, 20);
+			s.firstStoredMeasurementIndex = (uint32_t)sqlite3_column_int64(stmt, 21);
+			s.storedMeasurementCount = (uint32_t)sqlite3_column_int64(stmt, 22);
+			s.estimatedStoredMeasurementCount = (uint32_t)sqlite3_column_int64(stmt, 23);
+			s.lastSignalStrengthB2S = (int8_t)sqlite3_column_int64(stmt, 24);
+			s.averageSignalStrength.b2s = (int8_t)sqlite3_column_int64(stmt, 25);
+			s.averageSignalStrength.s2b = (int8_t)sqlite3_column_int64(stmt, 26);
+			s.isRTMeasurementValid = sqlite3_column_int64(stmt, 27) ? true : false;
+			s.rtMeasurementTemperature = (float)sqlite3_column_double(stmt, 28);
+			s.rtMeasurementHumidity = (float)sqlite3_column_double(stmt, 29);
+			s.rtMeasurementVcc = (float)sqlite3_column_double(stmt, 30);
 			data.sensors.push_back(std::move(s));
 		}
 	}
@@ -1183,6 +1196,12 @@ bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
         {
             if (d.lastCommsTimePoint > sensor.lastCommsTimePoint)
             {
+                //skipped beats?
+                if (sensor.lastCommsTimePoint + getLastSensorTimeConfig().computedCommsPeriod + std::chrono::minutes(1) < d.lastCommsTimePoint)
+                {
+                    sensor.errorCounters.commsBlackouts++;
+                }
+
                 sensor.lastCommsTimePoint = d.lastCommsTimePoint;
             }
         }
@@ -1240,7 +1259,8 @@ bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
 
         if (d.hasErrorCountersDelta)
         {
-            sensor.errorCounters.comms += d.errorCountersDelta.comms;
+            sensor.errorCounters.commsBlackouts += d.errorCountersDelta.commsBlackouts;
+            sensor.errorCounters.commsFailures += d.errorCountersDelta.commsFailures;
             sensor.errorCounters.resetReboots += d.errorCountersDelta.resetReboots;
             sensor.errorCounters.unknownReboots += d.errorCountersDelta.unknownReboots;
             sensor.errorCounters.brownoutReboots += d.errorCountersDelta.brownoutReboots;
@@ -1932,7 +1952,7 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
 		{
 			for (MeasurementDescriptor const& md : mds)
 			{
-				MeasurementId id = computeMeasurementId(md);
+				//MeasurementId id = computeMeasurementId(md);
 
 				//advance the last confirmed index
 				if (md.index == sensor.lastConfirmedMeasurementIndex + 1)
@@ -1941,7 +1961,7 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
 				}
 
 				Measurement measurement;
-				measurement.id = id;
+				//measurement.id = id;
 				measurement.descriptor = md;
 				measurement.timePoint = computeMeasurementTimepoint(md);
                 measurement.receivedTimePoint = Clock::now();
@@ -1962,8 +1982,6 @@ bool DB::_addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> 
 		{
 			return true;
 		}
-
-		emit sensorDataChanged(sensor.id);
 	}
 
 	{
@@ -2003,18 +2021,17 @@ void DB::addAsyncMeasurements()
 			{
 				MeasurementDescriptor const& md = m.descriptor;
 
-				sqlite3_bind_int64(stmt, 1, m.id);
-				sqlite3_bind_int64(stmt, 2, Clock::to_time_t(m.timePoint));
-                sqlite3_bind_int64(stmt, 3, Clock::to_time_t(m.receivedTimePoint));
-				sqlite3_bind_int64(stmt, 4, md.index);
-				sqlite3_bind_int64(stmt, 5, md.sensorId);
-				sqlite3_bind_double(stmt, 6, md.temperature);
-				sqlite3_bind_double(stmt, 7, md.humidity);
-				sqlite3_bind_double(stmt, 8, md.vcc);
-				sqlite3_bind_int64(stmt, 9, md.signalStrength.s2b);
-				sqlite3_bind_int64(stmt, 10, md.signalStrength.b2s);
-				sqlite3_bind_int64(stmt, 11, md.sensorErrors);
-				sqlite3_bind_int64(stmt, 12, m.alarmTriggers);
+				sqlite3_bind_int64(stmt, 1, Clock::to_time_t(m.timePoint));
+                sqlite3_bind_int64(stmt, 2, Clock::to_time_t(m.receivedTimePoint));
+				sqlite3_bind_int64(stmt, 3, md.index);
+				sqlite3_bind_int64(stmt, 4, md.sensorId);
+				sqlite3_bind_double(stmt, 5, md.temperature);
+				sqlite3_bind_double(stmt, 6, md.humidity);
+				sqlite3_bind_double(stmt, 7, md.vcc);
+				sqlite3_bind_int64(stmt, 8, md.signalStrength.s2b);
+				sqlite3_bind_int64(stmt, 9, md.signalStrength.b2s);
+				sqlite3_bind_int64(stmt, 10, md.sensorErrors);
+				sqlite3_bind_int64(stmt, 11, m.alarmTriggers);
 				if (sqlite3_step(stmt) != SQLITE_DONE)
 				{
 					s_logger.logCritical(QString("Failed to save measurement: %1").arg(sqlite3_errmsg(m_sqlite)));
@@ -2294,23 +2311,16 @@ Result<void> DB::setMeasurement(MeasurementId id, MeasurementDescriptor const& m
 		return Error(QString("Failed to set measurement: %1").arg(sqlite3_errmsg(m_sqlite)).toUtf8().data());
 	}
 
-    emit measurementsChanged(getSensorIdFromMeasurementId(id));
+    emit measurementsChanged();
     return success;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-inline DB::SensorId DB::getSensorIdFromMeasurementId(MeasurementId id)
-{
-	return SensorId(id >> 32);
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-inline DB::MeasurementId DB::computeMeasurementId(MeasurementDescriptor const& md)
-{
-    return (MeasurementId(md.sensorId) << 32) | MeasurementId(md.index);
-}
+// inline DB::MeasurementId DB::computeMeasurementId(MeasurementDescriptor const& md)
+// {
+//     return (MeasurementId(md.sensorId) << 32) | MeasurementId(md.index);
+// }
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -2496,28 +2506,29 @@ void DB::save(Data const& data) const
             sqlite3_bind_int(stmt, 11, s.shouldSleep ? 1 : 0);
             sqlite3_bind_int64(stmt, 12, Clock::to_time_t(s.sleepStateTimePoint));
 
-			sqlite3_bind_int64(stmt, 13, s.errorCounters.comms);
-			sqlite3_bind_int64(stmt, 14, s.errorCounters.unknownReboots);
-			sqlite3_bind_int64(stmt, 15, s.errorCounters.powerOnReboots);
-			sqlite3_bind_int64(stmt, 16, s.errorCounters.resetReboots);
-			sqlite3_bind_int64(stmt, 17, s.errorCounters.brownoutReboots);
-			sqlite3_bind_int64(stmt, 18, s.errorCounters.watchdogReboots);
+			sqlite3_bind_int64(stmt, 13, s.errorCounters.commsBlackouts);
+			sqlite3_bind_int64(stmt, 14, s.errorCounters.commsFailures);
+			sqlite3_bind_int64(stmt, 15, s.errorCounters.unknownReboots);
+			sqlite3_bind_int64(stmt, 16, s.errorCounters.powerOnReboots);
+			sqlite3_bind_int64(stmt, 17, s.errorCounters.resetReboots);
+			sqlite3_bind_int64(stmt, 18, s.errorCounters.brownoutReboots);
+			sqlite3_bind_int64(stmt, 19, s.errorCounters.watchdogReboots);
 
-            sqlite3_bind_int64(stmt, 19, Clock::to_time_t(s.lastCommsTimePoint));
+            sqlite3_bind_int64(stmt, 20, Clock::to_time_t(s.lastCommsTimePoint));
 
-			sqlite3_bind_int64(stmt, 20, s.lastConfirmedMeasurementIndex);
-			sqlite3_bind_int64(stmt, 21, s.firstStoredMeasurementIndex);
-			sqlite3_bind_int64(stmt, 22, s.storedMeasurementCount);
-			sqlite3_bind_int64(stmt, 23, s.estimatedStoredMeasurementCount);
+			sqlite3_bind_int64(stmt, 21, s.lastConfirmedMeasurementIndex);
+			sqlite3_bind_int64(stmt, 22, s.firstStoredMeasurementIndex);
+			sqlite3_bind_int64(stmt, 23, s.storedMeasurementCount);
+			sqlite3_bind_int64(stmt, 24, s.estimatedStoredMeasurementCount);
 			
-            sqlite3_bind_int64(stmt, 24, s.lastSignalStrengthB2S);
-			sqlite3_bind_int64(stmt, 25, s.averageSignalStrength.b2s);
-			sqlite3_bind_int64(stmt, 26, s.averageSignalStrength.s2b);
+            sqlite3_bind_int64(stmt, 25, s.lastSignalStrengthB2S);
+			sqlite3_bind_int64(stmt, 26, s.averageSignalStrength.b2s);
+			sqlite3_bind_int64(stmt, 27, s.averageSignalStrength.s2b);
 
-            sqlite3_bind_int(stmt, 27, s.isRTMeasurementValid ? 1 : 0);
-			sqlite3_bind_double(stmt, 28, s.rtMeasurementTemperature);
-			sqlite3_bind_double(stmt, 29, s.rtMeasurementHumidity);
-			sqlite3_bind_double(stmt, 30, s.rtMeasurementVcc);
+            sqlite3_bind_int(stmt, 28, s.isRTMeasurementValid ? 1 : 0);
+			sqlite3_bind_double(stmt, 29, s.rtMeasurementTemperature);
+			sqlite3_bind_double(stmt, 30, s.rtMeasurementHumidity);
+			sqlite3_bind_double(stmt, 31, s.rtMeasurementVcc);
 			if (sqlite3_step(stmt) != SQLITE_DONE)
 			{
 				s_logger.logCritical(QString("Failed to save sensor: %1").arg(sqlite3_errmsg(m_sqlite)));

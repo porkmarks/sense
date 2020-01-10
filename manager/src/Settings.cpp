@@ -61,6 +61,37 @@ Result<void> Settings::create(sqlite3& db)
 	utils::epilogue epi([&db] { sqlite3_exec(&db, "END TRANSACTION;", NULL, NULL, NULL); });
 
 	{
+		const char* sql = "CREATE TABLE GeneralSettings (id INTEGER PRIMARY KEY, dateTimeFormat INTEGER);";
+		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
+		{
+			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			return error;
+		}
+		const char* sqlInsert = "INSERT INTO GeneralSettings VALUES(0, 0);";
+		if (sqlite3_exec(&db, sqlInsert, NULL, NULL, nullptr))
+		{
+			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			return error;
+		}
+	}
+	{
+		const char* sql = "CREATE TABLE CsvSettings (id INTEGER PRIMARY KEY, dateTimeFormatOverride INTEGER, unitsFormat INTEGER, "
+									"exportId BOOLEAN, exportIndex BOOLEAN, exportSensorName BOOLEAN, exportSensorSN BOOLEAN, exportTimePoint BOOLEAN, exportReceivedTimePoint BOOLEAN, "
+									"exportTemperature BOOLEAN, exportHumidity BOOLEAN, exportBattery BOOLEAN, exportSignal BOOLEAN, "
+									"decimalPlaces INTEGER);";
+		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
+		{
+			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			return error;
+		}
+		const char* sqlInsert = "INSERT INTO CsvSettings VALUES(0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);";
+		if (sqlite3_exec(&db, sqlInsert, NULL, NULL, nullptr))
+		{
+			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+			return error;
+		}
+	}
+	{
 		const char* sql = "CREATE TABLE EmailSettings (id INTEGER PRIMARY KEY, host STRING, port INTEGER, connection INTEGER, username STRING, password STRING, sender STRING, recipients STRING);";
 		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
@@ -104,6 +135,62 @@ Result<void> Settings::create(sqlite3& db)
 bool Settings::load(sqlite3& db)
 {
 	Data data;
+	{
+		const char* sql = "SELECT dateTimeFormat FROM GeneralSettings;";
+		sqlite3_stmt* stmt;
+		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
+		{
+			s_logger.logCritical(QString("Cannot load general settings: %1").arg(sqlite3_errmsg(&db)));
+			return false;
+		}
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+		if (sqlite3_step(stmt) != SQLITE_ROW)
+		{
+			s_logger.logCritical(QString("Cannot load general settings row: %1").arg(sqlite3_errmsg(&db)));
+			return false;
+		}
+		data.generalSettings.dateTimeFormat = (DateTimeFormat)sqlite3_column_int64(stmt, 0);
+	}
+	{
+		//id INTEGER PRIMARY KEY, dateTimeFormatOverride INTEGER, unitsFormat INTEGER, "
+		//	"exportId BOOLEAN, exportIndex BOOLEAN, exportSensorName BOOLEAN, exportSensorSN BOOLEAN, exportTimePoint BOOLEAN, exportReceivedTimePoint BOOLEAN, "
+		//	"exportTemperature BOOLEAN, exportHumidity BOOLEAN, exportBattery BOOLEAN, exportSignal BOOLEAN, "
+		//	"decimalPlaces INTEGER
+		const char* sql = "SELECT dateTimeFormatOverride, unitsFormat, exportId, exportIndex, exportSensorName, exportSensorSN, exportTimePoint, exportReceivedTimePoint, "
+								"exportTemperature, exportHumidity, exportBattery, exportSignal, "
+								"decimalPlaces FROM CsvSettings;";
+		sqlite3_stmt* stmt;
+		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
+		{
+			s_logger.logCritical(QString("Cannot load csv settings: %1").arg(sqlite3_errmsg(&db)));
+			return false;
+		}
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+		if (sqlite3_step(stmt) != SQLITE_ROW)
+		{
+			s_logger.logCritical(QString("Cannot load csv settings row: %1").arg(sqlite3_errmsg(&db)));
+			return false;
+		}
+		int v = sqlite3_column_int64(stmt, 0);
+		if (v >= 0)
+		{
+			data.csvSettings.dateTimeFormatOverride = (DateTimeFormat)v;
+		}
+		data.csvSettings.unitsFormat = (CsvSettings::UnitsFormat)sqlite3_column_int(stmt, 1);
+		data.csvSettings.exportId = sqlite3_column_int(stmt, 2) ? true : false;
+		data.csvSettings.exportIndex = sqlite3_column_int(stmt, 3) ? true : false;
+		data.csvSettings.exportSensorName = sqlite3_column_int(stmt, 4) ? true : false;
+		data.csvSettings.exportSensorSN = sqlite3_column_int(stmt, 5) ? true : false;
+		data.csvSettings.exportTimePoint = sqlite3_column_int(stmt, 6) ? true : false;
+		data.csvSettings.exportReceivedTimePoint = sqlite3_column_int(stmt, 7) ? true : false;
+		data.csvSettings.exportTemperature = sqlite3_column_int(stmt, 8) ? true : false;
+		data.csvSettings.exportHumidity = sqlite3_column_int(stmt, 9) ? true : false;
+		data.csvSettings.exportBattery = sqlite3_column_int(stmt, 10) ? true : false;
+		data.csvSettings.exportSignal = sqlite3_column_int(stmt, 11) ? true : false;
+		data.csvSettings.decimalPlaces = (uint32_t)sqlite3_column_int(stmt, 12);
+	}
 	{
         //id INTEGER PRIMARY KEY, host STRING, port INTEGER, connection INTEGER, username STRING, password STRING, sender STRING, recipients STRING
 		const char* sql = "SELECT host, port, connection, username, password, sender, recipients FROM EmailSettings;";
@@ -192,6 +279,7 @@ bool Settings::load(sqlite3& db)
     if (result != success)
     {
         s_logger.logCritical(QString("Cannot load the DB: %1").arg(result.error().what().c_str()));
+		return false;
     }
 
 	m_sqlite = &db;
@@ -216,21 +304,45 @@ DB& Settings::getDB()
 
 //////////////////////////////////////////////////////////////////////////
 
-//void Settings::setActiveBaseStation(Mac mac)
-//{
-//    emit baseStationWillChanged();
-//    m_mainData.activeBaseStation = mac;
-//    emit baseStationChanged();
+bool Settings::setGeneralSettings(GeneralSettings const& settings)
+{
+	m_data.generalSettings = settings;
+	emit generalSettingsChanged();
 
-//    triggerSave();
-//}
+	s_logger.logInfo("Changed general settings");
+
+	save(m_data);
+
+	return true;
+}
 
 //////////////////////////////////////////////////////////////////////////
 
-//Settings::Mac Settings::getActiveBaseStation() const
-//{
-//    return m_mainData.activeBaseStation;
-//}
+Settings::GeneralSettings const& Settings::getGeneralSettings() const
+{
+	return m_data.generalSettings;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool Settings::setCsvSettings(CsvSettings const& settings)
+{
+	m_data.csvSettings = settings;
+	emit csvSettingsChanged();
+
+	s_logger.logInfo("Changed csv settings");
+
+	save(m_data);
+
+	return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+Settings::CsvSettings const& Settings::getCsvSettings() const
+{
+	return m_data.csvSettings;
+}
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -531,6 +643,47 @@ void Settings::save(Data const& data) const
 
     sqlite3_exec(m_sqlite, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 	utils::epilogue epi([this] { sqlite3_exec(m_sqlite, "END TRANSACTION;", NULL, NULL, NULL); });
+
+	{
+		sqlite3_stmt* stmt;
+		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO GeneralSettings (id, dateTimeFormat) VALUES (0, ?1);", -1, &stmt, NULL);
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+		sqlite3_bind_int64(stmt, 1, (int)data.generalSettings.dateTimeFormat);
+		if (sqlite3_step(stmt) != SQLITE_DONE)
+		{
+			s_logger.logCritical(QString("Failed to save general settings: %1").arg(sqlite3_errmsg(m_sqlite)));
+			return;
+		}
+	}
+
+	{
+		sqlite3_stmt* stmt;
+		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO CsvSettings (id, dateTimeFormatOverride, unitsFormat, "
+												"exportId, exportIndex, exportSensorName, exportSensorSN, exportTimePoint, exportReceivedTimePoint, "
+												"exportTemperature, exportHumidity, exportBattery, exportSignal, "
+												"decimalPlaces) VALUES (0, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13);", -1, &stmt, NULL);
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+		sqlite3_bind_int64(stmt, 1, data.csvSettings.dateTimeFormatOverride.has_value() ? (int)data.csvSettings.dateTimeFormatOverride.value() : -1);
+		sqlite3_bind_int64(stmt, 2, (int)data.csvSettings.unitsFormat);
+		sqlite3_bind_int(stmt, 3, data.csvSettings.exportId ? 1 : 0);
+		sqlite3_bind_int(stmt, 4, data.csvSettings.exportIndex ? 1 : 0);
+		sqlite3_bind_int(stmt, 5, data.csvSettings.exportSensorName ? 1 : 0);
+		sqlite3_bind_int(stmt, 6, data.csvSettings.exportSensorSN ? 1 : 0);
+		sqlite3_bind_int(stmt, 7, data.csvSettings.exportTimePoint ? 1 : 0);
+		sqlite3_bind_int(stmt, 8, data.csvSettings.exportReceivedTimePoint ? 1 : 0);
+		sqlite3_bind_int(stmt, 9, data.csvSettings.exportTemperature ? 1 : 0);
+		sqlite3_bind_int(stmt, 10, data.csvSettings.exportHumidity ? 1 : 0);
+		sqlite3_bind_int(stmt, 11, data.csvSettings.exportBattery ? 1 : 0);
+		sqlite3_bind_int(stmt, 12, data.csvSettings.exportSignal ? 1 : 0);
+		sqlite3_bind_int64(stmt, 13, data.csvSettings.decimalPlaces);
+		if (sqlite3_step(stmt) != SQLITE_DONE)
+		{
+			s_logger.logCritical(QString("Failed to save csv settings: %1").arg(sqlite3_errmsg(m_sqlite)));
+			return;
+		}
+	}
 
 	{
 		sqlite3_stmt* stmt;

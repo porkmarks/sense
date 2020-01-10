@@ -13,7 +13,7 @@ class LogsWidget : public QWidget
 public:
     explicit LogsWidget(QWidget *parent = 0);
     ~LogsWidget();
-    void init();
+    void init(Settings& settings);
     void shutdown();
 
     void setAutoRefresh(bool enabled);
@@ -28,6 +28,7 @@ private:
 
     Logger::Filter createFilter() const;
 
+    Settings* m_settings = nullptr;
     Ui::LogsWidget m_ui;
     std::unique_ptr<LogsModel> m_model;
     QSortFilterProxyModel m_sortingModel;

@@ -497,7 +497,7 @@ DB::SensorInputDetails Comms::createSensorInputDetails(DB::Sensor const& sensor,
     details.measurementVcc = data::sensor::unpack_qvcc(configRequest.qvcc);
 
     details.hasErrorCountersDelta = true;
-    details.errorCountersDelta.comms = configRequest.comms_errors;
+    details.errorCountersDelta.commsFailures = configRequest.comms_errors;
     details.errorCountersDelta.resetReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_RESET)) ? 1 : 0;
     details.errorCountersDelta.unknownReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_UNKNOWN)) ? 1 : 0;
     details.errorCountersDelta.brownoutReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_BROWNOUT)) ? 1 : 0;

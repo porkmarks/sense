@@ -199,7 +199,7 @@ void SensorsWidget::configureSensor(QModelIndex const& index)
     size_t sensorIndex = static_cast<size_t>(_sensorIndex);
     DB::Sensor sensor = m_db->getSensor(sensorIndex);
 
-    SensorDetailsDialog dialog(*m_db, this);
+    SensorDetailsDialog dialog(*m_settings, *m_db, this);
     dialog.setSensor(sensor);
 
     do

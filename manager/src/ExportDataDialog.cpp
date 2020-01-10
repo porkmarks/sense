@@ -5,6 +5,7 @@
 #include <QSettings>
 #include <QProgressDialog>
 #include <QSettings>
+#include <QDateTime>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -14,6 +15,7 @@
 #include "Utils.h"
 
 extern Logger s_logger;
+extern std::string s_programFolder;
 
 ExportDataDialog::ExportDataDialog(DB& db, MeasurementsModel& model, QWidget* parent)
     : QDialog(parent)
@@ -49,9 +51,9 @@ ExportDataDialog::ExportDataDialog(DB& db, MeasurementsModel& model, QWidget* pa
 void ExportDataDialog::refreshPreview()
 {
     std::stringstream stream;
-    exportTo(stream, 100, false);
+    exportTo(stream, 100, true, false);
 
-    m_ui.previewText->setText((stream.str() + "\n.....\n").c_str());
+    m_ui.previewText->setPlainText((stream.str() + "\n.....\n").c_str());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -115,7 +117,20 @@ void ExportDataDialog::accept()
 {
     QString extension = "Export Files (*.csv)";
 
-    QString fileName = QFileDialog::getSaveFileName(this, "Select export file", QString(), extension);
+    std::string defaultFilename = "report.csv";
+
+    DB::Filter const& filter = m_model.getFilter();
+    if (filter.useTimePointFilter)
+    {
+        defaultFilename = "report";
+        defaultFilename += QDateTime::fromTime_t(DB::Clock::to_time_t(filter.timePointFilter.min)).toString("dd_MM_yyyy_HH_mm").toUtf8().data();
+        defaultFilename += "-";
+        defaultFilename += QDateTime::fromTime_t(DB::Clock::to_time_t(filter.timePointFilter.max)).toString("dd_MM_yyyy_HH_mm").toUtf8().data();
+        defaultFilename += ".csv";
+    }
+
+    QString fileName = QFileDialog::getSaveFileName(this, "Select export file", 
+                                                    (s_programFolder + "/user_reports/" + defaultFilename).c_str(), extension);
     if (fileName.isEmpty())
     {
         return;
@@ -132,7 +147,7 @@ void ExportDataDialog::accept()
             return;
         }
 
-        finished = exportTo(file, size_t(-1), true);
+        finished = exportTo(file, size_t(-1), false, true);
         file.close();
 
         if (!finished)
@@ -152,7 +167,7 @@ void ExportDataDialog::accept()
 
 //////////////////////////////////////////////////////////////////////////
 
-bool ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount, bool showProgress)
+bool ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount, bool unicode, bool showProgress)
 {
     std::string separator = m_ui.separator->text().toUtf8().data();
     if (m_ui.tabSeparator->isChecked())
@@ -344,12 +359,12 @@ bool ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount, bool show
             stream << std::fixed << std::setprecision(decimalPlaces) << m.descriptor.temperature;
             if (unitsFormat == UnitsFormat::Embedded)
             {
-                stream << "°C";
+                stream << (unicode ? "°C" : "\xB0""C");
             }
             stream << separator;
             if (unitsFormat == UnitsFormat::SeparateColumn)
             {
-                stream << "°C";
+                stream << (unicode ? "°C" : "\xB0""C");
                 stream << separator;
             }
         }
@@ -358,12 +373,12 @@ bool ExportDataDialog::exportTo(std::ostream& stream, size_t maxCount, bool show
             stream << std::fixed << std::setprecision(decimalPlaces) << m.descriptor.humidity;
             if (unitsFormat == UnitsFormat::Embedded)
             {
-                stream << "%";
+                stream << " %RH";
             }
             stream << separator;
             if (unitsFormat == UnitsFormat::SeparateColumn)
             {
-                stream << "%";
+                stream << "%RH";
                 stream << separator;
             }
         }

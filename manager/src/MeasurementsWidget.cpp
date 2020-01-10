@@ -51,7 +51,7 @@ void MeasurementsWidget::init(Settings& settings)
 	m_settings = &settings;
 	m_db = &m_settings->getDB();
 
-    m_model.reset(new MeasurementsModel(*m_db));
+    m_model.reset(new MeasurementsModel(*m_settings, *m_db));
     m_sortingModel.setSourceModel(m_model.get());
     m_sortingModel.setSortRole(MeasurementsModel::SortingRole);
 
