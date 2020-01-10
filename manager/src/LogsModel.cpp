@@ -12,8 +12,8 @@ static std::array<const char*, 3> s_headerNames = {"Timestamp", "Type", "Message
 
 //////////////////////////////////////////////////////////////////////////
 
-LogsModel::LogsModel(Settings& settings, Logger& logger)
-    : m_settings(settings)
+LogsModel::LogsModel(DB& db, Logger& logger)
+    : m_db(db)
     , m_logger(logger)
 {
     m_refreshTimer = new QTimer(this);
@@ -161,7 +161,7 @@ QVariant LogsModel::data(QModelIndex const& index, int role) const
     {
         if (column == Column::Timestamp)
         {
-            return utils::toString<Logger::Clock>(line.timePoint, m_settings.getGeneralSettings().dateTimeFormat);
+            return utils::toString<Logger::Clock>(line.timePoint, m_db.getGeneralSettings().dateTimeFormat);
         }
         else if (column == Column::Type)
         {

@@ -2,7 +2,7 @@
 
 #include <QWidget>
 #include "ui_UsersWidget.h"
-#include "Settings.h"
+#include "DB.h"
 #include "UsersModel.h"
 
 class UsersWidget : public QWidget
@@ -11,7 +11,7 @@ class UsersWidget : public QWidget
 public:
     explicit UsersWidget(QWidget *parent = 0);
     ~UsersWidget();
-    void init(Settings& settings);
+	void init(DB& db);
     void shutdown();
 
 signals:
@@ -26,7 +26,7 @@ private:
 
     Ui::UsersWidget m_ui;
     std::unique_ptr<UsersModel> m_model;
-    Settings* m_settings = nullptr;
+	DB* m_db = nullptr;
     std::vector<QMetaObject::Connection> m_uiConnections;
     bool m_sectionSaveScheduled = false;
 };

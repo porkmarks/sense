@@ -8,14 +8,14 @@
 #include <QTimer>
 
 #include "Logger.h"
-#include "Settings.h"
+#include "DB.h"
 
 class LogsModel : public QAbstractItemModel
 {
     Q_OBJECT
 public:
 
-    LogsModel(Settings& settings, Logger& logger);
+	LogsModel(DB& db, Logger& logger);
     ~LogsModel();
 
     void setFilter(Logger::Filter const& filter);
@@ -58,7 +58,7 @@ private:
     virtual bool removeRows(int position, int rows, QModelIndex const& parent = QModelIndex());
 
 private:
-    Settings& m_settings;
+	DB& m_db;
     Logger& m_logger;
     Logger::Filter m_filter;
     std::vector<Logger::LogLine> m_logLines;

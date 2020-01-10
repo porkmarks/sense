@@ -2,7 +2,6 @@
 
 #include <QWidget>
 #include "ui_ReportsWidget.h"
-#include "Settings.h"
 #include "DB.h"
 #include "ReportsModel.h"
 
@@ -16,7 +15,7 @@ class ReportsWidget : public QWidget
 public:
     explicit ReportsWidget(QWidget *parent = 0);
     ~ReportsWidget();
-    void init(Settings& settings);
+	void init(DB& db);
     void shutdown();
 
 signals:
@@ -31,7 +30,6 @@ private:
 
     Ui::ReportsWidget m_ui;
     std::unique_ptr<ReportsModel> m_model;
-    Settings* m_settings = nullptr;
     DB* m_db = nullptr;
     std::vector<QMetaObject::Connection> m_uiConnections;
     bool m_sectionSaveScheduled = false;

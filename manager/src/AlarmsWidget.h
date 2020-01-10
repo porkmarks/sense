@@ -2,7 +2,6 @@
 
 #include <QWidget>
 #include "ui_AlarmsWidget.h"
-#include "Settings.h"
 #include "DB.h"
 #include "AlarmsModel.h"
 
@@ -16,7 +15,7 @@ class AlarmsWidget : public QWidget
 public:
     explicit AlarmsWidget(QWidget *parent = 0);
     ~AlarmsWidget();
-    void init(Settings& settings);
+	void init(DB& db);
     void shutdown();
 
 signals:
@@ -32,7 +31,6 @@ private:
     Ui::AlarmsWidget m_ui;
     std::unique_ptr<AlarmsModel> m_model;
     DB* m_db = nullptr;
-    Settings* m_settings = nullptr;
     std::vector<QMetaObject::Connection> m_uiConnections;
     bool m_sectionSaveScheduled = false;
 };

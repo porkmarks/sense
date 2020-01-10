@@ -1,6 +1,5 @@
 #include "AlarmsWidget.h"
 #include "ConfigureAlarmDialog.h"
-#include "Settings.h"
 #include "PermissionsCheck.h"
 #include "DB.h"
 
@@ -30,7 +29,7 @@ AlarmsWidget::~AlarmsWidget()
 
 //////////////////////////////////////////////////////////////////////////
 
-void AlarmsWidget::init(Settings& settings)
+void AlarmsWidget::init(DB& db)
 {
     for (const QMetaObject::Connection& connection: m_uiConnections)
     {
@@ -40,8 +39,7 @@ void AlarmsWidget::init(Settings& settings)
 
     setEnabled(true);
 
-    m_settings = &settings;
-    m_db = &m_settings->getDB();
+    m_db = &db;
 
     m_model.reset(new AlarmsModel(*m_db));
     m_ui.list->setModel(m_model.get());
@@ -69,7 +67,7 @@ void AlarmsWidget::init(Settings& settings)
 	m_ui.list->header()->setSectionHidden((int)AlarmsModel::Column::Id, true);
 
     setPermissions();
-    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &AlarmsWidget::setPermissions));
+	m_uiConnections.push_back(connect(&db, &DB::userLoggedIn, this, &AlarmsWidget::setPermissions));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -93,7 +91,7 @@ void AlarmsWidget::setPermissions()
 
 void AlarmsWidget::configureAlarm(QModelIndex const& index)
 {
-    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionChangeAlarms, this))
+	if (!hasPermissionOrCanLoginAsAdmin(*m_db, DB::UserDescriptor::PermissionChangeAlarms, this))
     {
 		QMessageBox::critical(this, "Error", "You don't have permission to configure alarms.");
         return;
@@ -109,7 +107,7 @@ void AlarmsWidget::configureAlarm(QModelIndex const& index)
 
     ConfigureAlarmDialog dialog(*m_db, this);
     dialog.setAlarm(alarm);
-    dialog.setEnabled(m_settings->isLoggedInAsAdmin());
+	dialog.setEnabled(m_db->isLoggedInAsAdmin());
 
     do
     {
@@ -133,7 +131,7 @@ void AlarmsWidget::configureAlarm(QModelIndex const& index)
 
 void AlarmsWidget::addAlarm()
 {
-    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionAddRemoveAlarms, this))
+	if (!hasPermissionOrCanLoginAsAdmin(*m_db, DB::UserDescriptor::PermissionAddRemoveAlarms, this))
     {
         QMessageBox::critical(this, "Error", "You don't have permission to add alarms.");
         return;
@@ -162,7 +160,7 @@ void AlarmsWidget::addAlarm()
 
 void AlarmsWidget::removeAlarms()
 {
-    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionAddRemoveAlarms, this))
+	if (!hasPermissionOrCanLoginAsAdmin(*m_db, DB::UserDescriptor::PermissionAddRemoveAlarms, this))
     {
         QMessageBox::critical(this, "Error", "You don't have permission to remove alarms.");
         return;

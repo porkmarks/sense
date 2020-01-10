@@ -5,12 +5,11 @@
 #include "ui_SensorDetailsDialog.h"
 
 #include "DB.h"
-#include "Settings.h"
 
 class SensorDetailsDialog : public QDialog
 {
 public:
-    SensorDetailsDialog(Settings& settings, DB& db, QWidget* parent);
+    SensorDetailsDialog(DB& db, QWidget* parent);
 
     DB::Sensor const& getSensor() const;
     void setSensor(DB::Sensor const& sensor);
@@ -27,7 +26,6 @@ private:
 
     Ui::SensorDetailsDialog m_ui;
 
-    Settings& m_settings;
     DB& m_db;
     DB::Sensor m_sensor;
 };

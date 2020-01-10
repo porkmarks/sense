@@ -8,9 +8,9 @@ std::string k_passwordHashReferenceText = "Cannot open file.";
 
 //////////////////////////////////////////////////////////////////////////
 
-ConfigureUserDialog::ConfigureUserDialog(Settings& settings, QWidget* parent)
+ConfigureUserDialog::ConfigureUserDialog(DB& db, QWidget* parent)
     : QDialog(parent)
-    , m_settings(settings)
+    , m_db(db)
 {
     m_ui.setupUi(this);
 
@@ -39,48 +39,48 @@ void ConfigureUserDialog::saveSettings()
 
 //////////////////////////////////////////////////////////////////////////
 
-Settings::User const& ConfigureUserDialog::getUser() const
+DB::User const& ConfigureUserDialog::getUser() const
 {
     return m_user;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void ConfigureUserDialog::setUser(Settings::User const& user)
+void ConfigureUserDialog::setUser(DB::User const& user)
 {
     m_user = user;
-    Settings::UserDescriptor descriptor = m_user.descriptor;
+    DB::UserDescriptor descriptor = m_user.descriptor;
 
     m_ui.name->setText(descriptor.name.c_str());
 
     if (m_ui.administrator->isEnabled())
 	{
-		m_ui.administrator->setChecked(descriptor.type == Settings::UserDescriptor::Type::Admin);
+		m_ui.administrator->setChecked(descriptor.type == DB::UserDescriptor::Type::Admin);
 	}
-    if (descriptor.type != Settings::UserDescriptor::Type::Admin)
+    if (descriptor.type != DB::UserDescriptor::Type::Admin)
     {
-        m_ui.addRemoveSensors->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionAddRemoveSensors);
-        m_ui.changeSensors->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeSensors);
+        m_ui.addRemoveSensors->setChecked(descriptor.permissions & DB::UserDescriptor::PermissionAddRemoveSensors);
+        m_ui.changeSensors->setChecked(descriptor.permissions & DB::UserDescriptor::PermissionChangeSensors);
 
-		m_ui.addRemoveBaseStations->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionAddRemoveBaseStations);
-		m_ui.changeBaseStations->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeBaseStations);
+		m_ui.addRemoveBaseStations->setChecked(descriptor.permissions & DB::UserDescriptor::PermissionAddRemoveBaseStations);
+		m_ui.changeBaseStations->setChecked(descriptor.permissions & DB::UserDescriptor::PermissionChangeBaseStations);
 
-		m_ui.addRemoveAlarms->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionAddRemoveAlarms);
-		m_ui.changeAlarms->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeAlarms);
+		m_ui.addRemoveAlarms->setChecked(descriptor.permissions & DB::UserDescriptor::PermissionAddRemoveAlarms);
+		m_ui.changeAlarms->setChecked(descriptor.permissions & DB::UserDescriptor::PermissionChangeAlarms);
 
-		m_ui.addRemoveReports->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionAddRemoveReports);
-		m_ui.changeReports->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeReports);
+		m_ui.addRemoveReports->setChecked(descriptor.permissions & DB::UserDescriptor::PermissionAddRemoveReports);
+		m_ui.changeReports->setChecked(descriptor.permissions & DB::UserDescriptor::PermissionChangeReports);
 
-		m_ui.addRemoveUsers->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionAddRemoveUsers);
-		m_ui.changeUsers->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeUsers);
+		m_ui.addRemoveUsers->setChecked(descriptor.permissions & DB::UserDescriptor::PermissionAddRemoveUsers);
+		m_ui.changeUsers->setChecked(descriptor.permissions & DB::UserDescriptor::PermissionChangeUsers);
 
-        m_ui.changeMeasurements->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeMeasurements);
-		m_ui.changeEmailSettings->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeEmailSettings);
-		m_ui.changeFtpSettings->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeFtpSettings);
-		m_ui.changeSensorSettings->setChecked(descriptor.permissions & Settings::UserDescriptor::PermissionChangeSensorSettings);
+        m_ui.changeMeasurements->setChecked(descriptor.permissions & DB::UserDescriptor::PermissionChangeMeasurements);
+		m_ui.changeEmailSettings->setChecked(descriptor.permissions & DB::UserDescriptor::PermissionChangeEmailSettings);
+		m_ui.changeFtpSettings->setChecked(descriptor.permissions & DB::UserDescriptor::PermissionChangeFtpSettings);
+		m_ui.changeSensorSettings->setChecked(descriptor.permissions & DB::UserDescriptor::PermissionChangeSensorSettings);
     }
 
-    if (!hasPermission(m_settings, Settings::UserDescriptor::PermissionChangeUsers))
+	if (!hasPermission(m_db, DB::UserDescriptor::PermissionChangeUsers))
     {
         m_ui.administrator->setEnabled(false);
         m_ui.permissions->setEnabled(false);
@@ -92,9 +92,9 @@ void ConfigureUserDialog::setUser(Settings::User const& user)
 
 //////////////////////////////////////////////////////////////////////////
 
-void ConfigureUserDialog::setForcedType(Settings::UserDescriptor::Type type)
+void ConfigureUserDialog::setForcedType(DB::UserDescriptor::Type type)
 {
-    m_ui.administrator->setChecked(type == Settings::UserDescriptor::Type::Admin);
+    m_ui.administrator->setChecked(type == DB::UserDescriptor::Type::Admin);
     m_ui.administrator->setEnabled(false);
 }
 
@@ -110,7 +110,7 @@ void ConfigureUserDialog::done(int result)
 
 void ConfigureUserDialog::accept()
 {
-    Settings::UserDescriptor descriptor = m_user.descriptor;
+    DB::UserDescriptor descriptor = m_user.descriptor;
     descriptor.name = m_ui.name->text().toUtf8().data();
     if (descriptor.name.empty())
     {
@@ -118,22 +118,22 @@ void ConfigureUserDialog::accept()
         return;
     }
 
-	descriptor.type = m_ui.administrator->isChecked() ? Settings::UserDescriptor::Type::Admin : Settings::UserDescriptor::Type::Normal;
+	descriptor.type = m_ui.administrator->isChecked() ? DB::UserDescriptor::Type::Admin : DB::UserDescriptor::Type::Normal;
     descriptor.permissions = 0;
-	descriptor.permissions |= m_ui.addRemoveSensors->isChecked() ? Settings::UserDescriptor::PermissionAddRemoveSensors : 0;
-	descriptor.permissions |= m_ui.changeSensors->isChecked() ? Settings::UserDescriptor::PermissionChangeSensors : 0;
-	descriptor.permissions |= m_ui.addRemoveBaseStations->isChecked() ? Settings::UserDescriptor::PermissionAddRemoveBaseStations : 0;
-	descriptor.permissions |= m_ui.changeBaseStations->isChecked() ? Settings::UserDescriptor::PermissionChangeBaseStations : 0;
-	descriptor.permissions |= m_ui.addRemoveAlarms->isChecked() ? Settings::UserDescriptor::PermissionAddRemoveAlarms : 0;
-	descriptor.permissions |= m_ui.changeAlarms->isChecked() ? Settings::UserDescriptor::PermissionChangeAlarms : 0;
-	descriptor.permissions |= m_ui.addRemoveReports->isChecked() ? Settings::UserDescriptor::PermissionAddRemoveReports : 0;
-	descriptor.permissions |= m_ui.changeReports->isChecked() ? Settings::UserDescriptor::PermissionChangeReports : 0;
-	descriptor.permissions |= m_ui.addRemoveUsers->isChecked() ? Settings::UserDescriptor::PermissionAddRemoveUsers : 0;
-	descriptor.permissions |= m_ui.changeUsers->isChecked() ? Settings::UserDescriptor::PermissionChangeUsers : 0;
-	descriptor.permissions |= m_ui.changeMeasurements->isChecked() ? Settings::UserDescriptor::PermissionChangeMeasurements : 0;
-	descriptor.permissions |= m_ui.changeEmailSettings->isChecked() ? Settings::UserDescriptor::PermissionChangeEmailSettings : 0;
-	descriptor.permissions |= m_ui.changeFtpSettings->isChecked() ? Settings::UserDescriptor::PermissionChangeFtpSettings : 0;
-	descriptor.permissions |= m_ui.changeSensorSettings->isChecked() ? Settings::UserDescriptor::PermissionChangeSensorSettings : 0;
+	descriptor.permissions |= m_ui.addRemoveSensors->isChecked() ? DB::UserDescriptor::PermissionAddRemoveSensors : 0;
+	descriptor.permissions |= m_ui.changeSensors->isChecked() ? DB::UserDescriptor::PermissionChangeSensors : 0;
+	descriptor.permissions |= m_ui.addRemoveBaseStations->isChecked() ? DB::UserDescriptor::PermissionAddRemoveBaseStations : 0;
+	descriptor.permissions |= m_ui.changeBaseStations->isChecked() ? DB::UserDescriptor::PermissionChangeBaseStations : 0;
+	descriptor.permissions |= m_ui.addRemoveAlarms->isChecked() ? DB::UserDescriptor::PermissionAddRemoveAlarms : 0;
+	descriptor.permissions |= m_ui.changeAlarms->isChecked() ? DB::UserDescriptor::PermissionChangeAlarms : 0;
+	descriptor.permissions |= m_ui.addRemoveReports->isChecked() ? DB::UserDescriptor::PermissionAddRemoveReports : 0;
+	descriptor.permissions |= m_ui.changeReports->isChecked() ? DB::UserDescriptor::PermissionChangeReports : 0;
+	descriptor.permissions |= m_ui.addRemoveUsers->isChecked() ? DB::UserDescriptor::PermissionAddRemoveUsers : 0;
+	descriptor.permissions |= m_ui.changeUsers->isChecked() ? DB::UserDescriptor::PermissionChangeUsers : 0;
+	descriptor.permissions |= m_ui.changeMeasurements->isChecked() ? DB::UserDescriptor::PermissionChangeMeasurements : 0;
+	descriptor.permissions |= m_ui.changeEmailSettings->isChecked() ? DB::UserDescriptor::PermissionChangeEmailSettings : 0;
+	descriptor.permissions |= m_ui.changeFtpSettings->isChecked() ? DB::UserDescriptor::PermissionChangeFtpSettings : 0;
+	descriptor.permissions |= m_ui.changeSensorSettings->isChecked() ? DB::UserDescriptor::PermissionChangeSensorSettings : 0;
 
     if (m_ui.password1->text().isEmpty() && m_ui.password2->text().isEmpty())
     {
@@ -159,8 +159,8 @@ void ConfigureUserDialog::accept()
         descriptor.passwordHash = crypt.encryptToString(QString(k_passwordHashReferenceText.c_str())).toUtf8().data();
     }
 
-    int32_t userIndex = m_settings.findUserIndexByName(descriptor.name);
-    if (userIndex >= 0 && m_settings.getUser(static_cast<size_t>(userIndex)).id != m_user.id)
+	int32_t userIndex = m_db.findUserIndexByName(descriptor.name);
+    if (userIndex >= 0 && m_db.getUser(static_cast<size_t>(userIndex)).id != m_user.id)
     {
         QMessageBox::critical(this, "Error", QString("User '%1' already exists.").arg(descriptor.name.c_str()));
         return;

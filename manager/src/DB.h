@@ -17,6 +17,7 @@
 
 struct sqlite3;
 struct sqlite3_stmt;
+class Emailer;
 
 class DB : public QObject
 {
@@ -33,6 +34,151 @@ public:
 
 	static Result<void> create(sqlite3& db);
     Result<void> load(sqlite3& db);
+
+	////////////////////////////////////////////////////////////////////////////
+
+	enum class DateTimeFormat
+	{
+		DD_MM_YYYY_Dash,
+		YYYY_MM_DD_Slash,
+		YYYY_MM_DD_Dash,
+		MM_DD_YYYY_Slash
+	};
+
+	struct GeneralSettings
+	{
+		DateTimeFormat dateTimeFormat = DateTimeFormat::DD_MM_YYYY_Dash;
+	};
+
+	bool setGeneralSettings(GeneralSettings const& settings);
+	GeneralSettings const& getGeneralSettings() const;
+
+	////////////////////////////////////////////////////////////////////////////
+
+	struct CsvSettings
+	{
+		enum class UnitsFormat
+		{
+			None,
+			Embedded,
+			SeparateColumn
+		};
+
+		std::optional<DateTimeFormat> dateTimeFormatOverride;
+		UnitsFormat unitsFormat = UnitsFormat::Embedded;
+		bool exportId = true;
+		bool exportIndex = true;
+		bool exportSensorName = true;
+		bool exportSensorSN = true;
+		bool exportTimePoint = true;
+		bool exportReceivedTimePoint = true;
+		bool exportTemperature = true;
+		bool exportHumidity = true;
+		bool exportBattery = true;
+		bool exportSignal = true;
+		uint32_t decimalPlaces = 1;
+		std::string separator = ",";
+	};
+
+	bool setCsvSettings(CsvSettings const& settings);
+	CsvSettings const& getCsvSettings() const;
+
+	////////////////////////////////////////////////////////////////////////////
+
+	struct EmailSettings
+	{
+		enum class Connection : uint8_t
+		{
+			Ssl,
+			Tls,
+			Tcp,
+		};
+
+		std::string host;
+		uint16_t port = 0;
+		Connection connection = Connection::Ssl;
+		std::string username;
+		std::string password;
+		std::string sender;
+		std::vector<std::string> recipients;
+	};
+
+	bool setEmailSettings(EmailSettings const& settings);
+	EmailSettings const& getEmailSettings() const;
+
+	////////////////////////////////////////////////////////////////////////////
+
+	struct FtpSettings
+	{
+		std::string host;
+		uint16_t port = 0;
+		std::string username;
+		std::string password;
+		std::string folder;
+		bool uploadBackups = false;
+		Clock::duration uploadBackupsPeriod = std::chrono::hours(24);
+	};
+
+	bool setFtpSettings(FtpSettings const& settings);
+	FtpSettings const& getFtpSettings() const;
+
+	////////////////////////////////////////////////////////////////////////////
+
+	struct UserDescriptor
+	{
+		std::string name;
+		std::string passwordHash;
+
+		//do not change the order of these!!!!
+		enum Permissions
+		{
+			PermissionAddRemoveSensors = 1 << 0,
+			PermissionChangeSensors = 1 << 1,
+			PermissionAddRemoveBaseStations = 1 << 2,
+			PermissionChangeBaseStations = 1 << 3,
+			PermissionChangeMeasurements = 1 << 4,
+			PermissionChangeEmailSettings = 1 << 5,
+			PermissionChangeFtpSettings = 1 << 6,
+			PermissionAddRemoveAlarms = 1 << 7,
+			PermissionChangeAlarms = 1 << 8,
+			PermissionAddRemoveReports = 1 << 9,
+			PermissionChangeReports = 1 << 10,
+			PermissionAddRemoveUsers = 1 << 11,
+			PermissionChangeUsers = 1 << 12,
+			PermissionChangeSensorSettings = 1 << 13,
+		};
+
+		uint32_t permissions = 0;
+
+		enum class Type : uint8_t
+		{
+			Admin, //has all the permissions
+			Normal
+		};
+		Type type = Type::Normal;
+	};
+
+	typedef uint32_t UserId;
+	struct User
+	{
+		UserDescriptor descriptor;
+		UserId id = 0;
+		Clock::time_point lastLogin = Clock::time_point(Clock::duration::zero());
+	};
+
+	size_t getUserCount() const;
+	User const& getUser(size_t index) const;
+	int32_t findUserIndexByName(std::string const& name) const;
+	int32_t findUserIndexById(UserId id) const;
+	int32_t findUserIndexByPasswordHash(std::string const& passwordHash) const;
+	bool addUser(UserDescriptor const& descriptor);
+	Result<void> setUser(UserId id, UserDescriptor const& descriptor);
+	void removeUser(size_t index);
+	bool needsAdmin() const;
+	void setLoggedInUserId(UserId id);
+	UserId getLoggedInUserId() const;
+	User const* getLoggedInUser() const;
+	bool isLoggedInAsAdmin() const;
 
     ////////////////////////////////////////////////////////////////////////////
 
@@ -403,6 +549,7 @@ public:
 
     bool addMeasurement(MeasurementDescriptor const& descriptor);
     bool addMeasurements(std::vector<MeasurementDescriptor> descriptors);
+	bool addSingleSensorMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> descriptors);
 
     template <typename T>
     struct Range
@@ -448,6 +595,16 @@ public:
     ////////////////////////////////////////////////////////////////////////////
 
 signals:
+	void generalSettingsChanged();
+	void csvSettingsChanged();
+	void emailSettingsChanged();
+	void ftpSettingsChanged();
+
+	void userAdded(UserId id);
+	void userRemoved(UserId id);
+	void userChanged(UserId id);
+	void userLoggedIn(UserId id);
+
     void baseStationAdded(BaseStationId id);
     void baseStationRemoved(BaseStationId id);
     void baseStationChanged(BaseStationId id);
@@ -482,7 +639,6 @@ private:
     Result<void> checkAlarmDescriptor(AlarmDescriptor const& descriptor) const;
     void checkRepetitiveAlarms();
     uint32_t _computeAlarmTriggers(Alarm& alarm, Measurement const& m);
-    bool _addMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> mds);
     size_t _getFilteredMeasurements(Filter const& filter, std::vector<Measurement>* result) const;
 
     //static inline MeasurementId computeMeasurementId(MeasurementDescriptor const& md);
@@ -499,13 +655,46 @@ private:
 
     struct Data
     {
-        std::vector<BaseStation> baseStations;
-        std::vector<SensorTimeConfig> sensorTimeConfigs;
-        std::vector<Sensor> sensors;
-        std::vector<Alarm> alarms;
-        std::vector<Report> reports;
-        SensorSettings sensorSettings;
+        bool generalSettingsChanged = false;
+		GeneralSettings generalSettings;
+		
+        bool csvSettingsChanged = false;
+		CsvSettings csvSettings;
+		
+        bool emailSettingsChanged = false;
+		EmailSettings emailSettings;
+		
+        bool ftpSettingsChanged = false;
+		FtpSettings ftpSettings;
+		
+        bool sensorSettingsChanged = false;
+		SensorSettings sensorSettings;
 
+        bool usersChanged = false;
+		bool usersAddedOrRemoved = false;
+		std::vector<User> users;
+		
+        bool baseStationsChanged = false;
+		bool baseStationsAddedOrRemoved = false;
+        std::vector<BaseStation> baseStations;
+		
+        bool sensorTimeConfigsChanged = false;
+        std::vector<SensorTimeConfig> sensorTimeConfigs;
+		
+        bool sensorsChanged = false;
+		bool sensorsAddedOrRemoved = false;
+        std::vector<Sensor> sensors;
+		
+        bool alarmsChanged = false;
+		bool alarmsAddedOrRemoved = false;
+        std::vector<Alarm> alarms;
+		
+        bool reportsChanged = false;
+		bool reportsAddedOrRemoved = false;
+        std::vector<Report> reports;
+
+		UserId loggedInUserId = UserId(-1);
+		UserId lastUserId = 0;
         BaseStationId lastBaseStationId = 0;
         SensorId lastSensorId = 0;
         AlarmId lastAlarmId = 0;
@@ -523,6 +712,7 @@ private:
 	std::shared_ptr<sqlite3_stmt> m_saveReportsStmt;
 	std::shared_ptr<sqlite3_stmt> m_addMeasurementsStmt;
 
+	std::unique_ptr<Emailer> m_emailer;
 
     mutable std::recursive_mutex m_dataMutex;
     Data m_data;
@@ -535,6 +725,6 @@ private:
 
     bool m_saveScheduled = false;
     void scheduleSave();
-    void save();
-    void save(Data const& data) const;
+	void save(bool newTransaction);
+	void save(Data& data, bool newTransaction) const;
 };

@@ -9,6 +9,9 @@
 #include "DB.h"
 #include "PermissionsCheck.h"
 
+#define NOMINMAX
+#include <windows.h>
+
 extern std::pair<std::string, int32_t> computeDurationString(DB::Clock::duration d);
 
 DB::Clock::duration computeBatteryLife(float capacity, DB::Clock::duration measurementPeriod, DB::Clock::duration commsPeriod, float power, uint8_t hardwareVersion)
@@ -74,7 +77,7 @@ SettingsWidget::~SettingsWidget()
 
 //////////////////////////////////////////////////////////////////////////
 
-void SettingsWidget::init(Comms& comms, Settings& settings)
+void SettingsWidget::init(Comms& comms, DB& db)
 {
     for (const QMetaObject::Connection& connection: m_uiConnections)
     {
@@ -83,17 +86,23 @@ void SettingsWidget::init(Comms& comms, Settings& settings)
     m_uiConnections.clear();
 
     setEnabled(true);
-    m_settings = &settings;
-    m_db = nullptr;
+    m_db = &db;
 
-    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &SettingsWidget::setPermissions));
+	m_uiConnections.push_back(connect(&db, &DB::userLoggedIn, this, &SettingsWidget::setPermissions));
+
+    m_ui.showDebugConsole->setChecked(IsWindowVisible(GetConsoleWindow()) == SW_SHOW);
+    m_ui.showDebugConsole->setVisible(db.isLoggedInAsAdmin());
+    m_uiConnections.push_back(connect(m_ui.showDebugConsole, &QCheckBox::stateChanged, this, [](int state) 
+    {
+        ShowWindow(GetConsoleWindow(), state ? SW_SHOW : SW_HIDE);
+    }));
 
     m_uiConnections.push_back(connect(m_ui.radioPower, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
     m_uiConnections.push_back(connect(m_ui.sensorsMeasurementPeriod, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
     m_uiConnections.push_back(connect(m_ui.sensorsCommsPeriod, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
     m_uiConnections.push_back(connect(m_ui.batteryCapacity, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
 
-    setEmailSettings(m_settings->getEmailSettings());
+	setEmailSettings(m_db->getEmailSettings());
     m_uiConnections.push_back(connect(m_ui.emailHost, &QLineEdit::textChanged, this, &SettingsWidget::resetEmailProviderPreset));
     m_uiConnections.push_back(connect(m_ui.emailPort, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, &SettingsWidget::resetEmailProviderPreset));
     m_uiConnections.push_back(connect(m_ui.emailConnection, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &SettingsWidget::resetEmailProviderPreset));
@@ -117,8 +126,6 @@ void SettingsWidget::init(Comms& comms, Settings& settings)
 //     }));
 //     m_ui.list->setCurrentItem(m_ui.list->topLevelItem(0));
 
-    m_db = &m_settings->getDB();
-
     setSensorSettings(m_db->getSensorSettings());
     setSensorTimeConfig(m_db->getLastSensorTimeConfig());
     m_dbConnections.push_back(connect(m_db, &DB::sensorSettingsChanged, [this]() { if (m_db) setSensorSettings(m_db->getSensorSettings()); }));
@@ -132,7 +139,6 @@ void SettingsWidget::init(Comms& comms, Settings& settings)
 void SettingsWidget::shutdown()
 {
     setEnabled(false);
-    m_settings = nullptr;
     m_db = nullptr;
 
     for (const QMetaObject::Connection& connection: m_dbConnections)
@@ -156,14 +162,14 @@ void SettingsWidget::save()
 
 void SettingsWidget::setPermissions()
 {
-	m_ui.emailTab->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeEmailSettings));
-    m_ui.ftpTab->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeFtpSettings));
-	m_ui.batteryCapacity->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensorSettings));
-	m_ui.radioPower->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensorSettings));
-	m_ui.batteryAlertThreshold->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensorSettings));
-	m_ui.signalStrengthAlertThreshold->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensorSettings));
-	m_ui.sensorsCommsPeriod->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensorSettings));
-	m_ui.sensorsMeasurementPeriod->setEnabled(hasPermission(*m_settings, Settings::UserDescriptor::PermissionChangeSensorSettings));
+	m_ui.emailTab->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeEmailSettings));
+	m_ui.ftpTab->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeFtpSettings));
+	m_ui.batteryCapacity->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
+	m_ui.radioPower->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
+	m_ui.batteryAlertThreshold->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
+	m_ui.signalStrengthAlertThreshold->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
+	m_ui.sensorsCommsPeriod->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
+	m_ui.sensorsMeasurementPeriod->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -193,7 +199,7 @@ void SettingsWidget::emailSmtpProviderPresetChanged()
         m_ui.emailPort->blockSignals(false);
 
         m_ui.emailConnection->blockSignals(true);
-        m_ui.emailConnection->setCurrentIndex((int)Settings::EmailSettings::Connection::Tls);
+		m_ui.emailConnection->setCurrentIndex((int)DB::EmailSettings::Connection::Tls);
         m_ui.emailConnection->blockSignals(false);
 
         m_ui.emailUsername->setPlaceholderText("example@gmail.com");
@@ -243,7 +249,7 @@ void SettingsWidget::removeEmailRecipient()
 
 //////////////////////////////////////////////////////////////////////////
 
-void SettingsWidget::setEmailSettings(Settings::EmailSettings const& settings)
+void SettingsWidget::setEmailSettings(DB::EmailSettings const& settings)
 {
     m_ui.emailHost->setText(settings.host.c_str());
     m_ui.emailPort->setValue(settings.port);
@@ -262,11 +268,11 @@ void SettingsWidget::setEmailSettings(Settings::EmailSettings const& settings)
 
 //////////////////////////////////////////////////////////////////////////
 
-bool SettingsWidget::getEmailSettings(Settings::EmailSettings& settings)
+bool SettingsWidget::getEmailSettings(DB::EmailSettings& settings)
 {
     settings.host = m_ui.emailHost->text().toUtf8().data();
     settings.port = static_cast<uint16_t>(m_ui.emailPort->value());
-    settings.connection = static_cast<Settings::EmailSettings::Connection>(m_ui.emailConnection->currentIndex());
+    settings.connection = static_cast<DB::EmailSettings::Connection>(m_ui.emailConnection->currentIndex());
     settings.username = m_ui.emailUsername->text().toUtf8().data();
     settings.password = m_ui.emailPassword->text().toUtf8().data();
     settings.sender = m_ui.emailSender->text().toUtf8().data();
@@ -298,20 +304,20 @@ bool SettingsWidget::getEmailSettings(Settings::EmailSettings& settings)
 
 void SettingsWidget::applyEmailSettings()
 {
-    Settings::EmailSettings settings;
+    DB::EmailSettings settings;
     if (!getEmailSettings(settings))
     {
         return;
     }
 
-    m_settings->setEmailSettings(settings);
+	m_db->setEmailSettings(settings);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void SettingsWidget::sendTestEmail()
 {
-    Settings::EmailSettings settings;
+	DB::EmailSettings settings;
     if (!getEmailSettings(settings))
     {
         return;
@@ -341,9 +347,9 @@ void SettingsWidget::sendTestEmail()
         SmtpClient::ConnectionType connectionType = SmtpClient::SslConnection;
         switch (settings.connection)
         {
-        case Emailer::EmailSettings::Connection::Ssl: connectionType = SmtpClient::SslConnection; break;
-        case Emailer::EmailSettings::Connection::Tcp: connectionType = SmtpClient::TcpConnection; break;
-        case Emailer::EmailSettings::Connection::Tls: connectionType = SmtpClient::TlsConnection; break;
+        case DB::EmailSettings::Connection::Ssl: connectionType = SmtpClient::SslConnection; break;
+        case DB::EmailSettings::Connection::Tcp: connectionType = SmtpClient::TcpConnection; break;
+        case DB::EmailSettings::Connection::Tls: connectionType = SmtpClient::TlsConnection; break;
         }
 
         SmtpClient smtp(QString::fromUtf8(settings.host.c_str()), settings.port, connectionType);
@@ -488,7 +494,7 @@ void SettingsWidget::sendTestEmail()
 
 //////////////////////////////////////////////////////////////////////////
 
-void SettingsWidget::setFtpSettings(Settings::FtpSettings const& settings)
+void SettingsWidget::setFtpSettings(DB::FtpSettings const& settings)
 {
     m_ui.ftpHost->setText(settings.host.c_str());
     m_ui.ftpPort->setValue(settings.port);
@@ -498,7 +504,7 @@ void SettingsWidget::setFtpSettings(Settings::FtpSettings const& settings)
 
 //////////////////////////////////////////////////////////////////////////
 
-bool SettingsWidget::getFtpSettings(Settings::FtpSettings& settings)
+bool SettingsWidget::getFtpSettings(DB::FtpSettings& settings)
 {
     settings.host = m_ui.ftpHost->text().toUtf8().data();
     settings.port = static_cast<uint16_t>(m_ui.ftpPort->value());
@@ -518,35 +524,35 @@ bool SettingsWidget::getFtpSettings(Settings::FtpSettings& settings)
 
 void SettingsWidget::applyFtpSettings()
 {
-    Settings::FtpSettings settings;
+    DB::FtpSettings settings;
     if (!getFtpSettings(settings))
     {
         return;
     }
 
-    m_settings->setFtpSettings(settings);
+	m_db->setFtpSettings(settings);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void SettingsWidget::testFtpSettings()
 {
-    Settings::FtpSettings settings;
+	DB::FtpSettings settings;
     if (!getFtpSettings(settings))
     {
         return;
     }
 
-    static const Settings::Clock::duration timeout = std::chrono::seconds(10);
+	static const DB::Clock::duration timeout = std::chrono::seconds(10);
 
     QFtp* ftp = new QFtp(this);
 
     ftp->connectToHost(settings.host.c_str(), settings.port);
 
-    Settings::Clock::time_point start = Settings::Clock::now();
+	DB::Clock::time_point start = DB::Clock::now();
     while (ftp->hasPendingCommands())
     {
-        if (Settings::Clock::now() - start > timeout)
+        if (DB::Clock::now() - start > timeout)
         {
             QMessageBox::critical(this, "Error", "Connection timed out.");
             return;
@@ -559,10 +565,10 @@ void SettingsWidget::testFtpSettings()
     }
 
     ftp->login(settings.username.c_str(), settings.password.c_str());
-    start = Settings::Clock::now();
+    start = DB::Clock::now();
     while (ftp->hasPendingCommands())
     {
-        if (Settings::Clock::now() - start > timeout)
+        if (DB::Clock::now() - start > timeout)
         {
             QMessageBox::critical(this, "Error", "Authentication timed out.");
             return;
@@ -575,10 +581,10 @@ void SettingsWidget::testFtpSettings()
     }
 
     ftp->cd(settings.folder.c_str());
-    start = Settings::Clock::now();
+    start = DB::Clock::now();
     while (ftp->hasPendingCommands())
     {
-        if (Settings::Clock::now() - start > timeout)
+        if (DB::Clock::now() - start > timeout)
         {
             QMessageBox::critical(this, "Error", "Selecting folder timed out.");
             return;

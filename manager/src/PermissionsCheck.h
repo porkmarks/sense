@@ -1,8 +1,8 @@
 #pragma once
-#include "Settings.h"
+#include "DB.h"
 
 class QWidget;
 
-extern bool adminCheck(Settings& settings, QWidget* parent);
-extern bool hasPermission(Settings& settings, Settings::UserDescriptor::Permissions permission);
-extern bool hasPermissionOrCanLoginAsAdmin(Settings& settings, Settings::UserDescriptor::Permissions permission, QWidget* parent);
+extern bool adminCheck(DB& db, QWidget* parent);
+extern bool hasPermission(DB& db, DB::UserDescriptor::Permissions permission);
+extern bool hasPermissionOrCanLoginAsAdmin(DB& db, DB::UserDescriptor::Permissions permission, QWidget* parent);

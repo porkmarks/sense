@@ -1,6 +1,5 @@
 #include "ReportsWidget.h"
 #include "ConfigureReportDialog.h"
-#include "Settings.h"
 #include "PermissionsCheck.h"
 
 #include <QSettings>
@@ -28,7 +27,7 @@ ReportsWidget::~ReportsWidget()
 
 //////////////////////////////////////////////////////////////////////////
 
-void ReportsWidget::init(Settings& settings)
+void ReportsWidget::init(DB& db)
 {
     for (const QMetaObject::Connection& connection: m_uiConnections)
     {
@@ -38,8 +37,7 @@ void ReportsWidget::init(Settings& settings)
 
     setEnabled(true);
 
-    m_settings = &settings;
-    m_db = &m_settings->getDB();
+    m_db = &db;
 
     m_model.reset(new ReportsModel(*m_db));
     m_ui.list->setModel(m_model.get());
@@ -67,7 +65,7 @@ void ReportsWidget::init(Settings& settings)
 	m_ui.list->header()->setSectionHidden((int)ReportsModel::Column::Id, true);
 
     setPermissions();
-    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &ReportsWidget::setPermissions));
+	m_uiConnections.push_back(connect(&db, &DB::userLoggedIn, this, &ReportsWidget::setPermissions));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -91,7 +89,7 @@ void ReportsWidget::setPermissions()
 
 void ReportsWidget::configureReport(QModelIndex const& index)
 {
-    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionChangeReports, this))
+	if (!hasPermissionOrCanLoginAsAdmin(*m_db, DB::UserDescriptor::PermissionChangeReports, this))
     {
         QMessageBox::critical(this, "Error", "You don't have permission to configure reports.");
         return;
@@ -105,9 +103,9 @@ void ReportsWidget::configureReport(QModelIndex const& index)
 
     DB::Report report = m_db->getReport(indexRow);
 
-    ConfigureReportDialog dialog(*m_settings, *m_db, this);
+	ConfigureReportDialog dialog(*m_db, this);
     dialog.setReport(report);
-    dialog.setEnabled(m_settings->isLoggedInAsAdmin());
+    dialog.setEnabled(m_db->isLoggedInAsAdmin());
 
     int result = dialog.exec();
     if (result == QDialog::Accepted)
@@ -126,13 +124,13 @@ void ReportsWidget::configureReport(QModelIndex const& index)
 
 void ReportsWidget::addReport()
 {
-    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionAddRemoveReports, this))
+	if (!hasPermissionOrCanLoginAsAdmin(*m_db, DB::UserDescriptor::PermissionAddRemoveReports, this))
     {
         QMessageBox::critical(this, "Error", "You don't have permission to add reports.");
         return;
     }
 
-    ConfigureReportDialog dialog(*m_settings, *m_db, this);
+	ConfigureReportDialog dialog(*m_db, this);
 
     DB::Report report;
     report.descriptor.name = "Report " + std::to_string(m_db->getReportCount());
@@ -157,7 +155,7 @@ void ReportsWidget::addReport()
 
 void ReportsWidget::removeReports()
 {
-    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionAddRemoveReports, this))
+	if (!hasPermissionOrCanLoginAsAdmin(*m_db, DB::UserDescriptor::PermissionAddRemoveReports, this))
     {
         QMessageBox::critical(this, "Error", "You don't have permission to remove reports.");
         return;

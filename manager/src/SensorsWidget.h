@@ -6,7 +6,6 @@
 
 #include "ui_SensorsWidget.h"
 #include "DB.h"
-#include "Settings.h"
 #include "SensorsModel.h"
 #include "SensorsDelegate.h"
 
@@ -16,7 +15,7 @@ class SensorsWidget : public QWidget
 public:
     explicit SensorsWidget(QWidget *parent = 0);
     ~SensorsWidget();
-    void init(Settings& settings);
+	void init(DB& db);
     void shutdown();
 
 signals:
@@ -34,7 +33,6 @@ private:
     std::unique_ptr<SensorsDelegate> m_delegate;
 
     DB* m_db = nullptr;
-    Settings* m_settings = nullptr;
     std::vector<QMetaObject::Connection> m_uiConnections;
     bool m_sectionSaveScheduled = false;
 };

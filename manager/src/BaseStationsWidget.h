@@ -5,7 +5,7 @@
 #include <QStandardItemModel>
 #include "ui_BaseStationsWidget.h"
 #include "Comms.h"
-#include "Settings.h"
+#include "DB.h"
 #include "Emailer.h"
 
 class BaseStationsWidget : public QWidget
@@ -15,7 +15,7 @@ public:
     explicit BaseStationsWidget(QWidget *parent = 0);
     ~BaseStationsWidget();
 
-    void init(Comms& comms, Settings& settings);
+	void init(Comms& comms, DB& db);
 
 signals:
     void baseStationActivated(Comms::BaseStationDescriptor const& bs, DB& db);
@@ -38,7 +38,7 @@ private:
 
     Ui::BaseStationsWidget m_ui;
     Comms* m_comms = nullptr;
-    Settings* m_settings = nullptr;
+	DB* m_db = nullptr;
     QStandardItemModel m_model;
 
     std::vector<DB::BaseStationDescriptor> m_baseStationDescriptors;

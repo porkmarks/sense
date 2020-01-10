@@ -39,7 +39,7 @@ MeasurementsWidget::~MeasurementsWidget()
 
 //////////////////////////////////////////////////////////////////////////
 
-void MeasurementsWidget::init(Settings& settings)
+void MeasurementsWidget::init(DB& db)
 {
     for (const QMetaObject::Connection& connection: m_uiConnections)
     {
@@ -48,10 +48,9 @@ void MeasurementsWidget::init(Settings& settings)
     m_uiConnections.clear();
 
     setEnabled(true);
-	m_settings = &settings;
-	m_db = &m_settings->getDB();
+	m_db = &db;
 
-    m_model.reset(new MeasurementsModel(*m_settings, *m_db));
+	m_model.reset(new MeasurementsModel(*m_db));
     m_sortingModel.setSourceModel(m_model.get());
     m_sortingModel.setSortRole(MeasurementsModel::SortingRole);
 
@@ -496,7 +495,7 @@ void MeasurementsWidget::configureMeasurement(QModelIndex const& index)
 
     DB::Measurement measurement = result.payload();
 
-	MeasurementDetailsDialog dialog(*m_settings, this);
+	MeasurementDetailsDialog dialog(*m_db, this);
 	dialog.setMeasurement(measurement);
 
 	do

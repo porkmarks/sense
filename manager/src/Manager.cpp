@@ -12,7 +12,7 @@
 #include "ui_ReportsDialog.h"
 #include "Crypt.h"
 #include "Logger.h"
-#include "Settings.h"
+#include "DB.h"
 
 #define SQLITE_HAS_CODEC
 #include "sqlite3.h"
@@ -67,6 +67,7 @@ Manager::Manager(QWidget *parent)
 
 //            sqlite3_key_v2(db, "sense", "sense", -1);
 
+            sqlite3_exec(db, "PRAGMA journal_mode = WAL;", NULL, NULL, nullptr);
 // 			sqlite3_exec(db, "PRAGMA synchronous = OFF;", NULL, NULL, nullptr);
 // 			sqlite3_exec(db, "PRAGMA journal_mode = MEMORY;", NULL, NULL, nullptr);
 // 			sqlite3_exec(db, "PRAGMA main.locking_mode = EXCLUSIVE;", NULL, NULL, nullptr);
@@ -79,18 +80,10 @@ Manager::Manager(QWidget *parent)
                 remove(dataFilename.c_str());
 				exit(-1);
 			}
-			result = Settings::create(*db);
-			if (result != success)
-			{
-				QMessageBox::critical(this, "Error", QString("Cannot create settings db structure: %1").arg(result.error().what().c_str()));
-				sqlite3_close(db);
-                remove(dataFilename.c_str());
-				exit(-1);
-			}
 			result = DB::create(*db);
 			if (result != success)
 			{
-				QMessageBox::critical(this, "Error", QString("Cannot create measurements db structure: %1").arg(result.error().what().c_str()));
+				QMessageBox::critical(this, "Error", QString("Cannot create db structure: %1").arg(result.error().what().c_str()));
 				sqlite3_close(db);
                 remove(dataFilename.c_str());
 				exit(-1);
@@ -107,20 +100,21 @@ Manager::Manager(QWidget *parent)
     }
     s_logger.logInfo("Program started");
 
-    if (!m_settings.load(*m_sqlite))
+    Result<void> dbLoadResult = m_db.load(*m_sqlite);
+	if (dbLoadResult != success)
     {
-        s_logger.logCritical("Cannot load settings");
-        QMessageBox::critical(this, "Error", "Cannot load settings module.");
+        s_logger.logCritical(QString("Cannot load db: %1").arg(dbLoadResult.error().what().c_str()));
+        QMessageBox::critical(this, "Error", QString("Cannot load db: %1").arg(dbLoadResult.error().what().c_str()));
         exit(1);
     }
 
-    //m_ui.settingsWidget->init(m_comms, m_settings);
-    m_ui.logsWidget->init(m_settings);
+    //m_ui.settingsWidget->init(m_comms, m_db);
+    m_ui.logsWidget->init(m_db);
 
-    m_ui.sensorsWidget->init(m_settings);
-    m_ui.measurementsWidget->init(m_settings);
-    m_ui.plotWidget->init(m_settings, m_settings.getDB());
-    m_ui.alarmsWidget->init(m_settings);
+    m_ui.sensorsWidget->init(m_db);
+    m_ui.measurementsWidget->init(m_db);
+    m_ui.plotWidget->init(m_db);
+    m_ui.alarmsWidget->init(m_db);
 
 //     m_ui.actionEmailSettings->setEnabled(true);
 //     m_ui.actionFtpSettings->setEnabled(true);
@@ -148,7 +142,7 @@ Manager::Manager(QWidget *parent)
 
     show();
 
-    connect(&m_settings, &Settings::userLoggedIn, this, &Manager::userLoggedIn);
+	connect(&m_db, &DB::userLoggedIn, this, &Manager::userLoggedIn);
     connect(&m_comms, &Comms::baseStationDiscovered, this, &Manager::baseStationDiscovered);
 
     checkIfAdminExists();
@@ -175,30 +169,30 @@ Manager::~Manager()
 
 void Manager::checkIfAdminExists()
 {
-    if (m_settings.needsAdmin())
+	if (m_db.needsAdmin())
     {
         s_logger.logInfo("No admin account exists, creating one");
 
         QMessageBox::information(this, "Admin", "No admin user exists. Please create one now.");
 
-        ConfigureUserDialog dialog(m_settings, this);
+        ConfigureUserDialog dialog(m_db, this);
 
-        Settings::User user;
+		DB::User user;
         dialog.setUser(user);
-        dialog.setForcedType(Settings::UserDescriptor::Type::Admin);
+        dialog.setForcedType(DB::UserDescriptor::Type::Admin);
 
         int result = dialog.exec();
         if (result == QDialog::Accepted)
         {
             user = dialog.getUser();
-            if (m_settings.addUser(user.descriptor))
+			if (m_db.addUser(user.descriptor))
             {
                 s_logger.logInfo(QString("Admin user '%1' created, logging in").arg(user.descriptor.name.c_str()).toUtf8().data());
 
-                int32_t userIndex = m_settings.findUserIndexByName(user.descriptor.name);
+                int32_t userIndex = m_db.findUserIndexByName(user.descriptor.name);
                 if (userIndex >= 0)
                 {
-                    m_settings.setLoggedInUserId(m_settings.getUser(static_cast<size_t>(userIndex)).id);
+                    m_db.setLoggedInUserId(m_db.getUser(static_cast<size_t>(userIndex)).id);
                 }
                 else
                 {
@@ -218,7 +212,7 @@ void Manager::checkIfAdminExists()
             s_logger.logWarning("User cancelled admin creation dialog");
         }
 
-        if (m_settings.needsAdmin())
+        if (m_db.needsAdmin())
         {
             s_logger.logCritical("User failed to create an admin account. Exiting");
             QMessageBox::critical(this, "Error", "No admin user exists.\nThe program will now close.");
@@ -243,7 +237,7 @@ void Manager::login()
         int result = dialog.exec();
         if (result == QDialog::Accepted)
         {
-            int32_t _userIndex = m_settings.findUserIndexByName(ui.username->text().toUtf8().data());
+            int32_t _userIndex = m_db.findUserIndexByName(ui.username->text().toUtf8().data());
             if (_userIndex < 0)
             {
                 attempts++;
@@ -253,7 +247,7 @@ void Manager::login()
             }
 
             size_t userIndex = static_cast<size_t>(_userIndex);
-            Settings::User const& user = m_settings.getUser(userIndex);
+			DB::User const& user = m_db.getUser(userIndex);
 
 #ifdef CHECK_PASSWORD
             Crypt crypt;
@@ -271,7 +265,7 @@ void Manager::login()
             }
 #endif
 
-            m_settings.setLoggedInUserId(user.id);
+            m_db.setLoggedInUserId(user.id);
             break;
         }
         else
@@ -309,7 +303,7 @@ void Manager::showSettingsDialog()
 	QDialog dialog(this);
 	Ui::SettingsDialog ui;
 	ui.setupUi(&dialog);
-	ui.settingsWidget->init(m_comms, m_settings);
+	ui.settingsWidget->init(m_comms, m_db);
 
 	QSettings settings;
     if (settings.contains("settingsDialogGeometry"))
@@ -332,7 +326,7 @@ void Manager::showBaseStationsDialog()
 	QDialog dialog(this);
 	Ui::BaseStationsDialog ui;
 	ui.setupUi(&dialog);
-	ui.baseStationsWidget->init(m_comms, m_settings);
+	ui.baseStationsWidget->init(m_comms, m_db);
 
 	QSettings settings;
 	if (settings.contains("baseStationsDialogGeometry"))
@@ -352,7 +346,7 @@ void Manager::showUsersDialog()
 	QDialog dialog(this);
 	Ui::UsersDialog ui;
 	ui.setupUi(&dialog);
-	ui.usersWidget->init(m_settings);
+	ui.usersWidget->init(m_db);
 
 	QSettings settings;
 	if (settings.contains("usersDialogGeometry"))
@@ -372,7 +366,7 @@ void Manager::showReportsDialog()
 	QDialog dialog(this);
 	Ui::ReportsDialog ui;
 	ui.setupUi(&dialog);
-	ui.reportsWidget->init(m_settings);
+	ui.reportsWidget->init(m_db);
 
 	QSettings settings;
 	if (settings.contains("reportsDialogGeometry"))
@@ -394,9 +388,9 @@ void Manager::exitAction()
 
 //////////////////////////////////////////////////////////////////////////
 
-void Manager::userLoggedIn(Settings::UserId id)
+void Manager::userLoggedIn(DB::UserId id)
 {
-    int32_t _index = m_settings.findUserIndexById(id);
+	int32_t _index = m_db.findUserIndexById(id);
     if (_index < 0)
     {
         setWindowTitle("Manager (Not Logged In");
@@ -404,7 +398,7 @@ void Manager::userLoggedIn(Settings::UserId id)
     else
     {
         size_t index = static_cast<size_t>(_index);
-        Settings::User const& user = m_settings.getUser(index);
+		DB::User const& user = m_db.getUser(index);
         setWindowTitle(QString("Manager (%1)").arg(user.descriptor.name.c_str()));
     }
 }
@@ -413,13 +407,12 @@ void Manager::userLoggedIn(Settings::UserId id)
 
 void Manager::baseStationDiscovered(Comms::BaseStationDescriptor const& commsBS)
 {
-	DB& db = m_settings.getDB();
-	int32_t _bsIndex = db.findBaseStationIndexByMac(commsBS.mac);
+	int32_t _bsIndex = m_db.findBaseStationIndexByMac(commsBS.mac);
 	if (_bsIndex >= 0)
 	{
 		size_t bsIndex = static_cast<size_t>(_bsIndex);
-		DB::BaseStation const& bs = db.getBaseStation(static_cast<size_t>(bsIndex));
-		m_comms.connectToBaseStation(db, bs.descriptor.mac);
+		DB::BaseStation const& bs = m_db.getBaseStation(static_cast<size_t>(bsIndex));
+		m_comms.connectToBaseStation(m_db, bs.descriptor.mac);
 	}
 }
 
@@ -486,7 +479,7 @@ void Manager::readSettings()
 
 void Manager::processBackups()
 {
-	Settings::Clock::time_point now = Settings::Clock::now();
+	DB::Clock::time_point now = DB::Clock::now();
     if (now - m_lastHourlyBackupTP >= std::chrono::hours(1))
     {
         m_lastHourlyBackupTP = now;
@@ -518,7 +511,7 @@ void Manager::process()
 //    }
 
     m_comms.process();
-    m_settings.process();
+	m_db.process();
 
     processBackups();
 }

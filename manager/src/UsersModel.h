@@ -3,12 +3,12 @@
 #include <memory>
 #include <vector>
 #include <QAbstractItemModel>
-#include "Settings.h"
+#include "DB.h"
 
 class UsersModel : public QAbstractItemModel
 {
 public:
-    UsersModel(Settings& db);
+    UsersModel(DB& db);
     ~UsersModel();
 
     enum class Column
@@ -42,5 +42,5 @@ protected:
     virtual bool removeRows(int position, int rows, QModelIndex const& parent = QModelIndex());
 
 private:
-    Settings& m_settings;
+	DB& m_db;
 };

@@ -1,5 +1,5 @@
 #include "BaseStationsWidget.h"
-#include "Settings.h"
+#include "DB.h"
 #include <cassert>
 #include <QMessageBox>
 #include <QSettings>
@@ -59,7 +59,7 @@ BaseStationsWidget::~BaseStationsWidget()
 
 //////////////////////////////////////////////////////////////////////////
 
-void BaseStationsWidget::init(Comms& comms, Settings& settings)
+void BaseStationsWidget::init(Comms& comms, DB& db)
 {
     for (const QMetaObject::Connection& connection: m_uiConnections)
     {
@@ -70,13 +70,12 @@ void BaseStationsWidget::init(Comms& comms, Settings& settings)
     setEnabled(true);
 
     m_comms = &comms;
-    m_settings = &settings;
+    m_db = &db;
 
     m_uiConnections.push_back(connect(m_comms, &Comms::baseStationDiscovered, this, &BaseStationsWidget::baseStationDiscovered));
     m_uiConnections.push_back(connect(m_comms, &Comms::baseStationConnected, this, &BaseStationsWidget::baseStationConnected));
     m_uiConnections.push_back(connect(m_comms, &Comms::baseStationDisconnected, this, &BaseStationsWidget::baseStationDisconnected));
 
-    DB& db = settings.getDB();
     for (size_t i = 0; i < db.getBaseStationCount(); i++)
     {
         DB::BaseStation const& bs = db.getBaseStation(i);
@@ -118,7 +117,7 @@ void BaseStationsWidget::init(Comms& comms, Settings& settings)
 	}
 
     setPermissions();
-    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &BaseStationsWidget::setPermissions));
+	m_uiConnections.push_back(connect(&db, &DB::userLoggedIn, this, &BaseStationsWidget::setPermissions));
 }
 
 
@@ -158,7 +157,7 @@ void BaseStationsWidget::setAddress(size_t row, QHostAddress const& address)
 
 void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
 {
-	if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionAddRemoveBaseStations, this))
+	if (!hasPermissionOrCanLoginAsAdmin(*m_db, DB::UserDescriptor::PermissionAddRemoveBaseStations, this))
     {
         QMessageBox::critical(this, "Error", "You don't have permission to add base stations.");
         return;
@@ -173,8 +172,7 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
 
     DB::BaseStationDescriptor descriptor = m_baseStationDescriptors[indexRow];
 
-    DB& db = m_settings->getDB();
-    int32_t _bsIndex = db.findBaseStationIndexByMac(descriptor.mac);
+    int32_t _bsIndex = m_db->findBaseStationIndexByMac(descriptor.mac);
     if (_bsIndex >= 0)
     {
         return;
@@ -187,13 +185,13 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
     }
 
     descriptor.name = qname.toUtf8().data();
-    if (db.addBaseStation(descriptor))
+    if (m_db->addBaseStation(descriptor))
     {
-        _bsIndex = db.findBaseStationIndexByMac(descriptor.mac);
+        _bsIndex = m_db->findBaseStationIndexByMac(descriptor.mac);
         if (_bsIndex >= 0)
         {
             size_t bsIndex = static_cast<size_t>(_bsIndex);
-            bool connected = m_comms->connectToBaseStation(db, descriptor.mac);
+            bool connected = m_comms->connectToBaseStation(*m_db, descriptor.mac);
             setStatus(bsIndex, connected ? "Connected" : "Disconnected");
             setName(bsIndex, descriptor.name);
         }
@@ -212,8 +210,7 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
 
 void BaseStationsWidget::baseStationConnected(Comms::BaseStationDescriptor const& commsBS)
 {
-    DB const& db = m_settings->getDB();
-    int32_t _bsIndex = db.findBaseStationIndexByMac(commsBS.mac);
+    int32_t _bsIndex = m_db->findBaseStationIndexByMac(commsBS.mac);
     if (_bsIndex >= 0)
     {
         size_t bsIndex = static_cast<size_t>(_bsIndex);
@@ -228,12 +225,11 @@ void BaseStationsWidget::baseStationConnected(Comms::BaseStationDescriptor const
 
 void BaseStationsWidget::baseStationDisconnected(Comms::BaseStationDescriptor const& commsBS)
 {
-    DB const& db = m_settings->getDB();
-    int32_t _bsIndex = db.findBaseStationIndexByMac(commsBS.mac);
+    int32_t _bsIndex = m_db->findBaseStationIndexByMac(commsBS.mac);
     if (_bsIndex >= 0)
     {
         size_t bsIndex = static_cast<size_t>(_bsIndex);
-        DB::BaseStation const& bs = db.getBaseStation(bsIndex);
+        DB::BaseStation const& bs = m_db->getBaseStation(bsIndex);
         setStatus(bsIndex, "Disconnected");
         setAddress(bsIndex, commsBS.address);
         showDisconnectionMessageBox(bs, commsBS.address);
@@ -256,12 +252,11 @@ void BaseStationsWidget::showDisconnectionMessageBox(DB::BaseStation const& bs, 
 
 void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor const& commsBS)
 {
-    DB& db = m_settings->getDB();
-    int32_t _bsIndex = db.findBaseStationIndexByMac(commsBS.mac);
+    int32_t _bsIndex = m_db->findBaseStationIndexByMac(commsBS.mac);
     if (_bsIndex >= 0)
     {
         size_t bsIndex = static_cast<size_t>(_bsIndex);
-        DB::BaseStation const& bs = db.getBaseStation(static_cast<size_t>(bsIndex));
+        DB::BaseStation const& bs = m_db->getBaseStation(static_cast<size_t>(bsIndex));
         bool connected = m_comms->isBaseStationConnected(bs.descriptor.mac);
         setStatus(bsIndex, connected ? "Connected" : "Disconnected");
         setAddress(bsIndex, commsBS.address);

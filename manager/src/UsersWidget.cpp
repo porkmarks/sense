@@ -1,10 +1,11 @@
 #include "UsersWidget.h"
 #include "ConfigureUserDialog.h"
 #include "PermissionsCheck.h"
-#include "Settings.h"
+#include "DB.h"
 
 #include <QMessageBox>
 #include <QSettings>
+#include <QTimer>
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -28,7 +29,7 @@ UsersWidget::~UsersWidget()
 
 //////////////////////////////////////////////////////////////////////////
 
-void UsersWidget::init(Settings& settings)
+void UsersWidget::init(DB& db)
 {
     for (const QMetaObject::Connection& connection: m_uiConnections)
     {
@@ -38,9 +39,9 @@ void UsersWidget::init(Settings& settings)
 
     setEnabled(true);
 
-    m_settings = &settings;
+    m_db = &db;
 
-    m_model.reset(new UsersModel(settings));
+    m_model.reset(new UsersModel(db));
     m_ui.list->setModel(m_model.get());
     m_ui.list->setUniformRowHeights(true);
 
@@ -66,7 +67,7 @@ void UsersWidget::init(Settings& settings)
 	m_ui.list->header()->setSectionHidden((int)UsersModel::Column::Id, true);
 
     setPermissions();
-    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &UsersWidget::setPermissions));
+	m_uiConnections.push_back(connect(&db, &DB::userLoggedIn, this, &UsersWidget::setPermissions));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -77,7 +78,7 @@ void UsersWidget::shutdown()
     m_ui.list->setModel(nullptr);
     m_ui.list->setItemDelegate(nullptr);
     m_model.reset();
-    m_settings = nullptr;
+	m_db = nullptr;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -91,29 +92,29 @@ void UsersWidget::setPermissions()
 void UsersWidget::configureUser(QModelIndex const& index)
 {
     size_t indexRow = static_cast<size_t>(index.row());
-    if (!index.isValid() || indexRow >= m_settings->getUserCount())
+    if (!index.isValid() || indexRow >= m_db->getUserCount())
     {
         return;
     }
 
-    Settings::User user = m_settings->getUser(indexRow);
-    if (m_settings->getLoggedInUserId() != user.id && 
-        !hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionChangeUsers, this))
+	DB::User user = m_db->getUser(indexRow);
+    if (m_db->getLoggedInUserId() != user.id &&
+		!hasPermissionOrCanLoginAsAdmin(*m_db, DB::UserDescriptor::PermissionChangeUsers, this))
     {
         QMessageBox::critical(this, "Error", "You don't have permission to configure users.");
         return;
     }
 
-    ConfigureUserDialog dialog(*m_settings, this);
+	ConfigureUserDialog dialog(*m_db, this);
     dialog.setUser(user);
 
-    if (user.descriptor.type == Settings::UserDescriptor::Type::Admin)
+	if (user.descriptor.type == DB::UserDescriptor::Type::Admin)
     {
-        dialog.setForcedType(Settings::UserDescriptor::Type::Admin);
+        dialog.setForcedType(DB::UserDescriptor::Type::Admin);
     }
-    else if (!m_settings->needsAdmin())
+	else if (!m_db->needsAdmin())
     {
-        dialog.setForcedType(Settings::UserDescriptor::Type::Normal);
+		dialog.setForcedType(DB::UserDescriptor::Type::Normal);
     }
 
     do
@@ -122,7 +123,7 @@ void UsersWidget::configureUser(QModelIndex const& index)
 		if (result == QDialog::Accepted)
 		{
 			user = dialog.getUser();
-			Result<void> result = m_settings->setUser(user.id, user.descriptor);
+			Result<void> result = m_db->setUser(user.id, user.descriptor);
 			if (result != success)
 			{
 				QMessageBox::critical(this, "Error", QString("Cannot change user '%1': %2").arg(user.descriptor.name.c_str()).arg(result.error().what().c_str()));
@@ -138,31 +139,31 @@ void UsersWidget::configureUser(QModelIndex const& index)
 
 void UsersWidget::addUser()
 {
-    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionAddRemoveUsers, this))
+	if (!hasPermissionOrCanLoginAsAdmin(*m_db, DB::UserDescriptor::PermissionAddRemoveUsers, this))
     {
         QMessageBox::critical(this, "Error", "You don't have permission to add users.");
         return;
     }
 
-    ConfigureUserDialog dialog(*m_settings, this);
+	ConfigureUserDialog dialog(*m_db, this);
 
-    Settings::User user;
+	DB::User user;
     dialog.setUser(user);
 
-    if (user.descriptor.type == Settings::UserDescriptor::Type::Admin)
+    if (user.descriptor.type == DB::UserDescriptor::Type::Admin)
     {
-        dialog.setForcedType(Settings::UserDescriptor::Type::Admin);
+        dialog.setForcedType(DB::UserDescriptor::Type::Admin);
     }
-    else if (!m_settings->needsAdmin())
+	else if (!m_db->needsAdmin())
     {
-        dialog.setForcedType(Settings::UserDescriptor::Type::Normal);
+		dialog.setForcedType(DB::UserDescriptor::Type::Normal);
     }
 
     int result = dialog.exec();
     if (result == QDialog::Accepted)
     {
         user = dialog.getUser();
-        m_settings->addUser(user.descriptor);
+		m_db->addUser(user.descriptor);
         m_model->refresh();
     }
 }
@@ -171,7 +172,7 @@ void UsersWidget::addUser()
 
 void UsersWidget::removeUsers()
 {
-    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionAddRemoveUsers, this))
+	if (!hasPermissionOrCanLoginAsAdmin(*m_db, DB::UserDescriptor::PermissionAddRemoveUsers, this))
     {
         QMessageBox::critical(this, "Error", "You don't have permission to remove users.");
         return;
@@ -185,8 +186,8 @@ void UsersWidget::removeUsers()
     }
 
     QModelIndex mi = m_model->index(selected.at(0).row(), static_cast<int>(UsersModel::Column::Id));
-    Settings::UserId id = m_model->data(mi).toUInt();
-    int32_t _index = m_settings->findUserIndexById(id);
+	DB::UserId id = m_model->data(mi).toUInt();
+	int32_t _index = m_db->findUserIndexById(id);
     if (_index < 0)
     {
         QMessageBox::critical(this, "Error", "Invalid user selected.");
@@ -194,7 +195,7 @@ void UsersWidget::removeUsers()
     }
 
     size_t index = static_cast<size_t>(_index);
-    Settings::User const& user = m_settings->getUser(index);
+	DB::User const& user = m_db->getUser(index);
 
     int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete user '%1'").arg(user.descriptor.name.c_str()));
     if (response != QMessageBox::Yes)
@@ -202,7 +203,7 @@ void UsersWidget::removeUsers()
         return;
     }
 
-    m_settings->removeUser(index);
+    m_db->removeUser(index);
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -5,9 +5,8 @@
 
 //////////////////////////////////////////////////////////////////////////
 
-ConfigureReportDialog::ConfigureReportDialog(Settings& settings, DB& db, QWidget* parent)
+ConfigureReportDialog::ConfigureReportDialog(DB& db, QWidget* parent)
     : QDialog(parent)
-    , m_settings(settings)
     , m_db(db)
 {
     m_ui.setupUi(this);
@@ -45,7 +44,7 @@ void ConfigureReportDialog::sendReportNow()
     DB::Report report = m_report;
     if (getDescriptor(report.descriptor))
     {
-        Emailer emailer(m_settings, m_db);
+        Emailer emailer(m_db);
         emailer.sendReportEmail(report);
         QMessageBox::information(this, "Done", "The report email was scheduled to be sent.");
     }

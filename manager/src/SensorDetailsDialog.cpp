@@ -9,9 +9,8 @@ extern uint32_t getSensorStorageCapacity(DB::Sensor const& sensor);
 
 //////////////////////////////////////////////////////////////////////////
 
-SensorDetailsDialog::SensorDetailsDialog(Settings& settings, DB& db, QWidget* parent)
+SensorDetailsDialog::SensorDetailsDialog(DB& db, QWidget* parent)
     : QDialog(parent)
-    , m_settings(settings)
     , m_db(db)
 {
     m_ui.setupUi(this);
@@ -77,7 +76,7 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
         auto pair = computeRelativeTimePointString(m_sensor.sleepStateTimePoint);
         std::string str = pair.first;
         str = (pair.second > 0) ? "In " + str : str + " ago";
-        m_ui.sleepState->setText(QString("(sleeping since %1, %2)").arg(utils::toString<DB::Clock>(m_sensor.sleepStateTimePoint, m_settings.getGeneralSettings().dateTimeFormat)).arg(str.c_str()));
+		m_ui.sleepState->setText(QString("(sleeping since %1, %2)").arg(utils::toString<DB::Clock>(m_sensor.sleepStateTimePoint, m_db.getGeneralSettings().dateTimeFormat)).arg(str.c_str()));
     }
     else if (m_sensor.state == DB::Sensor::State::Active)
     {
@@ -132,7 +131,7 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
         std::string str = pair.first;
         str = (pair.second > 0) ? "In " + str : str + " ago";
 
-        m_ui.lastComms->setText(QString("%1 (%2)").arg(utils::toString<DB::Clock>(m_sensor.lastCommsTimePoint, m_settings.getGeneralSettings().dateTimeFormat)).arg(str.c_str()));
+        m_ui.lastComms->setText(QString("%1 (%2)").arg(utils::toString<DB::Clock>(m_sensor.lastCommsTimePoint, m_db.getGeneralSettings().dateTimeFormat)).arg(str.c_str()));
     }
     else
     {

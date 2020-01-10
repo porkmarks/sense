@@ -8,7 +8,6 @@
 #include <QTimer>
 
 #include "DB.h"
-#include "Settings.h"
 
 class MeasurementsWidget;
 
@@ -17,7 +16,7 @@ class MeasurementsModel : public QAbstractItemModel
     friend class MeasurementsWidget;
 public:
 
-	MeasurementsModel(Settings& settings, DB& db);
+	MeasurementsModel(DB& db);
     ~MeasurementsModel();
 
     void setFilter(DB::Filter const& filter);
@@ -34,6 +33,7 @@ public:
         Sensor,
         Index,
         Timestamp,
+        ReceivedTimestamp,
         Temperature,
         Humidity,
         Battery,
@@ -75,7 +75,6 @@ private slots:
 	void startFastAutoRefresh();
 
 private:
-    Settings& m_settings;
     DB& m_db;
     DB::Filter m_filter;
     std::vector<DB::Measurement> m_measurements;

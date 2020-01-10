@@ -2,17 +2,16 @@
 #include <iostream>
 #include <cassert>
 #include "Smtp/SmtpMime"
-#include "Settings.h"
 #include "Logger.h"
 #include "Utils.h"
+#include "DB.h"
 
 extern Logger s_logger;
 
 //////////////////////////////////////////////////////////////////////////
 
-Emailer::Emailer(Settings& settings, DB& db)
-    : m_settings(settings)
-    , m_db(db)
+Emailer::Emailer(DB& db)
+    : m_db(db)
 {
     m_emailThread = std::thread(std::bind(&Emailer::emailThreadProc, this));
 
@@ -191,8 +190,8 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
 </table>
     )X").arg(sensor.descriptor.name.c_str())
         .arg(sensor.serialNumber, 8, 16, QChar('0'))
-        .arg(utils::toString<DB::Clock>(m.timePoint, m_settings.getGeneralSettings().dateTimeFormat))
-        .arg(utils::toString<DB::Clock>(m.receivedTimePoint, m_settings.getGeneralSettings().dateTimeFormat))
+        .arg(utils::toString<DB::Clock>(m.timePoint, m_db.getGeneralSettings().dateTimeFormat))
+        .arg(utils::toString<DB::Clock>(m.receivedTimePoint, m_db.getGeneralSettings().dateTimeFormat))
         .arg(temperatureStr)
         .arg(humidityStr)
         .arg(batteryStr)
@@ -241,13 +240,13 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
 			.toUtf8().data();
 	}
 
-	QString dateTimeFormatStr = utils::getQDateTimeFormatString(m_settings.getGeneralSettings().dateTimeFormat);
+	QString dateTimeFormatStr = utils::getQDateTimeFormatString(m_db.getGeneralSettings().dateTimeFormat);
 	email.body += QString(R"X(
 <p>&nbsp;</p>
 <p><strong>Date/Time Format: %1</strong></p>
 <p>&nbsp;</p>)X").arg(dateTimeFormatStr.toUpper()).toUtf8().data();
 
-	email.settings = m_settings.getEmailSettings();
+	email.settings = m_db.getEmailSettings();
 
 	s_logger.logInfo(QString("Sending alarm email"));
 
@@ -304,7 +303,7 @@ void Emailer::sendAlarmRetriggerEmail(DB::Alarm const& alarm)
 		}
 	}
 	
-	email.settings = m_settings.getEmailSettings();
+	email.settings = m_db.getEmailSettings();
 
 	s_logger.logInfo(QString("Sending alarm email'"));
 
@@ -315,10 +314,10 @@ void Emailer::sendAlarmRetriggerEmail(DB::Alarm const& alarm)
 
 void Emailer::sendReportEmail(DB::Report const& report)
 {
-    QString dateTimeFormatStr = utils::getQDateTimeFormatString(m_settings.getGeneralSettings().dateTimeFormat);
+    QString dateTimeFormatStr = utils::getQDateTimeFormatString(m_db.getGeneralSettings().dateTimeFormat);
 
     Email email;
-    email.settings = m_settings.getEmailSettings();
+    email.settings = m_db.getEmailSettings();
 
     s_logger.logInfo(QString("Sending report email"));
 

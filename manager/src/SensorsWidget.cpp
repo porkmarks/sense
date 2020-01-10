@@ -1,5 +1,4 @@
 #include "SensorsWidget.h"
-#include "Settings.h"
 #include "SensorDetailsDialog.h"
 #include "PermissionsCheck.h"
 
@@ -32,7 +31,7 @@ SensorsWidget::~SensorsWidget()
 
 //////////////////////////////////////////////////////////////////////////
 
-void SensorsWidget::init(Settings& settings)
+void SensorsWidget::init(DB& db)
 {
     for (const QMetaObject::Connection& connection: m_uiConnections)
     {
@@ -42,8 +41,7 @@ void SensorsWidget::init(Settings& settings)
 
     setEnabled(true);
 
-    m_settings = &settings;
-    m_db = &m_settings->getDB();
+    m_db = &db;
     m_model.reset(new SensorsModel(*m_db));
     m_sortingModel.setSourceModel(m_model.get());
     m_delegate.reset(new SensorsDelegate(m_sortingModel));
@@ -72,7 +70,7 @@ void SensorsWidget::init(Settings& settings)
     }
 
     setPermissions();
-    m_uiConnections.push_back(connect(&settings, &Settings::userLoggedIn, this, &SensorsWidget::setPermissions));
+	m_uiConnections.push_back(connect(&db, &DB::userLoggedIn, this, &SensorsWidget::setPermissions));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -108,7 +106,7 @@ void SensorsWidget::bindSensor()
         return;
     }
 
-    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionAddRemoveSensors, this))
+	if (!hasPermissionOrCanLoginAsAdmin(*m_db, DB::UserDescriptor::PermissionAddRemoveSensors, this))
     {
         QMessageBox::critical(this, "Error", "You don't have permission to add sensors.");
         return;
@@ -152,7 +150,7 @@ void SensorsWidget::unbindSensor()
         return;
     }
 
-	if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionAddRemoveSensors, this))
+	if (!hasPermissionOrCanLoginAsAdmin(*m_db, DB::UserDescriptor::PermissionAddRemoveSensors, this))
 	{
         QMessageBox::critical(this, "Error", "You don't have permission to remove sensors.");
 		return;
@@ -182,7 +180,7 @@ void SensorsWidget::unbindSensor()
 
 void SensorsWidget::configureSensor(QModelIndex const& index)
 {
-    if (!hasPermissionOrCanLoginAsAdmin(*m_settings, Settings::UserDescriptor::PermissionChangeSensors, this))
+	if (!hasPermissionOrCanLoginAsAdmin(*m_db, DB::UserDescriptor::PermissionChangeSensors, this))
     {
         QMessageBox::critical(this, "Error", "You don't have permission to configure sensors.");
         return;
@@ -199,7 +197,7 @@ void SensorsWidget::configureSensor(QModelIndex const& index)
     size_t sensorIndex = static_cast<size_t>(_sensorIndex);
     DB::Sensor sensor = m_db->getSensor(sensorIndex);
 
-    SensorDetailsDialog dialog(*m_settings, *m_db, this);
+	SensorDetailsDialog dialog(*m_db, this);
     dialog.setSensor(sensor);
 
     do

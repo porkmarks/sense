@@ -13,34 +13,16 @@
 
 #include "DB.h"
 
-class Settings;
-
 class Emailer : public QObject
 {
     Q_OBJECT
 public:
-    Emailer(Settings& settings, DB& db);
+    Emailer(DB& db);
     ~Emailer();
 
     void sendReportEmail(DB::Report const& report);
 
-    struct EmailSettings
-    {
-        enum class Connection : uint8_t
-        {
-            Ssl,
-            Tls,
-            Tcp,
-        };
-
-        std::string host;
-        uint16_t port = 0;
-        Connection connection = Connection::Ssl;
-        std::string username;
-        std::string password;
-        std::string sender;
-        std::vector<std::string> recipients;
-    };
+    using EmailSettings = DB::EmailSettings;
 
 private slots:
     void alarmTriggersChanged(DB::AlarmId alarmId, DB::Measurement const& m, uint32_t oldTriggers, uint32_t newTriggers, uint32_t addedTriggers, uint32_t removedTriggers);
@@ -49,7 +31,6 @@ private slots:
 private:
     void checkReports();
 
-    Settings& m_settings;
     DB& m_db;
     QTimer m_timer;
 

@@ -11,13 +11,12 @@
 #include <iostream>
 #include "Utils.h"
 
-static std::array<const char*, 10> s_headerNames = {"Id", "Sensor", "Index", "Timestamp", "Temperature", "Humidity", "Battery", "Signal", "Alarms"};
+static std::array<const char*, 10> s_headerNames = {"Id", "Sensor", "Index", "Timestamp", "Received Timestamp", "Temperature", "Humidity", "Battery", "Signal", "Alarms"};
 
 //////////////////////////////////////////////////////////////////////////
 
-MeasurementsModel::MeasurementsModel(Settings& settings, DB& db)
-    : m_settings(settings)
-    , m_db(db)
+MeasurementsModel::MeasurementsModel(DB& db)
+    : m_db(db)
 {
     m_refreshTimer = new QTimer(this);
     m_refreshTimer->setSingleShot(true);
@@ -115,6 +114,10 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         {
             return static_cast<qlonglong>(DB::Clock::to_time_t(measurement.timePoint));
         }
+		else if (column == Column::ReceivedTimestamp)
+		{
+			return static_cast<qlonglong>(DB::Clock::to_time_t(measurement.receivedTimePoint));
+		}
         else if (column == Column::Temperature)
         {
             return measurement.descriptor.temperature;
@@ -188,8 +191,12 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Timestamp)
         {
-            return utils::toString<DB::Clock>(measurement.timePoint, m_settings.getGeneralSettings().dateTimeFormat);
+			return utils::toString<DB::Clock>(measurement.timePoint, m_db.getGeneralSettings().dateTimeFormat);
         }
+		else if (column == Column::ReceivedTimestamp)
+		{
+			return utils::toString<DB::Clock>(measurement.receivedTimePoint, m_db.getGeneralSettings().dateTimeFormat);
+		}
         else if (column == Column::Temperature)
         {
             return QString("%1°C").arg(measurement.descriptor.temperature, 0, 'f', 1);

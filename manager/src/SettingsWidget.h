@@ -3,7 +3,7 @@
 #include <QWidget>
 #include "ui_SettingsWidget.h"
 #include "Comms.h"
-#include "Settings.h"
+#include "DB.h"
 #include "DB.h"
 
 #include "SensorsModel.h"
@@ -17,7 +17,7 @@ public:
     explicit SettingsWidget(QWidget *parent = 0);
     ~SettingsWidget();
 
-    void init(Comms& comms, Settings& settings);
+	void init(Comms& comms, DB& db);
     void shutdown();
     void save();
 
@@ -37,11 +37,11 @@ private slots:
     void resetEmailProviderPreset();
 
 private:
-    void setEmailSettings(Settings::EmailSettings const& settings);
-    bool getEmailSettings(Settings::EmailSettings& settings);
+	void setEmailSettings(DB::EmailSettings const& settings);
+    bool getEmailSettings(DB::EmailSettings& settings);
 
-    void setFtpSettings(Settings::FtpSettings const& settings);
-    bool getFtpSettings(Settings::FtpSettings& settings);
+    void setFtpSettings(DB::FtpSettings const& settings);
+    bool getFtpSettings(DB::FtpSettings& settings);
 
     void setSensorTimeConfig(DB::SensorTimeConfig const& config);
     Result<DB::SensorTimeConfigDescriptor> getSensorTimeConfig() const;
@@ -52,7 +52,6 @@ private:
     void computeBatteryLife();
 
     Ui::SettingsWidget m_ui;
-    Settings* m_settings = nullptr;
     DB* m_db = nullptr;
     std::vector<QMetaObject::Connection> m_uiConnections;
     std::vector<QMetaObject::Connection> m_dbConnections;

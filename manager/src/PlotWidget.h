@@ -11,7 +11,6 @@
 #include "DB.h"
 #include "Butterworth.h"
 #include "ui_PlotWidget.h"
-#include "Settings.h"
 
 
 class PlotWidget : public QWidget
@@ -21,7 +20,7 @@ class PlotWidget : public QWidget
 public:
     PlotWidget(QWidget* parent = nullptr);
 
-    void init(Settings& settings, DB& db);
+    void init(DB& db);
     void shutdown();
 
     void loadSettings();
@@ -55,7 +54,6 @@ private:
 //    void setMarkerVisible(QLegendMarker* marker, bool visible);
     void showAnnotation(const QPointF& pos);
 
-    Settings* m_settings = nullptr;
     DB* m_db = nullptr;
     DB::Filter m_filter;
 

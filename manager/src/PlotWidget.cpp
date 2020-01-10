@@ -46,7 +46,7 @@ PlotWidget::PlotWidget(QWidget* parent)
 
 //////////////////////////////////////////////////////////////////////////
 
-void PlotWidget::init(Settings& settings, DB& db)
+void PlotWidget::init(DB& db)
 {
     for (const QMetaObject::Connection& connection: m_uiConnections)
     {
@@ -55,7 +55,6 @@ void PlotWidget::init(Settings& settings, DB& db)
     m_uiConnections.clear();
 
     setEnabled(true);
-    m_settings = &settings;
     m_db = &db;
 
     m_uiConnections.push_back(connect(m_ui.clearAnnotations, &QPushButton::released, this, &PlotWidget::clearAnnotations));
@@ -897,7 +896,7 @@ void PlotWidget::createAnnotation(DB::SensorId sensorId, QPointF point, double k
 
     QColor color = graph->pen().color();
     QDateTime dt = QDateTime::fromSecsSinceEpoch(static_cast<int64_t>(key));
-	QString dateTimeFormatStr = utils::getQDateTimeFormatString(m_settings->getGeneralSettings().dateTimeFormat);
+	QString dateTimeFormatStr = utils::getQDateTimeFormatString(m_db->getGeneralSettings().dateTimeFormat);
     if (temperature)
     {
         m_annotation.toolTip->setText(graph, QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Temperature: <b>%3&deg;C</b>")

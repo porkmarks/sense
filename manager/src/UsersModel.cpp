@@ -7,9 +7,9 @@ static std::array<const char*, 3> s_headerNames = {"Id", "Name", "Type"};
 
 //////////////////////////////////////////////////////////////////////////
 
-UsersModel::UsersModel(Settings& settings)
+UsersModel::UsersModel(DB& db)
     : QAbstractItemModel()
-    , m_settings(settings)
+    , m_db(db)
 {
 }
 
@@ -57,7 +57,7 @@ int UsersModel::rowCount(QModelIndex const& index) const
 {
     if (!index.isValid())
     {
-        return static_cast<int>(m_settings.getUserCount());
+        return static_cast<int>(m_db.getUserCount());
     }
     else
     {
@@ -96,13 +96,13 @@ QVariant UsersModel::data(QModelIndex const& index, int role) const
     }
 
     size_t indexRow = static_cast<size_t>(index.row());
-    if (indexRow >= m_settings.getUserCount())
+    if (indexRow >= m_db.getUserCount())
     {
         return QVariant();
     }
 
-    Settings::User const& user = m_settings.getUser(indexRow);
-    Settings::UserDescriptor const& descriptor = user.descriptor;
+	DB::User const& user = m_db.getUser(indexRow);
+	DB::UserDescriptor const& descriptor = user.descriptor;
 
     Column column = static_cast<Column>(index.column());
     if (role == Qt::DisplayRole)
@@ -117,7 +117,7 @@ QVariant UsersModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Type)
         {
-            if (descriptor.type == Settings::UserDescriptor::Type::Admin)
+            if (descriptor.type == DB::UserDescriptor::Type::Admin)
             {
                 return "Admin";
             }
@@ -128,7 +128,7 @@ QVariant UsersModel::data(QModelIndex const& index, int role) const
     {
         if (column == Column::Name)
 		{
-			if (user.descriptor.type == Settings::UserDescriptor::Type::Admin)
+			if (user.descriptor.type == DB::UserDescriptor::Type::Admin)
 			{
 				return QIcon(":/icons/ui/admin.png");
 			}

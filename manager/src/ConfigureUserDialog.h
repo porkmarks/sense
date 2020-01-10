@@ -3,17 +3,17 @@
 #include <QDialog>
 #include "ui_ConfigureUserDialog.h"
 
-#include "Settings.h"
+#include "DB.h"
 
 class ConfigureUserDialog : public QDialog
 {
 public:
-    ConfigureUserDialog(Settings& settings, QWidget* parent);
+	ConfigureUserDialog(DB& db, QWidget* parent);
 
-    Settings::User const& getUser() const;
-    void setUser(Settings::User const& user);
+	DB::User const& getUser() const;
+    void setUser(DB::User const& user);
 
-    void setForcedType(Settings::UserDescriptor::Type type);
+    void setForcedType(DB::UserDescriptor::Type type);
 
 private slots:
     void accept() override;
@@ -25,6 +25,6 @@ private:
 
     Ui::ConfigureUserDialog m_ui;
 
-    Settings& m_settings;
-    Settings::User m_user;
+	DB& m_db;
+	DB::User m_user;
 };

@@ -28,7 +28,7 @@ private slots:
 private:
     void processBackups();
     void process();
-    void userLoggedIn(Settings::UserId id);
+	void userLoggedIn(DB::UserId id);
     void checkIfAdminExists();
     void login();
 
@@ -40,17 +40,17 @@ private:
 
     QMetaObject::Connection m_tabChangedConnection;
 
+	std::unique_ptr<sqlite3, int(*)(sqlite3*)> m_sqlite;
+
     Comms m_comms;
-    Settings m_settings;
+	DB m_db;
 
     Ui::Manager m_ui;
     int m_currentTabIndex = 0;
 
-    Settings::Clock::time_point m_lastHourlyBackupTP;
-    Settings::Clock::time_point m_lastDailyBackupTP;
-    Settings::Clock::time_point m_lastWeeklyBackupTP;
-
-	std::unique_ptr<sqlite3, int(*)(sqlite3*)> m_sqlite;
+	DB::Clock::time_point m_lastHourlyBackupTP;
+    DB::Clock::time_point m_lastDailyBackupTP;
+    DB::Clock::time_point m_lastWeeklyBackupTP;
 };
 
 

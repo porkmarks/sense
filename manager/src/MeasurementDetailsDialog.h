@@ -4,12 +4,12 @@
 #include <QSortFilterProxyModel>
 #include "ui_MeasurementDetailsDialog.h"
 
-#include "Settings.h"
+#include "DB.h"
 
 class MeasurementDetailsDialog : public QDialog
 {
 public:
-    MeasurementDetailsDialog(Settings& settings, QWidget* parent);
+    MeasurementDetailsDialog(DB& db, QWidget* parent);
 
     DB::Measurement const& getMeasurement() const;
     void setMeasurement(DB::Measurement const& measurement);
@@ -25,6 +25,6 @@ private:
 
     Ui::MeasurementDetailsDialog m_ui;
 
-    Settings& m_settings;
+    DB& m_db;
     DB::Measurement m_measurement;
 };

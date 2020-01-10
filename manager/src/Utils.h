@@ -4,7 +4,6 @@
 #include <QIcon>
 #include <functional>
 #include "DB.h"
-#include "Settings.h"
 
 namespace utils
 {
@@ -15,9 +14,9 @@ void moveToBackup(std::string const& filename, std::string const& srcFilepath, s
 bool renameFile(std::string const& oldFilepath, std::string const& newFilepath);
 std::string getLastErrorAsString();
 
-QString getQDateTimeFormatString(Settings::DateTimeFormat format, bool millis = false);
+QString getQDateTimeFormatString(DB::DateTimeFormat format, bool millis = false);
 template<typename Clock>
-QString toString(typename Clock::time_point tp, Settings::DateTimeFormat format)
+QString toString(typename Clock::time_point tp, DB::DateTimeFormat format)
 {
 	return QDateTime::fromTime_t(Clock::to_time_t(tp)).toString(getQDateTimeFormatString(format, false));
 }

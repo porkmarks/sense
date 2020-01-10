@@ -3,7 +3,6 @@
 #include <iostream>
 
 #include "Logger.h"
-#include "Settings.h"
 
 extern std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac);
 extern Logger s_logger;
@@ -348,7 +347,7 @@ void Comms::processSensorReq(InitializedBaseStation& cbs)
 
     processSensorReq(cbs, request);
 
-    std::cout << "Duration: " << std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - startTp).count() << std::endl;
+    std::cout << "Duration: " << std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - startTp).count() / 1000.f << std::endl;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -367,7 +366,7 @@ void Comms::processRevertedRadioStateToNormal(InitializedBaseStation& cbs)
         cbs.db.removeSensor((size_t)index);
     }
 
-	std::cout << "Duration: " << std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - startTp).count() << std::endl;
+	std::cout << "Duration: " << std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - startTp).count() / 1000.f << std::endl;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -453,14 +452,6 @@ void Comms::processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, Senso
         data::sensor::Measurement const& m = measurementBatch.measurements[i];
         DB::MeasurementDescriptor d;
         d.index = measurementBatch.start_index + i;
-//        if (m.flags & static_cast<int>(data::sensor::Measurement::Flag::COMMS_ERROR))
-//        {
-//            d.sensorErrors |= DB::SensorErrors::Comms;
-//        }
-//        else if (m.flags > 0)// & static_cast<int>(data::sensor::Measurement::Flag::SENSOR_ERROR))
-//        {
-//            d.sensorErrors |= DB::SensorErrors::Hardware;
-//        }
         d.sensorId = sensor.id;
         d.signalStrength.b2s = sensor.lastSignalStrengthB2S;
         d.signalStrength.s2b = request.signalS2B;
@@ -469,7 +460,7 @@ void Comms::processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, Senso
         measurements.push_back(d);
     }
 
-    cbs.db.addMeasurements(std::move(measurements));
+    cbs.db.addSingleSensorMeasurements(sensor.id, std::move(measurements));
 }
 
 //////////////////////////////////////////////////////////////////////////

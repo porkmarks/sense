@@ -1,5 +1,5 @@
 #include "PermissionsCheck.h"
-#include "Settings.h"
+#include "DB.h"
 #include "Logger.h"
 #include "Crypt.h"
 #include "ui_LoginDialog.h"
@@ -10,10 +10,10 @@
 extern Logger s_logger;
 extern std::string k_passwordHashReferenceText;
 
-bool adminCheck(Settings& settings, QWidget* parent)
+bool adminCheck(DB& db, QWidget* parent)
 {
-    Settings::User const* user = settings.getLoggedInUser();
-    if (user && user->descriptor.type == Settings::UserDescriptor::Type::Admin)
+	DB::User const* user = db.getLoggedInUser();
+	if (user && user->descriptor.type == DB::UserDescriptor::Type::Admin)
     {
         return true;
     }
@@ -30,7 +30,7 @@ bool adminCheck(Settings& settings, QWidget* parent)
     int result = dialog.exec();
     if (result == QDialog::Accepted)
     {
-        int32_t _userIndex = settings.findUserIndexByName(ui.username->text().toUtf8().data());
+		int32_t _userIndex = db.findUserIndexByName(ui.username->text().toUtf8().data());
         if (_userIndex < 0)
         {
             s_logger.logCritical(QString("Invalid login credentials (user '%1' not found)").arg(ui.username->text()).toUtf8().data());
@@ -39,8 +39,8 @@ bool adminCheck(Settings& settings, QWidget* parent)
         }
 
         size_t userIndex = static_cast<size_t>(_userIndex);
-        Settings::User const& user = settings.getUser(userIndex);
-        if (user.descriptor.type != Settings::UserDescriptor::Type::Admin)
+		DB::User const& user = db.getUser(userIndex);
+		if (user.descriptor.type != DB::UserDescriptor::Type::Admin)
         {
             s_logger.logCritical(QString("Invalid login credentials (user '%1' not admin)").arg(ui.username->text()).toUtf8().data());
             QMessageBox::critical(&dialog, "Error", QString("Invalid user '%1': not admin.").arg(ui.username->text()));
@@ -66,22 +66,22 @@ bool adminCheck(Settings& settings, QWidget* parent)
     return false;
 }
 
-bool hasPermission(Settings& settings, Settings::UserDescriptor::Permissions permission)
+bool hasPermission(DB& db, DB::UserDescriptor::Permissions permission)
 {
-	Settings::User const* user = settings.getLoggedInUser();
+	DB::User const* user = db.getLoggedInUser();
     if (!user)
     {
         return false;
     }
 
-	if (user->descriptor.type == Settings::UserDescriptor::Type::Admin)
+	if (user->descriptor.type == DB::UserDescriptor::Type::Admin)
 	{
 		return true;
 	}
     return (user->descriptor.permissions & permission) != 0;
 }
 
-bool hasPermissionOrCanLoginAsAdmin(Settings& settings, Settings::UserDescriptor::Permissions permission, QWidget* parent)
+bool hasPermissionOrCanLoginAsAdmin(DB& db, DB::UserDescriptor::Permissions permission, QWidget* parent)
 {
-    return hasPermission(settings, permission) || adminCheck(settings, parent);
+	return hasPermission(db, permission) || adminCheck(db, parent);
 }
