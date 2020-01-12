@@ -27,8 +27,6 @@ extern Logger s_logger;
 const DB::Clock::duration MEASUREMENT_JITTER = std::chrono::seconds(10);
 const DB::Clock::duration COMMS_DURATION = std::chrono::seconds(10);
 
-extern std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac);
-
 Q_DECLARE_METATYPE(DB::Measurement);
 
 //////////////////////////////////////////////////////////////////////////
@@ -537,9 +535,9 @@ Result<void> DB::load(sqlite3& db)
 			s.firstStoredMeasurementIndex = (uint32_t)sqlite3_column_int64(stmt, 21);
 			s.storedMeasurementCount = (uint32_t)sqlite3_column_int64(stmt, 22);
 			s.estimatedStoredMeasurementCount = (uint32_t)sqlite3_column_int64(stmt, 23);
-			s.lastSignalStrengthB2S = (int8_t)sqlite3_column_int64(stmt, 24);
-			s.averageSignalStrength.b2s = (int8_t)sqlite3_column_int64(stmt, 25);
-			s.averageSignalStrength.s2b = (int8_t)sqlite3_column_int64(stmt, 26);
+			s.lastSignalStrengthB2S = (int16_t)sqlite3_column_int64(stmt, 24);
+			s.averageSignalStrength.b2s = (int16_t)sqlite3_column_int64(stmt, 25);
+			s.averageSignalStrength.s2b = (int16_t)sqlite3_column_int64(stmt, 26);
 			s.isRTMeasurementValid = sqlite3_column_int64(stmt, 27) ? true : false;
 			s.rtMeasurementTemperature = (float)sqlite3_column_double(stmt, 28);
 			s.rtMeasurementHumidity = (float)sqlite3_column_double(stmt, 29);
@@ -1236,7 +1234,7 @@ bool DB::addBaseStation(BaseStationDescriptor const& descriptor)
         return false;
     }
 
-    s_logger.logInfo(QString("Adding base station '%1' / %2").arg(descriptor.name.c_str()).arg(getMacStr(descriptor.mac).c_str()));
+    s_logger.logInfo(QString("Adding base station '%1' / %2").arg(descriptor.name.c_str()).arg(utils::getMacStr(descriptor.mac).c_str()));
 
     BaseStation baseStation;
     baseStation.descriptor = descriptor;
@@ -1276,7 +1274,7 @@ bool DB::setBaseStation(BaseStationId id, BaseStationDescriptor const& descripto
 
     size_t index = static_cast<size_t>(_index);
 
-    s_logger.logInfo(QString("Changing base station '%1' / %2").arg(descriptor.name.c_str()).arg(getMacStr(descriptor.mac).c_str()));
+    s_logger.logInfo(QString("Changing base station '%1' / %2").arg(descriptor.name.c_str()).arg(utils::getMacStr(descriptor.mac).c_str()));
 
     m_data.baseStations[index].descriptor = descriptor;
 	m_data.baseStationsChanged = true;
@@ -1297,7 +1295,7 @@ void DB::removeBaseStation(size_t index)
     BaseStationId id = m_data.baseStations[index].id;
 
     BaseStationDescriptor const& descriptor = m_data.baseStations[index].descriptor;
-    s_logger.logInfo(QString("Removing base station '%1' / %2").arg(descriptor.name.c_str()).arg(getMacStr(descriptor.mac).c_str()));
+    s_logger.logInfo(QString("Removing base station '%1' / %2").arg(descriptor.name.c_str()).arg(utils::getMacStr(descriptor.mac).c_str()));
 
     m_data.baseStations.erase(m_data.baseStations.begin() + index);
 	m_data.baseStationsAddedOrRemoved = true;
@@ -1855,7 +1853,7 @@ bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
 
             //we do this here just in case the sensor doesn't have any measurements. In that case the average signal strength will be calculated from the lastSignalStrengthB2S
             //this happens the first time a sensor is added
-            if (sensor.averageSignalStrength.b2s == 0 || sensor.averageSignalStrength.s2b == 0)
+            if (sensor.averageSignalStrength.b2s >= 0 || sensor.averageSignalStrength.s2b >= 0)
 			{
                 sensor.averageSignalStrength = { d.signalStrengthB2S, d.signalStrengthB2S };
 			}
@@ -2948,8 +2946,8 @@ DB::Measurement DB::unpackMeasurement(sqlite3_stmt* stmt)
 	m.descriptor.temperature = (float)sqlite3_column_double(stmt, 5);
 	m.descriptor.humidity = (float)sqlite3_column_double(stmt, 6);
 	m.descriptor.vcc = (float)sqlite3_column_double(stmt, 7);
-	m.descriptor.signalStrength.s2b = (int8_t)sqlite3_column_int(stmt, 8);
-	m.descriptor.signalStrength.b2s = (int8_t)sqlite3_column_int(stmt, 9);
+	m.descriptor.signalStrength.s2b = (int16_t)sqlite3_column_int(stmt, 8);
+	m.descriptor.signalStrength.b2s = (int16_t)sqlite3_column_int(stmt, 9);
 	m.descriptor.sensorErrors = (uint32_t)sqlite3_column_int(stmt, 10);
 	m.alarmTriggers = (uint32_t)sqlite3_column_int(stmt, 11);
     return m;
@@ -2999,8 +2997,8 @@ DB::SignalStrength DB::computeAverageSignalStrength(SensorId sensorId, Data cons
 		}
     }
 	SignalStrength avg;
-    avg.b2s = static_cast<int8_t>(avgb2s);
-    avg.s2b = static_cast<int8_t>(avgs2b);
+    avg.b2s = static_cast<int16_t>(avgb2s);
+    avg.s2b = static_cast<int16_t>(avgs2b);
 	return avg;
 }
 
@@ -3174,7 +3172,7 @@ void DB::save(Data& data, bool newTransaction) const
 		{
 			sqlite3_bind_int64(stmt, 1, bs.id);
 			sqlite3_bind_text(stmt, 2, bs.descriptor.name.c_str(), -1, SQLITE_STATIC);
-			sqlite3_bind_text(stmt, 3, getMacStr(bs.descriptor.mac).c_str(), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_text(stmt, 3, utils::getMacStr(bs.descriptor.mac).c_str(), -1, SQLITE_TRANSIENT);
 			if (sqlite3_step(stmt) != SQLITE_DONE)
 			{
 				s_logger.logCritical(QString("Failed to save base station: %1").arg(sqlite3_errmsg(m_sqlite)));

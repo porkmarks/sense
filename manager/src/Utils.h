@@ -21,6 +21,22 @@ QString toString(typename Clock::time_point tp, DB::DateTimeFormat format)
 	return QDateTime::fromTime_t(Clock::to_time_t(tp)).toString(getQDateTimeFormatString(format, false));
 }
 
+std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac);
+
+std::pair<std::string, int32_t> computeDurationString(DB::Clock::duration d);
+std::pair<std::string, int32_t> computeRelativeTimePointString(DB::Clock::time_point tp);
+uint32_t getSensorStorageCapacity(DB::Sensor const& sensor);
+DB::Clock::duration computeBatteryLife(float capacity, DB::Clock::duration measurementPeriod, DB::Clock::duration commsPeriod, float power, uint8_t hardwareVersion);
+
+struct CsvData
+{
+	DB::Measurement measurement;
+	DB::Sensor sensor;
+};
+using CsvDataProvider = std::function<CsvData(size_t index)>;
+bool exportToCsv(std::ostream& stream, DB::GeneralSettings const& settings, DB::CsvSettings const& csvSettings, CsvDataProvider provider, size_t count, bool unicode);
+
+
 static constexpr float k_maxBatteryLevel = 2.95f;
 static constexpr float k_minBatteryLevel = 2.0f;
 //static constexpr float k_alertBatteryLevel = 0.1f;
@@ -37,8 +53,8 @@ static uint32_t k_inRangeColor = 0xFF00b159;
 
 float getBatteryLevel(float vcc);
 QIcon getBatteryIcon(DB::SensorSettings const& settings, float vcc);
-float getSignalLevel(int8_t dBm);
-QIcon getSignalIcon(DB::SensorSettings const& settings, int8_t dBm);
+float getSignalLevel(int16_t dBm);
+QIcon getSignalIcon(DB::SensorSettings const& settings, int16_t dBm);
 
 uint32_t crc32(const void* data, size_t size);
 

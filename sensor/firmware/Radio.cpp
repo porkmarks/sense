@@ -236,7 +236,7 @@ uint8_t* Radio::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size, chrono
         uint8_t size = sizeof(Header) + packet_size;
         if (m_lora.receive(raw_buffer, size, timeout) == ERR_NONE && size > sizeof(Header))
         {
-            int8_t rssi = m_lora.getRSSI();
+            int16_t rssi = m_lora.getRSSI();
             auto_sleep();
             chrono::time_ms receive_tp = chrono::now();
             Header* header_ptr = reinterpret_cast<Header*>(raw_buffer);
@@ -334,14 +334,14 @@ Radio::Address Radio::get_rx_packet_source_address(uint8_t* received_buffer) con
     return header_ptr->source_address;
 }
 
-int8_t Radio::get_last_input_dBm()
+int16_t Radio::get_last_input_dBm()
 {
     return m_last_rssi;
 }
 
-int8_t Radio::get_input_dBm()
+int16_t Radio::get_input_dBm()
 {
-    int8_t rssi = m_lora.getRSSI();
+    int16_t rssi = m_lora.getRSSI();
     auto_sleep();
     return rssi;
 }

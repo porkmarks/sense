@@ -3,10 +3,9 @@
 #include <iostream>
 
 #include "Logger.h"
+#include "Utils.h"
 
-extern std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac);
 extern Logger s_logger;
-
 
 template<typename C>
 void pack(C& c, void const* data, size_t size, size_t& offset)
@@ -113,7 +112,7 @@ bool Comms::connectToBaseStation(DB& db, Mac const& mac)
 		auto it = std::find_if(m_initializedBaseStations.begin(), m_initializedBaseStations.end(), [&mac](std::unique_ptr<InitializedBaseStation> const& _bs) { return _bs->descriptor.mac == mac; });
 		if (it != m_initializedBaseStations.end())
 		{
-			s_logger.logWarning(QString("Attempting to connect to already connected BS %1.").arg(getMacStr(mac).c_str()));
+			s_logger.logWarning(QString("Attempting to connect to already connected BS %1.").arg(utils::getMacStr(mac).c_str()));
 			return false;
 		}
 	}
@@ -121,11 +120,11 @@ bool Comms::connectToBaseStation(DB& db, Mac const& mac)
     auto it = std::find_if(m_discoveredBaseStations.begin(), m_discoveredBaseStations.end(), [&mac](Comms::BaseStationDescriptor const& _bs) { return _bs.mac == mac; });
     if (it == m_discoveredBaseStations.end())
     {
-        s_logger.logWarning(QString("Attempting to connect to undiscovered BS %1. Postponed until discovery.").arg(getMacStr(mac).c_str()));
+        s_logger.logWarning(QString("Attempting to connect to undiscovered BS %1. Postponed until discovery.").arg(utils::getMacStr(mac).c_str()));
         return false;
     }
 
-    s_logger.logInfo(QString("Attempting to connect to BS %1").arg(getMacStr(mac).c_str()));
+    s_logger.logInfo(QString("Attempting to connect to BS %1").arg(utils::getMacStr(mac).c_str()));
 
     InitializedBaseStation* cbsPtr = new InitializedBaseStation(db, *it);
     std::unique_ptr<InitializedBaseStation> cbs(cbsPtr);
@@ -135,7 +134,7 @@ bool Comms::connectToBaseStation(DB& db, Mac const& mac)
     cbsPtr->connections.push_back(connect(&cbsPtr->socketAdapter.getSocket(), &QTcpSocket::disconnected, [this, cbsPtr]() { disconnectedFromBaseStation(cbsPtr); }));
     cbsPtr->connections.push_back(connect(&cbsPtr->socketAdapter.getSocket(), static_cast<void(QTcpSocket::*)(QAbstractSocket::SocketError)>(&QTcpSocket::error), [this, cbsPtr]()
     {
-        s_logger.logCritical(QString("Socket error for BS %1: %2").arg(getMacStr(cbsPtr->descriptor.mac).c_str()).arg(cbsPtr->socketAdapter.getSocket().errorString()));
+        s_logger.logCritical(QString("Socket error for BS %1: %2").arg(utils::getMacStr(cbsPtr->descriptor.mac).c_str()).arg(cbsPtr->socketAdapter.getSocket().errorString()));
         disconnectedFromBaseStation(cbsPtr);
     }));
 
@@ -156,7 +155,7 @@ void Comms::reconnectToBaseStation(InitializedBaseStation* cbs)
     {
         return;
     }
-    s_logger.logInfo(QString("Attempting to reconnect to BS %1").arg(getMacStr(cbs->descriptor.mac).c_str()));
+    s_logger.logInfo(QString("Attempting to reconnect to BS %1").arg(utils::getMacStr(cbs->descriptor.mac).c_str()));
 
     cbs->isConnecting = true;
     cbs->socketAdapter.getSocket().connectToHost(cbs->descriptor.address, 4444);
@@ -168,7 +167,7 @@ void Comms::connectedToBaseStation(InitializedBaseStation* cbs)
 {
     if (cbs)
     {
-        s_logger.logInfo(QString("Connected to BS %1").arg(getMacStr(cbs->descriptor.mac).c_str()));
+        s_logger.logInfo(QString("Connected to BS %1").arg(utils::getMacStr(cbs->descriptor.mac).c_str()));
 
         cbs->isConnecting = false;
         cbs->isConnected = true;
@@ -202,7 +201,7 @@ void Comms::disconnectedFromBaseStation(InitializedBaseStation* cbs)
 
         if (wasConnected)
         {
-            s_logger.logWarning(QString("Disconnected from BS %1").arg(getMacStr(cbs->descriptor.mac).c_str()));
+            s_logger.logWarning(QString("Disconnected from BS %1").arg(utils::getMacStr(cbs->descriptor.mac).c_str()));
             emit baseStationDisconnected(cbs->descriptor);
         }
     }
@@ -475,7 +474,7 @@ DB::SensorInputDetails Comms::createSensorInputDetails(DB::Sensor const& sensor,
     details.storedMeasurementCount = configRequest.measurement_count;
 
     details.hasSignalStrength = true;
-    details.signalStrengthB2S = configRequest.b2s_input_dBm;
+    details.signalStrengthB2S = data::sensor::unpack_qss(configRequest.b2s_qss);
 
     details.hasSleepingData = true;
     details.sleeping = configRequest.sleeping;

@@ -92,7 +92,7 @@ private:
     struct SensorRequest
     {
         uint32_t reqId = 0;
-        int8_t signalS2B = 0;
+        int16_t signalS2B = 0;
         uint8_t type = 0;
         Radio::Address address = 0;
         std::vector<uint8_t> payload;

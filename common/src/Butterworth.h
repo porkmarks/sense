@@ -88,7 +88,8 @@ public:
             w1[i] = t;
             w2[i] = t;
         }
-        for (size_t i = 0; i < static_cast<size_t>(m_rate) * 100; i++)
+        size_t count = std::max<size_t>(static_cast<size_t>(m_rate * 1000.f), 10000);
+        for (size_t i = 0; i < count; i++)
         {
             T copy = t;
             process(copy);

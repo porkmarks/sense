@@ -4,3 +4,6 @@ Add counters for:
 - comms TX + RX
 - measurements
 
+Add alarm for sensor blackout
+Better battery quantization (2 + 1.5 instead of 2 + 2.54)
+Better signal storage (uint8_t -255 - 0 instead of int8_t -127 - 0)

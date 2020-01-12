@@ -6,8 +6,7 @@
 #include <QInputDialog>
 #include <QDateTime>
 #include "PermissionsCheck.h"
-
-extern std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac);
+#include "Utils.h"
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -93,7 +92,7 @@ void BaseStationsWidget::init(Comms& comms, DB& db)
 
         {
             DB::BaseStationDescriptor::Mac mac = bs.descriptor.mac;
-            macItem->setText(QString("   %1   ").arg(getMacStr(mac).c_str()));
+            macItem->setText(QString("   %1   ").arg(utils::getMacStr(mac).c_str()));
             macItem->setEditable(false);
         }
         ipItem->setEditable(false);
@@ -284,7 +283,7 @@ void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor cons
     }
 
     {
-        macItem->setText(QString("   %1   ").arg(getMacStr(commsBS.mac).c_str()));
+        macItem->setText(QString("   %1   ").arg(utils::getMacStr(commsBS.mac).c_str()));
         macItem->setEditable(false);
     }
 

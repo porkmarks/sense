@@ -38,7 +38,7 @@ public:
     int8_t setCodingRate(uint8_t cr);
     int8_t setOutputPower(int8_t power);
     int8_t setGain(uint8_t gain);
-    int8_t getRSSI();
+    int16_t getRSSI();
     float getSNR();
     int8_t setBitRate(float br);
     int8_t setFrequencyDeviation(float freqDev);

@@ -8,53 +8,11 @@
 
 #include "DB.h"
 #include "PermissionsCheck.h"
+#include "Utils.h"
+#include <sstream>
 
 #define NOMINMAX
 #include <windows.h>
-
-extern std::pair<std::string, int32_t> computeDurationString(DB::Clock::duration d);
-
-DB::Clock::duration computeBatteryLife(float capacity, DB::Clock::duration measurementPeriod, DB::Clock::duration commsPeriod, float power, uint8_t hardwareVersion)
-{
-    float idleMAh = 0.01f;
-    float powerMu = std::clamp(power, -3.f, 17.f) / 20.f;
-    float commsMAh = 0;
-    float measurementMAh = 0;
-    if (hardwareVersion == 3)
-    {
-        float minMAh = 20.f;
-        float maxMAh = 80.f;
-        commsMAh = minMAh + (maxMAh - minMAh) * powerMu;
-        measurementMAh = 3;
-    }
-    else
-    {
-        float minMAh = 60.f;
-        float maxMAh = 130.f;
-        commsMAh = minMAh + (maxMAh - minMAh) * powerMu;
-        measurementMAh = 3;
-    }
-
-    float commsDuration = 2.f;
-    float commsPeriodS = std::chrono::duration<float>(commsPeriod).count();
-
-    float measurementDuration = 1.f;
-    float measurementPeriodS = std::chrono::duration<float>(measurementPeriod).count();
-
-    float measurementPerHour = 3600.f / measurementPeriodS;
-    float commsPerHour = 3600.f / commsPeriodS;
-
-    float measurementDurationPerHour = measurementPerHour * measurementDuration;
-    float commsDurationPerHour = commsPerHour * commsDuration;
-
-    float commsUsagePerHour = commsMAh * commsDurationPerHour / 3600.f;
-    float measurementUsagePerHour = measurementMAh * measurementDurationPerHour / 3600.f;
-
-    float usagePerHour = commsUsagePerHour + measurementUsagePerHour + idleMAh;
-
-    float hours = capacity / usagePerHour;
-    return std::chrono::hours(static_cast<int32_t>(hours));
-}
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -110,22 +68,29 @@ void SettingsWidget::init(Comms& comms, DB& db)
 	m_uiConnections.push_back(connect(m_ui.emailSmtpProviderPreset, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &SettingsWidget::emailSmtpProviderPresetChanged));
     m_uiConnections.push_back(connect(m_ui.emailAddRecipient, &QPushButton::released, this, &SettingsWidget::addEmailRecipient));
     m_uiConnections.push_back(connect(m_ui.emailRemoveRecipient, &QPushButton::released, this, &SettingsWidget::removeEmailRecipient));
-    //m_uiConnections.push_back(connect(m_ui.emailApply, &QPushButton::released, this, &SettingsWidget::applyEmailSettings));
-    //m_uiConnections.push_back(connect(m_ui.emailReset, &QPushButton::released, [this]() { setEmailSettings(m_settings->getEmailSettings()); }));
     m_uiConnections.push_back(connect(m_ui.emailTest, &QPushButton::released, this, &SettingsWidget::sendTestEmail));
 
-    //m_uiConnections.push_back(connect(m_ui.ftpApply, &QPushButton::released, this, &SettingsWidget::applyFtpSettings));
-    //m_uiConnections.push_back(connect(m_ui.ftpReset, &QPushButton::released, [this]() { setFtpSettings(m_settings->getFtpSettings()); }));
     m_uiConnections.push_back(connect(m_ui.ftpTest, &QPushButton::released, this, &SettingsWidget::testFtpSettings));
 
-    //m_uiConnections.push_back(connect(m_ui.sensorsApply, &QPushButton::released, this, &SettingsWidget::applySensorTimeConfig));
-    //m_uiConnections.push_back(connect(m_ui.sensorsReset, &QPushButton::released, [this]() { if (m_db) setSensorTimeConfig(m_db->getLastSensorTimeConfig()); }));
-//     m_uiConnections.push_back(connect(m_ui.list, &QTreeWidget::currentItemChanged, [this](QTreeWidgetItem* current, QTreeWidgetItem* previous)
-//     {
-//         m_ui.stackedWidget->setCurrentIndex(m_ui.list->indexOfTopLevelItem(current));
-//     }));
-//     m_ui.list->setCurrentItem(m_ui.list->topLevelItem(0));
+    connect(m_ui.csvDateTimeFormatOverride, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
+	connect(m_ui.csvDateTimeFormat, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &SettingsWidget::refreshCsvPreview);
+	connect(m_ui.csvExportId, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
+	connect(m_ui.csvExportIndex, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
+	connect(m_ui.csvExportSensorName, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
+	connect(m_ui.csvExportSensorSN, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
+	connect(m_ui.csvExportTimePoint, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
+	connect(m_ui.csvExportReceivedTimePoint, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
+	connect(m_ui.csvExportTemperature, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
+	connect(m_ui.csvExportHumidity, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
+	connect(m_ui.csvExportBattery, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
+	connect(m_ui.csvExportSignal, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
+	connect(m_ui.csvUnitFormat, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &SettingsWidget::refreshCsvPreview);
+	connect(m_ui.csvDecimalPlaces, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, &SettingsWidget::refreshCsvPreview);
+	connect(m_ui.csvSeparator, &QLineEdit::textChanged, this, &SettingsWidget::refreshCsvPreview);
+	connect(m_ui.csvTabSeparator, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
 
+    setGeneralSettings(m_db->getGeneralSettings());
+    setCsvSettings(m_db->getGeneralSettings(), m_db->getCsvSettings());
     setSensorSettings(m_db->getSensorSettings());
     setSensorTimeConfig(m_db->getLastSensorTimeConfig());
     m_dbConnections.push_back(connect(m_db, &DB::sensorSettingsChanged, [this]() { if (m_db) setSensorSettings(m_db->getSensorSettings()); }));
@@ -152,6 +117,8 @@ void SettingsWidget::shutdown()
 
 void SettingsWidget::save()
 {
+    applyGeneralSettings();
+    applyCsvSettings();
     applyEmailSettings();
     applyFtpSettings();
     applySensorTimeConfig();
@@ -162,6 +129,8 @@ void SettingsWidget::save()
 
 void SettingsWidget::setPermissions()
 {
+	m_ui.generalTab->setEnabled(m_db->isLoggedInAsAdmin());
+	m_ui.csvTab->setEnabled(m_db->isLoggedInAsAdmin());
 	m_ui.emailTab->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeEmailSettings));
 	m_ui.ftpTab->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeFtpSettings));
 	m_ui.batteryCapacity->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
@@ -170,6 +139,140 @@ void SettingsWidget::setPermissions()
 	m_ui.signalStrengthAlertThreshold->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
 	m_ui.sensorsCommsPeriod->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
 	m_ui.sensorsMeasurementPeriod->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::refreshCsvPreview()
+{
+	std::stringstream stream;
+    DB::GeneralSettings generalSettings = getGeneralSettings();
+    DB::CsvSettings csvSettings = getCsvSettings();
+
+	m_ui.csvDateTimeFormat->setCurrentIndex((int)(csvSettings.dateTimeFormatOverride.has_value() ? *csvSettings.dateTimeFormatOverride : generalSettings.dateTimeFormat));
+
+    static std::vector<utils::CsvData> s_csvData;
+    if (s_csvData.empty())
+    {
+        utils::CsvData data;
+        data.measurement.id = 1000;
+        data.measurement.timePoint = DB::Clock::now() - std::chrono::hours(24);
+        data.measurement.receivedTimePoint = data.measurement.timePoint + std::chrono::minutes(1);
+        data.measurement.alarmTriggers = 0;
+        data.measurement.descriptor.temperature = 22.f;
+        data.measurement.descriptor.humidity = 32.f;
+        data.measurement.descriptor.index = 2000;
+        data.measurement.descriptor.sensorId = 1;
+        data.measurement.descriptor.signalStrength.b2s = -77;
+        data.measurement.descriptor.signalStrength.s2b = -78;
+        data.measurement.descriptor.vcc = 2.88f;
+        data.sensor.address = 1003;
+        data.sensor.averageSignalStrength.b2s = -77;
+        data.sensor.averageSignalStrength.s2b = -76;
+        data.sensor.descriptor.name = "sensor1";
+        s_csvData.push_back(data);
+        for (size_t i = 0; i < 30; i++)
+		{
+			data.measurement.id++;
+			data.measurement.descriptor.index++;
+			data.measurement.timePoint += std::chrono::minutes(15);
+			data.measurement.receivedTimePoint = data.measurement.timePoint + std::chrono::minutes(1);
+			data.measurement.descriptor.temperature += 1.f;
+			data.measurement.descriptor.humidity += 0.5f;
+			s_csvData.push_back(data);
+		}
+    }
+
+    utils::exportToCsv(stream, generalSettings, csvSettings, [](size_t index) { return s_csvData[index]; }, s_csvData.size(), true);
+
+	m_ui.csvPreview->setPlainText((stream.str() + "\n.....\n").c_str());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::setGeneralSettings(DB::GeneralSettings const& settings)
+{
+    m_ui.dateTimeFormat->setCurrentIndex((int)settings.dateTimeFormat);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+DB::GeneralSettings SettingsWidget::getGeneralSettings() const
+{
+    DB::GeneralSettings settings = m_db->getGeneralSettings();
+	settings.dateTimeFormat = (DB::DateTimeFormat)m_ui.dateTimeFormat->currentIndex();
+    return settings;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::applyGeneralSettings()
+{
+    m_db->setGeneralSettings(getGeneralSettings());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::setCsvSettings(DB::GeneralSettings const& generalSettings, DB::CsvSettings const& settings)
+{
+    m_ui.csvDateTimeFormatOverride->setChecked(settings.dateTimeFormatOverride.has_value());
+    m_ui.csvDateTimeFormat->setCurrentIndex((int)(settings.dateTimeFormatOverride.has_value() ? *settings.dateTimeFormatOverride : generalSettings.dateTimeFormat));
+//    m_ui.csvDateTimeFormat->setEnabled(m_ui.csvDateTimeFormatOverride->isChecked());
+    m_ui.csvExportId->setChecked(settings.exportId);
+	m_ui.csvExportIndex->setChecked(settings.exportIndex);
+	m_ui.csvExportSensorName->setChecked(settings.exportSensorName);
+	m_ui.csvExportSensorSN->setChecked(settings.exportSensorSN);
+	m_ui.csvExportTimePoint->setChecked(settings.exportTimePoint);
+	m_ui.csvExportReceivedTimePoint->setChecked(settings.exportReceivedTimePoint);
+	m_ui.csvExportTemperature->setChecked(settings.exportTemperature);
+	m_ui.csvExportHumidity->setChecked(settings.exportHumidity);
+	m_ui.csvExportBattery->setChecked(settings.exportBattery);
+	m_ui.csvExportSignal->setChecked(settings.exportSignal);
+    m_ui.csvUnitFormat->setCurrentIndex((int)settings.unitsFormat);
+    m_ui.csvDecimalPlaces->setValue(settings.decimalPlaces);
+    m_ui.csvSeparator->setText(settings.separator.c_str());
+    m_ui.csvTabSeparator->setChecked(settings.separator == "\t");
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+DB::CsvSettings SettingsWidget::getCsvSettings() const
+{
+	DB::CsvSettings settings = m_db->getCsvSettings();
+
+    if (m_ui.csvDateTimeFormatOverride->isChecked())
+	{
+        settings.dateTimeFormatOverride = (DB::DateTimeFormat)m_ui.csvDateTimeFormat->currentIndex();
+	}
+	settings.exportId = m_ui.csvExportId->isChecked();
+	settings.exportIndex = m_ui.csvExportIndex->isChecked();
+	settings.exportSensorName = m_ui.csvExportSensorName->isChecked();
+	settings.exportSensorSN = m_ui.csvExportSensorSN->isChecked();
+	settings.exportTimePoint = m_ui.csvExportTimePoint->isChecked();
+	settings.exportReceivedTimePoint = m_ui.csvExportReceivedTimePoint->isChecked();
+	settings.exportTemperature = m_ui.csvExportTemperature->isChecked();
+	settings.exportHumidity = m_ui.csvExportHumidity->isChecked();
+	settings.exportBattery = m_ui.csvExportBattery->isChecked();
+	settings.exportSignal = m_ui.csvExportSignal->isChecked();
+	settings.unitsFormat = (DB::CsvSettings::UnitsFormat)m_ui.csvUnitFormat->currentIndex();
+    settings.decimalPlaces = m_ui.csvDecimalPlaces->value();
+    if (m_ui.csvTabSeparator->isChecked())
+    {
+        settings.separator = "\t";
+    }
+    else
+    {
+		settings.separator = m_ui.csvSeparator->text().toUtf8().data();
+	}
+
+	return settings;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::applyCsvSettings()
+{
+	m_db->setCsvSettings(getCsvSettings());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -268,8 +371,10 @@ void SettingsWidget::setEmailSettings(DB::EmailSettings const& settings)
 
 //////////////////////////////////////////////////////////////////////////
 
-bool SettingsWidget::getEmailSettings(DB::EmailSettings& settings)
+DB::EmailSettings SettingsWidget::getEmailSettings() const
 {
+    DB::EmailSettings settings = m_db->getEmailSettings();
+
     settings.host = m_ui.emailHost->text().toUtf8().data();
     settings.port = static_cast<uint16_t>(m_ui.emailPort->value());
     settings.connection = static_cast<DB::EmailSettings::Connection>(m_ui.emailConnection->currentIndex());
@@ -287,29 +392,14 @@ bool SettingsWidget::getEmailSettings(DB::EmailSettings& settings)
         }
     }
 
-    if (settings.host.empty())
-    {
-        QMessageBox::critical(this, "Error", "You need to specify a valid host.");
-        return false;
-    }
-    if (settings.recipients.empty())
-    {
-        QMessageBox::warning(this, "Warning", "No email recipients configured, emails will not be sent.");
-    }
-
-    return true;
+    return settings;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void SettingsWidget::applyEmailSettings()
 {
-    DB::EmailSettings settings;
-    if (!getEmailSettings(settings))
-    {
-        return;
-    }
-
+    DB::EmailSettings settings = getEmailSettings();
 	m_db->setEmailSettings(settings);
 }
 
@@ -317,12 +407,12 @@ void SettingsWidget::applyEmailSettings()
 
 void SettingsWidget::sendTestEmail()
 {
-	DB::EmailSettings settings;
-    if (!getEmailSettings(settings))
-    {
-        return;
-    }
-
+    DB::EmailSettings settings = getEmailSettings();
+	if (settings.host.empty())
+	{
+		QMessageBox::critical(this, "Error", "No host configured.");
+		return;
+	}
     if (settings.recipients.empty())
     {
         QMessageBox::critical(this, "Error", "No email recipients configured.");
@@ -524,7 +614,7 @@ bool SettingsWidget::getFtpSettings(DB::FtpSettings& settings)
 
 void SettingsWidget::applyFtpSettings()
 {
-    DB::FtpSettings settings;
+    DB::FtpSettings settings = m_db->getFtpSettings();
     if (!getFtpSettings(settings))
     {
         return;
@@ -537,7 +627,7 @@ void SettingsWidget::applyFtpSettings()
 
 void SettingsWidget::testFtpSettings()
 {
-	DB::FtpSettings settings;
+	DB::FtpSettings settings = m_db->getFtpSettings();
     if (!getFtpSettings(settings))
     {
         return;
@@ -725,13 +815,19 @@ void SettingsWidget::computeBatteryLife()
         return;
 	}
 
+    uint8_t hardwareVersion = 1;
+    if (m_db->getSensorCount() > 0)
+    {
+        hardwareVersion = m_db->getSensor(0).deviceInfo.hardwareVersion;
+    }
+
     DB::SensorTimeConfigDescriptor descriptor = timeConfigResult.extract_payload();
     DB::SensorSettings settings = settingsResult.extract_payload();
-    DB::Clock::duration d = ::computeBatteryLife(m_ui.batteryCapacity->value(),
-                                                    descriptor.measurementPeriod,
-                                                    m_db->computeActualCommsPeriod(descriptor),
-                                                    settings.radioPower,
-                                                    1);
+    DB::Clock::duration d = utils::computeBatteryLife(m_ui.batteryCapacity->value(),
+                                                      descriptor.measurementPeriod,
+                                                      m_db->computeActualCommsPeriod(descriptor),
+                                                      settings.radioPower,
+                                                      hardwareVersion);
 
     int64_t seconds = std::chrono::duration_cast<std::chrono::seconds>(d).count();
     int64_t days = seconds / (24 * 3600);

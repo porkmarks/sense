@@ -190,6 +190,288 @@ QString getQDateTimeFormatString(DB::DateTimeFormat format, bool millis)
 	return QString("dd-MM-yyyy HH:mm").arg(millis ? ".zzz" : "");
 }
 
+std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac)
+{
+	char macStr[128];
+	sprintf(macStr, "%X:%X:%X:%X:%X:%X", mac[0] & 0xFF, mac[1] & 0xFF, mac[2] & 0xFF, mac[3] & 0xFF, mac[4] & 0xFF, mac[5] & 0xFF);
+	return macStr;
+}
+
+std::pair<std::string, int32_t> computeDurationString(DB::Clock::duration d)
+{
+	int32_t totalSeconds = std::chrono::duration_cast<std::chrono::seconds>(d).count();
+	int32_t seconds = std::abs(totalSeconds);
+
+	int32_t days = seconds / (24 * 3600);
+	seconds -= days * (24 * 3600);
+
+	int32_t hours = seconds / 3600;
+	seconds -= hours * 3600;
+
+	int32_t minutes = seconds / 60;
+	seconds -= minutes * 60;
+
+	char buf[256] = { '\0' };
+	if (days > 0)
+	{
+		sprintf(buf, "%dd %02dh %02dm %02ds", days, hours, minutes, seconds);
+	}
+	else if (hours > 0)
+	{
+		sprintf(buf, "%dh %02dm %02ds", hours, minutes, seconds);
+	}
+	else if (minutes > 0)
+	{
+		sprintf(buf, "%dm %02ds", minutes, seconds);
+	}
+	else if (seconds > 0)
+	{
+		sprintf(buf, "%ds", seconds);
+	}
+
+	std::string str(buf);
+	return std::make_pair(str, totalSeconds);
+}
+
+std::pair<std::string, int32_t> computeRelativeTimePointString(DB::Clock::time_point tp)
+{
+	return computeDurationString(tp - DB::Clock::now());
+}
+
+uint32_t getSensorStorageCapacity(DB::Sensor const& sensor)
+{
+	if (sensor.deviceInfo.sensorType == 1)
+	{
+		if (sensor.deviceInfo.hardwareVersion >= 2)
+		{
+			return 1000;
+		}
+	}
+	return 0;
+}
+
+DB::Clock::duration computeBatteryLife(float capacity, DB::Clock::duration measurementPeriod, DB::Clock::duration commsPeriod, float power, uint8_t hardwareVersion)
+{
+	float idleMAh = 0.01f;
+	float commsMAh = 0;
+	float measurementMAh = 3;
+
+    float minPower = -3.f;
+    float maxPower = 17.f;
+    float minCommsMAh = 0;
+    float maxCommsMAh = 0;
+	if (hardwareVersion >= 3)
+	{
+		minCommsMAh = 20.f;
+		maxCommsMAh = 80.f;
+	}
+	else
+	{
+		minCommsMAh = 60.f;
+		maxCommsMAh = 130.f;
+	}
+	float powerMu = std::clamp(power - minPower, 0.f, maxPower - minPower) / (maxPower - minPower);
+	commsMAh = minCommsMAh + (maxCommsMAh - minCommsMAh) * powerMu;
+
+	float commsDuration = 2.f;
+	float commsPeriodS = std::chrono::duration<float>(commsPeriod).count();
+
+	float measurementDuration = 1.f;
+	float measurementPeriodS = std::chrono::duration<float>(measurementPeriod).count();
+
+	float measurementPerHour = 3600.f / measurementPeriodS;
+	float commsPerHour = 3600.f / commsPeriodS;
+
+	float measurementDurationPerHour = measurementPerHour * measurementDuration;
+	float commsDurationPerHour = commsPerHour * commsDuration;
+
+	float commsUsagePerHour = commsMAh * commsDurationPerHour / 3600.f;
+	float measurementUsagePerHour = measurementMAh * measurementDurationPerHour / 3600.f;
+
+	float usagePerHour = commsUsagePerHour + measurementUsagePerHour + idleMAh;
+
+	float hours = capacity / usagePerHour;
+	return std::chrono::hours(static_cast<int32_t>(hours));
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool exportToCsv(std::ostream& stream, DB::GeneralSettings const& settings, DB::CsvSettings const& csvSettings, CsvDataProvider provider, size_t count, bool unicode)
+{
+	//header
+	if (csvSettings.exportId)
+	{
+		stream << "Id";
+		stream << csvSettings.separator;
+	}
+	if (csvSettings.exportSensorName)
+	{
+		stream << "Sensor Name";
+		stream << csvSettings.separator;
+	}
+	if (csvSettings.exportSensorSN)
+	{
+		stream << "Sensor S/N";
+		stream << csvSettings.separator;
+	}
+	if (csvSettings.exportIndex)
+	{
+		stream << "Index";
+		stream << csvSettings.separator;
+	}
+	if (csvSettings.exportTimePoint)
+	{
+		stream << "Timestamp";
+		stream << csvSettings.separator;
+	}
+	if (csvSettings.exportReceivedTimePoint)
+	{
+		stream << "Received Timestamp";
+		stream << csvSettings.separator;
+	}
+	if (csvSettings.exportTemperature)
+	{
+		stream << "Temperature";
+		stream << csvSettings.separator;
+		if (csvSettings.unitsFormat == DB::CsvSettings::UnitsFormat::SeparateColumn)
+		{
+			stream << "Temperature Unit";
+			stream << csvSettings.separator;
+		}
+	}
+	if (csvSettings.exportHumidity)
+	{
+		stream << "Humidity";
+		stream << csvSettings.separator;
+		if (csvSettings.unitsFormat == DB::CsvSettings::UnitsFormat::SeparateColumn)
+		{
+			stream << "Humidity Unit";
+			stream << csvSettings.separator;
+		}
+	}
+	if (csvSettings.exportBattery)
+	{
+		stream << "Battery";
+		stream << csvSettings.separator;
+		if (csvSettings.unitsFormat == DB::CsvSettings::UnitsFormat::SeparateColumn)
+		{
+			stream << "Battery Unit";
+			stream << csvSettings.separator;
+		}
+	}
+	if (csvSettings.exportSignal)
+	{
+		stream << "Signal";
+		stream << csvSettings.separator;
+		if (csvSettings.unitsFormat == DB::CsvSettings::UnitsFormat::SeparateColumn)
+		{
+			stream << "Signal Unit";
+			stream << csvSettings.separator;
+		}
+	}
+	stream << std::endl;
+
+	for (size_t i = 0; i < count; i++)
+	{
+		CsvData data = provider(i);
+		DB::Measurement const& m = data.measurement;
+		DB::Sensor const& s = data.sensor;
+		if (csvSettings.exportId)
+		{
+			stream << m.id;
+			stream << csvSettings.separator;
+		}
+		if (csvSettings.exportSensorName)
+		{
+			stream << s.descriptor.name;
+			stream << csvSettings.separator;
+		}
+		if (csvSettings.exportSensorSN)
+		{
+			stream << QString("%1").arg(s.serialNumber, 8, 16, QChar('0')).toUtf8().data();
+			stream << csvSettings.separator;
+		}
+		if (csvSettings.exportIndex)
+		{
+			stream << m.descriptor.index;
+			stream << csvSettings.separator;
+		}
+		if (csvSettings.exportTimePoint)
+		{
+			DB::DateTimeFormat dateTimeFormat = csvSettings.dateTimeFormatOverride.has_value() ? *csvSettings.dateTimeFormatOverride : settings.dateTimeFormat;
+			QString str = toString<DB::Clock>(m.timePoint, dateTimeFormat);
+			stream << str.toUtf8().data();
+			stream << csvSettings.separator;
+		}
+		if (csvSettings.exportReceivedTimePoint)
+		{
+			DB::DateTimeFormat dateTimeFormat = csvSettings.dateTimeFormatOverride.has_value() ? *csvSettings.dateTimeFormatOverride : settings.dateTimeFormat;
+			QString str = toString<DB::Clock>(m.receivedTimePoint, dateTimeFormat);
+			stream << str.toUtf8().data();
+			stream << csvSettings.separator;
+		}
+		if (csvSettings.exportTemperature)
+		{
+			stream << std::fixed << std::setprecision(csvSettings.decimalPlaces) << m.descriptor.temperature;
+			if (csvSettings.unitsFormat == DB::CsvSettings::UnitsFormat::Embedded)
+			{
+				stream << (unicode ? "°C" : "\xB0""C");
+			}
+			stream << csvSettings.separator;
+			if (csvSettings.unitsFormat == DB::CsvSettings::UnitsFormat::SeparateColumn)
+			{
+				stream << (unicode ? "°C" : "\xB0""C");
+				stream << csvSettings.separator;
+			}
+		}
+		if (csvSettings.exportHumidity)
+		{
+			stream << std::fixed << std::setprecision(csvSettings.decimalPlaces) << m.descriptor.humidity;
+			if (csvSettings.unitsFormat == DB::CsvSettings::UnitsFormat::Embedded)
+			{
+				stream << " %RH";
+			}
+			stream << csvSettings.separator;
+			if (csvSettings.unitsFormat == DB::CsvSettings::UnitsFormat::SeparateColumn)
+			{
+				stream << "%RH";
+				stream << csvSettings.separator;
+			}
+		}
+		if (csvSettings.exportBattery)
+		{
+			stream << std::fixed << std::setprecision(csvSettings.decimalPlaces) << utils::getBatteryLevel(m.descriptor.vcc) * 100.f;
+			if (csvSettings.unitsFormat == DB::CsvSettings::UnitsFormat::Embedded)
+			{
+				stream << "%";
+			}
+			stream << csvSettings.separator;
+			if (csvSettings.unitsFormat == DB::CsvSettings::UnitsFormat::SeparateColumn)
+			{
+				stream << "%";
+				stream << csvSettings.separator;
+			}
+		}
+		if (csvSettings.exportSignal)
+		{
+			stream << std::fixed << std::setprecision(csvSettings.decimalPlaces) << utils::getSignalLevel(std::min(m.descriptor.signalStrength.s2b, m.descriptor.signalStrength.b2s)) * 100.f;
+			if (csvSettings.unitsFormat == DB::CsvSettings::UnitsFormat::Embedded)
+			{
+				stream << "%";
+			}
+			stream << csvSettings.separator;
+			if (csvSettings.unitsFormat == DB::CsvSettings::UnitsFormat::SeparateColumn)
+			{
+				stream << "%";
+				stream << csvSettings.separator;
+			}
+		}
+		stream << std::endl;
+	}
+
+	return true;
+}
+
 float getBatteryLevel(float vcc)
 {
     float level = std::max(std::min(vcc, k_maxBatteryLevel) - k_minBatteryLevel, 0.f) / (k_maxBatteryLevel - k_minBatteryLevel);
@@ -222,7 +504,7 @@ QIcon getBatteryIcon(DB::SensorSettings const& settings, float vcc)
     return k_icons[index];
 }
 
-float getSignalLevel(int8_t dBm)
+float getSignalLevel(int16_t dBm)
 {
     if (dBm == 0)
     {
@@ -232,7 +514,7 @@ float getSignalLevel(int8_t dBm)
     return level;
 }
 
-QIcon getSignalIcon(DB::SensorSettings const& settings, int8_t dBm)
+QIcon getSignalIcon(DB::SensorSettings const& settings, int16_t dBm)
 {
     static const QIcon k_alertIcon = QIcon(":/icons/ui/signal-0.png");
     const static std::array<QIcon, 5> k_icons =

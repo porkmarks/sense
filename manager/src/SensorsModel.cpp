@@ -13,59 +13,6 @@
 
 static std::array<const char*, 9> s_headerNames = {"Name", "Serial Number", "Temperature", "Humidity", "Battery", "Signal", "Comms", "Stored", "Alarms"};
 
-std::pair<std::string, int32_t> computeDurationString(DB::Clock::duration d)
-{
-    int32_t totalSeconds = std::chrono::duration_cast<std::chrono::seconds>(d).count();
-    int32_t seconds = std::abs(totalSeconds);
-
-    int32_t days = seconds / (24 * 3600);
-    seconds -= days * (24 * 3600);
-
-    int32_t hours = seconds / 3600;
-    seconds -= hours * 3600;
-
-    int32_t minutes = seconds / 60;
-    seconds -= minutes * 60;
-
-    char buf[256] = { '\0' };
-    if (days > 0)
-    {
-        sprintf(buf, "%dd %02dh %02dm %02ds", days, hours, minutes, seconds);
-    }
-    else if (hours > 0)
-    {
-        sprintf(buf, "%dh %02dm %02ds", hours, minutes, seconds);
-    }
-    else if (minutes > 0)
-    {
-        sprintf(buf, "%dm %02ds", minutes, seconds);
-    }
-    else if (seconds > 0)
-    {
-        sprintf(buf, "%ds", seconds);
-    }
-
-    std::string str(buf);
-    return std::make_pair(str, totalSeconds);
-}
-
-std::pair<std::string, int32_t> computeRelativeTimePointString(DB::Clock::time_point tp)
-{
-    return computeDurationString(tp - DB::Clock::now());
-}
-
-uint32_t getSensorStorageCapacity(DB::Sensor const& sensor)
-{
-    if (sensor.deviceInfo.sensorType == 1)
-    {
-        if (sensor.deviceInfo.hardwareVersion == 2)
-        {
-            return 1000;
-        }
-    }
-    return 0;
-}
-
 constexpr int32_t k_imminentMaxSecond = 5;
 constexpr int32_t k_imminentMinSecond = -60;
 
@@ -343,7 +290,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
             {
                 if (sensor.lastCommsTimePoint.time_since_epoch().count() != 0)
                 {
-                    auto p = computeRelativeTimePointString(sensor.lastCommsTimePoint + m_db.getLastSensorTimeConfig().computedCommsPeriod);
+                    auto p = utils::computeRelativeTimePointString(sensor.lastCommsTimePoint + m_db.getLastSensorTimeConfig().computedCommsPeriod);
                     if (p.second < k_imminentMaxSecond && p.second > k_imminentMinSecond)
                     {
                         return QVariant(QColor(255, 255, 150));
@@ -447,7 +394,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
             {
                 if (sensor.lastCommsTimePoint.time_since_epoch().count() != 0)
                 {
-                    auto p = computeRelativeTimePointString(sensor.lastCommsTimePoint + m_db.getLastSensorTimeConfig().computedCommsPeriod);
+                    auto p = utils::computeRelativeTimePointString(sensor.lastCommsTimePoint + m_db.getLastSensorTimeConfig().computedCommsPeriod);
                     std::string str = p.first;
                     str = (p.second > 0) ? "In " + str : str + " ago";
                     if (p.second < k_imminentMaxSecond && p.second > k_imminentMinSecond)

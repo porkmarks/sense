@@ -211,7 +211,7 @@ public:
 
 	struct SensorSettings
 	{
-		int8_t radioPower = 10; //dBm. 0 means invalid
+		int8_t radioPower = 10; //dBm.
 		float alertBatteryLevel = 0.1f; //0 - 1 mu
 		float alertSignalStrengthLevel = 0.1f; //0 - 1 mu
 	};
@@ -242,6 +242,7 @@ public:
     SensorTimeConfig const& getSensorTimeConfig(size_t index) const;
     SensorTimeConfig const& getLastSensorTimeConfig() const;
     Clock::duration computeActualCommsPeriod(SensorTimeConfigDescriptor const& descriptor) const;
+	SensorTimeConfig const& findSensorTimeConfigForMeasurementIndex(uint32_t index) const;
 
     struct SensorErrors
     {
@@ -259,8 +260,8 @@ public:
 
     struct SignalStrength
     {
-        int8_t s2b = 0;
-        int8_t b2s = 0;
+        int16_t s2b = 0;
+        int16_t b2s = 0;
     };
 
     struct MeasurementDescriptor
@@ -349,7 +350,7 @@ public:
         uint32_t estimatedStoredMeasurementCount = 0;
 
         //the signal strength from the base station to this sensor, in dBm
-        int8_t lastSignalStrengthB2S = 0; //dBm
+        int16_t lastSignalStrengthB2S = 0; //dBm
 
         SignalStrength averageSignalStrength;
 
@@ -386,7 +387,7 @@ public:
         uint32_t storedMeasurementCount = 0;
 
         bool hasSignalStrength = false;
-        int8_t signalStrengthB2S = 0; //dBm
+        int16_t signalStrengthB2S = 0; //dBm
 
         bool hasLastCommsTimePoint = false;
         Clock::time_point lastCommsTimePoint = Clock::time_point(Clock::duration::zero());
@@ -576,7 +577,7 @@ public:
         Range<float> vccFilter;
 
         bool useSignalStrengthFilter = false;
-        Range<int8_t> signalStrengthFilter;
+        Range<int16_t> signalStrengthFilter;
 
 //        bool useSensorErrorsFilter = false;
 //        bool sensorErrorsFilter = true;
@@ -649,7 +650,6 @@ private:
     Clock::time_point computeNextMeasurementTimePoint(Sensor const& sensor) const;
     uint32_t computeNextMeasurementIndex(Sensor const& sensor) const;
     uint32_t computeNextRealTimeMeasurementIndex() const;
-    SensorTimeConfig const& findSensorTimeConfigForMeasurementIndex(uint32_t index) const;
     Clock::time_point computeMeasurementTimepoint(MeasurementDescriptor const& md) const;
     uint32_t computeAlarmTriggers(Measurement const& m);
 

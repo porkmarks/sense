@@ -14,8 +14,6 @@
 #include "Logger.h"
 
 extern Logger s_logger;
-extern float getBatteryLevel(float vcc);
-
 
 ExportLogsDialog::ExportLogsDialog(LogsModel& model, QWidget* parent)
     : QDialog(parent)

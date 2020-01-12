@@ -79,12 +79,12 @@ void MeasurementDetailsDialog::setMeasurement(DB::Measurement const& measurement
 		m_ui.batteryIcon->setPixmap(utils::getBatteryIcon(m_db.getSensorSettings(), vcc).pixmap(24, 24));
 
 		{
-			int8_t signal = static_cast<int8_t>(utils::getSignalLevel(m_measurement.descriptor.signalStrength.b2s) * 100.f);
+			int signal = static_cast<int>(utils::getSignalLevel(m_measurement.descriptor.signalStrength.b2s) * 100.f);
 			m_ui.signalStrengthB2S->setText(QString("%1% (%2 dBm)").arg(signal).arg(m_measurement.descriptor.signalStrength.b2s));
 			m_ui.signalStrengthIconB2S->setPixmap(utils::getSignalIcon(m_db.getSensorSettings(), signal).pixmap(24, 24));
 		}
 		{
-			int8_t signal = static_cast<int8_t>(utils::getSignalLevel(m_measurement.descriptor.signalStrength.s2b) * 100.f);
+			int signal = static_cast<int>(utils::getSignalLevel(m_measurement.descriptor.signalStrength.s2b) * 100.f);
 			m_ui.signalStrengthS2B->setText(QString("%1% (%2 dBm)").arg(signal).arg(m_measurement.descriptor.signalStrength.s2b));
 			m_ui.signalStrengthIconS2B->setPixmap(utils::getSignalIcon(m_db.getSensorSettings(), signal).pixmap(24, 24));
 		}

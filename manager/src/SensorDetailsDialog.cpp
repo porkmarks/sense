@@ -4,9 +4,6 @@
 #include <QSettings>
 #include "Utils.h"
 
-extern std::pair<std::string, int32_t> computeRelativeTimePointString(DB::Clock::time_point tp);
-extern uint32_t getSensorStorageCapacity(DB::Sensor const& sensor);
-
 //////////////////////////////////////////////////////////////////////////
 
 SensorDetailsDialog::SensorDetailsDialog(DB& db, QWidget* parent)
@@ -73,7 +70,7 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
     }
     else if (m_sensor.state == DB::Sensor::State::Sleeping)
     {
-        auto pair = computeRelativeTimePointString(m_sensor.sleepStateTimePoint);
+        auto pair = utils::computeRelativeTimePointString(m_sensor.sleepStateTimePoint);
         std::string str = pair.first;
         str = (pair.second > 0) ? "In " + str : str + " ago";
 		m_ui.sleepState->setText(QString("(sleeping since %1, %2)").arg(utils::toString<DB::Clock>(m_sensor.sleepStateTimePoint, m_db.getGeneralSettings().dateTimeFormat)).arg(str.c_str()));
@@ -92,12 +89,12 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
 		}
 
 		{
-			int8_t signal = static_cast<int8_t>(utils::getSignalLevel(m_sensor.averageSignalStrength.b2s) * 100.f);
+			int signal = static_cast<int>(utils::getSignalLevel(m_sensor.averageSignalStrength.b2s) * 100.f);
 			m_ui.signalStrengthB2S->setText(QString("%1% (%2 dBm)").arg(signal).arg(m_sensor.averageSignalStrength.b2s));
 			m_ui.signalStrengthIconB2S->setPixmap(utils::getSignalIcon(m_db.getSensorSettings(), signal).pixmap(24, 24));
 		}
 		{
-			int8_t signal = static_cast<int8_t>(utils::getSignalLevel(m_sensor.averageSignalStrength.s2b) * 100.f);
+			int signal = static_cast<int>(utils::getSignalLevel(m_sensor.averageSignalStrength.s2b) * 100.f);
 			m_ui.signalStrengthS2B->setText(QString("%1% (%2 dBm)").arg(signal).arg(m_sensor.averageSignalStrength.s2b));
 			m_ui.signalStrengthIconS2B->setPixmap(utils::getSignalIcon(m_db.getSensorSettings(), signal).pixmap(24, 24));
 		}
@@ -111,7 +108,7 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
 
     m_ui.power->setText(QString("%1 dBm").arg(sensorSettings.radioPower));
     {
-        uint32_t capacity = getSensorStorageCapacity(m_sensor);
+        uint32_t capacity = utils::getSensorStorageCapacity(m_sensor);
         if (capacity == 0)
         {
             m_ui.storage->setText(QString("%1").arg(m_sensor.estimatedStoredMeasurementCount));
@@ -127,7 +124,7 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
 
     if (DB::Clock::to_time_t(m_sensor.lastCommsTimePoint) > 0)
     {
-        auto pair = computeRelativeTimePointString(m_sensor.lastCommsTimePoint);
+        auto pair = utils::computeRelativeTimePointString(m_sensor.lastCommsTimePoint);
         std::string str = pair.first;
         str = (pair.second > 0) ? "In " + str : str + " ago";
 

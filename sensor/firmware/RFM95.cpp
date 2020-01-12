@@ -1455,9 +1455,9 @@ int8_t RFM95::setPreambleLength(uint16_t preambleLength)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
-int8_t RFM95::getRSSI()
+int16_t RFM95::getRSSI()
 {
-    int8_t lastPacketRSSI;
+    int16_t lastPacketRSSI;
 
     int16_t rawRSSI = _mod->SPIgetRegValue(SX127X_REG_PKT_RSSI_VALUE);
 

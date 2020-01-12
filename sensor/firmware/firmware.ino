@@ -60,7 +60,7 @@ static State s_state = State::PAIR;
 
 #define SENSOR_TYPE       1
 #define HARDWARE_VERSION  2
-#define SOFTWARE_VERSION  3
+#define SOFTWARE_VERSION  4
 
 static uint8_t s_reboot_flags = 0;
 static uint8_t s_comms_errors = 0;
@@ -77,7 +77,7 @@ static chrono::millis s_measurement_period;
 static chrono::time_ms s_next_comms_time_point;
 static chrono::millis s_comms_period;
 
-static int8_t s_last_input_dBm = 0;
+static int16_t s_last_input_dBm = 0;
 static float s_last_batery_vcc_during_comms = 0;
 
 static Storage s_storage;
@@ -339,7 +339,7 @@ void setup()
         LOG(PSTR("VCC: %ldmV\n"), (int32_t)(vcc*1000.f));
         LOG(PSTR("T: %ldm'C\n"), (int32_t)(t*1000.f));
         LOG(PSTR("H: %d%%\n"), (int)h);
-        if (t != 0.f && h > 0.1f && vcc > 1.5f)
+        if (h > 0.1f && vcc > 1.5f)
         {
           break;
         }
@@ -581,7 +581,7 @@ static void fill_config_request(data::sensor::Config_Request& request)
     request.comms_errors = s_comms_errors;
     request.first_measurement_index = s_first_stored_measurement_index;
     request.measurement_count = s_storage.get_data_count();
-    request.b2s_input_dBm = s_last_input_dBm;
+    request.b2s_qss = data::sensor::pack_qss(s_last_input_dBm);
     request.calibration = s_stable_settings.calibration;
     request.sleeping = s_sensor_sleeping;
     

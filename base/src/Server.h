@@ -28,7 +28,7 @@ public:
     struct Sensor_Request                                                                              
     {
         uint8_t type = 0;
-        int8_t signal_s2b = 0;
+        int16_t signal_s2b = 0;
         Radio::Address address = 0;
         bool needs_response = true;
         std::vector<uint8_t> payload;

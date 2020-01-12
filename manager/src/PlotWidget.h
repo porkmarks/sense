@@ -29,10 +29,20 @@ public:
     QSize getPlotSize() const;
     void saveToPng(const QString& fileName, bool showLegend, bool showAnnotations);
 
+	enum class PlotType
+	{
+		Temperature,
+		Humidity,
+		Battery,
+		Signal,
+		Count
+	};
+
 private slots:
+    void setPermissions();
     void resizeEvent(QResizeEvent* event);
     void keepAnnotation();
-    void createAnnotation(DB::SensorId sensorId, QPointF point, double key, double value, DB::Sensor const& sensor, bool temperature);
+    void createAnnotation(DB::SensorId sensorId, QPointF point, double key, double value, DB::Sensor const& sensor, PlotType plotType);
     void plotContextMenu(QPoint const& position);
     void refresh();
     void scheduleSlowRefresh();
@@ -60,17 +70,19 @@ private:
     void scheduleRefresh(DB::Clock::duration dt);
     std::unique_ptr<QTimer> m_scheduleTimer;
 
+    struct Plot
+    {
+		QCPGraph* graph = nullptr;
+		util::Butterworth<qreal> lpf;
+		QVector<double> keys;
+		QVector<double> values;
+		QCPAxis* axis = nullptr;
+    };
+
     struct GraphData
     {
         DB::Sensor sensor;
-        QCPGraph* temperatureGraph = nullptr;
-        util::Butterworth<qreal> temperatureLpf;
-        QVector<double> temperatureKeys;
-        QVector<double> temperatureValues;
-        QCPGraph* humidityGraph = nullptr;
-        util::Butterworth<qreal> humidityLpf;
-        QVector<double> humidityKeys;
-        QVector<double> humidityValues;
+        std::array<Plot, (size_t)PlotType::Count> plots;
         int64_t lastIndex = -1;
     };
 
@@ -80,7 +92,7 @@ private:
     {
         std::unique_ptr<PlotToolTip> toolTip;
         DB::SensorId sensorId;
-        bool isTemperature = false;
+        PlotType plotType = PlotType::Temperature;
     };
 
     Annotation m_annotation;
@@ -100,9 +112,8 @@ private:
     QCustomPlot* m_plot = nullptr;
     QCPLayer* m_graphsLayer = nullptr;
     QCPLayer* m_annotationsLayer = nullptr;
-    QCPAxis* m_axisD = nullptr;
-    QCPAxis* m_axisT = nullptr;
-    QCPAxis* m_axisH = nullptr;
+    QCPAxis* m_axisDate = nullptr;
+    std::array<QCPAxis*, (size_t)PlotType::Count> m_plotAxis;
 
     bool m_useSmoothing = true;
     bool m_fitMeasurements = true;

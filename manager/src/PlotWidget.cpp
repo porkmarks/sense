@@ -30,6 +30,11 @@ static std::array<uint32_t, 128> k_colors =
     0xFFC895C5, 0xFF320033, 0xFFFF6832, 0xFF66E1D3, 0xFFCFCDAC, 0xFFD0AC94, 0xFF7ED379, 0xFF012C58
 };
 
+std::array<const char*, (size_t)PlotWidget::PlotType::Count> k_plotUnits = { "°C", "%RH", "%", "%" };
+std::array<Qt::PenStyle, (size_t)PlotWidget::PlotType::Count> k_plotPenStyles = { Qt::SolidLine, Qt::DashLine, Qt::DotLine, Qt::DashDotDotLine };
+std::array<const char*, (size_t)PlotWidget::PlotType::Count> k_plotNames = { "Temperature", "Humidity", "Battery", "Signal" };
+std::array<qreal, (size_t)PlotWidget::PlotType::Count> k_plotMinRange = { 5.0, 10.0, 0.1, 0.1 };
+
 //////////////////////////////////////////////////////////////////////////
 
 PlotWidget::PlotWidget(QWidget* parent)
@@ -57,6 +62,8 @@ void PlotWidget::init(DB& db)
     setEnabled(true);
     m_db = &db;
 
+    m_uiConnections.push_back(connect(&db, &DB::userLoggedIn, this, &PlotWidget::setPermissions));
+
     m_uiConnections.push_back(connect(m_ui.clearAnnotations, &QPushButton::released, this, &PlotWidget::clearAnnotations));
     m_uiConnections.push_back(connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.selectSensors, &QPushButton::released, this, &PlotWidget::selectSensors, Qt::QueuedConnection));
@@ -72,6 +79,8 @@ void PlotWidget::init(DB& db)
 
     m_uiConnections.push_back(connect(m_ui.showTemperature, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.showHumidity, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.showBattery, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.showSignal, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
 
     m_uiConnections.push_back(connect(m_db, &DB::measurementsAdded, this, &PlotWidget::scheduleSlowRefresh, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_db, &DB::measurementsChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
@@ -79,8 +88,9 @@ void PlotWidget::init(DB& db)
 	m_uiConnections.push_back(connect(m_db, &DB::sensorRemoved, this, &PlotWidget::sensorRemoved, Qt::QueuedConnection));
 
     loadSettings();
-
     refresh();
+
+    setPermissions();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -96,11 +106,31 @@ void PlotWidget::shutdown()
     m_graphs.clear();
     delete m_plot;
     m_plot = nullptr;
-    m_axisD = nullptr;
-    m_axisT = nullptr;
-    m_axisH = nullptr;
+    m_axisDate = nullptr;
+    for (QCPAxis*& axis : m_plotAxis)
+    {
+        axis = nullptr;
+    }
 
     m_db = nullptr;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::setPermissions()
+{
+	if (!m_db->isLoggedInAsAdmin())
+	{
+		m_ui.showBattery->setVisible(false);
+		m_ui.showBattery->setChecked(false);
+		m_ui.showSignal->setVisible(false);
+		m_ui.showSignal->setChecked(false);
+	}
+    else
+    {
+		m_ui.showBattery->setVisible(true);
+		m_ui.showSignal->setVisible(true);
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -111,6 +141,8 @@ void PlotWidget::loadSettings()
 
     bool showTemperature = m_ui.showTemperature->isChecked();
     bool showHumidity = m_ui.showHumidity->isChecked();
+    bool showBattery = m_ui.showBattery->isChecked();
+    bool showSignal = m_ui.showSignal->isChecked();
     bool fitMeasurements = m_ui.fitMeasurements->isChecked();
     bool useSmoothing = m_ui.useSmoothing->isChecked();
     double minHumidity = m_ui.minHumidity->value();
@@ -121,6 +153,8 @@ void PlotWidget::loadSettings()
 
     m_ui.showTemperature->blockSignals(true);
     m_ui.showHumidity->blockSignals(true);
+    m_ui.showBattery->blockSignals(true);
+    m_ui.showSignal->blockSignals(true);
     m_ui.fitMeasurements->blockSignals(true);
     m_ui.useSmoothing->blockSignals(true);
     m_ui.minHumidity->blockSignals(true);
@@ -131,6 +165,8 @@ void PlotWidget::loadSettings()
     QSettings settings;
     m_ui.showTemperature->setChecked(settings.value("filter/showTemperature", true).toBool());
     m_ui.showHumidity->setChecked(settings.value("filter/showHumidity", true).toBool());
+    m_ui.showBattery->setChecked(settings.value("filter/showBattery", false).toBool());
+    m_ui.showSignal->setChecked(settings.value("filter/showSignal", false).toBool());
     m_ui.fitMeasurements->setChecked(settings.value("filter/fitMeasurements", true).toBool());
     m_ui.useSmoothing->setChecked(settings.value("rendering/useSmoothing", true).toBool());
     m_ui.minHumidity->setValue(settings.value("rendering/minHumidity", 0.0).toDouble());
@@ -140,6 +176,8 @@ void PlotWidget::loadSettings()
 
     m_ui.showTemperature->blockSignals(false);
     m_ui.showHumidity->blockSignals(false);
+    m_ui.showBattery->blockSignals(false);
+    m_ui.showSignal->blockSignals(false);
     m_ui.fitMeasurements->blockSignals(false);
     m_ui.useSmoothing->blockSignals(false);
     m_ui.minHumidity->blockSignals(false);
@@ -177,6 +215,8 @@ void PlotWidget::loadSettings()
 
     if (showTemperature != m_ui.showTemperature->isChecked() ||
             showHumidity != m_ui.showHumidity->isChecked() ||
+            showBattery != m_ui.showBattery->isChecked() ||
+            showSignal != m_ui.showSignal->isChecked() ||
             fitMeasurements != m_ui.fitMeasurements->isChecked() ||
             useSmoothing != m_ui.useSmoothing->isChecked() ||
             minHumidity != m_ui.minHumidity->value() ||
@@ -198,6 +238,8 @@ void PlotWidget::saveSettings()
     QSettings settings;
     settings.setValue("filter/showTemperature", m_ui.showTemperature->isChecked());
     settings.setValue("filter/showHumidity", m_ui.showHumidity->isChecked());
+    settings.setValue("filter/showBattery", m_ui.showBattery->isChecked());
+    settings.setValue("filter/showSignal", m_ui.showSignal->isChecked());
     settings.setValue("filter/fitMeasurements", m_ui.fitMeasurements->isChecked());
     settings.setValue("rendering/useSmoothing", m_ui.useSmoothing->isChecked());
     settings.setValue("rendering/minHumidity", m_ui.minHumidity->value());
@@ -399,38 +441,61 @@ void PlotWidget::createPlotWidgets()
         connect(m_plot, &QCustomPlot::legendClick, this, &PlotWidget::legendSelectionChanged);
 
         {
-            m_axisD = m_plot->xAxis;
-            m_axisD->setTickLabelFont(font);
-            m_axisD->setLabel("Date");
+            m_axisDate = m_plot->xAxis;
+            m_axisDate->setTickLabelFont(font);
+            m_axisDate->setLabel("Date");
             QSharedPointer<QCPAxisTickerDateTime> dateTicker(new QCPAxisTickerDateTime);
             dateTicker->setDateTimeFormat("dd-MMM-yy h:mm");
             dateTicker->setTickStepStrategy(QCPAxisTicker::TickStepStrategy::tssReadability);
             dateTicker->setTickCount(10);
-            m_axisD->setTicker(dateTicker);
-            m_axisD->setTicks(true);
-            m_axisD->setVisible(true);
+            m_axisDate->setTicker(dateTicker);
+            m_axisDate->setTicks(true);
+            m_axisDate->setVisible(true);
         }
         {
             m_plot->yAxis->setTickLabelFont(font);
-            m_plot->yAxis->setLabel("°C");
+            m_plot->yAxis->setLabel("Temperature (°C)");
             m_plot->yAxis->setNumberFormat("gb");
             m_plot->yAxis->ticker()->setTickStepStrategy(QCPAxisTicker::TickStepStrategy::tssReadability);
             m_plot->yAxis->ticker()->setTickCount(20);
             m_plot->yAxis->setTicks(true);
+			m_plotAxis[(size_t)PlotType::Temperature] = m_plot->yAxis;
         }
         {
             m_plot->yAxis2->setTickLabelFont(font);
-            m_plot->yAxis2->setLabel("%RH");
+            m_plot->yAxis2->setLabel("Humidity (%RH)");
             m_plot->yAxis2->setNumberFormat("gb");
             m_plot->yAxis2->ticker()->setTickStepStrategy(QCPAxisTicker::TickStepStrategy::tssReadability);
             m_plot->yAxis2->ticker()->setTickCount(20);
             m_plot->yAxis2->setTicks(true);
+            m_plotAxis[(size_t)PlotType::Humidity] = m_plot->yAxis2;
         }
+
+        {
+            QCPAxis* axis = m_plot->axisRect()->addAxis(QCPAxis::atLeft);
+            axis->setTickLabelFont(font);
+			axis->setLabel("Battery (%)");
+			axis->setNumberFormat("gb");
+			axis->ticker()->setTickStepStrategy(QCPAxisTicker::TickStepStrategy::tssReadability);
+			axis->ticker()->setTickCount(20);
+			axis->setTicks(true);
+            m_plotAxis[(size_t)PlotType::Battery] = axis;
+        }
+		{
+            QCPAxis* axis = m_plot->axisRect()->addAxis(QCPAxis::atRight);
+			axis->setTickLabelFont(font);
+			axis->setLabel("Signal (%)");
+			axis->setNumberFormat("gb");
+			axis->ticker()->setTickStepStrategy(QCPAxisTicker::TickStepStrategy::tssReadability);
+			axis->ticker()->setTickCount(20);
+			axis->setTicks(true);
+            m_plotAxis[(size_t)PlotType::Signal] = axis;
+		}
 
         {
             m_plot->legend->setVisible(true);
             QFont legendFont;  // start out with MainWindow's font..
-            legendFont.setPointSize(9); // and make a bit smaller for legend
+            legendFont.setPointSize(7); // and make a bit smaller for legend
             m_plot->legend->setFont(legendFont);
             m_plot->legend->setBrush(QBrush(QColor(255, 255, 255, 230)));
             // by default, the legend is in the inset layout of the main axis rect. So this is how we access it to change legend placement:
@@ -453,27 +518,10 @@ void PlotWidget::createPlotWidgets()
         connect(m_plot, &QCustomPlot::mouseMove, this, &PlotWidget::mouseMoveEvent);
     }
 
-    if (m_ui.showTemperature->isChecked())
-    {
-        m_axisT = m_plot->yAxis;
-        m_axisT->setVisible(true);
-    }
-    else
-    {
-        m_axisT = nullptr;
-        m_plot->yAxis->setVisible(false);
-    }
-
-    if (m_ui.showHumidity->isChecked())
-    {
-        m_axisH = m_plot->yAxis2;
-        m_axisH->setVisible(true);
-    }
-    else
-    {
-        m_axisH = nullptr;
-        m_plot->yAxis2->setVisible(false);
-    }
+    m_plotAxis[(size_t)PlotType::Temperature]->setVisible(m_ui.showTemperature->isChecked());
+    m_plotAxis[(size_t)PlotType::Humidity]->setVisible(m_ui.showHumidity->isChecked());
+	m_plotAxis[(size_t)PlotType::Battery]->setVisible(m_ui.showBattery->isChecked());
+	m_plotAxis[(size_t)PlotType::Signal]->setVisible(m_ui.showSignal->isChecked());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -496,10 +544,13 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
 
     uint64_t minTS = std::numeric_limits<uint64_t>::max();
     uint64_t maxTS = std::numeric_limits<uint64_t>::lowest();
-    qreal minT = std::numeric_limits<qreal>::max();
-    qreal maxT = std::numeric_limits<qreal>::lowest();
-    qreal minH = std::numeric_limits<qreal>::max();
-    qreal maxH = std::numeric_limits<qreal>::lowest();
+
+    std::array<std::pair<qreal, qreal>, (size_t)PlotType::Count> plotMinMax;
+    for (size_t plotIndex = 0; plotIndex < plotMinMax.size(); plotIndex++)
+    {
+		plotMinMax[plotIndex].first = std::numeric_limits<qreal>::max();
+		plotMinMax[plotIndex].second = std::numeric_limits<qreal>::lowest();
+    }
 
     std::vector<DB::Measurement> measurements = m_db->getFilteredMeasurements(m_filter);
 
@@ -508,6 +559,21 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
 
     std::sort(measurements.begin(), measurements.end(), [](DB::Measurement const& a, DB::Measurement const& b) { return a.timePoint < b.timePoint; });
 
+	float measurementFrequency = 1.f;
+	if (!measurements.empty())
+	{
+		DB::SensorTimeConfig const& stc = m_db->findSensorTimeConfigForMeasurementIndex(measurements.front().descriptor.index);
+        measurementFrequency = 1.f / std::chrono::duration<float>(stc.descriptor.measurementPeriod).count();
+	}
+    float maxCutoffFrequency = measurementFrequency / 3.f;
+    std::array<float, (size_t)PlotType::Count> plotCutoffFrequencies = 
+    { 
+        std::min(maxCutoffFrequency, 1.f / (60.f * 10.f)), 
+        std::min(maxCutoffFrequency, 1.f / (60.f * 10.f)), 
+        std::min(maxCutoffFrequency, 1.f / (60.f * 60.f)), 
+        std::min(maxCutoffFrequency, 1.f / (60.f * 2.f)) 
+    };
+
     for (size_t i = 0; i < m_db->getSensorCount(); i++)
     {
         DB::Sensor const& sensor = m_db->getSensor(i);
@@ -515,12 +581,13 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         {
             GraphData& graphData = m_graphs[sensor.id];
             graphData.sensor = sensor;
-            graphData.temperatureLpf.setup(1, 1, 0.15f);
-            graphData.humidityLpf.setup(1, 1, 0.15f);
-            graphData.temperatureKeys.reserve(8192);
-            graphData.temperatureValues.reserve(8192);
-            graphData.humidityKeys.reserve(8192);
-            graphData.humidityValues.reserve(8192);
+			for (size_t plotIndex = 0; plotIndex < graphData.plots.size(); plotIndex++)
+			{
+				Plot& plot = graphData.plots[plotIndex];
+				plot.lpf.setup(1, measurementFrequency, plotCutoffFrequencies[plotIndex]);
+				plot.keys.reserve(8192);
+				plot.values.reserve(8192);
+			}
             graphData.lastIndex = -1;
         }
     }
@@ -541,65 +608,76 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         bool gap = graphData.lastIndex >= 0 && graphData.lastIndex + 1 != m.descriptor.index;
         graphData.lastIndex = m.descriptor.index;
 
+        for (size_t plotIndex = 0; plotIndex < graphData.plots.size(); plotIndex++)
         {
-            qreal value = m.descriptor.temperature;
+            Plot& plot = graphData.plots[plotIndex];
+            qreal value = 0;
+            switch ((PlotType)plotIndex)
+            {
+            case PlotType::Temperature: value = m.descriptor.temperature; break;
+            case PlotType::Humidity: value = m.descriptor.humidity; break;
+            case PlotType::Battery: value = utils::getBatteryLevel(m.descriptor.vcc) * 100.0; break;
+            case PlotType::Signal: value = utils::getSignalLevel(std::min(m.descriptor.signalStrength.b2s, m.descriptor.signalStrength.s2b)) * 100.0; break;
+            }
             if (m_useSmoothing)
             {
-                graphData.temperatureLpf.process(value);
+                plot.lpf.process(value);
             }
-            graphData.temperatureKeys.push_back(time);
-            graphData.temperatureValues.push_back(gap ? qQNaN() : value);
-            minT = std::min(minT, value);
-            maxT = std::max(maxT, value);
-        }
-
-        {
-            qreal value = m.descriptor.humidity;
-            if (m_useSmoothing)
-            {
-                graphData.humidityLpf.process(value);
-            }
-            graphData.humidityKeys.push_back(time);
-            graphData.humidityValues.push_back(gap ? qQNaN() : value);
-            minH = std::min(minH, value);
-            maxH = std::max(maxH, value);
+            plot.keys.push_back(time);
+            plot.values.push_back(gap ? qQNaN() : value);
+            auto& minMax = plotMinMax[plotIndex];
+            minMax.first = std::min(minMax.first, value);
+            minMax.second = std::max(minMax.second, value);
         }
     }
 
-    m_axisD->setRange(m_ui.dateTimeFilter->getFromDateTime().toTime_t(), m_ui.dateTimeFilter->getToDateTime().toTime_t());
+    m_axisDate->setRange(m_ui.dateTimeFilter->getFromDateTime().toTime_t(), m_ui.dateTimeFilter->getToDateTime().toTime_t());
 
     if (m_fitMeasurements)
     {
-        constexpr qreal minTemperatureRange = 5.0;
-        if (std::abs(maxT - minT) < minTemperatureRange)
-        {
-            qreal center = (maxT + minT) / 2.0;
-            minT = center - minTemperatureRange / 2.0;
-            maxT = center + minTemperatureRange / 2.0;
-        }
-        constexpr qreal minHumidityRange = 10.0;
-        if (std::abs(maxH - minH) < minHumidityRange)
-        {
-            qreal center = (maxH + minH) / 2.0;
-            minH = center - minHumidityRange / 2.0;
-            maxH = center + minHumidityRange / 2.0;
-        }
+		for (size_t plotIndex = 0; plotIndex < plotMinMax.size(); plotIndex++)
+		{
+            auto& minMax = plotMinMax[plotIndex];
+			if (std::abs(minMax.second - minMax.first) < k_plotMinRange[plotIndex])
+			{
+				qreal center = (minMax.first + minMax.second) / 2.0;
+                minMax.first = center - k_plotMinRange[plotIndex] / 2.0;
+                minMax.second = center + k_plotMinRange[plotIndex] / 2.0;
+			}
+		}
     }
     else
     {
-        maxT = std::max(m_ui.minTemperature->value(), m_ui.maxTemperature->value());
-        minT = std::min(m_ui.minTemperature->value(), m_ui.maxTemperature->value());
-        maxH = std::max(m_ui.minHumidity->value(), m_ui.maxHumidity->value());
-        minH = std::min(m_ui.minHumidity->value(), m_ui.maxHumidity->value());
+		{
+			auto& minMax = plotMinMax[(size_t)PlotType::Temperature];
+			minMax.first = std::min(m_ui.minTemperature->value(), m_ui.maxTemperature->value());
+			minMax.second = std::max(m_ui.minTemperature->value(), m_ui.maxTemperature->value());
+		}
+		{
+			auto& minMax = plotMinMax[(size_t)PlotType::Humidity];
+			minMax.first = std::min(m_ui.minHumidity->value(), m_ui.maxHumidity->value());
+			minMax.second = std::max(m_ui.minHumidity->value(), m_ui.maxHumidity->value());
+		}
+		{
+			auto& minMax = plotMinMax[(size_t)PlotType::Battery];
+			minMax.first = 0.0;
+			minMax.second = 100.0;
+		}
+		{
+			auto& minMax = plotMinMax[(size_t)PlotType::Signal];
+			minMax.first = 0.0;
+			minMax.second = 100.0;
+		}
     }
 
-    if (m_axisT)
+    for (size_t plotIndex = 0; plotIndex < plotMinMax.size(); plotIndex++)
     {
-        m_axisT->setRange(minT, maxT);
-    }
-    if (m_axisH)
-    {
-        m_axisH->setRange(minH, maxH);
+        QCPAxis* axis = m_plotAxis[plotIndex];
+        if (axis->visible())
+		{
+			auto& minMax = plotMinMax[plotIndex];
+			axis->setRange(minMax.first, minMax.second);
+		}
     }
 
     for (auto& pair : m_graphs)
@@ -613,36 +691,23 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
             color.setHslF(color.hueF(), color.saturationF(), 0.4);
         }
 
-        if (m_axisT)
+        for (size_t plotIndex = 0; plotIndex < graphData.plots.size(); plotIndex++)
         {
-            QCPGraph* graph = m_plot->addGraph(m_axisD, m_axisT);
-            graph->setLayer(m_graphsLayer);
-            QPen pen = graph->pen();
-            //pen.setWidth(2);
-            pen.setColor(color);
-            graph->setPen(pen);
-            graph->setName(QString("%1°C").arg(graphData.sensor.descriptor.name.c_str()));
+            Plot& plot = graphData.plots[plotIndex];
+            QCPAxis* axis = m_plotAxis[plotIndex];
 
-            QVector<double> const& keys = graphData.temperatureKeys;
-            QVector<double> const& values = graphData.temperatureValues;
-            graph->setData(keys, values);
-            graphData.temperatureGraph = graph;
-        }
-        if (m_axisH)
-        {
-            QCPGraph* graph = m_plot->addGraph(m_axisD, m_axisH);
-            graph->setLayer(m_graphsLayer);
-            QPen pen = graph->pen();
-            //pen.setWidth(2);
-            pen.setColor(color);
-            pen.setStyle(Qt::DotLine);
-            graph->setPen(pen);
-            graph->setName(QString("%1 %RH").arg(graphData.sensor.descriptor.name.c_str()));
-
-            QVector<double> const& keys = graphData.humidityKeys;
-            QVector<double> const& values = graphData.humidityValues;
-            graph->setData(keys, values);
-            graphData.humidityGraph = graph;
+            if (axis->visible())
+            {
+                QCPGraph* graph = m_plot->addGraph(m_axisDate, axis);
+                graph->setLayer(m_graphsLayer);
+                QPen pen = graph->pen();
+                pen.setColor(color);
+				pen.setStyle(k_plotPenStyles[plotIndex]);
+                graph->setPen(pen);
+                graph->setName(QString("%1 %2 (%3)").arg(graphData.sensor.descriptor.name.c_str()).arg(k_plotNames[plotIndex]).arg(k_plotUnits[plotIndex]));
+                graph->setData(plot.keys, plot.values);
+                plot.graph = graph;
+            }
         }
     }
 
@@ -809,27 +874,25 @@ void PlotWidget::showAnnotation(const QPointF& pos)
     };
 
     const GraphData* bestGraphData = nullptr;
-    bool isTemperature = false;
+    PlotType plotType = PlotType::Temperature;
     for (const auto& pair: m_graphs)
     {
         const GraphData& graphData = pair.second;
-        QCPGraph* graph = graphData.temperatureGraph;
-        if (graph && computeClosestPoint(graph, pos))
+        for (size_t plotIndex = 0; plotIndex < graphData.plots.size(); plotIndex++)
         {
-            bestGraphData = &graphData;
-            isTemperature = true;
-        }
-        graph = graphData.humidityGraph;
-        if (graph && computeClosestPoint(graph, pos))
-        {
-            bestGraphData = &graphData;
-            isTemperature = false;
+            const Plot& plot = graphData.plots[plotIndex];
+            QCPGraph* graph = plot.graph;
+            if (graph && computeClosestPoint(graph, pos))
+            {
+                bestGraphData = &graphData;
+                plotType = (PlotType)plotIndex;
+            }
         }
     }
 
     if (bestGraphData)
     {
-        createAnnotation(bestGraphData->sensor.id, QPointF(), key, value, bestGraphData->sensor, isTemperature);
+        createAnnotation(bestGraphData->sensor.id, QPointF(), key, value, bestGraphData->sensor, plotType);
     }
     else
     {
@@ -847,7 +910,7 @@ QCPGraph* PlotWidget::findAnnotationGraph(const Annotation& annotation) const
         return nullptr;
     }
     const GraphData& gd = it->second;
-    return annotation.isTemperature ? gd.temperatureGraph : gd.humidityGraph;
+    return gd.plots[(size_t)annotation.plotType].graph;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -879,14 +942,14 @@ void PlotWidget::keepAnnotation()
 
 //////////////////////////////////////////////////////////////////////////
 
-void PlotWidget::createAnnotation(DB::SensorId sensorId, QPointF point, double key, double value, DB::Sensor const& sensor, bool temperature)
+void PlotWidget::createAnnotation(DB::SensorId sensorId, QPointF point, double key, double value, DB::Sensor const& sensor, PlotType plotType)
 {
     if (m_annotation.toolTip == nullptr)
     {
         m_annotation.toolTip.reset(new PlotToolTip(m_plot, m_annotationsLayer));
     }
     m_annotation.sensorId = sensorId;
-    m_annotation.isTemperature = temperature;
+    m_annotation.plotType = plotType;
 
 	QCPGraph* graph = findAnnotationGraph(m_annotation);
     if (!graph)
@@ -897,22 +960,13 @@ void PlotWidget::createAnnotation(DB::SensorId sensorId, QPointF point, double k
     QColor color = graph->pen().color();
     QDateTime dt = QDateTime::fromSecsSinceEpoch(static_cast<int64_t>(key));
 	QString dateTimeFormatStr = utils::getQDateTimeFormatString(m_db->getGeneralSettings().dateTimeFormat);
-    if (temperature)
-    {
-        m_annotation.toolTip->setText(graph, QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Temperature: <b>%3&deg;C</b>")
-                                      .arg(sensor.descriptor.name.c_str())
-                                      .arg(dt.toString(dateTimeFormatStr))
-                                      .arg(value, 0, 'f', 1)
-                                      .arg(color.name()));
-    }
-    else
-    {
-        m_annotation.toolTip->setText(graph, QString("<p style=\"color:%4;\"><b>%1</b></p>%2<br>Humidity: <b>%3 %RH</b>")
-                                      .arg(sensor.descriptor.name.c_str())
-                                      .arg(dt.toString(dateTimeFormatStr))
-                                      .arg(value, 0, 'f', 1)
-                                      .arg(color.name()));
-    }
+    m_annotation.toolTip->setText(graph, QString("<p style=\"color:%1;\"><b>%2</b></p>%3<br>%4: <b>%5%6</b>")
+                                    .arg(color.name())
+                                    .arg(sensor.descriptor.name.c_str())
+                                    .arg(dt.toString(dateTimeFormatStr))
+                                    .arg(k_plotNames[(size_t)plotType])
+                                    .arg(value, 0, 'f', 1)
+                                    .arg(k_plotUnits[(size_t)plotType]));
 	m_annotation.toolTip->setAnchor(graph, point, key, value);
 }
 

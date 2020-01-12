@@ -26,15 +26,7 @@ static const std::string s_version = "1.0.17";
 
 Logger s_logger;
 extern std::string s_dataFolder;
-
 extern std::string k_passwordHashReferenceText;
-
-std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac)
-{
-    char macStr[128];
-    sprintf(macStr, "%X:%X:%X:%X:%X:%X", mac[0]&0xFF, mac[1]&0xFF, mac[2]&0xFF, mac[3]&0xFF, mac[4]&0xFF, mac[5]&0xFF);
-    return macStr;
-}
 
 //////////////////////////////////////////////////////////////////////////
 

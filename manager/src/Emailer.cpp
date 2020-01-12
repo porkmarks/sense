@@ -225,17 +225,17 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
 		{
 			highHumidityStr = QString(R"X(&nbsp;|&nbsp;<span style="color: #f37736;">%1</span>&nbsp;|&nbsp;<span style="color: #ff2015;">%2</span>)X").arg(alarm.descriptor.highHumiditySoft, 0, 'f', 1).arg(alarm.descriptor.highHumidityHard, 0, 'f', 1);
 		}
-		email.body += QString(R"X(<p><strong>Humidity Thresholds</strong><strong>&nbsp;(&deg;C):&nbsp;</strong>%1<span style="color: #339966;">OK</span>%2</p>)X").arg(lowHumidityStr).arg(highHumidityStr).toUtf8().data();
+		email.body += QString(R"X(<p><strong>Humidity Thresholds</strong><strong>&nbsp;(%RH):&nbsp;</strong>%1<span style="color: #339966;">OK</span>%2</p>)X").arg(lowHumidityStr).arg(highHumidityStr).toUtf8().data();
 	}
     if (alarm.descriptor.lowVccWatch)
 	{
-		email.body += QString(R"X(<p><strong>Battery Threshold</strong><strong>&nbsp;(%):&nbsp;</strong><strong><span style="color: #339966;">OK</span>&nbsp;|&nbsp;<span style="color: #ff2015;">%1</span></strong></p>)X")
+		email.body += QString(R"X(<p><strong>Battery Threshold</strong><strong>&nbsp;(%):&nbsp;</strong><strong><span style="color: #ff2015;">%1</span>&nbsp;|&nbsp;<span style="color: #339966;">OK</span></strong></p>)X")
             .arg(static_cast<int>(m_db.getSensorSettings().alertBatteryLevel * 100.f))
             .toUtf8().data();
 	}
 	if (alarm.descriptor.lowSignalWatch)
 	{
-		email.body += QString(R"X(<p><strong>Signal Strength Threshold</strong><strong>&nbsp;(%):&nbsp;</strong><strong><span style="color: #339966;">OK</span>&nbsp;|&nbsp;<span style="color: #ff2015;">%1</span></strong></p>)X")
+		email.body += QString(R"X(<p><strong>Signal Strength Threshold</strong><strong>&nbsp;(%):&nbsp;</strong><strong><span style="color: #ff2015;">%1</span>&nbsp;|&nbsp;<span style="color: #339966;">OK</span></strong></p>)X")
 			.arg(static_cast<int>(m_db.getSensorSettings().alertSignalStrengthLevel * 100.f))
 			.toUtf8().data();
 	}
@@ -305,7 +305,7 @@ void Emailer::sendAlarmRetriggerEmail(DB::Alarm const& alarm)
 	
 	email.settings = m_db.getEmailSettings();
 
-	s_logger.logInfo(QString("Sending alarm email'"));
+	s_logger.logInfo(QString("Sending alarm retrigger email"));
 
 	sendEmail(email);
 }
