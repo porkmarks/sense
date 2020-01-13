@@ -241,6 +241,7 @@ QHostAddress Comms::getBaseStationAddress(Mac const& mac) const
 
 void Comms::sendEmptySensorResponse(InitializedBaseStation& cbs, SensorRequest const& request)
 {
+    Q_ASSERT(request.version == data::sensor::v1::k_version);
     std::array<uint8_t, 1024> buffer;
     size_t offset = 0;
     pack(buffer, request.reqId, offset);
@@ -263,12 +264,14 @@ void Comms::sendPing(Comms::InitializedBaseStation& cbs)
 //////////////////////////////////////////////////////////////////////////
 
 template <typename T>
-void Comms::sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Type type, Radio::Address address, T const& payload)
+void Comms::sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::v1::Type type, Radio::Address address, T const& payload)
 {
+    Q_ASSERT(request.version == data::sensor::v1::k_version);
     std::array<uint8_t, 1024> buffer;
     size_t offset = 0;
     pack(buffer, request.reqId, offset);
     pack(buffer, true, offset);
+    pack(buffer, request.version, offset);
     pack(buffer, type, offset);
     pack(buffer, address, offset);
     pack(buffer, static_cast<uint32_t>(sizeof(T)), offset);
@@ -328,6 +331,7 @@ void Comms::processSensorReq(InitializedBaseStation& cbs)
     uint32_t payload_size = 0;
     ok &= unpack(buffer, request.reqId, offset, maxSize);
     ok &= unpack(buffer, request.signalS2B, offset, maxSize);
+    ok &= unpack(buffer, request.version, offset, maxSize);
     ok &= unpack(buffer, request.type, offset, maxSize);
     ok &= unpack(buffer, request.address, offset, maxSize);
     ok &= unpack(buffer, payload_size, offset, maxSize);
@@ -372,41 +376,49 @@ void Comms::processRevertedRadioStateToNormal(InitializedBaseStation& cbs)
 
 void Comms::processSensorReq(InitializedBaseStation& cbs, SensorRequest const& request)
 {
-    switch (static_cast<data::sensor::Type>(request.type))
+    if (request.version == data::sensor::v1::k_version)
+	{
+		switch (static_cast<data::sensor::v1::Type>(request.type))
+		{
+		case data::sensor::v1::Type::MEASUREMENT_BATCH_REQUEST:
+			if (request.payload.size() == sizeof(data::sensor::v1::Measurement_Batch_Request))
+			{
+				processSensorReq_MeasurementBatch(cbs, request, *reinterpret_cast<data::sensor::v1::Measurement_Batch_Request const*>(request.payload.data()));
+			}
+			break;
+		case data::sensor::v1::Type::CONFIG_REQUEST:
+			if (request.payload.size() == sizeof(data::sensor::v1::Config_Request))
+			{
+				processSensorReq_ConfigRequest(cbs, request, *reinterpret_cast<data::sensor::v1::Config_Request const*>(request.payload.data()));
+			}
+			break;
+		case data::sensor::v1::Type::FIRST_CONFIG_REQUEST:
+			if (request.payload.size() == sizeof(data::sensor::v1::First_Config_Request))
+			{
+				processSensorReq_FirstConfigRequest(cbs, request, *reinterpret_cast<data::sensor::v1::First_Config_Request const*>(request.payload.data()));
+			}
+			break;
+		case data::sensor::v1::Type::PAIR_REQUEST:
+			if (request.payload.size() == sizeof(data::sensor::v1::Pair_Request))
+			{
+				processSensorReq_PairRequest(cbs, request, *reinterpret_cast<data::sensor::v1::Pair_Request const*>(request.payload.data()));
+			}
+			break;
+		default:
+			std::cerr << "Invalid sensor request: " << int(request.type) << std::endl;
+			s_logger.logCritical(QString("Invalid sensor request: %1").arg(request.type));
+			break;
+		}
+	}
+    else
     {
-    case data::sensor::Type::MEASUREMENT_BATCH_REQUEST:
-        if (request.payload.size() == sizeof(data::sensor::Measurement_Batch_Request))
-        {
-            processSensorReq_MeasurementBatch(cbs, request, *reinterpret_cast<data::sensor::Measurement_Batch_Request const*>(request.payload.data()));
-        }
-        break;
-    case data::sensor::Type::CONFIG_REQUEST:
-        if (request.payload.size() == sizeof(data::sensor::Config_Request))
-        {
-            processSensorReq_ConfigRequest(cbs, request, *reinterpret_cast<data::sensor::Config_Request const*>(request.payload.data()));
-        }
-        break;
-    case data::sensor::Type::FIRST_CONFIG_REQUEST:
-        if (request.payload.size() == sizeof(data::sensor::First_Config_Request))
-        {
-            processSensorReq_FirstConfigRequest(cbs, request, *reinterpret_cast<data::sensor::First_Config_Request const*>(request.payload.data()));
-        }
-        break;
-    case data::sensor::Type::PAIR_REQUEST:
-        if (request.payload.size() == sizeof(data::sensor::Pair_Request))
-        {
-            processSensorReq_PairRequest(cbs, request, *reinterpret_cast<data::sensor::Pair_Request const*>(request.payload.data()));
-        }
-        break;
-    default:
-        std::cerr << "Invalid sensor request: " << int(request.type) << std::endl;
-        s_logger.logCritical(QString("Invalid sensor request: %1").arg(request.type));
-        break;
+		std::cerr << "Invalid sensor protocol version: " << int(request.version) << std::endl;
+		s_logger.logCritical(QString("Invalid sensor protocol version: %1").arg(int(request.version)));
     }
 }
 
 
-static void fillConfig(data::sensor::Config_Response& config, DB::SensorSettings const& sensorSettings, DB::Sensor const& sensor, DB::SensorOutputDetails const& sensorOutputDetails, DB::Sensor::Calibration const& reportedCalibration)
+static void fillConfig(data::sensor::v1::Config_Response& config, DB::SensorSettings const& sensorSettings, DB::Sensor const& sensor, DB::SensorOutputDetails const& sensorOutputDetails, DB::Sensor::Calibration const& reportedCalibration)
 {
     DB::Clock::time_point now = DB::Clock::now();
 
@@ -431,7 +443,7 @@ static void fillConfig(data::sensor::Config_Response& config, DB::SensorSettings
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Measurement_Batch_Request const& measurementBatch)
+void Comms::processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::v1::Measurement_Batch_Request const& measurementBatch)
 {
     int32_t sensorIndex = cbs.db.findSensorIndexByAddress(request.address);
     if (sensorIndex < 0)
@@ -443,18 +455,18 @@ void Comms::processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, Senso
     DB::Sensor const& sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
 
     std::vector<DB::MeasurementDescriptor> measurements;
-    uint32_t count = std::min<uint32_t>(measurementBatch.count, data::sensor::Measurement_Batch_Request::MAX_COUNT);
+    uint32_t count = std::min<uint32_t>(measurementBatch.count, data::sensor::v1::Measurement_Batch_Request::MAX_COUNT);
     measurements.reserve(count);
 
     for (uint32_t i = 0; i < count; i++)
     {
-        data::sensor::Measurement const& m = measurementBatch.measurements[i];
+        data::sensor::v1::Measurement const& m = measurementBatch.measurements[i];
         DB::MeasurementDescriptor d;
         d.index = measurementBatch.start_index + i;
         d.sensorId = sensor.id;
         d.signalStrength.b2s = sensor.lastSignalStrengthB2S;
         d.signalStrength.s2b = request.signalS2B;
-        d.vcc = data::sensor::unpack_qvcc(measurementBatch.qvcc);
+        d.vcc = data::sensor::v1::unpack_qvcc(measurementBatch.qvcc);
         m.unpack(d.humidity, d.temperature);
         measurements.push_back(d);
     }
@@ -464,7 +476,7 @@ void Comms::processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, Senso
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::SensorInputDetails Comms::createSensorInputDetails(DB::Sensor const& sensor, data::sensor::Config_Request const& configRequest) const
+DB::SensorInputDetails Comms::createSensorInputDetails(DB::Sensor const& sensor, data::sensor::v1::Config_Request const& configRequest) const
 {
     DB::SensorInputDetails details;
     details.id = sensor.id;
@@ -474,7 +486,7 @@ DB::SensorInputDetails Comms::createSensorInputDetails(DB::Sensor const& sensor,
     details.storedMeasurementCount = configRequest.measurement_count;
 
     details.hasSignalStrength = true;
-    details.signalStrengthB2S = data::sensor::unpack_qss(configRequest.b2s_qss);
+    details.signalStrengthB2S = data::sensor::v1::unpack_qss(configRequest.b2s_qss);
 
     details.hasSleepingData = true;
     details.sleeping = configRequest.sleeping;
@@ -484,22 +496,22 @@ DB::SensorInputDetails Comms::createSensorInputDetails(DB::Sensor const& sensor,
 
     details.hasMeasurement = true;
     configRequest.measurement.unpack(details.measurementHumidity, details.measurementTemperature);
-    details.measurementVcc = data::sensor::unpack_qvcc(configRequest.qvcc);
+    details.measurementVcc = data::sensor::v1::unpack_qvcc(configRequest.qvcc);
 
     details.hasErrorCountersDelta = true;
     details.errorCountersDelta.commsFailures = configRequest.comms_errors;
-    details.errorCountersDelta.resetReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_RESET)) ? 1 : 0;
-    details.errorCountersDelta.unknownReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_UNKNOWN)) ? 1 : 0;
-    details.errorCountersDelta.brownoutReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_BROWNOUT)) ? 1 : 0;
-    details.errorCountersDelta.powerOnReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_POWER_ON)) ? 1 : 0;
-    details.errorCountersDelta.watchdogReboots = (configRequest.reboot_flags & int(data::sensor::Reboot_Flag::REBOOT_WATCHDOG)) ? 1 : 0;
+    details.errorCountersDelta.resetReboots = (configRequest.reboot_flags & int(data::sensor::v1::Reboot_Flag::REBOOT_RESET)) ? 1 : 0;
+    details.errorCountersDelta.unknownReboots = (configRequest.reboot_flags & int(data::sensor::v1::Reboot_Flag::REBOOT_UNKNOWN)) ? 1 : 0;
+    details.errorCountersDelta.brownoutReboots = (configRequest.reboot_flags & int(data::sensor::v1::Reboot_Flag::REBOOT_BROWNOUT)) ? 1 : 0;
+    details.errorCountersDelta.powerOnReboots = (configRequest.reboot_flags & int(data::sensor::v1::Reboot_Flag::REBOOT_POWER_ON)) ? 1 : 0;
+    details.errorCountersDelta.watchdogReboots = (configRequest.reboot_flags & int(data::sensor::v1::Reboot_Flag::REBOOT_WATCHDOG)) ? 1 : 0;
 
     return details;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processSensorReq_ConfigRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Config_Request const& configRequest)
+void Comms::processSensorReq_ConfigRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::v1::Config_Request const& configRequest)
 {
     int32_t sensorIndex = cbs.db.findSensorIndexByAddress(request.address);
     if (sensorIndex < 0)
@@ -519,17 +531,17 @@ void Comms::processSensorReq_ConfigRequest(InitializedBaseStation& cbs, SensorRe
     DB::Sensor::Calibration reportedCalibration{ static_cast<float>(configRequest.calibration.temperature_bias) / 100.f,
                 static_cast<float>(configRequest.calibration.humidity_bias) / 100.f};
 
-    data::sensor::Config_Response response;
+    data::sensor::v1::Config_Response response;
 	fillConfig(response, sensorSettings, sensor, outputDetails, reportedCalibration);
 
-    sendSensorResponse(cbs, request, data::sensor::Type::CONFIG_RESPONSE, request.address, response);
+    sendSensorResponse(cbs, request, data::sensor::v1::Type::CONFIG_RESPONSE, request.address, response);
 
     std::cout << "Received Config Request" << std::endl;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::First_Config_Request const& firstConfigRequest)
+void Comms::processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::v1::First_Config_Request const& firstConfigRequest)
 {
     int32_t sensorIndex = cbs.db.findSensorIndexByAddress(request.address);
     if (sensorIndex < 0)
@@ -541,7 +553,7 @@ void Comms::processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, Sen
 
     DB::Sensor const& sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
 
-    data::sensor::First_Config_Response response;
+    data::sensor::v1::First_Config_Response response;
 
     {
         DB::SensorOutputDetails outputDetails = cbs.db.computeSensorOutputDetails(sensor.id);
@@ -567,14 +579,14 @@ void Comms::processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, Sen
 		fillConfig(response, sensorSettings, sensor, outputDetails, sensor.calibration);
     }
 
-    sendSensorResponse(cbs, request, data::sensor::Type::FIRST_CONFIG_RESPONSE, request.address, response);
+    sendSensorResponse(cbs, request, data::sensor::v1::Type::FIRST_CONFIG_RESPONSE, request.address, response);
 
     std::cout << "Received First Config Request" << std::endl;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Pair_Request const& pairRequest)
+void Comms::processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::v1::Pair_Request const& pairRequest)
 {
     DB::Sensor::Calibration calibration;
     calibration.temperatureBias = static_cast<float>(pairRequest.calibration.temperature_bias) / 100.f;
@@ -603,9 +615,9 @@ void Comms::processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequ
 
     DB::Sensor const& sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
 
-    data::sensor::Pair_Response response;
+    data::sensor::v1::Pair_Response response;
     response.address = sensor.address;
-    sendSensorResponse(cbs, request, data::sensor::Type::PAIR_RESPONSE, request.address, response);
+    sendSensorResponse(cbs, request, data::sensor::v1::Type::PAIR_RESPONSE, request.address, response);
 
     //switch back to normal state
     changeToRadioState(cbs, data::Radio_State::NORMAL);

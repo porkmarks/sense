@@ -14,11 +14,25 @@ public:
 #endif
     struct Header
     {
-        uint8_t type = 0;
-        uint16_t req_id : 15;
-        uint16_t needs_response : 1;
-        Address source_address = BROADCAST_ADDRESS;
-        Address destination_address = BROADCAST_ADDRESS;
+        static const uint8_t k_internal_version = 1;
+        
+        static const uint32_t k_max_internal_version = uint32_t(1) << 3;
+        uint32_t internal_version : 3;
+
+		    static const uint32_t k_max_user_version = uint32_t(1) << 4;
+		    uint32_t user_version : 4;
+
+        static const uint32_t k_max_user_type = uint32_t(1) << 5;
+        uint32_t user_type : 5;
+        
+        static const uint32_t k_max_req_id = uint32_t(1) << 16;
+        uint32_t req_id : 16;
+        
+        uint32_t needs_response : 1;
+        
+        static const uint32_t k_max_address = uint32_t(1) << 14;
+        uint32_t source_address : 14;
+        uint32_t destination_address : 14;
         uint32_t crc;
     };
 
@@ -26,10 +40,12 @@ public:
 #   pragma pack(pop)
 #endif
 
+    static_assert(sizeof(Header) == 12, "Invalid header size");
+
     Radio();
 
     static constexpr Address BROADCAST_ADDRESS = 0;
-    static constexpr Address BASE_ADDRESS = 0xFFFFUL;
+    static constexpr Address BASE_ADDRESS = Header::k_max_address - 1;
 
     static constexpr Address PAIR_ADDRESS_BEGIN = BROADCAST_ADDRESS + 1;
     static constexpr Address PAIR_ADDRESS_END = PAIR_ADDRESS_BEGIN + 1000;
@@ -54,7 +70,7 @@ public:
 
     void* get_tx_packet_payload(uint8_t* raw_buffer) const;
 
-    uint8_t begin_packet(uint8_t* raw_buffer, uint8_t type, bool needs_response);
+    uint8_t begin_packet(uint8_t* raw_buffer, uint8_t user_version, uint8_t user_type, bool needs_response);
 
     uint8_t pack(uint8_t* raw_buffer, const void* data, uint8_t size);
 
@@ -70,7 +86,8 @@ public:
     int16_t get_input_dBm();
     int16_t get_last_input_dBm();
     Address get_rx_packet_source_address(uint8_t* received_buffer) const;
-    uint8_t get_rx_packet_type(uint8_t* received_buffer) const;
+    uint8_t get_rx_packet_user_version(uint8_t* received_buffer) const;
+    uint8_t get_rx_packet_user_type(uint8_t* received_buffer) const;
     bool get_rx_packet_needs_response(uint8_t* received_buffer) const;
     const void* get_rx_packet_payload(uint8_t* received_buffer) const;
 

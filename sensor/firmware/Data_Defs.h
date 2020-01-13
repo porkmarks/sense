@@ -8,17 +8,19 @@ namespace data
 {
 namespace sensor
 {
+namespace v1
+{
+static const uint8_t k_version = 1;
 
 enum class Type : uint8_t
 {
-    /*  0 */ ACK,
-    /*  1 */ MEASUREMENT_BATCH_REQUEST,
-    /*  2 */ PAIR_REQUEST,
-    /*  3 */ PAIR_RESPONSE,
-    /*  4 */ CONFIG_REQUEST,
-    /*  5 */ CONFIG_RESPONSE,
-    /*  6 */ FIRST_CONFIG_REQUEST,
-    /*  7 */ FIRST_CONFIG_RESPONSE,
+    /*  0 */ MEASUREMENT_BATCH_REQUEST,
+    /*  1 */ PAIR_REQUEST,
+    /*  2 */ PAIR_RESPONSE,
+    /*  3 */ CONFIG_REQUEST,
+    /*  4 */ CONFIG_RESPONSE,
+    /*  5 */ FIRST_CONFIG_REQUEST,
+    /*  6 */ FIRST_CONFIG_RESPONSE,
 };
 
 
@@ -40,7 +42,7 @@ struct Measurement
         temperature = static_cast<float>(this->qtemperature) / 327.f;
     }
 
-//packed data
+    //packed data
     uint16_t qhumidity = 0; //*655
     int16_t qtemperature = 0; //*327
 };
@@ -62,7 +64,7 @@ inline float unpack_qvcc(QVCC qvcc)
 
 struct QSS //signal strength
 {
-	uint8_t value;
+    uint8_t value;
 };
 inline QSS pack_qss(int16_t ss) //signal strength
 {
@@ -72,7 +74,7 @@ inline QSS pack_qss(int16_t ss) //signal strength
 }
 inline int16_t unpack_qss(QSS qss)
 {
-	return static_cast<int16_t>(qss.value) - 200;
+    return static_cast<int16_t>(qss.value) - int16_t(200);
 }
 
 struct Measurement_Batch_Request
@@ -100,10 +102,10 @@ static_assert(sizeof(Calibration) == 20, "");
 enum class Reboot_Flag : uint8_t
 {
     REBOOT_POWER_ON = 1 << 0,
-    REBOOT_RESET    = 1 << 1,
+    REBOOT_RESET = 1 << 1,
     REBOOT_BROWNOUT = 1 << 2,
     REBOOT_WATCHDOG = 1 << 3,
-    REBOOT_UNKNOWN  = 1 << 4,
+    REBOOT_UNKNOWN = 1 << 4,
 };
 
 struct Config_Request
@@ -177,6 +179,8 @@ static_assert(sizeof(Pair_Response) == 4, "");
 #   pragma pack(pop)
 #endif
 }
+} //v1
+
 
 enum class Server_Message : uint8_t
 {

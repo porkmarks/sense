@@ -12,7 +12,7 @@ struct Settings
 struct Stable_Settings
 {
     uint32_t serial_number = 0;
-    data::sensor::Calibration calibration;
+    data::sensor::v1::Calibration calibration;
     uint8_t vref = 110; //*100
 };
 

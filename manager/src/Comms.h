@@ -91,6 +91,7 @@ private:
 
     struct SensorRequest
     {
+        uint8_t version = data::sensor::v1::k_version;
         uint32_t reqId = 0;
         int16_t signalS2B = 0;
         uint8_t type = 0;
@@ -100,18 +101,18 @@ private:
 
     void sendEmptySensorResponse(InitializedBaseStation& cbs, SensorRequest const& request);
     template <typename T>
-    void sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Type type, Radio::Address address, T const& payload);
+    void sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::v1::Type type, Radio::Address address, T const& payload);
 
-    DB::SensorInputDetails createSensorInputDetails(DB::Sensor const& sensor, data::sensor::Config_Request const& configRequest) const;
+    DB::SensorInputDetails createSensorInputDetails(DB::Sensor const& sensor, data::sensor::v1::Config_Request const& configRequest) const;
 
     void sendPing(InitializedBaseStation& cbs);
     void processPong(InitializedBaseStation& cbs);
     void processSensorReq(InitializedBaseStation& cbs);
     void processSensorReq(InitializedBaseStation& cbs, SensorRequest const& request);
-    void processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Measurement_Batch_Request const& payload);
-    void processSensorReq_ConfigRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Config_Request const& payload);
-    void processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::First_Config_Request const& payload);
-    void processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::Pair_Request const& payload);
+    void processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::v1::Measurement_Batch_Request const& payload);
+    void processSensorReq_ConfigRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::v1::Config_Request const& payload);
+    void processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::v1::First_Config_Request const& payload);
+    void processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::v1::Pair_Request const& payload);
     void processRevertedRadioStateToNormal(InitializedBaseStation& cbs);
 
     QUdpSocket m_broadcastSocket;

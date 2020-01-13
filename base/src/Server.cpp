@@ -340,7 +340,8 @@ void Server::radio_thread_func()
                 m_radio.stop_async_receive();
                 m_leds.set_color(LEDs::Color::Yellow);
 
-                request.type = m_radio.get_rx_packet_type(packet_data);
+                request.version = m_radio.get_rx_packet_user_version(packet_data);
+                request.type = m_radio.get_rx_packet_user_type(packet_data);
                 request.signal_s2b = m_radio.get_input_dBm();
                 request.address = m_radio.get_rx_packet_source_address(packet_data);
                 request.needs_response = m_radio.get_rx_packet_needs_response(packet_data);
@@ -374,7 +375,7 @@ void Server::radio_thread_func()
                             {
                                 LOGI << "\tdone. Sending response back..." << std::endl;
                                 m_radio.set_destination_address(response.address);
-                                m_radio.begin_packet(raw_packet_data.data(), response.type, false);
+                                m_radio.begin_packet(raw_packet_data.data(), response.version, response.type, false);
                                 if (!response.payload.empty())
                                 {
                                     m_radio.pack(raw_packet_data.data(), response.payload.data(), static_cast<uint8_t>(response.payload.size()));
@@ -459,6 +460,7 @@ Server::Result Server::send_sensor_message(Sensor_Request const& request, Sensor
     uint32_t req_id = m_last_request_id++;
     pack(buffer, req_id, offset);
     pack(buffer, request.signal_s2b, offset);
+    pack(buffer, request.version, offset);
     pack(buffer, request.type, offset);
     pack(buffer, request.address, offset);
     pack(buffer, static_cast<uint32_t>(request.payload.size()), offset);
@@ -492,6 +494,7 @@ Server::Result Server::send_sensor_message(Sensor_Request const& request, Sensor
         }
 
         uint32_t payload_size = 0;
+        ok &= unpack(buffer, response.version, offset);
         ok &= unpack(buffer, response.type, offset);
         ok &= unpack(buffer, response.address, offset);
         ok &= unpack(buffer, payload_size, offset);

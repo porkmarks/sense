@@ -53,7 +53,7 @@ bool Radio::init(uint8_t retries, int8_t power_dBm)
         {
             break;
         }
-        LOG(PSTR("Try failed %d: %d\n"), int(i), state);
+        LOG(PSTR("Try fld %d:%d\n"), int(i), state);
         chrono::delay(chrono::millis(500));
     }
 
@@ -115,16 +115,17 @@ void Radio::set_destination_address(Address address)
     m_destination_address = address;
 }
 
-uint8_t Radio::begin_packet(uint8_t* raw_buffer, uint8_t type, bool needs_response)
+uint8_t Radio::begin_packet(uint8_t* raw_buffer, uint8_t user_version, uint8_t user_type, bool needs_response)
 {
     Header* header_ptr = reinterpret_cast<Header*>(raw_buffer);
-    header_ptr->type = type;
-    header_ptr->source_address = m_address;
-    header_ptr->destination_address = m_destination_address;
-    header_ptr->req_id = ++m_last_req_id;
+    memset(header_ptr, 0, sizeof(Header));
+    header_ptr->internal_version = Header::k_internal_version;
+    header_ptr->user_version = user_version & (Header::k_max_user_version - 1);
+    header_ptr->user_type = user_type & (Header::k_max_user_type - 1);
+    header_ptr->req_id = (++m_last_req_id) & (Header::k_max_req_id - 1);
     header_ptr->needs_response = needs_response ? 1 : 0;
-    header_ptr->crc = 0;
-
+    header_ptr->source_address = m_address & (Header::k_max_address - 1);
+    header_ptr->destination_address = m_destination_address & (Header::k_max_address - 1);
     m_offset = 0;
     return MAX_USER_DATA_SIZE;
 }
@@ -150,7 +151,7 @@ bool Radio::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload
 {
     if (!data || size <= sizeof(Header))
     {
-        LOG(PSTR("null/size\n"));
+        LOG(PSTR("null sz\n"));
         return false;
     }
 
@@ -159,9 +160,15 @@ bool Radio::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload
     //insufficient data?
     if (size < sizeof(Header) + desired_payload_size)
     {
-        LOG(PSTR("insuf data: %d<%d, type %d\n"), (int)size, (int)(sizeof(Header) + desired_payload_size), (int)header_ptr->type);
+        LOG(PSTR("ins dt:%d<%d,ut%d\n"), (int)size, (int)(sizeof(Header) + desired_payload_size), (int)header_ptr->user_type);
         return false;
     }
+
+	if (header_ptr->internal_version != Header::k_internal_version)
+	{
+		LOG(PSTR("wrg ver:%d!=%d\n"), (int)header_ptr->internal_version, (int)Header::k_internal_version);
+		return false;
+	}
 
     uint32_t crc = header_ptr->crc;
 
@@ -172,18 +179,18 @@ bool Radio::validate_packet(uint8_t* data, uint8_t size, uint8_t desired_payload
     uint32_t computed_crc = crc32(data, size);
     if (crc != computed_crc)
     {
-        LOG(PSTR("crc %lu/%lu, type %d\n"), crc, computed_crc, (int)header_ptr->type);
+        LOG(PSTR("crc:%lu/%lu,ut%d\n"), crc, computed_crc, (int)header_ptr->user_type);
         return false;
     }
 
     //not addressed to me?
     if (header_ptr->destination_address != m_address && header_ptr->destination_address != BROADCAST_ADDRESS)
     {
-        LOG(PSTR("notForMe %d != %d\n"), (int)header_ptr->destination_address, (int)m_address);
+        LOG(PSTR("wrg addr:%d!=%d\n"), (int)header_ptr->destination_address, (int)m_address);
         return false;
     }
 
-    //LOG(PSTR("received packet %d, size %d\n"), (int)header_ptr->type, (int)size);
+    //LOG(PSTR("received packet %d, size %d\n"), (int)header_ptr->user_type, (int)size);
 
     return true;
 }
@@ -223,7 +230,7 @@ bool Radio::send_packet(uint8_t* raw_buffer, uint8_t packet_size, bool _wait_min
     {
         return true;
     }
-    LOG(PSTR("txerr %d\n"), (int)state);
+    LOG(PSTR("txerr%d\n"), (int)state);
     return false;
 }
 
@@ -233,20 +240,19 @@ uint8_t* Radio::receive_packet(uint8_t* raw_buffer, uint8_t& packet_size, chrono
     do
     {
 //        LOG(PSTR("RP re\n"));
-        uint8_t size = sizeof(Header) + packet_size;
+        uint8_t size = uint8_t(sizeof(Header) + packet_size);
         if (m_lora.receive(raw_buffer, size, timeout) == ERR_NONE && size > sizeof(Header))
         {
             int16_t rssi = m_lora.getRSSI();
             auto_sleep();
             chrono::time_ms receive_tp = chrono::now();
-            Header* header_ptr = reinterpret_cast<Header*>(raw_buffer);
             if (validate_packet(raw_buffer, size, 0))
             {
 //                LOG(PSTR("RP se done\n"));
 
                 m_last_rssi = rssi;
                 m_last_receive_time_point = chrono::now();
-                packet_size = size - sizeof(Header);
+                packet_size = uint8_t(size - sizeof(Header));
                 return raw_buffer;
             }
             else
@@ -270,11 +276,11 @@ bool Radio::start_async_receive()
 uint8_t* Radio::async_receive_packet(uint8_t* raw_buffer, uint8_t& packet_size)
 {
     bool gotIt = false;
-    uint8_t size = sizeof(Header) + packet_size;
+    uint8_t size = uint8_t(sizeof(Header) + packet_size);
     int8_t state = m_lora.getReceivedPackage(raw_buffer, size, gotIt);
     if (state != ERR_NONE)
     {
-        LOG(PSTR("rxerr %d\n"), (int)state);
+        LOG(PSTR("rxerr%d\n"), (int)state);
         return nullptr;
     }
 
@@ -284,13 +290,12 @@ uint8_t* Radio::async_receive_packet(uint8_t* raw_buffer, uint8_t& packet_size)
     }
 
     chrono::time_ms receive_tp = chrono::now();
-    Header* header_ptr = reinterpret_cast<Header*>(raw_buffer);
     if (validate_packet(raw_buffer, size, 0))
     {
 //                LOG(PSTR("RP se done\n"));
 
         m_last_receive_time_point = chrono::now();
-        packet_size = size - sizeof(Header);
+        packet_size = uint8_t(size - sizeof(Header));
         m_last_rssi = m_lora.getRSSI();
         stop_async_receive();
         return raw_buffer;
@@ -309,10 +314,15 @@ void Radio::stop_async_receive()
     auto_sleep();    
 }
 
-uint8_t Radio::get_rx_packet_type(uint8_t* received_buffer) const
+uint8_t Radio::get_rx_packet_user_version(uint8_t* received_buffer) const
 {
     const Header* header_ptr = reinterpret_cast<const Header*>(received_buffer);
-    return header_ptr->type;
+    return header_ptr->user_version;
+}
+uint8_t Radio::get_rx_packet_user_type(uint8_t* received_buffer) const
+{
+	const Header* header_ptr = reinterpret_cast<const Header*>(received_buffer);
+	return header_ptr->user_type;
 }
 bool Radio::get_rx_packet_needs_response(uint8_t* received_buffer) const
 {
