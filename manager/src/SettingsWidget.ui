@@ -29,7 +29,7 @@
    <item>
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="generalTab">
       <attribute name="icon">
@@ -93,7 +93,7 @@
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="csvTab">
+     <widget class="CsvSettingsWidget" name="csvTab">
       <attribute name="icon">
        <iconset resource="../res/res.qrc">
         <normaloff>:/icons/ui/export.png</normaloff>:/icons/ui/export.png</iconset>
@@ -101,7 +101,7 @@
       <attribute name="title">
        <string>CSV Format</string>
       </attribute>
-      <layout class="QVBoxLayout" name="verticalLayout_2" stretch="0,100">
+      <layout class="QVBoxLayout" name="verticalLayout_2">
        <property name="leftMargin">
         <number>6</number>
        </property>
@@ -114,316 +114,6 @@
        <property name="bottomMargin">
         <number>6</number>
        </property>
-       <item>
-        <widget class="QWidget" name="widget_12" native="true">
-         <layout class="QHBoxLayout" name="horizontalLayout_2">
-          <property name="leftMargin">
-           <number>0</number>
-          </property>
-          <property name="topMargin">
-           <number>6</number>
-          </property>
-          <property name="rightMargin">
-           <number>0</number>
-          </property>
-          <property name="bottomMargin">
-           <number>6</number>
-          </property>
-          <item>
-           <widget class="QGroupBox" name="groupBox_3">
-            <property name="title">
-             <string>Fields</string>
-            </property>
-            <layout class="QGridLayout" name="gridLayout_6">
-             <item row="4" column="0">
-              <widget class="QCheckBox" name="csvExportBattery">
-               <property name="text">
-                <string>Battery</string>
-               </property>
-               <property name="icon">
-                <iconset resource="../res/res.qrc">
-                 <normaloff>:/icons/ui/battery-80.png</normaloff>:/icons/ui/battery-80.png</iconset>
-               </property>
-               <property name="checked">
-                <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="0">
-              <widget class="QCheckBox" name="csvExportSensorName">
-               <property name="text">
-                <string>Sensor Name</string>
-               </property>
-               <property name="icon">
-                <iconset resource="../res/res.qrc">
-                 <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
-               </property>
-               <property name="checked">
-                <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-             <item row="0" column="0">
-              <widget class="QCheckBox" name="csvExportId">
-               <property name="text">
-                <string>Id</string>
-               </property>
-               <property name="icon">
-                <iconset resource="../res/res.qrc">
-                 <normaloff>:/icons/ui/arrow-right.png</normaloff>:/icons/ui/arrow-right.png</iconset>
-               </property>
-               <property name="checked">
-                <bool>false</bool>
-               </property>
-              </widget>
-             </item>
-             <item row="3" column="1">
-              <widget class="QCheckBox" name="csvExportHumidity">
-               <property name="text">
-                <string>Humidity</string>
-               </property>
-               <property name="icon">
-                <iconset resource="../res/res.qrc">
-                 <normaloff>:/icons/ui/humidity.png</normaloff>:/icons/ui/humidity.png</iconset>
-               </property>
-               <property name="checked">
-                <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="1">
-              <widget class="QCheckBox" name="csvExportSensorSN">
-               <property name="text">
-                <string>Sensor S/N</string>
-               </property>
-               <property name="icon">
-                <iconset resource="../res/res.qrc">
-                 <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
-               </property>
-              </widget>
-             </item>
-             <item row="0" column="1">
-              <widget class="QCheckBox" name="csvExportIndex">
-               <property name="text">
-                <string>Index</string>
-               </property>
-               <property name="icon">
-                <iconset resource="../res/res.qrc">
-                 <normaloff>:/icons/ui/arrow-right.png</normaloff>:/icons/ui/arrow-right.png</iconset>
-               </property>
-               <property name="checked">
-                <bool>false</bool>
-               </property>
-              </widget>
-             </item>
-             <item row="3" column="0">
-              <widget class="QCheckBox" name="csvExportTemperature">
-               <property name="text">
-                <string>Temperature</string>
-               </property>
-               <property name="icon">
-                <iconset resource="../res/res.qrc">
-                 <normaloff>:/icons/ui/temperature.png</normaloff>:/icons/ui/temperature.png</iconset>
-               </property>
-               <property name="checked">
-                <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-             <item row="4" column="1">
-              <widget class="QCheckBox" name="csvExportSignal">
-               <property name="text">
-                <string>Signal</string>
-               </property>
-               <property name="icon">
-                <iconset resource="../res/res.qrc">
-                 <normaloff>:/icons/ui/signal-80.png</normaloff>:/icons/ui/signal-80.png</iconset>
-               </property>
-              </widget>
-             </item>
-             <item row="5" column="0" colspan="2">
-              <spacer name="verticalSpacer_7">
-               <property name="orientation">
-                <enum>Qt::Vertical</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>1</width>
-                 <height>1</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-             <item row="2" column="0">
-              <widget class="QCheckBox" name="csvExportTimePoint">
-               <property name="text">
-                <string>Timestamp</string>
-               </property>
-               <property name="icon">
-                <iconset resource="../res/res.qrc">
-                 <normaloff>:/icons/ui/today.png</normaloff>:/icons/ui/today.png</iconset>
-               </property>
-               <property name="checked">
-                <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="1">
-              <widget class="QCheckBox" name="csvExportReceivedTimePoint">
-               <property name="text">
-                <string>Received Timestamp</string>
-               </property>
-               <property name="icon">
-                <iconset resource="../res/res.qrc">
-                 <normaloff>:/icons/ui/today.png</normaloff>:/icons/ui/today.png</iconset>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </widget>
-          </item>
-          <item>
-           <widget class="QGroupBox" name="groupBox_4">
-            <property name="title">
-             <string>Format</string>
-            </property>
-            <layout class="QGridLayout" name="gridLayout_7">
-             <item row="0" column="1">
-              <widget class="QLineEdit" name="csvSeparator">
-               <property name="text">
-                <string>;</string>
-               </property>
-               <property name="maxLength">
-                <number>2</number>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="1" colspan="2">
-              <widget class="QSpinBox" name="csvDecimalPlaces">
-               <property name="maximum">
-                <number>2</number>
-               </property>
-               <property name="value">
-                <number>2</number>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="1" colspan="2">
-              <widget class="QComboBox" name="csvUnitFormat">
-               <property name="currentIndex">
-                <number>2</number>
-               </property>
-               <item>
-                <property name="text">
-                 <string>None</string>
-                </property>
-               </item>
-               <item>
-                <property name="text">
-                 <string>Embedded</string>
-                </property>
-               </item>
-               <item>
-                <property name="text">
-                 <string>Separate Column</string>
-                </property>
-               </item>
-              </widget>
-             </item>
-             <item row="0" column="2">
-              <widget class="QCheckBox" name="csvTabSeparator">
-               <property name="text">
-                <string>Tabs</string>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="0">
-              <widget class="QLabel" name="label_32">
-               <property name="text">
-                <string>Units</string>
-               </property>
-              </widget>
-             </item>
-             <item row="0" column="0">
-              <widget class="QLabel" name="label_35">
-               <property name="text">
-                <string>Separator</string>
-               </property>
-              </widget>
-             </item>
-             <item row="3" column="1" colspan="2">
-              <widget class="QComboBox" name="csvDateTimeFormat">
-               <property name="enabled">
-                <bool>false</bool>
-               </property>
-               <item>
-                <property name="text">
-                 <string>DD-MM-YYYY hh:mm (27-03-2019 21:22)</string>
-                </property>
-               </item>
-               <item>
-                <property name="text">
-                 <string>YYYY/MM/DD hh:mm (2019/03/27 21:22)</string>
-                </property>
-               </item>
-               <item>
-                <property name="text">
-                 <string>YYYY-MM-DD hh:mm (2019-03-27 21:22)</string>
-                </property>
-               </item>
-               <item>
-                <property name="text">
-                 <string>MM/DD/YYYY hh:mm (03/27/2019 21:22)</string>
-                </property>
-               </item>
-              </widget>
-             </item>
-             <item row="3" column="0">
-              <widget class="QCheckBox" name="csvDateTimeFormatOverride">
-               <property name="text">
-                <string>Date/Time Format Override</string>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="0">
-              <widget class="QLabel" name="label_34">
-               <property name="text">
-                <string>Decimal Places</string>
-               </property>
-              </widget>
-             </item>
-             <item row="4" column="0" colspan="3">
-              <spacer name="verticalSpacer_8">
-               <property name="orientation">
-                <enum>Qt::Vertical</enum>
-               </property>
-               <property name="sizeType">
-                <enum>QSizePolicy::MinimumExpanding</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>1</width>
-                 <height>1</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-            </layout>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item>
-        <widget class="QTextEdit" name="csvPreview">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="MinimumExpanding">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-        </widget>
-       </item>
       </layout>
      </widget>
      <widget class="QWidget" name="sensorsTab">
@@ -1291,24 +981,15 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>CsvSettingsWidget</class>
+   <extends>QWidget</extends>
+   <header>CsvSettingsWidget.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <tabstops>
-  <tabstop>csvExportId</tabstop>
-  <tabstop>csvExportIndex</tabstop>
-  <tabstop>csvExportSensorName</tabstop>
-  <tabstop>csvExportSensorSN</tabstop>
-  <tabstop>csvExportTimePoint</tabstop>
-  <tabstop>csvExportReceivedTimePoint</tabstop>
-  <tabstop>csvExportTemperature</tabstop>
-  <tabstop>csvExportHumidity</tabstop>
-  <tabstop>csvExportBattery</tabstop>
-  <tabstop>csvExportSignal</tabstop>
-  <tabstop>csvSeparator</tabstop>
-  <tabstop>csvTabSeparator</tabstop>
-  <tabstop>csvDecimalPlaces</tabstop>
-  <tabstop>csvUnitFormat</tabstop>
-  <tabstop>csvDateTimeFormatOverride</tabstop>
-  <tabstop>csvDateTimeFormat</tabstop>
-  <tabstop>csvPreview</tabstop>
   <tabstop>ftpUploadBackups</tabstop>
   <tabstop>ftpBackupPeriod</tabstop>
   <tabstop>ftpTest</tabstop>
@@ -1342,38 +1023,5 @@
  <resources>
   <include location="../res/res.qrc"/>
  </resources>
- <connections>
-  <connection>
-   <sender>csvDateTimeFormatOverride</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>csvDateTimeFormat</receiver>
-   <slot>setEnabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>303</x>
-     <y>128</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>361</x>
-     <y>128</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>csvTabSeparator</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>csvSeparator</receiver>
-   <slot>setDisabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>497</x>
-     <y>57</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>465</x>
-     <y>57</y>
-    </hint>
-   </hints>
-  </connection>
- </connections>
+ <connections/>
 </ui>

@@ -296,7 +296,7 @@ DB::Clock::duration computeBatteryLife(float capacity, DB::Clock::duration measu
 
 //////////////////////////////////////////////////////////////////////////
 
-bool exportToCsv(std::ostream& stream, DB::GeneralSettings const& settings, DB::CsvSettings const& csvSettings, CsvDataProvider provider, size_t count, bool unicode)
+bool exportCsvTo(std::ostream& stream, DB::GeneralSettings const& settings, DB::CsvSettings const& csvSettings, CsvDataProvider provider, size_t count, bool unicode)
 {
 	//header
 	if (csvSettings.exportId)
@@ -373,9 +373,13 @@ bool exportToCsv(std::ostream& stream, DB::GeneralSettings const& settings, DB::
 
 	for (size_t i = 0; i < count; i++)
 	{
-		CsvData data = provider(i);
-		DB::Measurement const& m = data.measurement;
-		DB::Sensor const& s = data.sensor;
+		std::optional<CsvData> data = provider(i);
+		if (!data.has_value())
+		{
+			return false;
+		}
+		DB::Measurement const& m = data->measurement;
+		DB::Sensor const& s = data->sensor;
 		if (csvSettings.exportId)
 		{
 			stream << m.id;
@@ -415,12 +419,12 @@ bool exportToCsv(std::ostream& stream, DB::GeneralSettings const& settings, DB::
 			stream << std::fixed << std::setprecision(csvSettings.decimalPlaces) << m.descriptor.temperature;
 			if (csvSettings.unitsFormat == DB::CsvSettings::UnitsFormat::Embedded)
 			{
-				stream << (unicode ? "°C" : "\xB0""C");
+				stream << (unicode ? u8"°C" : u8"\xB0""C");
 			}
 			stream << csvSettings.separator;
 			if (csvSettings.unitsFormat == DB::CsvSettings::UnitsFormat::SeparateColumn)
 			{
-				stream << (unicode ? "°C" : "\xB0""C");
+				stream << (unicode ? u8"°C" : u8"\xB0""C");
 				stream << csvSettings.separator;
 			}
 		}

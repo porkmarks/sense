@@ -33,8 +33,8 @@ struct CsvData
 	DB::Measurement measurement;
 	DB::Sensor sensor;
 };
-using CsvDataProvider = std::function<CsvData(size_t index)>;
-bool exportToCsv(std::ostream& stream, DB::GeneralSettings const& settings, DB::CsvSettings const& csvSettings, CsvDataProvider provider, size_t count, bool unicode);
+using CsvDataProvider = std::function<std::optional<CsvData>(size_t index)>;
+bool exportCsvTo(std::ostream& stream, DB::GeneralSettings const& settings, DB::CsvSettings const& csvSettings, CsvDataProvider provider, size_t count, bool unicode);
 
 
 static constexpr float k_maxBatteryLevel = 2.95f;

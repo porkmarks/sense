@@ -39,13 +39,8 @@ private slots:
     void resetEmailProviderPreset();
 
 private:
-    void refreshCsvPreview();
-
 	void setGeneralSettings(DB::GeneralSettings const& settings);
     DB::GeneralSettings getGeneralSettings() const;
-
-	void setCsvSettings(DB::GeneralSettings const& generalSettings, DB::CsvSettings const& settings);
-    DB::CsvSettings getCsvSettings() const;
 
 	void setEmailSettings(DB::EmailSettings const& settings);
     DB::EmailSettings getEmailSettings() const;

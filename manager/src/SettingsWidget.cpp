@@ -72,25 +72,9 @@ void SettingsWidget::init(Comms& comms, DB& db)
 
     m_uiConnections.push_back(connect(m_ui.ftpTest, &QPushButton::released, this, &SettingsWidget::testFtpSettings));
 
-    connect(m_ui.csvDateTimeFormatOverride, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
-	connect(m_ui.csvDateTimeFormat, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &SettingsWidget::refreshCsvPreview);
-	connect(m_ui.csvExportId, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
-	connect(m_ui.csvExportIndex, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
-	connect(m_ui.csvExportSensorName, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
-	connect(m_ui.csvExportSensorSN, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
-	connect(m_ui.csvExportTimePoint, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
-	connect(m_ui.csvExportReceivedTimePoint, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
-	connect(m_ui.csvExportTemperature, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
-	connect(m_ui.csvExportHumidity, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
-	connect(m_ui.csvExportBattery, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
-	connect(m_ui.csvExportSignal, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
-	connect(m_ui.csvUnitFormat, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &SettingsWidget::refreshCsvPreview);
-	connect(m_ui.csvDecimalPlaces, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, &SettingsWidget::refreshCsvPreview);
-	connect(m_ui.csvSeparator, &QLineEdit::textChanged, this, &SettingsWidget::refreshCsvPreview);
-	connect(m_ui.csvTabSeparator, &QCheckBox::stateChanged, this, &SettingsWidget::refreshCsvPreview);
-
     setGeneralSettings(m_db->getGeneralSettings());
-    setCsvSettings(m_db->getGeneralSettings(), m_db->getCsvSettings());
+    m_ui.csvTab->init(*m_db);
+    m_ui.csvTab->setCsvSettings(m_db->getGeneralSettings(), m_db->getCsvSettings());
     setSensorSettings(m_db->getSensorSettings());
     setSensorTimeConfig(m_db->getLastSensorTimeConfig());
     m_dbConnections.push_back(connect(m_db, &DB::sensorSettingsChanged, [this]() { if (m_db) setSensorSettings(m_db->getSensorSettings()); }));
@@ -143,53 +127,6 @@ void SettingsWidget::setPermissions()
 
 //////////////////////////////////////////////////////////////////////////
 
-void SettingsWidget::refreshCsvPreview()
-{
-	std::stringstream stream;
-    DB::GeneralSettings generalSettings = getGeneralSettings();
-    DB::CsvSettings csvSettings = getCsvSettings();
-
-	m_ui.csvDateTimeFormat->setCurrentIndex((int)(csvSettings.dateTimeFormatOverride.has_value() ? *csvSettings.dateTimeFormatOverride : generalSettings.dateTimeFormat));
-
-    static std::vector<utils::CsvData> s_csvData;
-    if (s_csvData.empty())
-    {
-        utils::CsvData data;
-        data.measurement.id = 1000;
-        data.measurement.timePoint = DB::Clock::now() - std::chrono::hours(24);
-        data.measurement.receivedTimePoint = data.measurement.timePoint + std::chrono::minutes(1);
-        data.measurement.alarmTriggers = 0;
-        data.measurement.descriptor.temperature = 22.f;
-        data.measurement.descriptor.humidity = 32.f;
-        data.measurement.descriptor.index = 2000;
-        data.measurement.descriptor.sensorId = 1;
-        data.measurement.descriptor.signalStrength.b2s = -77;
-        data.measurement.descriptor.signalStrength.s2b = -78;
-        data.measurement.descriptor.vcc = 2.88f;
-        data.sensor.address = 1003;
-        data.sensor.averageSignalStrength.b2s = -77;
-        data.sensor.averageSignalStrength.s2b = -76;
-        data.sensor.descriptor.name = "sensor1";
-        s_csvData.push_back(data);
-        for (size_t i = 0; i < 30; i++)
-		{
-			data.measurement.id++;
-			data.measurement.descriptor.index++;
-			data.measurement.timePoint += std::chrono::minutes(15);
-			data.measurement.receivedTimePoint = data.measurement.timePoint + std::chrono::minutes(1);
-			data.measurement.descriptor.temperature += 1.f;
-			data.measurement.descriptor.humidity += 0.5f;
-			s_csvData.push_back(data);
-		}
-    }
-
-    utils::exportToCsv(stream, generalSettings, csvSettings, [](size_t index) { return s_csvData[index]; }, s_csvData.size(), true);
-
-	m_ui.csvPreview->setPlainText((stream.str() + "\n.....\n").c_str());
-}
-
-//////////////////////////////////////////////////////////////////////////
-
 void SettingsWidget::setGeneralSettings(DB::GeneralSettings const& settings)
 {
     m_ui.dateTimeFormat->setCurrentIndex((int)settings.dateTimeFormat);
@@ -213,66 +150,9 @@ void SettingsWidget::applyGeneralSettings()
 
 //////////////////////////////////////////////////////////////////////////
 
-void SettingsWidget::setCsvSettings(DB::GeneralSettings const& generalSettings, DB::CsvSettings const& settings)
-{
-    m_ui.csvDateTimeFormatOverride->setChecked(settings.dateTimeFormatOverride.has_value());
-    m_ui.csvDateTimeFormat->setCurrentIndex((int)(settings.dateTimeFormatOverride.has_value() ? *settings.dateTimeFormatOverride : generalSettings.dateTimeFormat));
-//    m_ui.csvDateTimeFormat->setEnabled(m_ui.csvDateTimeFormatOverride->isChecked());
-    m_ui.csvExportId->setChecked(settings.exportId);
-	m_ui.csvExportIndex->setChecked(settings.exportIndex);
-	m_ui.csvExportSensorName->setChecked(settings.exportSensorName);
-	m_ui.csvExportSensorSN->setChecked(settings.exportSensorSN);
-	m_ui.csvExportTimePoint->setChecked(settings.exportTimePoint);
-	m_ui.csvExportReceivedTimePoint->setChecked(settings.exportReceivedTimePoint);
-	m_ui.csvExportTemperature->setChecked(settings.exportTemperature);
-	m_ui.csvExportHumidity->setChecked(settings.exportHumidity);
-	m_ui.csvExportBattery->setChecked(settings.exportBattery);
-	m_ui.csvExportSignal->setChecked(settings.exportSignal);
-    m_ui.csvUnitFormat->setCurrentIndex((int)settings.unitsFormat);
-    m_ui.csvDecimalPlaces->setValue(settings.decimalPlaces);
-    m_ui.csvSeparator->setText(settings.separator.c_str());
-    m_ui.csvTabSeparator->setChecked(settings.separator == "\t");
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-DB::CsvSettings SettingsWidget::getCsvSettings() const
-{
-	DB::CsvSettings settings = m_db->getCsvSettings();
-
-    if (m_ui.csvDateTimeFormatOverride->isChecked())
-	{
-        settings.dateTimeFormatOverride = (DB::DateTimeFormat)m_ui.csvDateTimeFormat->currentIndex();
-	}
-	settings.exportId = m_ui.csvExportId->isChecked();
-	settings.exportIndex = m_ui.csvExportIndex->isChecked();
-	settings.exportSensorName = m_ui.csvExportSensorName->isChecked();
-	settings.exportSensorSN = m_ui.csvExportSensorSN->isChecked();
-	settings.exportTimePoint = m_ui.csvExportTimePoint->isChecked();
-	settings.exportReceivedTimePoint = m_ui.csvExportReceivedTimePoint->isChecked();
-	settings.exportTemperature = m_ui.csvExportTemperature->isChecked();
-	settings.exportHumidity = m_ui.csvExportHumidity->isChecked();
-	settings.exportBattery = m_ui.csvExportBattery->isChecked();
-	settings.exportSignal = m_ui.csvExportSignal->isChecked();
-	settings.unitsFormat = (DB::CsvSettings::UnitsFormat)m_ui.csvUnitFormat->currentIndex();
-    settings.decimalPlaces = m_ui.csvDecimalPlaces->value();
-    if (m_ui.csvTabSeparator->isChecked())
-    {
-        settings.separator = "\t";
-    }
-    else
-    {
-		settings.separator = m_ui.csvSeparator->text().toUtf8().data();
-	}
-
-	return settings;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
 void SettingsWidget::applyCsvSettings()
 {
-	m_db->setCsvSettings(getCsvSettings());
+	m_db->setCsvSettings(m_ui.csvTab->getCsvSettings());
 }
 
 //////////////////////////////////////////////////////////////////////////

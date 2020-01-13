@@ -5,6 +5,9 @@
 #include "MeasurementsModel.h"
 
 #include <ostream>
+#include "Utils.h"
+
+class QProgressDialog;
 
 class ExportDataDialog : public QDialog
 {
@@ -20,7 +23,8 @@ private:
     void saveSettings();
 
     void refreshPreview();
-    bool exportTo(std::ostream& stream, size_t maxCount, bool unicode, bool showProgress);
+    std::optional<utils::CsvData> getCsvData(size_t index) const;
+    std::optional<utils::CsvData> getCsvDataWithProgress(size_t index, QProgressDialog* progressDialog) const;
 
     Ui::ExportDataDialog m_ui;
     DB& m_db;

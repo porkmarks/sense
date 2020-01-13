@@ -15,350 +15,33 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <widget class="QWidget" name="widget_2" native="true">
-     <property name="minimumSize">
-      <size>
-       <width>222</width>
-       <height>0</height>
-      </size>
+    <widget class="QGroupBox" name="overrideSettings">
+     <property name="title">
+      <string>Override Settings</string>
      </property>
-     <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="0,100">
+     <property name="checkable">
+      <bool>true</bool>
+     </property>
+     <property name="checked">
+      <bool>false</bool>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_2">
       <item>
-       <widget class="QWidget" name="widget" native="true">
-        <property name="minimumSize">
-         <size>
-          <width>0</width>
-          <height>0</height>
-         </size>
-        </property>
-        <layout class="QVBoxLayout" name="verticalLayout_2">
-         <property name="leftMargin">
-          <number>0</number>
-         </property>
-         <property name="topMargin">
-          <number>0</number>
-         </property>
-         <property name="rightMargin">
-          <number>0</number>
-         </property>
-         <property name="bottomMargin">
-          <number>0</number>
-         </property>
-         <item>
-          <widget class="QGroupBox" name="horizontalGroupBox">
-           <property name="title">
-            <string>Filter</string>
-           </property>
-           <layout class="QHBoxLayout" name="horizontalLayout">
-            <item>
-             <layout class="QGridLayout" name="gridLayout">
-              <item row="7" column="0">
-               <widget class="QCheckBox" name="exportBattery">
-                <property name="text">
-                 <string>Battery</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/battery-75.png</normaloff>:/icons/ui/battery-75.png</iconset>
-                </property>
-                <property name="checked">
-                 <bool>true</bool>
-                </property>
-               </widget>
-              </item>
-              <item row="3" column="0" colspan="2">
-               <widget class="QCheckBox" name="exportTimePoint">
-                <property name="text">
-                 <string>Date/Time</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/today.png</normaloff>:/icons/ui/today.png</iconset>
-                </property>
-                <property name="checked">
-                 <bool>true</bool>
-                </property>
-               </widget>
-              </item>
-              <item row="2" column="0">
-               <widget class="QCheckBox" name="exportSensorName">
-                <property name="text">
-                 <string>Sensor Name</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
-                </property>
-                <property name="checked">
-                 <bool>true</bool>
-                </property>
-               </widget>
-              </item>
-              <item row="2" column="1">
-               <widget class="QCheckBox" name="exportSensorSN">
-                <property name="text">
-                 <string>Sensor S/N</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
-                </property>
-               </widget>
-              </item>
-              <item row="0" column="0">
-               <widget class="QCheckBox" name="exportId">
-                <property name="text">
-                 <string>Id</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/arrow-right.png</normaloff>:/icons/ui/arrow-right.png</iconset>
-                </property>
-                <property name="checked">
-                 <bool>false</bool>
-                </property>
-               </widget>
-              </item>
-              <item row="0" column="1">
-               <widget class="QCheckBox" name="exportIndex">
-                <property name="text">
-                 <string>Index</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/arrow-right.png</normaloff>:/icons/ui/arrow-right.png</iconset>
-                </property>
-                <property name="checked">
-                 <bool>false</bool>
-                </property>
-               </widget>
-              </item>
-              <item row="5" column="0">
-               <widget class="QCheckBox" name="exportTemperature">
-                <property name="text">
-                 <string>Temperature</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/temperature.png</normaloff>:/icons/ui/temperature.png</iconset>
-                </property>
-                <property name="checked">
-                 <bool>true</bool>
-                </property>
-               </widget>
-              </item>
-              <item row="5" column="1">
-               <widget class="QCheckBox" name="exportHumidity">
-                <property name="text">
-                 <string>Humidity</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/humidity.png</normaloff>:/icons/ui/humidity.png</iconset>
-                </property>
-                <property name="checked">
-                 <bool>true</bool>
-                </property>
-               </widget>
-              </item>
-              <item row="7" column="1">
-               <widget class="QCheckBox" name="exportSignal">
-                <property name="text">
-                 <string>Signal</string>
-                </property>
-                <property name="icon">
-                 <iconset resource="../res/res.qrc">
-                  <normaloff>:/icons/ui/signal-80.png</normaloff>:/icons/ui/signal-80.png</iconset>
-                </property>
-               </widget>
-              </item>
-             </layout>
-            </item>
-           </layout>
-          </widget>
-         </item>
-         <item>
-          <widget class="QGroupBox" name="groupBox">
-           <property name="title">
-            <string>Format</string>
-           </property>
-           <layout class="QGridLayout" name="gridLayout_2">
-            <item row="0" column="0">
-             <widget class="QLabel" name="label_3">
-              <property name="text">
-               <string>File Format</string>
-              </property>
-             </widget>
-            </item>
-            <item row="4" column="0">
-             <widget class="QLabel" name="label_7">
-              <property name="text">
-               <string>Units</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="0">
-             <widget class="QLabel" name="label_6">
-              <property name="text">
-               <string>Separator</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="1">
-             <widget class="QLineEdit" name="separator">
-              <property name="text">
-               <string>;</string>
-              </property>
-              <property name="maxLength">
-               <number>2</number>
-              </property>
-             </widget>
-            </item>
-            <item row="3" column="0">
-             <widget class="QLabel" name="label_5">
-              <property name="text">
-               <string>Date Format</string>
-              </property>
-             </widget>
-            </item>
-            <item row="2" column="0">
-             <widget class="QLabel" name="label_4">
-              <property name="text">
-               <string>Decimal Places</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="2">
-             <widget class="QCheckBox" name="tabSeparator">
-              <property name="text">
-               <string>Tabs</string>
-              </property>
-             </widget>
-            </item>
-            <item row="0" column="1" colspan="2">
-             <widget class="QComboBox" name="fileFormat">
-              <item>
-               <property name="text">
-                <string>CSV</string>
-               </property>
-              </item>
-             </widget>
-            </item>
-            <item row="2" column="1" colspan="2">
-             <widget class="QSpinBox" name="decimalPlaces">
-              <property name="maximum">
-               <number>2</number>
-              </property>
-              <property name="value">
-               <number>2</number>
-              </property>
-             </widget>
-            </item>
-            <item row="3" column="1" colspan="2">
-             <widget class="QComboBox" name="dateFormat">
-              <item>
-               <property name="text">
-                <string>2017/05/22 17:52:21</string>
-               </property>
-              </item>
-              <item>
-               <property name="text">
-                <string>2017-05-22 17:52:21</string>
-               </property>
-              </item>
-              <item>
-               <property name="text">
-                <string>22-05-2017 17:52:21</string>
-               </property>
-              </item>
-              <item>
-               <property name="text">
-                <string>05/22/2017 17:52:21</string>
-               </property>
-              </item>
-             </widget>
-            </item>
-            <item row="4" column="1" colspan="2">
-             <widget class="QComboBox" name="units">
-              <property name="currentIndex">
-               <number>2</number>
-              </property>
-              <item>
-               <property name="text">
-                <string>None</string>
-               </property>
-              </item>
-              <item>
-               <property name="text">
-                <string>Embedded</string>
-               </property>
-              </item>
-              <item>
-               <property name="text">
-                <string>Separate Column</string>
-               </property>
-              </item>
-             </widget>
-            </item>
-           </layout>
-          </widget>
-         </item>
-         <item>
-          <spacer name="verticalSpacer">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>20</width>
-             <height>40</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item>
-       <widget class="QWidget" name="widget_3" native="true">
-        <property name="minimumSize">
-         <size>
-          <width>222</width>
-          <height>0</height>
-         </size>
-        </property>
-        <layout class="QVBoxLayout" name="verticalLayout_3">
-         <property name="leftMargin">
-          <number>0</number>
-         </property>
-         <property name="topMargin">
-          <number>0</number>
-         </property>
-         <property name="rightMargin">
-          <number>0</number>
-         </property>
-         <property name="bottomMargin">
-          <number>0</number>
-         </property>
-         <item>
-          <widget class="QTextEdit" name="previewText">
-           <property name="font">
-            <font>
-             <family>Courier 10 Pitch</family>
-            </font>
-           </property>
-           <property name="lineWrapMode">
-            <enum>QTextEdit::NoWrap</enum>
-           </property>
-           <property name="readOnly">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
+       <widget class="CsvSettingsWidget" name="csvSettings" native="true"/>
       </item>
      </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTextEdit" name="preview">
+     <property name="font">
+      <font>
+       <family>Courier New</family>
+      </font>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
     </widget>
    </item>
    <item>
@@ -373,24 +56,14 @@
    </item>
   </layout>
  </widget>
- <tabstops>
-  <tabstop>exportId</tabstop>
-  <tabstop>exportIndex</tabstop>
-  <tabstop>exportSensorName</tabstop>
-  <tabstop>exportSensorSN</tabstop>
-  <tabstop>exportTimePoint</tabstop>
-  <tabstop>exportTemperature</tabstop>
-  <tabstop>exportHumidity</tabstop>
-  <tabstop>exportBattery</tabstop>
-  <tabstop>exportSignal</tabstop>
-  <tabstop>fileFormat</tabstop>
-  <tabstop>separator</tabstop>
-  <tabstop>tabSeparator</tabstop>
-  <tabstop>decimalPlaces</tabstop>
-  <tabstop>dateFormat</tabstop>
-  <tabstop>units</tabstop>
-  <tabstop>previewText</tabstop>
- </tabstops>
+ <customwidgets>
+  <customwidget>
+   <class>CsvSettingsWidget</class>
+   <extends>QWidget</extends>
+   <header>CsvSettingsWidget.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources>
   <include location="../res/res.qrc"/>
  </resources>
@@ -402,8 +75,8 @@
    <slot>accept()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>257</x>
-     <y>653</y>
+     <x>263</x>
+     <y>706</y>
     </hint>
     <hint type="destinationlabel">
      <x>157</x>
@@ -418,8 +91,8 @@
    <slot>reject()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>325</x>
-     <y>653</y>
+     <x>331</x>
+     <y>706</y>
     </hint>
     <hint type="destinationlabel">
      <x>286</x>
@@ -428,18 +101,18 @@
    </hints>
   </connection>
   <connection>
-   <sender>tabSeparator</sender>
+   <sender>overrideSettings</sender>
    <signal>toggled(bool)</signal>
-   <receiver>separator</receiver>
-   <slot>setDisabled(bool)</slot>
+   <receiver>csvSettings</receiver>
+   <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>398</x>
-     <y>340</y>
+     <x>31</x>
+     <y>9</y>
     </hint>
     <hint type="destinationlabel">
-     <x>332</x>
-     <y>348</y>
+     <x>77</x>
+     <y>26</y>
     </hint>
    </hints>
   </connection>
