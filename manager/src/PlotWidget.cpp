@@ -166,8 +166,9 @@ void PlotWidget::loadSettings()
     QSettings settings;
     m_ui.showTemperature->setChecked(settings.value("filter/showTemperature", true).toBool());
     m_ui.showHumidity->setChecked(settings.value("filter/showHumidity", true).toBool());
-    m_ui.showBattery->setChecked(settings.value("filter/showBattery", false).toBool());
-    m_ui.showSignal->setChecked(settings.value("filter/showSignal", false).toBool());
+    //not loading these on purpose
+//     m_ui.showBattery->setChecked(settings.value("filter/showBattery", false).toBool());
+//     m_ui.showSignal->setChecked(settings.value("filter/showSignal", false).toBool());
     m_ui.fitMeasurements->setChecked(settings.value("filter/fitMeasurements", true).toBool());
     m_ui.useSmoothing->setChecked(settings.value("rendering/useSmoothing", true).toBool());
     m_ui.minHumidity->setValue(settings.value("rendering/minHumidity", 0.0).toDouble());
@@ -239,8 +240,9 @@ void PlotWidget::saveSettings()
     QSettings settings;
     settings.setValue("filter/showTemperature", m_ui.showTemperature->isChecked());
     settings.setValue("filter/showHumidity", m_ui.showHumidity->isChecked());
-    settings.setValue("filter/showBattery", m_ui.showBattery->isChecked());
-    settings.setValue("filter/showSignal", m_ui.showSignal->isChecked());
+	//not saving these on purpose
+//     settings.setValue("filter/showBattery", m_ui.showBattery->isChecked());
+//     settings.setValue("filter/showSignal", m_ui.showSignal->isChecked());
     settings.setValue("filter/fitMeasurements", m_ui.fitMeasurements->isChecked());
     settings.setValue("rendering/useSmoothing", m_ui.useSmoothing->isChecked());
     settings.setValue("rendering/minHumidity", m_ui.minHumidity->value());

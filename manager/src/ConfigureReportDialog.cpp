@@ -66,8 +66,6 @@ void ConfigureReportDialog::setReport(DB::Report const& report)
 
     m_ui.name->setText(descriptor.name.c_str());
 
-    m_ui.allData->setChecked(descriptor.data == DB::ReportDescriptor::Data::All);
-
     m_ui.sensorGroup->setChecked(descriptor.filterSensors);
     if (descriptor.filterSensors)
     {
@@ -116,7 +114,6 @@ void ConfigureReportDialog::setReport(DB::Report const& report)
 bool ConfigureReportDialog::getDescriptor(DB::ReportDescriptor& descriptor)
 {
     descriptor.name = m_ui.name->text().toUtf8().data();
-    descriptor.data = m_ui.allData->isChecked() ? DB::ReportDescriptor::Data::All : DB::ReportDescriptor::Data::Summary;
 
     descriptor.filterSensors = m_ui.sensorGroup->isChecked();
     descriptor.sensors.clear();

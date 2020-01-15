@@ -184,7 +184,7 @@ Result<void> DB::create(sqlite3& db)
 		}
 	}
 	{
-		const char* sql = "CREATE TABLE Reports (id INTEGER PRIMARY KEY, name STRING, period INTEGER, customPeriod INTEGER, data INTEGER, filterSensors BOOLEAN, sensors STRING, lastTriggeredTimePoint DATETIME);";
+		const char* sql = "CREATE TABLE Reports (id INTEGER PRIMARY KEY, name STRING, period INTEGER, customPeriod INTEGER, filterSensors BOOLEAN, sensors STRING, lastTriggeredTimePoint DATETIME);";
 		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
@@ -281,8 +281,8 @@ Result<void> DB::load(sqlite3& db)
 	}
 	{
 		sqlite3_stmt* stmt;
-		if (sqlite3_prepare_v2(&db, "REPLACE INTO Reports (id, name, period, customPeriod, data, filterSensors, sensors, lastTriggeredTimePoint) "
-							        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8);", -1, &stmt, NULL) != SQLITE_OK)
+		if (sqlite3_prepare_v2(&db, "REPLACE INTO Reports (id, name, period, customPeriod, filterSensors, sensors, lastTriggeredTimePoint) "
+							        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7);", -1, &stmt, NULL) != SQLITE_OK)
 		{
 			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -613,7 +613,7 @@ Result<void> DB::load(sqlite3& db)
 		}
 	}
 	{
-		const char* sql = "SELECT id, name, period, customPeriod, data, filterSensors, sensors, lastTriggeredTimePoint "
+		const char* sql = "SELECT id, name, period, customPeriod, filterSensors, sensors, lastTriggeredTimePoint "
                           "FROM Reports;";
 		sqlite3_stmt* stmt;
 		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
@@ -629,15 +629,14 @@ Result<void> DB::load(sqlite3& db)
 			r.descriptor.name = (char const*)sqlite3_column_text(stmt, 1);
 			r.descriptor.period = (ReportDescriptor::Period)sqlite3_column_int64(stmt, 2);
 			r.descriptor.customPeriod = std::chrono::seconds(sqlite3_column_int64(stmt, 3));
-			r.descriptor.data = (ReportDescriptor::Data)sqlite3_column_int64(stmt, 4);
-			r.descriptor.filterSensors = sqlite3_column_int64(stmt, 5) ? true : false;
-			QString sensors = (char const*)sqlite3_column_text(stmt, 6);
+			r.descriptor.filterSensors = sqlite3_column_int64(stmt, 4) ? true : false;
+			QString sensors = (char const*)sqlite3_column_text(stmt, 5);
 			QStringList l = sensors.split(QChar(';'), QString::SkipEmptyParts);
 			for (QString str : l)
 			{
 				r.descriptor.sensors.insert(atoll(str.trimmed().toUtf8().data()));
 			}
-			r.lastTriggeredTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 7));
+			r.lastTriggeredTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 6));
 			data.reports.push_back(std::move(r));
 		}
     }
@@ -731,6 +730,30 @@ void DB::checkRepetitiveAlarms()
 
 //////////////////////////////////////////////////////////////////////////
 
+void DB::checkReports()
+{
+	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+
+	bool triggerSave = false;
+
+	for (Report& report: m_data.reports)
+	{
+		if (isReportTriggered(report))
+		{
+			emit reportTriggered(report.id);
+			m_data.reportsChanged = true;
+			triggerSave = true;
+		}
+	}
+
+	if (triggerSave)
+	{
+		save(true);
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void DB::process()
 {
 	addAsyncMeasurements();
@@ -740,6 +763,7 @@ void DB::process()
     }
 
     checkRepetitiveAlarms();
+	checkReports();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -2428,19 +2452,8 @@ int32_t DB::findReportIndexById(ReportId id) const
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::isReportTriggered(ReportId id) const
+bool DB::isReportTriggered(Report const& report) const
 {
-    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
-
-    int32_t _index = findReportIndexById(id);
-    if (_index < 0)
-    {
-        return false;
-    }
-
-    size_t index = static_cast<size_t>(_index);
-    Report const& report = m_data.reports[index];
-
     if (report.descriptor.period == ReportDescriptor::Period::Daily)
     {
         QDateTime dt = QDateTime::currentDateTime();
@@ -2482,26 +2495,6 @@ bool DB::isReportTriggered(ReportId id) const
     }
 
     return false;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void DB::setReportExecuted(ReportId id)
-{
-    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
-
-    int32_t _index = findReportIndexById(id);
-    if (_index < 0)
-    {
-        return;
-    }
-
-    size_t index = static_cast<size_t>(_index);
-    Report& report = m_data.reports[index];
-	m_data.reportsChanged = true;
-    report.lastTriggeredTimePoint = Clock::now();
-
-	save(true);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -3363,15 +3356,14 @@ void DB::save(Data& data, bool newTransaction) const
 			sqlite3_bind_text(stmt, 2, r.descriptor.name.c_str(), -1, SQLITE_STATIC);
 			sqlite3_bind_int(stmt, 3, (int)r.descriptor.period);
 			sqlite3_bind_int64(stmt, 4, std::chrono::duration_cast<std::chrono::seconds>(r.descriptor.customPeriod).count());
-			sqlite3_bind_int(stmt, 5, (int)r.descriptor.data);
-			sqlite3_bind_int64(stmt, 6, r.descriptor.filterSensors ? 1 : 0);
+			sqlite3_bind_int64(stmt, 5, r.descriptor.filterSensors ? 1 : 0);
 			std::string sensors;
 			for (SensorId id : r.descriptor.sensors)
 			{
 				sensors += std::to_string(id) + ";";
 			}
-			sqlite3_bind_text(stmt, 7, sensors.c_str(), -1, SQLITE_STATIC);
-			sqlite3_bind_int64(stmt, 8, Clock::to_time_t(r.lastTriggeredTimePoint));
+			sqlite3_bind_text(stmt, 6, sensors.c_str(), -1, SQLITE_STATIC);
+			sqlite3_bind_int64(stmt, 7, Clock::to_time_t(r.lastTriggeredTimePoint));
 			if (sqlite3_step(stmt) != SQLITE_DONE)
 			{
 				s_logger.logCritical(QString("Failed to save report: %1").arg(sqlite3_errmsg(m_sqlite)));

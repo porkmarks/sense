@@ -4,7 +4,7 @@
 #include <QIcon>
 #include <array>
 
-static std::array<const char*, 5> s_headerNames = {"Id", "Name", "Period", "Data"};
+static std::array<const char*, 5> s_headerNames = {"Id", "Name", "Period"};
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -137,17 +137,6 @@ QVariant ReportsModel::data(QModelIndex const& index, int role) const
             {
                 size_t days = std::chrono::duration_cast<std::chrono::hours>(descriptor.customPeriod).count() / 24;
                 return QString("Every %1 %2").arg(days).arg(days == 1 ? "day" : "days");
-            }
-        }
-        else if (column == Column::Data)
-        {
-            if (descriptor.data == DB::ReportDescriptor::Data::Summary)
-            {
-                return "Summary";
-            }
-            else
-            {
-                return "All";
             }
         }
     }

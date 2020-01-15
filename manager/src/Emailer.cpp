@@ -1,10 +1,12 @@
 #include "Emailer.h"
 #include <iostream>
 #include <cassert>
+#include <sstream>
 #include "Smtp/SmtpMime"
 #include "Logger.h"
 #include "Utils.h"
 #include "DB.h"
+#include "mimeattachment.h"
 
 extern Logger s_logger;
 
@@ -17,11 +19,7 @@ Emailer::Emailer(DB& db)
 
     connect(&m_db, &DB::alarmTriggersChanged, this, &Emailer::alarmTriggersChanged, Qt::QueuedConnection);
 	connect(&m_db, &DB::alarmStillTriggered, this, &Emailer::alarmStillTriggered, Qt::QueuedConnection);
-
-    m_timer.setSingleShot(false);
-    m_timer.setInterval(60 * 1000); //every minute
-    m_timer.start();
-    connect(&m_timer, &QTimer::timeout, this, &Emailer::checkReports);
+	connect(&m_db, &DB::reportTriggered, this, &Emailer::reportTriggered, Qt::QueuedConnection);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -38,19 +36,19 @@ Emailer::~Emailer()
 
 //////////////////////////////////////////////////////////////////////////
 
-void Emailer::checkReports()
+void Emailer::reportTriggered(DB::ReportId reportId)
 {
-    size_t count = m_db.getReportCount();
-    for (size_t i = 0; i < count; i++)
-    {
-        DB::Report const& report = m_db.getReport(i);
-        if (m_db.isReportTriggered(report.id))
-        {
-            s_logger.logInfo(QString("Report '%1' triggered").arg(report.descriptor.name.c_str()));
-            sendReportEmail(report);
-            m_db.setReportExecuted(report.id);
-        }
-    }
+	int32_t reportIndex = m_db.findReportIndexById(reportId);
+	if (reportIndex < 0)
+	{
+		assert(false);
+		return;
+	}
+
+	DB::Report const& report = m_db.getReport(static_cast<size_t>(reportIndex));
+
+    s_logger.logInfo(QString("Report '%1' triggered").arg(report.descriptor.name.c_str()));
+    sendReportEmail(report);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -312,6 +310,20 @@ void Emailer::sendAlarmRetriggerEmail(DB::Alarm const& alarm)
 
 //////////////////////////////////////////////////////////////////////////
 
+std::optional<utils::CsvData> Emailer::getCsvData(std::vector<DB::Measurement> const& measurements, size_t index) const
+{
+	utils::CsvData data;
+    data.measurement = measurements[index];
+	int32_t sensorIndex = m_db.findSensorIndexById(data.measurement.descriptor.sensorId);
+	if (sensorIndex >= 0)
+	{
+		data.sensor = m_db.getSensor((size_t)sensorIndex);
+	}
+	return data;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void Emailer::sendReportEmail(DB::Report const& report)
 {
     QString dateTimeFormatStr = utils::getQDateTimeFormatString(m_db.getGeneralSettings().dateTimeFormat);
@@ -396,8 +408,7 @@ void Emailer::sendReportEmail(DB::Report const& report)
                             .toUtf8().data();
 
 
-    if (report.descriptor.data == DB::ReportDescriptor::Data::Summary ||
-            report.descriptor.data == DB::ReportDescriptor::Data::All)
+    //summary
     {
         email.body += QString(R"X(
                               <table id="hor-minimalist-a">
@@ -491,51 +502,10 @@ void Emailer::sendReportEmail(DB::Report const& report)
                       "</table>";
     }
 
-    if (report.descriptor.data == DB::ReportDescriptor::Data::All)
-    {
-        email.body += QString(R"X(
-                              <table id="hor-minimalist-a">
-                              <tbody>
-                                  <tr>
-                                      <th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Sensor</strong></th>
-                                      <th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Timestamp</strong></th>
-                                      <th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Temperature</strong></th>
-                                      <th style="width: 80.6667px; text-align: center; white-space: nowrap;"><strong>Humidity</strong></th>
-                                      <th style="width: 81.3333px; text-align: center; white-space: nowrap;"><strong>Alerts</strong></th>
-                                  </tr>)X").toUtf8().data();
+    std::stringstream stream;
+    utils::exportCsvTo(stream, m_db.getGeneralSettings(), m_db.getCsvSettings(), [&measurements, this](size_t index) { return getCsvData(measurements, index); }, measurements.size(), true);
 
-        for (DB::Measurement const& m: measurements)
-        {
-            QDateTime dt;
-            dt.setTime_t(DB::Clock::to_time_t(m.timePoint));
-            std::string sensorName = "N/A";
-            int32_t sensorIndex = m_db.findSensorIndexById(m.descriptor.sensorId);
-            if (sensorIndex >= 0)
-            {
-                sensorName = m_db.getSensor(static_cast<size_t>(sensorIndex)).descriptor.name;
-            }
-            email.body += QString(R"X(
-                                  <tr>
-                                      <td style="width: 80.6667px;">%1</td>
-                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%2</td>
-                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%3 &deg;C</td>
-                                      <td style="width: 80.6667px; text-align: right; white-space: nowrap;">%4 %</td>
-                                      <td style="width: 81.3333px; text-align: right; white-space: nowrap;">%5</td>
-                                  </tr>)X").arg(sensorName.c_str())
-                    .arg(dt.toString(dateTimeFormatStr))
-                    .arg(m.descriptor.temperature, 0, 'f', 1)
-                    .arg(m.descriptor.humidity, 0, 'f', 1)
-                    .arg(m.alarmTriggers == 0 ? "no" : "yes")
-                    .toUtf8().data();
-        }
-        email.body += R"X(
-                      </tbody>
-                      </table>
-                      <p>&nbsp;</p>
-                      <p><em>- Sense -</em></p>
-                      </body>
-                      </html>)X";
-    }
+    email.attachments.push_back({ std::string("report.csv"), stream.str() });
 
     sendEmail(email);
 }
@@ -605,6 +575,14 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
 
         message.addPart(&body);
 
+        std::vector<MimeAttachment*> attachments;
+        for (Email::Attachment const& a: email.attachments)
+		{
+			MimeAttachment* attachment = new MimeAttachment(QByteArray(a.contents.c_str(), (int)a.contents.size()), a.filename.c_str());
+            attachments.push_back(attachment);
+            message.addPart(attachment);
+		}
+
         if (smtp.connectToHost() && smtp.login() && smtp.sendMail(message))
         {
             s_logger.logInfo(QString("Successfully sent email"));
@@ -614,6 +592,11 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
             s_logger.logCritical(QString("Failed to send email: %2").arg(errorMsg.c_str()));
         }
         smtp.quit();
+
+        for (MimeAttachment* attachment : attachments)
+        {
+            delete attachment;
+        }
     }
 }
 

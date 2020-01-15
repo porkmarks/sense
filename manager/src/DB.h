@@ -516,14 +516,6 @@ public:
         Period period = Period::Weekly;
         Clock::duration customPeriod = std::chrono::hours(48);
 
-        enum class Data : uint8_t
-        {
-            Summary,
-            All
-        };
-
-        Data data = Data::Summary;
-
         bool filterSensors = false;
         std::set<SensorId> sensors;
     };
@@ -543,8 +535,6 @@ public:
     Result<void> addReport(ReportDescriptor const& descriptor);
     Result<void> setReport(ReportId id, ReportDescriptor const& descriptor);
     void removeReport(size_t index);
-    bool isReportTriggered(ReportId id) const;
-    void setReportExecuted(ReportId id);
 
     ////////////////////////////////////////////////////////////////////////////
 
@@ -628,6 +618,7 @@ signals:
     void reportAdded(ReportId id);
     void reportRemoved(ReportId id);
     void reportChanged(ReportId id);
+	void reportTriggered(ReportId id);
 
     void measurementsAdded(SensorId id);
     void measurementsRemoved(SensorId id);
@@ -639,6 +630,8 @@ signals:
 private:
     Result<void> checkAlarmDescriptor(AlarmDescriptor const& descriptor) const;
     void checkRepetitiveAlarms();
+	bool isReportTriggered(Report const& report) const;
+    void checkReports();
     uint32_t _computeAlarmTriggers(Alarm& alarm, Measurement const& m);
     size_t _getFilteredMeasurements(Filter const& filter, std::vector<Measurement>* result) const;
 
