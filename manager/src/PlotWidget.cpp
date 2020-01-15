@@ -31,6 +31,7 @@ static std::array<uint32_t, 128> k_colors =
 };
 
 std::array<const char*, (size_t)PlotWidget::PlotType::Count> k_plotUnits = { "°C", "%RH", "%", "%" };
+std::array<float, (size_t)PlotWidget::PlotType::Count> k_plotPenWidths = { 2.f, 2.f, 1.f, 1.f };
 std::array<Qt::PenStyle, (size_t)PlotWidget::PlotType::Count> k_plotPenStyles = { Qt::SolidLine, Qt::DashLine, Qt::DotLine, Qt::DashDotDotLine };
 std::array<const char*, (size_t)PlotWidget::PlotType::Count> k_plotNames = { "Temperature", "Humidity", "Battery", "Signal" };
 std::array<qreal, (size_t)PlotWidget::PlotType::Count> k_plotMinRange = { 5.0, 10.0, 0.1, 0.1 };
@@ -686,7 +687,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
 
         QColor color(k_colors[graphData.sensor.id % k_colors.size()]);
         double brightness = (0.2126*color.redF() + 0.7152*color.greenF() + 0.0722*color.blueF());
-        if (brightness > 0.8) //make sure the color is not too bright
+        if (brightness > 0.6) //make sure the color is not too bright
         {
             color.setHslF(color.hueF(), color.saturationF(), 0.4);
         }
@@ -703,8 +704,9 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
                 QPen pen = graph->pen();
                 pen.setColor(color);
 				pen.setStyle(k_plotPenStyles[plotIndex]);
+				pen.setWidthF(k_plotPenWidths[plotIndex]);
                 graph->setPen(pen);
-                graph->setName(QString("%1 %2 (%3)").arg(graphData.sensor.descriptor.name.c_str()).arg(k_plotNames[plotIndex]).arg(k_plotUnits[plotIndex]));
+                graph->setName(QString("%1 %2").arg(graphData.sensor.descriptor.name.c_str()).arg(k_plotNames[plotIndex]));
                 graph->setData(plot.keys, plot.values);
                 plot.graph = graph;
             }
