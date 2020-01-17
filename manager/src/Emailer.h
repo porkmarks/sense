@@ -26,7 +26,7 @@ public:
     void sendReportEmail(DB::Report const& report, DB::Clock::time_point from, DB::Clock::time_point to);
 
 private slots:
-    void alarmTriggersChanged(DB::AlarmId alarmId, DB::Measurement const& m, uint32_t oldTriggers, DB::AlarmTriggers triggers);
+    void alarmSensorTriggersChanged(DB::AlarmId alarmId, DB::SensorId sensorId, std::optional<DB::Measurement> measurement, uint32_t oldTriggers, DB::AlarmTriggers triggers);
 	void alarmStillTriggered(DB::AlarmId alarmId);
 	void reportTriggered(DB::ReportId reportId, DB::Clock::time_point from, DB::Clock::time_point to);
 
@@ -55,7 +55,7 @@ private:
         Recovery
     };
 
-    void sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m, uint32_t oldTriggers, uint32_t newTriggers, uint32_t triggers, Action action);
+    void sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, std::optional<DB::Measurement> measurement, uint32_t oldTriggers, uint32_t newTriggers, uint32_t triggers, Action action);
     void sendAlarmRetriggerEmail(DB::Alarm const& alarm);
 
 	std::optional<utils::CsvData> getCsvData(std::vector<DB::Measurement> const& measurements, size_t index) const;

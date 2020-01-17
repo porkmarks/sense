@@ -5,7 +5,7 @@
 #include <QIcon>
 #include "Utils.h"
 
-static std::array<const char*, 8> s_headerNames = {"Id", "Name", "Temperature", "Humidity", "Low Battery", "Low Signal"};
+static std::array<const char*, 8> s_headerNames = {"Id", "Name", "Temperature", "Humidity", "Others"};
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -102,31 +102,7 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
     DB::AlarmDescriptor const& descriptor = alarm.descriptor;
 
     Column column = static_cast<Column>(index.column());
-    if (role == Qt::CheckStateRole)
-    {
-        if (column == Column::LowBattery)
-        {
-            if (descriptor.lowVccWatch)
-            {
-                return Qt::Checked;
-            }
-        }
-        else if (column == Column::LowSignal)
-        {
-            if (descriptor.lowSignalWatch)
-            {
-                return Qt::Checked;
-            }
-        }
-//        else if (column == Column::SensorErrors)
-//        {
-//            if (descriptor.sensorErrorsWatch)
-//            {
-//                return Qt::Checked;
-//            }
-//        }
-    }
-    else if (role == Qt::DisplayRole)
+    if (role == Qt::DisplayRole)
     {
         if (column == Column::Id)
         {
@@ -174,6 +150,39 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
 			}
 			return str;
         }
+        else if (column == Column::Others)
+        {
+            QString str;
+            if (descriptor.lowVccWatch)
+            {
+                str += R"X(<span style="font-size:small">Low Battery</span>)X";
+            }
+			if (descriptor.lowSignalWatch)
+			{
+				if (!str.isEmpty())
+				{
+					str += " | ";
+				}
+                str += R"X(<span style="font-size:small">Low Signal</span>)X";
+			}
+			if (descriptor.sensorBlackoutWatch)
+			{
+				if (!str.isEmpty())
+				{
+					str += " | ";
+				}
+                str += R"X(<span style="font-size:small">Sensor Blackout</span>)X";
+			}
+			if (descriptor.baseStationDisconnectedWatch)
+			{
+				if (!str.isEmpty())
+				{
+					str += " | ";
+				}
+				str += R"X(<span style="font-size:small">Base Station Disconnected</span>)X";
+			}
+            return str;
+        }
     }
     else if (role == Qt::DecorationRole)
     {
@@ -188,14 +197,6 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
         else if (column == Column::Humidity && (descriptor.lowHumidityWatch || descriptor.highHumidityWatch))
         {
             return QIcon(":/icons/ui/humidity.png");
-        }
-        else if (column == Column::LowBattery && descriptor.lowVccWatch)
-        {
-            return QIcon(":/icons/ui/battery-0.png");
-        }
-        else if (column == Column::LowSignal && descriptor.lowSignalWatch)
-        {
-            return QIcon(":/icons/ui/signal-0.png");
         }
     }
 

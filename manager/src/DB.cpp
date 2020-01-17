@@ -177,7 +177,7 @@ Result<void> DB::create(sqlite3& db)
 	{
 		const char* sql = "CREATE TABLE Alarms (id INTEGER PRIMARY KEY, name STRING, filterSensors BOOLEAN, sensors STRING, lowTemperatureWatch BOOLEAN, lowTemperatureSoft REAL, lowTemperatureHard REAL, highTemperatureWatch BOOLEAN, highTemperatureSoft REAL, highTemperatureHard REAL, "
             "lowHumidityWatch BOOLEAN, lowHumiditySoft REAL, lowHumidityHard REAL, highHumidityWatch BOOLEAN, highHumiditySoft REAL, highHumidityHard REAL, "
-            "lowVccWatch BOOLEAN, lowSignalWatch BOOLEAN, sendEmailAction BOOLEAN, resendPeriod INTEGER, triggersPerSensor STRING, lastTriggeredTimePoint DATETIME);";
+			"lowVccWatch BOOLEAN, lowSignalWatch BOOLEAN, sendEmailAction BOOLEAN, resendPeriod INTEGER, triggersPerSensor STRING, triggersPerBaseStation STRING, lastTriggeredTimePoint DATETIME);";
 		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
@@ -273,8 +273,9 @@ Result<void> DB::load(sqlite3& db)
 		sqlite3_stmt* stmt;
 		if (sqlite3_prepare_v2(&db, "REPLACE INTO Alarms (id, name, filterSensors, sensors, lowTemperatureWatch, lowTemperatureSoft, lowTemperatureHard, highTemperatureWatch, highTemperatureSoft, highTemperatureHard, "
 						                       "lowHumidityWatch, lowHumiditySoft, lowHumidityHard, highHumidityWatch, highHumiditySoft, highHumidityHard, "
-						                       "lowVccWatch, lowSignalWatch, sendEmailAction, resendPeriod, triggersPerSensor, lastTriggeredTimePoint) "
-							        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22);", -1, &stmt, NULL) != SQLITE_OK)
+						                       "lowVccWatch, lowSignalWatch, sensorBlackoutWatch, baseStationDisconnectedWatch, sendEmailAction, resendPeriod, triggersPerSensor, triggersPerBaseStation, "
+											   "lastTriggeredTimePoint) "
+							        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25);", -1, &stmt, NULL) != SQLITE_OK)
 		{
 			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -550,7 +551,8 @@ Result<void> DB::load(sqlite3& db)
 	{
 		const char* sql = "SELECT id, name, filterSensors, sensors, lowTemperatureWatch, lowTemperatureSoft, lowTemperatureHard, highTemperatureWatch, highTemperatureSoft, highTemperatureHard, "
 			 			            "lowHumidityWatch, lowHumiditySoft, lowHumidityHard, highHumidityWatch, highHumiditySoft, highHumidityHard, "
-			 			            "lowVccWatch, lowSignalWatch, sendEmailAction, resendPeriod, triggersPerSensor, lastTriggeredTimePoint "
+							        "lowVccWatch, lowSignalWatch, sensorBlackoutWatch, baseStationDisconnectedWatch, sendEmailAction, resendPeriod, triggersPerSensor, triggersPerBaseStation, "
+				                    "lastTriggeredTimePoint "
                           "FROM Alarms;";
 		sqlite3_stmt* stmt;
 		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
@@ -591,10 +593,12 @@ Result<void> DB::load(sqlite3& db)
 			std::tie(a.descriptor.highHumiditySoft, a.descriptor.highHumidityHard) = std::minmax(a.descriptor.highHumiditySoft, a.descriptor.highHumidityHard);
 			a.descriptor.lowVccWatch = sqlite3_column_int64(stmt, 16);
 			a.descriptor.lowSignalWatch = sqlite3_column_int64(stmt, 17);
-			a.descriptor.sendEmailAction = sqlite3_column_int64(stmt, 18);
-            a.descriptor.resendPeriod = std::chrono::seconds(sqlite3_column_int64(stmt, 19));
+			a.descriptor.sensorBlackoutWatch = sqlite3_column_int64(stmt, 18);
+			a.descriptor.baseStationDisconnectedWatch = sqlite3_column_int64(stmt, 19);
+			a.descriptor.sendEmailAction = sqlite3_column_int64(stmt, 20);
+            a.descriptor.resendPeriod = std::chrono::seconds(sqlite3_column_int64(stmt, 21));
 			{
-				QString triggers = (char const*)sqlite3_column_text(stmt, 20);
+				QString triggers = (char const*)sqlite3_column_text(stmt, 22);
 				QStringList l = triggers.split(QChar(';'), QString::SkipEmptyParts);
 				for (QString str : l)
 				{
@@ -609,7 +613,23 @@ Result<void> DB::load(sqlite3& db)
                     }
 				}
 			}
-            a.lastTriggeredTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 21));
+			{
+				QString triggers = (char const*)sqlite3_column_text(stmt, 23);
+				QStringList l = triggers.split(QChar(';'), QString::SkipEmptyParts);
+				for (QString str : l)
+				{
+					QStringList l2 = str.trimmed().split(QChar('/'), QString::SkipEmptyParts);
+					if (l2.size() == 2)
+					{
+						a.triggersPerBaseStation.emplace(atoll(l2[0].trimmed().toUtf8().data()), atoi(l2[1].trimmed().toUtf8().data()));
+					}
+					else
+					{
+						Q_ASSERT(false);
+					}
+				}
+			}
+			a.lastTriggeredTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 24));
 			data.alarms.push_back(std::move(a));
 		}
 	}
@@ -715,7 +735,8 @@ void DB::checkRepetitiveAlarms()
 	bool triggerSave = false;
 	for (Alarm& alarm : m_data.alarms)
 	{
-        if (!alarm.triggersPerSensor.empty() && Clock::now() - alarm.lastTriggeredTimePoint >= alarm.descriptor.resendPeriod)
+        if ((!alarm.triggersPerSensor.empty() || !alarm.triggersPerBaseStation.empty()) && 
+			(Clock::now() - alarm.lastTriggeredTimePoint >= alarm.descriptor.resendPeriod))
         {
             emit alarmStillTriggered(alarm.id);
             alarm.lastTriggeredTimePoint = Clock::now();
@@ -756,6 +777,60 @@ void DB::checkReports()
 
 //////////////////////////////////////////////////////////////////////////
 
+void DB::checkForDisconnectedBaseStations()
+{
+	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+
+	for (BaseStation& bs: m_data.baseStations)
+	{
+		if (!bs.isConnected && Clock::now() - bs.lastConnectedTimePoint > std::chrono::minutes(1))
+		{
+			computeAlarmTriggersForBaseStation(bs);
+		}
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void DB::checkForBlackoutSensors()
+{
+	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+
+	bool saveSensors = false;
+	SensorTimeConfig timeConfig = getLastSensorTimeConfig();
+	for (Sensor& s : m_data.sensors)
+	{
+		bool wasBlackout = s.blackout;
+		if (s.state == Sensor::State::Active && Clock::now() - s.lastCommsTimePoint > timeConfig.descriptor.commsPeriod * 1.5f)
+		{
+			s.blackout = true;
+		}
+		else
+		{
+			s.blackout = false;
+		}
+
+		//only send emails 2 rounds after being added to avoid slamming every time the program is started
+		if (Clock::now() - s.addedTimePoint > timeConfig.descriptor.commsPeriod * 2) 
+		{
+			if (!wasBlackout && s.blackout)
+			{
+				s.errorCounters.commsBlackouts++;
+				saveSensors = true;
+			}
+
+			computeAlarmTriggersForSensor(s);
+		}
+	}
+
+	if (saveSensors)
+	{
+		scheduleSave();
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void DB::process()
 {
 	addAsyncMeasurements();
@@ -766,6 +841,8 @@ void DB::process()
 
     checkRepetitiveAlarms();
 	checkReports();
+	checkForDisconnectedBaseStations();
+	checkForBlackoutSensors();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1314,6 +1391,40 @@ bool DB::setBaseStation(BaseStationId id, BaseStationDescriptor const& descripto
 
 //////////////////////////////////////////////////////////////////////////
 
+void DB::setBaseStationConnected(BaseStationId id, bool connected)
+{
+	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+
+	int32_t _index = findBaseStationIndexById(id);
+	if (_index < 0)
+	{
+		Q_ASSERT(false);
+		return;
+	}
+
+	size_t index = static_cast<size_t>(_index);
+
+	BaseStation& bs = m_data.baseStations[index];
+	if (bs.isConnected == connected)
+	{
+		return;
+	}
+
+	bs.isConnected = connected;
+	bs.lastConnectedTimePoint = Clock::now();
+	if (connected)
+	{
+		computeAlarmTriggersForBaseStation(bs);
+	}
+
+	m_data.baseStationsChanged = true;
+	emit baseStationChanged(id);
+
+	save(true);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void DB::removeBaseStation(size_t index)
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
@@ -1825,12 +1936,6 @@ bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
         {
             if (d.lastCommsTimePoint > sensor.lastCommsTimePoint)
             {
-                //skipped beats?
-                if (sensor.lastCommsTimePoint + getLastSensorTimeConfig().computedCommsPeriod + std::chrono::minutes(1) < d.lastCommsTimePoint)
-                {
-                    sensor.errorCounters.commsBlackouts++;
-                }
-
                 sensor.lastCommsTimePoint = d.lastCommsTimePoint;
             }
         }
@@ -2210,7 +2315,7 @@ int32_t DB::findAlarmIndexById(AlarmId id) const
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::AlarmTriggers DB::computeAlarmTriggers(Measurement const& m)
+DB::AlarmTriggers DB::computeAlarmTriggersForMeasurement(Measurement const& m)
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
@@ -2218,7 +2323,7 @@ DB::AlarmTriggers DB::computeAlarmTriggers(Measurement const& m)
 
     for (Alarm& alarm: m_data.alarms)
     {
-		AlarmTriggers triggers = _computeAlarmTriggers(alarm, m);
+		AlarmTriggers triggers = _computeAlarmTriggersForMeasurement(alarm, m);
         allTriggers |= triggers;
     }
 
@@ -2227,7 +2332,7 @@ DB::AlarmTriggers DB::computeAlarmTriggers(Measurement const& m)
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::AlarmTriggers DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
+DB::AlarmTriggers DB::_computeAlarmTriggersForMeasurement(Alarm& alarm, Measurement const& m)
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
@@ -2328,10 +2433,172 @@ DB::AlarmTriggers DB::_computeAlarmTriggers(Alarm& alarm, Measurement const& m)
                          .arg(triggers.removed));
 
 		alarm.lastTriggeredTimePoint = Clock::now();
-        emit alarmTriggersChanged(alarm.id, m, oldTriggers, triggers);
+        emit alarmSensorTriggersChanged(alarm.id, m.descriptor.sensorId, m, oldTriggers, triggers);
     }
 
     return triggers;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+DB::AlarmTriggers DB::computeAlarmTriggersForSensor(Sensor const& s)
+{
+	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+
+	AlarmTriggers allTriggers;
+
+	for (Alarm& alarm : m_data.alarms)
+	{
+		AlarmTriggers triggers = _computeAlarmTriggersForSensor(alarm, s);
+		allTriggers |= triggers;
+	}
+
+	return allTriggers;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+DB::AlarmTriggers DB::_computeAlarmTriggersForSensor(Alarm& alarm, Sensor const& s)
+{
+	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+
+	uint32_t currentTriggers = 0;
+
+	bool sensorWatched = true;
+	AlarmDescriptor const& ad = alarm.descriptor;
+	if (ad.filterSensors)
+	{
+		if (ad.sensors.find(s.id) == ad.sensors.end())
+		{
+			sensorWatched = false;
+		}
+	}
+
+	if (sensorWatched)
+	{
+		if (ad.sensorBlackoutWatch && s.blackout)
+		{
+			currentTriggers |= AlarmTrigger::SensorBlackout;
+		}
+	}
+
+	uint32_t oldTriggers = 0;
+	auto it = alarm.triggersPerSensor.find(s.id);
+	if (it != alarm.triggersPerSensor.end())
+	{
+		oldTriggers = it->second;
+	}
+
+	if (currentTriggers != oldTriggers)
+	{
+		if (currentTriggers == 0)
+		{
+			alarm.triggersPerSensor.erase(s.id);
+		}
+		else
+		{
+			alarm.triggersPerSensor[s.id] = currentTriggers;
+		}
+		m_data.alarmsChanged = true;
+	}
+
+	AlarmTriggers triggers;
+	triggers.current = currentTriggers;
+
+	uint32_t diff = oldTriggers ^ currentTriggers;
+	if (diff != 0)
+	{
+		triggers.removed = diff & oldTriggers;
+		triggers.added = diff & currentTriggers;
+
+		s_logger.logInfo(QString("Alarm '%1' triggers for sensor %2 have changed: old %3, new %4, added %5, removed %6")
+						 .arg(ad.name.c_str())
+						 .arg(s.descriptor.name.c_str())
+						 .arg(oldTriggers)
+						 .arg(currentTriggers)
+						 .arg(triggers.added)
+						 .arg(triggers.removed));
+
+		alarm.lastTriggeredTimePoint = Clock::now();
+		emit alarmSensorTriggersChanged(alarm.id, s.id, std::nullopt, oldTriggers, triggers);
+	}
+
+	return triggers;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+DB::AlarmTriggers DB::computeAlarmTriggersForBaseStation(BaseStation const& bs)
+{
+	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+
+	AlarmTriggers allTriggers;
+
+	for (Alarm& alarm : m_data.alarms)
+	{
+		AlarmTriggers triggers = _computeAlarmTriggersForBaseStation(alarm, bs);
+		allTriggers |= triggers;
+	}
+
+	return allTriggers;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+DB::AlarmTriggers DB::_computeAlarmTriggersForBaseStation(Alarm& alarm, BaseStation const& bs)
+{
+	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+
+	uint32_t currentTriggers = 0;
+
+	AlarmDescriptor const& ad = alarm.descriptor;
+	if (ad.baseStationDisconnectedWatch && !bs.isConnected)
+	{
+		currentTriggers |= AlarmTrigger::BaseStationDisconnected;
+	}
+
+	uint32_t oldTriggers = 0;
+	auto it = alarm.triggersPerBaseStation.find(bs.id);
+	if (it != alarm.triggersPerBaseStation.end())
+	{
+		oldTriggers = it->second;
+	}
+
+	if (currentTriggers != oldTriggers)
+	{
+		if (currentTriggers == 0)
+		{
+			alarm.triggersPerBaseStation.erase(bs.id);
+		}
+		else
+		{
+			alarm.triggersPerBaseStation[bs.id] = currentTriggers;
+		}
+		m_data.alarmsChanged = true;
+	}
+
+	AlarmTriggers triggers;
+	triggers.current = currentTriggers;
+
+	uint32_t diff = oldTriggers ^ currentTriggers;
+	if (diff != 0)
+	{
+		triggers.removed = diff & oldTriggers;
+		triggers.added = diff & currentTriggers;
+
+		s_logger.logInfo(QString("Alarm '%1' triggers for base station %2 have changed: old %3, new %4, added %5, removed %6")
+						 .arg(ad.name.c_str())
+						 .arg(bs.id)
+						 .arg(oldTriggers)
+						 .arg(currentTriggers)
+						 .arg(triggers.added)
+						 .arg(triggers.removed));
+
+		alarm.lastTriggeredTimePoint = Clock::now();
+		emit alarmBaseStationTriggersChanged(alarm.id, bs.id, oldTriggers, triggers);
+	}
+
+	return triggers;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -2588,7 +2855,7 @@ bool DB::addSingleSensorMeasurements(SensorId sensorId, std::vector<MeasurementD
 				m.descriptor = md;
 				m.timePoint = computeMeasurementTimepoint(md);
                 m.receivedTimePoint = Clock::now();
-				m.alarmTriggers = computeAlarmTriggers(m);
+				m.alarmTriggers = computeAlarmTriggersForMeasurement(m);
                 asyncMeasurements.emplace_back(m);
 
 				sqlite3_bind_int64(stmt, 1, Clock::to_time_t(m.timePoint));
@@ -3349,15 +3616,27 @@ void DB::save(Data& data, bool newTransaction) const
 			sqlite3_bind_double(stmt, 16, a.descriptor.highHumidityHard);
 			sqlite3_bind_int(stmt, 17, a.descriptor.lowVccWatch ? 1 : 0);
 			sqlite3_bind_int(stmt, 18, a.descriptor.lowSignalWatch ? 1 : 0);
-			sqlite3_bind_int(stmt, 19, a.descriptor.sendEmailAction ? 1 : 0);
-			sqlite3_bind_int64(stmt, 20, std::chrono::duration_cast<std::chrono::seconds>(a.descriptor.resendPeriod).count());
-			std::string triggers;
-			for (auto p : a.triggersPerSensor)
+			sqlite3_bind_int(stmt, 19, a.descriptor.sensorBlackoutWatch ? 1 : 0);
+			sqlite3_bind_int(stmt, 20, a.descriptor.baseStationDisconnectedWatch ? 1 : 0);
+			sqlite3_bind_int(stmt, 21, a.descriptor.sendEmailAction ? 1 : 0);
+			sqlite3_bind_int64(stmt, 22, std::chrono::duration_cast<std::chrono::seconds>(a.descriptor.resendPeriod).count());
 			{
-				triggers += std::to_string(p.first) + "/" + std::to_string(p.second) + ";";
+				std::string triggers;
+				for (auto p : a.triggersPerSensor)
+				{
+					triggers += std::to_string(p.first) + "/" + std::to_string(p.second) + ";";
+				}
+				sqlite3_bind_text(stmt, 23, triggers.c_str(), -1, SQLITE_STATIC);
 			}
-			sqlite3_bind_text(stmt, 21, triggers.c_str(), -1, SQLITE_STATIC);
-			sqlite3_bind_int64(stmt, 22, Clock::to_time_t(a.lastTriggeredTimePoint));
+			{
+				std::string triggers;
+				for (auto p : a.triggersPerBaseStation)
+				{
+					triggers += std::to_string(p.first) + "/" + std::to_string(p.second) + ";";
+				}
+				sqlite3_bind_text(stmt, 24, triggers.c_str(), -1, SQLITE_STATIC);
+			}
+			sqlite3_bind_int64(stmt, 25, Clock::to_time_t(a.lastTriggeredTimePoint));
 			if (sqlite3_step(stmt) != SQLITE_DONE)
 			{
 				s_logger.logCritical(QString("Failed to save alarms: %1").arg(sqlite3_errmsg(m_sqlite)));

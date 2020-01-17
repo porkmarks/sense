@@ -144,8 +144,10 @@ void ConfigureAlarmDialog::setAlarm(DB::Alarm const& alarm)
     m_ui.lowHumiditySoft->setValue(descriptor.lowHumiditySoft);
     m_ui.lowHumidityHard->setValue(descriptor.lowHumidityHard);
 
-    m_ui.lowSignalWatch->setChecked(descriptor.lowSignalWatch);
     m_ui.lowBatteryWatch->setChecked(descriptor.lowVccWatch);
+    m_ui.lowSignalWatch->setChecked(descriptor.lowSignalWatch);
+    m_ui.sensorBlackoutWatch->setChecked(descriptor.sensorBlackoutWatch);
+    m_ui.baseStationDisconnectedWatch->setChecked(descriptor.baseStationDisconnectedWatch);
 
     m_ui.sendEmailAction->setChecked(descriptor.sendEmailAction);
 //    m_ui.emailRecipient->setText(descriptor.emailRecipient.c_str());
@@ -204,8 +206,10 @@ void ConfigureAlarmDialog::accept()
     descriptor.lowHumiditySoft = static_cast<float>(m_ui.lowHumiditySoft->value());
     descriptor.lowHumidityHard = static_cast<float>(m_ui.lowHumidityHard->value());
 
-    descriptor.lowSignalWatch = m_ui.lowSignalWatch->isChecked();
     descriptor.lowVccWatch = m_ui.lowBatteryWatch->isChecked();
+    descriptor.lowSignalWatch = m_ui.lowSignalWatch->isChecked();
+    descriptor.sensorBlackoutWatch = m_ui.sensorBlackoutWatch->isChecked();
+    descriptor.baseStationDisconnectedWatch = m_ui.baseStationDisconnectedWatch->isChecked();
 
     descriptor.sendEmailAction = m_ui.sendEmailAction->isChecked();
 //    descriptor.emailRecipient = m_ui.emailRecipient->text().toUtf8().data();
@@ -236,7 +240,9 @@ void ConfigureAlarmDialog::accept()
     if (!descriptor.highTemperatureWatch && !descriptor.lowTemperatureWatch &&
             !descriptor.highHumidityWatch && !descriptor.lowHumidityWatch &&
             !descriptor.lowSignalWatch &&
-            !descriptor.lowVccWatch)
+            !descriptor.lowVccWatch &&
+            !descriptor.sensorBlackoutWatch &&
+            !descriptor.baseStationDisconnectedWatch)
     {
         QMessageBox::critical(this, "Error", "You need to specify at least a trigger condition.");
         return;

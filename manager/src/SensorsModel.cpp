@@ -288,16 +288,16 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
             }
             else
             {
+                if (sensor.blackout)
+                {
+					return QVariant(QColor(255, 150, 150));
+                }
                 if (sensor.lastCommsTimePoint.time_since_epoch().count() != 0)
                 {
                     auto p = utils::computeRelativeTimePointString(sensor.lastCommsTimePoint + m_db.getLastSensorTimeConfig().computedCommsPeriod);
-                    if (p.second < k_imminentMaxSecond && p.second > k_imminentMinSecond)
+                    if (p.second < k_imminentMaxSecond)
                     {
                         return QVariant(QColor(255, 255, 150));
-                    }
-                    if (p.second < k_imminentMinSecond)
-                    {
-                        return QVariant(QColor(255, 150, 150));
                     }
                 }
             }

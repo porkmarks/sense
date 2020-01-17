@@ -17,7 +17,7 @@ Emailer::Emailer(DB& db)
 {
     m_emailThread = std::thread(std::bind(&Emailer::emailThreadProc, this));
 
-    connect(&m_db, &DB::alarmTriggersChanged, this, &Emailer::alarmTriggersChanged, Qt::QueuedConnection);
+    connect(&m_db, &DB::alarmSensorTriggersChanged, this, &Emailer::alarmSensorTriggersChanged, Qt::QueuedConnection);
 	connect(&m_db, &DB::alarmStillTriggered, this, &Emailer::alarmStillTriggered, Qt::QueuedConnection);
 	connect(&m_db, &DB::reportTriggered, this, &Emailer::reportTriggered, Qt::QueuedConnection);
 }
@@ -53,10 +53,10 @@ void Emailer::reportTriggered(DB::ReportId reportId, DB::Clock::time_point from,
 
 //////////////////////////////////////////////////////////////////////////
 
-void Emailer::alarmTriggersChanged(DB::AlarmId alarmId, DB::Measurement const& m, uint32_t oldTriggers, DB::AlarmTriggers triggers)
+void Emailer::alarmSensorTriggersChanged(DB::AlarmId alarmId, DB::SensorId sensorId, std::optional<DB::Measurement> measurement, uint32_t oldTriggers, DB::AlarmTriggers triggers)
 {
     int32_t alarmIndex = m_db.findAlarmIndexById(alarmId);
-    int32_t sensorIndex = m_db.findSensorIndexById(m.descriptor.sensorId);
+    int32_t sensorIndex = m_db.findSensorIndexById(sensorId);
     if (alarmIndex < 0 || sensorIndex < 0)
     {
         assert(false);
@@ -70,11 +70,11 @@ void Emailer::alarmTriggersChanged(DB::AlarmId alarmId, DB::Measurement const& m
     {
         if (triggers.removed != 0)
         {
-            sendAlarmEmail(alarm, sensor, m, oldTriggers, triggers.current, triggers.removed, Action::Recovery);
+            sendAlarmEmail(alarm, sensor, measurement, oldTriggers, triggers.current, triggers.removed, Action::Recovery);
         }
         if (triggers.added != 0)
         {
-            sendAlarmEmail(alarm, sensor, m, oldTriggers, triggers.current, triggers.added, Action::Trigger);
+            sendAlarmEmail(alarm, sensor, measurement, oldTriggers, triggers.current, triggers.added, Action::Trigger);
         }
     }
 }
@@ -100,7 +100,7 @@ void Emailer::alarmStillTriggered(DB::AlarmId alarmId)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, DB::Measurement const& m, uint32_t oldTriggers, uint32_t newTriggers, uint32_t triggers, Action action)
+void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, std::optional<DB::Measurement> measurement, uint32_t oldTriggers, uint32_t newTriggers, uint32_t triggers, Action action)
 {
     Email email;
 
@@ -118,61 +118,65 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
     ///////////////////////////////
     // BODY
 
-    const char* alertTemplateStr = R"X(<table style="border-style: solid; border-width: 2px; border-color: #%1;"><tbody><tr><td><strong>%2%3%4</strong></td></tr></tbody></table>)X";
-
-    QString temperatureStr;
-    if (newTriggers & DB::AlarmTrigger::Temperature)
+    if (measurement.has_value())
 	{
-		if (newTriggers & DB::AlarmTrigger::HighTemperatureHard)
-			temperatureStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very High: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
-		else if (newTriggers & DB::AlarmTrigger::HighTemperatureSoft)
-			temperatureStr = QString(alertTemplateStr).arg(utils::k_highThresholdSoftColor & 0xFFFFFF, 6, 16, QChar('0')).arg("High: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
-		else if (newTriggers & DB::AlarmTrigger::LowTemperatureHard)
-			temperatureStr = QString(alertTemplateStr).arg(utils::k_lowThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very Low: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
-		else if (newTriggers & DB::AlarmTrigger::LowTemperatureSoft)
-			temperatureStr = QString(alertTemplateStr).arg(utils::k_lowThresholdSoftColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Low: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
-	}
-    else if (oldTriggers & DB::AlarmTrigger::Temperature)
-		temperatureStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Recovered: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
-    else 
-        temperatureStr = QString(R"X(%1&deg;C)X").arg(m.descriptor.temperature, 0, 'f', 1);
+		const char* alertTemplateStr = R"X(<table style="border-style: solid; border-width: 2px; border-color: #%1;"><tbody><tr><td><strong>%2%3%4</strong></td></tr></tbody></table>)X";
 
-	QString humidityStr;
-	if (newTriggers & DB::AlarmTrigger::Humidity)
-	{
-		if (newTriggers & DB::AlarmTrigger::HighHumidityHard)
-            humidityStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very High: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
-	    else if (newTriggers & DB::AlarmTrigger::HighHumiditySoft)
-            humidityStr = QString(alertTemplateStr).arg(utils::k_highThresholdSoftColor & 0xFFFFFF, 6, 16, QChar('0')).arg("High: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
-	    else if (newTriggers & DB::AlarmTrigger::LowHumidityHard)
-            humidityStr = QString(alertTemplateStr).arg(utils::k_lowThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very Low: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
-	    else if (newTriggers & DB::AlarmTrigger::LowHumiditySoft)
-            humidityStr = QString(alertTemplateStr).arg(utils::k_lowThresholdSoftColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Low: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
-	}
-	else if (oldTriggers & DB::AlarmTrigger::Humidity)
-        humidityStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Recovered: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
-	else
-        humidityStr = QString(R"X(%1&deg;C)X").arg(m.descriptor.humidity, 0, 'f', 1);
+		QString temperatureStr;
+		QString humidityStr;
+		QString batteryStr;
+		QString signalStrengthStr;
 
-	QString batteryStr;
-    int batteryPercentage = static_cast<int>(utils::getBatteryLevel(m.descriptor.vcc) * 100.f);
-	if (newTriggers & DB::AlarmTrigger::LowVcc)
-        batteryStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very Low: ").arg(batteryPercentage).arg("%");
-	else if (oldTriggers & DB::AlarmTrigger::LowVcc)
-        batteryStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Recovered: ").arg(batteryPercentage).arg("%");
-	else
-        batteryStr = QString(R"X(%1%)X").arg(batteryPercentage);
+        DB::Measurement const& m = *measurement;
+		if (newTriggers & DB::AlarmTrigger::Temperature)
+		{
+			if (newTriggers & DB::AlarmTrigger::HighTemperatureHard)
+				temperatureStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very High: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
+			else if (newTriggers & DB::AlarmTrigger::HighTemperatureSoft)
+				temperatureStr = QString(alertTemplateStr).arg(utils::k_highThresholdSoftColor & 0xFFFFFF, 6, 16, QChar('0')).arg("High: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
+			else if (newTriggers & DB::AlarmTrigger::LowTemperatureHard)
+				temperatureStr = QString(alertTemplateStr).arg(utils::k_lowThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very Low: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
+			else if (newTriggers & DB::AlarmTrigger::LowTemperatureSoft)
+				temperatureStr = QString(alertTemplateStr).arg(utils::k_lowThresholdSoftColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Low: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
+		}
+		else if (oldTriggers & DB::AlarmTrigger::Temperature)
+			temperatureStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Recovered: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
+		else
+			temperatureStr = QString(R"X(%1&deg;C)X").arg(m.descriptor.temperature, 0, 'f', 1);
 
-	QString signalStrengthStr;
-    int signalStrengthPercentage = static_cast<int>(utils::getSignalLevel(std::min(m.descriptor.signalStrength.s2b, m.descriptor.signalStrength.b2s)) * 100.f);
-	if (newTriggers & DB::AlarmTrigger::LowSignal)
-        signalStrengthStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very Low: ").arg(signalStrengthPercentage).arg("%");
-	else if (oldTriggers & DB::AlarmTrigger::LowSignal)
-        signalStrengthStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Recovered: ").arg(signalStrengthPercentage).arg("%");
-	else
-        signalStrengthStr = QString(R"X(%1%)X").arg(signalStrengthPercentage);
+		if (newTriggers & DB::AlarmTrigger::Humidity)
+		{
+			if (newTriggers & DB::AlarmTrigger::HighHumidityHard)
+				humidityStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very High: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
+			else if (newTriggers & DB::AlarmTrigger::HighHumiditySoft)
+				humidityStr = QString(alertTemplateStr).arg(utils::k_highThresholdSoftColor & 0xFFFFFF, 6, 16, QChar('0')).arg("High: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
+			else if (newTriggers & DB::AlarmTrigger::LowHumidityHard)
+				humidityStr = QString(alertTemplateStr).arg(utils::k_lowThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very Low: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
+			else if (newTriggers & DB::AlarmTrigger::LowHumiditySoft)
+				humidityStr = QString(alertTemplateStr).arg(utils::k_lowThresholdSoftColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Low: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
+		}
+		else if (oldTriggers & DB::AlarmTrigger::Humidity)
+			humidityStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Recovered: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
+		else
+			humidityStr = QString(R"X(%1&deg;C)X").arg(m.descriptor.humidity, 0, 'f', 1);
 
-    email.body += QString(R"X(
+		int batteryPercentage = static_cast<int>(utils::getBatteryLevel(m.descriptor.vcc) * 100.f);
+		if (newTriggers & DB::AlarmTrigger::LowVcc)
+			batteryStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very Low: ").arg(batteryPercentage).arg("%");
+		else if (oldTriggers & DB::AlarmTrigger::LowVcc)
+			batteryStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Recovered: ").arg(batteryPercentage).arg("%");
+		else
+			batteryStr = QString(R"X(%1%)X").arg(batteryPercentage);
+
+		int signalStrengthPercentage = static_cast<int>(utils::getSignalLevel(std::min(m.descriptor.signalStrength.s2b, m.descriptor.signalStrength.b2s)) * 100.f);
+		if (newTriggers & DB::AlarmTrigger::LowSignal)
+			signalStrengthStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very Low: ").arg(signalStrengthPercentage).arg("%");
+		else if (oldTriggers & DB::AlarmTrigger::LowSignal)
+			signalStrengthStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Recovered: ").arg(signalStrengthPercentage).arg("%");
+		else
+			signalStrengthStr = QString(R"X(%1%)X").arg(signalStrengthPercentage);
+
+		email.body += QString(R"X(
 <table>
 <tbody>
 <tr><td><strong>Sensor:</strong></td>           <td>%1</td></tr>
@@ -186,62 +190,63 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, D
 </tbody>
 </table>
     )X").arg(sensor.descriptor.name.c_str())
-        .arg(sensor.serialNumber, 8, 16, QChar('0'))
-        .arg(utils::toString<DB::Clock>(m.timePoint, m_db.getGeneralSettings().dateTimeFormat))
-        .arg(utils::toString<DB::Clock>(m.receivedTimePoint, m_db.getGeneralSettings().dateTimeFormat))
-        .arg(temperatureStr)
-        .arg(humidityStr)
-        .arg(batteryStr)
-        .arg(signalStrengthStr)
-        .toUtf8().data();
-
-
-    if (alarm.descriptor.lowTemperatureWatch || alarm.descriptor.highTemperatureWatch)
-	{
-        QString lowTemperatureStr;
-        if (alarm.descriptor.lowTemperatureWatch)
-		{
-            lowTemperatureStr = QString(R"X(<strong><span style="color: #011fff;">%1</span>&nbsp;|&nbsp;<span style="color: #004a96;">%2</span>&nbsp;|&nbsp;)X").arg(alarm.descriptor.lowTemperatureHard, 0, 'f', 1).arg(alarm.descriptor.lowTemperatureSoft, 0, 'f', 1);
-		}
-		QString highTemperatureStr;
-		if (alarm.descriptor.highTemperatureWatch)
-		{
-			highTemperatureStr = QString(R"X(&nbsp;|&nbsp;<span style="color: #f37736;">%1</span>&nbsp;|&nbsp;<span style="color: #ff2015;">%2</span>)X").arg(alarm.descriptor.highTemperatureSoft, 0, 'f', 1).arg(alarm.descriptor.highTemperatureHard, 0, 'f', 1);
-		}
-        email.body += QString(R"X(<p><strong>Temperature Thresholds</strong><strong>&nbsp;(&deg;C):&nbsp;</strong>%1<span style="color: #339966;">OK</span>%2</p>)X").arg(lowTemperatureStr).arg(highTemperatureStr).toUtf8().data();
-	}
-	if (alarm.descriptor.lowHumidityWatch || alarm.descriptor.highHumidityWatch)
-	{
-		QString lowHumidityStr;
-		if (alarm.descriptor.lowHumidityWatch)
-		{
-			lowHumidityStr = QString(R"X(<strong><span style="color: #011fff;">%1</span>&nbsp;|&nbsp;<span style="color: #004a96;">%2</span>&nbsp;|&nbsp;)X").arg(alarm.descriptor.lowHumidityHard, 0, 'f', 1).arg(alarm.descriptor.lowHumiditySoft, 0, 'f', 1);
-		}
-		QString highHumidityStr;
-		if (alarm.descriptor.highHumidityWatch)
-		{
-			highHumidityStr = QString(R"X(&nbsp;|&nbsp;<span style="color: #f37736;">%1</span>&nbsp;|&nbsp;<span style="color: #ff2015;">%2</span>)X").arg(alarm.descriptor.highHumiditySoft, 0, 'f', 1).arg(alarm.descriptor.highHumidityHard, 0, 'f', 1);
-		}
-		email.body += QString(R"X(<p><strong>Humidity Thresholds</strong><strong>&nbsp;(%RH):&nbsp;</strong>%1<span style="color: #339966;">OK</span>%2</p>)X").arg(lowHumidityStr).arg(highHumidityStr).toUtf8().data();
-	}
-    if (alarm.descriptor.lowVccWatch)
-	{
-		email.body += QString(R"X(<p><strong>Battery Threshold</strong><strong>&nbsp;(%):&nbsp;</strong><strong><span style="color: #ff2015;">%1</span>&nbsp;|&nbsp;<span style="color: #339966;">OK</span></strong></p>)X")
-            .arg(static_cast<int>(m_db.getSensorSettings().alertBatteryLevel * 100.f))
-            .toUtf8().data();
-	}
-	if (alarm.descriptor.lowSignalWatch)
-	{
-		email.body += QString(R"X(<p><strong>Signal Strength Threshold</strong><strong>&nbsp;(%):&nbsp;</strong><strong><span style="color: #ff2015;">%1</span>&nbsp;|&nbsp;<span style="color: #339966;">OK</span></strong></p>)X")
-			.arg(static_cast<int>(m_db.getSensorSettings().alertSignalStrengthLevel * 100.f))
+			.arg(sensor.serialNumber, 8, 16, QChar('0'))
+			.arg(utils::toString<DB::Clock>(m.timePoint, m_db.getGeneralSettings().dateTimeFormat))
+			.arg(utils::toString<DB::Clock>(m.receivedTimePoint, m_db.getGeneralSettings().dateTimeFormat))
+			.arg(temperatureStr)
+			.arg(humidityStr)
+			.arg(batteryStr)
+			.arg(signalStrengthStr)
 			.toUtf8().data();
-	}
 
-	QString dateTimeFormatStr = utils::getQDateTimeFormatString(m_db.getGeneralSettings().dateTimeFormat);
-	email.body += QString(R"X(
+
+		if (alarm.descriptor.lowTemperatureWatch || alarm.descriptor.highTemperatureWatch)
+		{
+			QString lowTemperatureStr;
+			if (alarm.descriptor.lowTemperatureWatch)
+			{
+				lowTemperatureStr = QString(R"X(<strong><span style="color: #011fff;">%1</span>&nbsp;|&nbsp;<span style="color: #004a96;">%2</span>&nbsp;|&nbsp;)X").arg(alarm.descriptor.lowTemperatureHard, 0, 'f', 1).arg(alarm.descriptor.lowTemperatureSoft, 0, 'f', 1);
+			}
+			QString highTemperatureStr;
+			if (alarm.descriptor.highTemperatureWatch)
+			{
+				highTemperatureStr = QString(R"X(&nbsp;|&nbsp;<span style="color: #f37736;">%1</span>&nbsp;|&nbsp;<span style="color: #ff2015;">%2</span>)X").arg(alarm.descriptor.highTemperatureSoft, 0, 'f', 1).arg(alarm.descriptor.highTemperatureHard, 0, 'f', 1);
+			}
+			email.body += QString(R"X(<p><strong>Temperature Thresholds</strong><strong>&nbsp;(&deg;C):&nbsp;</strong>%1<span style="color: #339966;">OK</span>%2</p>)X").arg(lowTemperatureStr).arg(highTemperatureStr).toUtf8().data();
+		}
+		if (alarm.descriptor.lowHumidityWatch || alarm.descriptor.highHumidityWatch)
+		{
+			QString lowHumidityStr;
+			if (alarm.descriptor.lowHumidityWatch)
+			{
+				lowHumidityStr = QString(R"X(<strong><span style="color: #011fff;">%1</span>&nbsp;|&nbsp;<span style="color: #004a96;">%2</span>&nbsp;|&nbsp;)X").arg(alarm.descriptor.lowHumidityHard, 0, 'f', 1).arg(alarm.descriptor.lowHumiditySoft, 0, 'f', 1);
+			}
+			QString highHumidityStr;
+			if (alarm.descriptor.highHumidityWatch)
+			{
+				highHumidityStr = QString(R"X(&nbsp;|&nbsp;<span style="color: #f37736;">%1</span>&nbsp;|&nbsp;<span style="color: #ff2015;">%2</span>)X").arg(alarm.descriptor.highHumiditySoft, 0, 'f', 1).arg(alarm.descriptor.highHumidityHard, 0, 'f', 1);
+			}
+			email.body += QString(R"X(<p><strong>Humidity Thresholds</strong><strong>&nbsp;(%RH):&nbsp;</strong>%1<span style="color: #339966;">OK</span>%2</p>)X").arg(lowHumidityStr).arg(highHumidityStr).toUtf8().data();
+		}
+		if (alarm.descriptor.lowVccWatch)
+		{
+			email.body += QString(R"X(<p><strong>Battery Threshold</strong><strong>&nbsp;(%):&nbsp;</strong><strong><span style="color: #ff2015;">%1</span>&nbsp;|&nbsp;<span style="color: #339966;">OK</span></strong></p>)X")
+				.arg(static_cast<int>(m_db.getSensorSettings().alertBatteryLevel * 100.f))
+				.toUtf8().data();
+		}
+		if (alarm.descriptor.lowSignalWatch)
+		{
+			email.body += QString(R"X(<p><strong>Signal Strength Threshold</strong><strong>&nbsp;(%):&nbsp;</strong><strong><span style="color: #ff2015;">%1</span>&nbsp;|&nbsp;<span style="color: #339966;">OK</span></strong></p>)X")
+				.arg(static_cast<int>(m_db.getSensorSettings().alertSignalStrengthLevel * 100.f))
+				.toUtf8().data();
+		}
+
+		QString dateTimeFormatStr = utils::getQDateTimeFormatString(m_db.getGeneralSettings().dateTimeFormat);
+		email.body += QString(R"X(
 <p>&nbsp;</p>
 <p><strong>Date/Time Format: %1</strong></p>
 <p>&nbsp;</p>)X").arg(dateTimeFormatStr.toUpper()).toUtf8().data();
+    }
 
 	email.settings = m_db.getEmailSettings();
 

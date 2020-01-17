@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>375</width>
-    <height>545</height>
+    <width>617</width>
+    <height>690</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -30,702 +30,805 @@
        <number>0</number>
       </property>
       <item>
-       <widget class="QGroupBox" name="groupBox">
+       <widget class="QScrollArea" name="scrollArea">
         <property name="sizePolicy">
-         <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+         <sizepolicy hsizetype="MinimumExpanding" vsizetype="Expanding">
           <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
         </property>
-        <property name="title">
-         <string>Triggers</string>
+        <property name="widgetResizable">
+         <bool>true</bool>
         </property>
-        <layout class="QGridLayout" name="gridLayout">
-         <property name="leftMargin">
-          <number>2</number>
+        <widget class="QWidget" name="scrollAreaWidgetContents_2">
+         <property name="geometry">
+          <rect>
+           <x>0</x>
+           <y>0</y>
+           <width>345</width>
+           <height>642</height>
+          </rect>
          </property>
-         <property name="topMargin">
-          <number>2</number>
-         </property>
-         <property name="rightMargin">
-          <number>2</number>
-         </property>
-         <property name="bottomMargin">
-          <number>2</number>
-         </property>
-         <item row="10" column="0" colspan="4">
-          <widget class="QCheckBox" name="highTemperatureWatch">
-           <property name="text">
-            <string>High Temperature</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/temperature.png</normaloff>:/icons/ui/temperature.png</iconset>
-           </property>
-          </widget>
-         </item>
-         <item row="28" column="0" colspan="4">
-          <widget class="QCheckBox" name="lowBatteryWatch">
-           <property name="text">
-            <string>Low Battery</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/battery-0.png</normaloff>:/icons/ui/battery-0.png</iconset>
-           </property>
-          </widget>
-         </item>
-         <item row="5" column="0">
-          <widget class="QLabel" name="label_11">
-           <property name="font">
-            <font>
-             <weight>75</weight>
-             <bold>true</bold>
-            </font>
-           </property>
-           <property name="styleSheet">
-            <string notr="true">QLabel { color : #004a96; }</string>
-           </property>
-           <property name="text">
-            <string>Soft Threshold:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="17" column="0">
-          <widget class="QLabel" name="label_15">
-           <property name="font">
-            <font>
-             <weight>75</weight>
-             <bold>true</bold>
-            </font>
-           </property>
-           <property name="styleSheet">
-            <string notr="true">QLabel { color : #004a96; }</string>
-           </property>
-           <property name="text">
-            <string>Soft Threshold:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="17" column="3">
-          <widget class="QDoubleSpinBox" name="lowHumidityHard">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="suffix">
-            <string> %RH</string>
-           </property>
-           <property name="decimals">
-            <number>1</number>
-           </property>
-           <property name="value">
-            <double>10.000000000000000</double>
-           </property>
-          </widget>
-         </item>
-         <item row="23" column="0">
-          <widget class="QLabel" name="label_17">
-           <property name="font">
-            <font>
-             <weight>75</weight>
-             <bold>true</bold>
-            </font>
-           </property>
-           <property name="styleSheet">
-            <string notr="true">QLabel { color : #f37736; }</string>
-           </property>
-           <property name="text">
-            <string>Soft Threshold:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="30" column="0" colspan="4">
-          <widget class="Line" name="line_6">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-          </widget>
-         </item>
-         <item row="5" column="1">
-          <widget class="QDoubleSpinBox" name="lowTemperatureSoft">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="suffix">
-            <string>°C</string>
-           </property>
-           <property name="decimals">
-            <number>1</number>
-           </property>
-           <property name="minimum">
-            <double>-50.000000000000000</double>
-           </property>
-           <property name="maximum">
-            <double>200.000000000000000</double>
-           </property>
-           <property name="value">
-            <double>5.000000000000000</double>
-           </property>
-          </widget>
-         </item>
-         <item row="8" column="0" colspan="4">
-          <widget class="Line" name="line_2">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-          </widget>
-         </item>
-         <item row="11" column="2">
-          <widget class="QLabel" name="label_14">
-           <property name="font">
-            <font>
-             <weight>75</weight>
-             <bold>true</bold>
-            </font>
-           </property>
-           <property name="styleSheet">
-            <string notr="true">QLabel { color : #ff2015; }</string>
-           </property>
-           <property name="text">
-            <string>Hard Threshold:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="5" column="2">
-          <widget class="QLabel" name="label_12">
-           <property name="font">
-            <font>
-             <weight>75</weight>
-             <bold>true</bold>
-            </font>
-           </property>
-           <property name="styleSheet">
-            <string notr="true">QLabel { color : #011fFF; }</string>
-           </property>
-           <property name="text">
-            <string>Hard Threshold:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="38" column="0">
-          <widget class="QLabel" name="label_8">
-           <property name="enabled">
-            <bool>true</bool>
-           </property>
-           <property name="text">
-            <string>Resend Email Every:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="17" column="2">
-          <widget class="QLabel" name="label_16">
-           <property name="font">
-            <font>
-             <weight>75</weight>
-             <bold>true</bold>
-            </font>
-           </property>
-           <property name="styleSheet">
-            <string notr="true">QLabel { color : #011fFF; }</string>
-           </property>
-           <property name="text">
-            <string>Hard Threshold:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="3" column="0" colspan="4">
-          <spacer name="verticalSpacer">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
-           </property>
-           <property name="sizeType">
-            <enum>QSizePolicy::Fixed</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>1</width>
-             <height>4</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-         <item row="37" column="0" colspan="4">
-          <widget class="QLabel" name="label_9">
-           <property name="font">
-            <font>
-             <pointsize>7</pointsize>
-            </font>
-           </property>
-           <property name="text">
-            <string>Sends an email to this address when any ov the above conditions triggers</string>
-           </property>
-          </widget>
-         </item>
-         <item row="15" column="0" colspan="4">
-          <spacer name="verticalSpacer_3">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
-           </property>
-           <property name="sizeType">
-            <enum>QSizePolicy::Fixed</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>1</width>
-             <height>4</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-         <item row="35" column="0" colspan="4">
-          <spacer name="verticalSpacer_8">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>20</width>
-             <height>40</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-         <item row="26" column="0" colspan="4">
-          <widget class="Line" name="line_5">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="0" colspan="4">
-          <widget class="Line" name="line">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-          </widget>
-         </item>
-         <item row="27" column="0" colspan="4">
-          <spacer name="verticalSpacer_5">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
-           </property>
-           <property name="sizeType">
-            <enum>QSizePolicy::Fixed</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>1</width>
-             <height>4</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-         <item row="1" column="0" colspan="4">
-          <widget class="QLabel" name="label_10">
-           <property name="font">
-            <font>
-             <pointsize>8</pointsize>
-            </font>
-           </property>
-           <property name="text">
-            <string>Enter a unique name for this alarm</string>
-           </property>
-          </widget>
-         </item>
-         <item row="29" column="0" colspan="4">
-          <widget class="QLabel" name="label_6">
-           <property name="font">
-            <font>
-             <pointsize>7</pointsize>
-            </font>
-           </property>
-           <property name="text">
-            <string>Triggered when a sensor is low on battery</string>
-           </property>
-          </widget>
-         </item>
-         <item row="20" column="0" colspan="4">
-          <widget class="Line" name="line_4">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-          </widget>
-         </item>
-         <item row="22" column="0" colspan="4">
-          <widget class="QCheckBox" name="highHumidityWatch">
-           <property name="text">
-            <string>High Humidity</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/humidity.png</normaloff>:/icons/ui/humidity.png</iconset>
-           </property>
-          </widget>
-         </item>
-         <item row="13" column="0" colspan="4">
-          <widget class="QLabel" name="label_3">
-           <property name="font">
-            <font>
-             <pointsize>7</pointsize>
-            </font>
-           </property>
-           <property name="text">
-            <string>Triggered when the temperature is above the set point</string>
-           </property>
-          </widget>
-         </item>
-         <item row="11" column="3">
-          <widget class="QDoubleSpinBox" name="highTemperatureHard">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="suffix">
-            <string>°C</string>
-           </property>
-           <property name="decimals">
-            <number>1</number>
-           </property>
-           <property name="minimum">
-            <double>-50.000000000000000</double>
-           </property>
-           <property name="maximum">
-            <double>200.000000000000000</double>
-           </property>
-           <property name="value">
-            <double>50.000000000000000</double>
-           </property>
-          </widget>
-         </item>
-         <item row="32" column="0" colspan="4">
-          <widget class="QCheckBox" name="lowSignalWatch">
-           <property name="text">
-            <string>Low Signal</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/signal-0.png</normaloff>:/icons/ui/signal-0.png</iconset>
-           </property>
-          </widget>
-         </item>
-         <item row="9" column="0" colspan="4">
-          <spacer name="verticalSpacer_2">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
-           </property>
-           <property name="sizeType">
-            <enum>QSizePolicy::Fixed</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>1</width>
-             <height>4</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-         <item row="16" column="0" colspan="4">
-          <widget class="QCheckBox" name="lowHumidityWatch">
-           <property name="text">
-            <string>Low Humidity</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/humidity.png</normaloff>:/icons/ui/humidity.png</iconset>
-           </property>
-          </widget>
-         </item>
-         <item row="5" column="3">
-          <widget class="QDoubleSpinBox" name="lowTemperatureHard">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="suffix">
-            <string>°C</string>
-           </property>
-           <property name="decimals">
-            <number>1</number>
-           </property>
-           <property name="minimum">
-            <double>-50.000000000000000</double>
-           </property>
-           <property name="maximum">
-            <double>200.000000000000000</double>
-           </property>
-           <property name="value">
-            <double>2.000000000000000</double>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="0">
-          <widget class="QLabel" name="label">
-           <property name="text">
-            <string>Name</string>
-           </property>
-          </widget>
-         </item>
-         <item row="7" column="0" colspan="4">
-          <widget class="QLabel" name="label_2">
-           <property name="font">
-            <font>
-             <pointsize>7</pointsize>
-            </font>
-           </property>
-           <property name="text">
-            <string>Triggered when the temperature is below the set point</string>
-           </property>
-          </widget>
-         </item>
-         <item row="36" column="0" colspan="4">
-          <widget class="QCheckBox" name="sendEmailAction">
-           <property name="text">
-            <string>Send Email</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/email.png</normaloff>:/icons/ui/email.png</iconset>
-           </property>
-          </widget>
-         </item>
-         <item row="21" column="0" colspan="4">
-          <spacer name="verticalSpacer_4">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
-           </property>
-           <property name="sizeType">
-            <enum>QSizePolicy::Fixed</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>1</width>
-             <height>4</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-         <item row="23" column="2">
-          <widget class="QLabel" name="label_18">
-           <property name="font">
-            <font>
-             <weight>75</weight>
-             <bold>true</bold>
-            </font>
-           </property>
-           <property name="styleSheet">
-            <string notr="true">QLabel { color : #ff2015; }</string>
-           </property>
-           <property name="text">
-            <string>Hard Threshold:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="11" column="1">
-          <widget class="QDoubleSpinBox" name="highTemperatureSoft">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="suffix">
-            <string>°C</string>
-           </property>
-           <property name="decimals">
-            <number>1</number>
-           </property>
-           <property name="minimum">
-            <double>-50.000000000000000</double>
-           </property>
-           <property name="maximum">
-            <double>200.000000000000000</double>
-           </property>
-           <property name="value">
-            <double>40.000000000000000</double>
-           </property>
-          </widget>
-         </item>
-         <item row="17" column="1">
-          <widget class="QDoubleSpinBox" name="lowHumiditySoft">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="suffix">
-            <string> %RH</string>
-           </property>
-           <property name="decimals">
-            <number>1</number>
-           </property>
-           <property name="maximum">
-            <double>100.000000000000000</double>
-           </property>
-           <property name="value">
-            <double>20.000000000000000</double>
-           </property>
-          </widget>
-         </item>
-         <item row="11" column="0">
-          <widget class="QLabel" name="label_13">
-           <property name="font">
-            <font>
-             <weight>75</weight>
-             <bold>true</bold>
-            </font>
-           </property>
-           <property name="styleSheet">
-            <string notr="true">QLabel { color : #f37736; }</string>
-           </property>
-           <property name="text">
-            <string>Soft Threshold:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="23" column="3">
-          <widget class="QDoubleSpinBox" name="highHumidityHard">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="suffix">
-            <string> %RH</string>
-           </property>
-           <property name="decimals">
-            <number>1</number>
-           </property>
-           <property name="value">
-            <double>90.000000000000000</double>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="1" colspan="3">
-          <widget class="QLineEdit" name="name">
-           <property name="text">
-            <string>Alarm</string>
-           </property>
-          </widget>
-         </item>
-         <item row="38" column="1" colspan="3">
-          <widget class="QWidget" name="widget" native="true">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <layout class="QHBoxLayout" name="horizontalLayout_2">
-            <property name="leftMargin">
-             <number>0</number>
+         <layout class="QVBoxLayout" name="verticalLayout_3">
+          <property name="spacing">
+           <number>0</number>
+          </property>
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <item>
+           <widget class="QGroupBox" name="groupBox">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
             </property>
-            <property name="topMargin">
-             <number>0</number>
+            <property name="title">
+             <string>Triggers</string>
             </property>
-            <property name="rightMargin">
-             <number>0</number>
-            </property>
-            <property name="bottomMargin">
-             <number>0</number>
-            </property>
-            <item>
-             <widget class="QSpinBox" name="resendValue">
-              <property name="suffix">
-               <string> hours</string>
-              </property>
-              <property name="minimum">
-               <number>1</number>
-              </property>
-              <property name="value">
-               <number>24</number>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </widget>
-         </item>
-         <item row="4" column="0" colspan="4">
-          <widget class="QCheckBox" name="lowTemperatureWatch">
-           <property name="text">
-            <string>Low Temperature</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/temperature.png</normaloff>:/icons/ui/temperature.png</iconset>
-           </property>
-          </widget>
-         </item>
-         <item row="19" column="0" colspan="4">
-          <widget class="QLabel" name="label_4">
-           <property name="font">
-            <font>
-             <pointsize>7</pointsize>
-            </font>
-           </property>
-           <property name="text">
-            <string>Triggered when the humidity is below the set point</string>
-           </property>
-          </widget>
-         </item>
-         <item row="31" column="0" colspan="4">
-          <spacer name="verticalSpacer_6">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
-           </property>
-           <property name="sizeType">
-            <enum>QSizePolicy::Fixed</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>1</width>
-             <height>4</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-         <item row="23" column="1">
-          <widget class="QDoubleSpinBox" name="highHumiditySoft">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="suffix">
-            <string> %RH</string>
-           </property>
-           <property name="decimals">
-            <number>1</number>
-           </property>
-           <property name="value">
-            <double>80.000000000000000</double>
-           </property>
-          </widget>
-         </item>
-         <item row="25" column="0" colspan="4">
-          <widget class="QLabel" name="label_5">
-           <property name="font">
-            <font>
-             <pointsize>7</pointsize>
-            </font>
-           </property>
-           <property name="text">
-            <string>Triggered when the humidity is above the set point</string>
-           </property>
-          </widget>
-         </item>
-         <item row="14" column="0" colspan="4">
-          <widget class="Line" name="line_3">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-          </widget>
-         </item>
-         <item row="33" column="0" colspan="4">
-          <widget class="QLabel" name="label_7">
-           <property name="font">
-            <font>
-             <pointsize>7</pointsize>
-            </font>
-           </property>
-           <property name="text">
-            <string>Triggered when a sensor cannot reliably communicate with the base station</string>
-           </property>
-          </widget>
-         </item>
-         <item row="34" column="0" colspan="4">
-          <widget class="Line" name="line_7">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-          </widget>
-         </item>
-        </layout>
+            <layout class="QGridLayout" name="gridLayout">
+             <property name="leftMargin">
+              <number>2</number>
+             </property>
+             <property name="topMargin">
+              <number>2</number>
+             </property>
+             <property name="rightMargin">
+              <number>2</number>
+             </property>
+             <property name="bottomMargin">
+              <number>2</number>
+             </property>
+             <item row="23" column="0">
+              <widget class="QLabel" name="label_17">
+               <property name="font">
+                <font>
+                 <weight>75</weight>
+                 <bold>true</bold>
+                </font>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">QLabel { color : #f37736; }</string>
+               </property>
+               <property name="text">
+                <string>Soft Threshold:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="44" column="1" colspan="3">
+              <widget class="QWidget" name="widget" native="true">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <layout class="QHBoxLayout" name="horizontalLayout_2">
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>0</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>0</number>
+                </property>
+                <item>
+                 <widget class="QSpinBox" name="resendValue">
+                  <property name="suffix">
+                   <string> hours</string>
+                  </property>
+                  <property name="minimum">
+                   <number>1</number>
+                  </property>
+                  <property name="value">
+                   <number>24</number>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item row="7" column="0" colspan="4">
+              <widget class="QLabel" name="label_2">
+               <property name="font">
+                <font>
+                 <pointsize>7</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>Triggered when the temperature is below the set point</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0" colspan="4">
+              <widget class="QLabel" name="label_10">
+               <property name="font">
+                <font>
+                 <pointsize>8</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>Enter a unique name for this alarm</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1" colspan="3">
+              <widget class="QLineEdit" name="name">
+               <property name="text">
+                <string>Alarm</string>
+               </property>
+              </widget>
+             </item>
+             <item row="28" column="0" colspan="4">
+              <widget class="QCheckBox" name="lowBatteryWatch">
+               <property name="text">
+                <string>Low Battery</string>
+               </property>
+               <property name="icon">
+                <iconset resource="../res/res.qrc">
+                 <normaloff>:/icons/ui/battery-0.png</normaloff>:/icons/ui/battery-0.png</iconset>
+               </property>
+              </widget>
+             </item>
+             <item row="30" column="0" colspan="4">
+              <widget class="Line" name="line_6">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+              </widget>
+             </item>
+             <item row="25" column="0" colspan="4">
+              <widget class="QLabel" name="label_5">
+               <property name="font">
+                <font>
+                 <pointsize>7</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>Triggered when the humidity is above the set point</string>
+               </property>
+              </widget>
+             </item>
+             <item row="11" column="0">
+              <widget class="QLabel" name="label_13">
+               <property name="font">
+                <font>
+                 <weight>75</weight>
+                 <bold>true</bold>
+                </font>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">QLabel { color : #f37736; }</string>
+               </property>
+               <property name="text">
+                <string>Soft Threshold:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="0">
+              <widget class="QLabel" name="label_11">
+               <property name="font">
+                <font>
+                 <weight>75</weight>
+                 <bold>true</bold>
+                </font>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">QLabel { color : #004a96; }</string>
+               </property>
+               <property name="text">
+                <string>Soft Threshold:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="41" column="0" colspan="4">
+              <spacer name="verticalSpacer_8">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item row="16" column="0" colspan="4">
+              <widget class="QCheckBox" name="lowHumidityWatch">
+               <property name="text">
+                <string>Low Humidity</string>
+               </property>
+               <property name="icon">
+                <iconset resource="../res/res.qrc">
+                 <normaloff>:/icons/ui/humidity.png</normaloff>:/icons/ui/humidity.png</iconset>
+               </property>
+              </widget>
+             </item>
+             <item row="34" column="0" colspan="4">
+              <widget class="Line" name="line_7">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="0">
+              <widget class="QLabel" name="label">
+               <property name="text">
+                <string>Name</string>
+               </property>
+              </widget>
+             </item>
+             <item row="17" column="0">
+              <widget class="QLabel" name="label_15">
+               <property name="font">
+                <font>
+                 <weight>75</weight>
+                 <bold>true</bold>
+                </font>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">QLabel { color : #004a96; }</string>
+               </property>
+               <property name="text">
+                <string>Soft Threshold:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="13" column="0" colspan="4">
+              <widget class="QLabel" name="label_3">
+               <property name="font">
+                <font>
+                 <pointsize>7</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>Triggered when the temperature is above the set point</string>
+               </property>
+              </widget>
+             </item>
+             <item row="35" column="0">
+              <widget class="QCheckBox" name="sensorBlackoutWatch">
+               <property name="text">
+                <string>Sensor Blackout</string>
+               </property>
+               <property name="icon">
+                <iconset resource="../res/res.qrc">
+                 <normaloff>:/icons/ui/sensor.png</normaloff>:/icons/ui/sensor.png</iconset>
+               </property>
+              </widget>
+             </item>
+             <item row="15" column="0" colspan="4">
+              <spacer name="verticalSpacer_3">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeType">
+                <enum>QSizePolicy::Fixed</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>1</width>
+                 <height>4</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item row="22" column="0" colspan="4">
+              <widget class="QCheckBox" name="highHumidityWatch">
+               <property name="text">
+                <string>High Humidity</string>
+               </property>
+               <property name="icon">
+                <iconset resource="../res/res.qrc">
+                 <normaloff>:/icons/ui/humidity.png</normaloff>:/icons/ui/humidity.png</iconset>
+               </property>
+              </widget>
+             </item>
+             <item row="11" column="2">
+              <widget class="QLabel" name="label_14">
+               <property name="font">
+                <font>
+                 <weight>75</weight>
+                 <bold>true</bold>
+                </font>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">QLabel { color : #ff2015; }</string>
+               </property>
+               <property name="text">
+                <string>Hard Threshold:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="32" column="0" colspan="4">
+              <widget class="QCheckBox" name="lowSignalWatch">
+               <property name="text">
+                <string>Low Signal</string>
+               </property>
+               <property name="icon">
+                <iconset resource="../res/res.qrc">
+                 <normaloff>:/icons/ui/signal-0.png</normaloff>:/icons/ui/signal-0.png</iconset>
+               </property>
+              </widget>
+             </item>
+             <item row="11" column="1">
+              <widget class="QDoubleSpinBox" name="highTemperatureSoft">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="suffix">
+                <string>°C</string>
+               </property>
+               <property name="decimals">
+                <number>1</number>
+               </property>
+               <property name="minimum">
+                <double>-50.000000000000000</double>
+               </property>
+               <property name="maximum">
+                <double>200.000000000000000</double>
+               </property>
+               <property name="value">
+                <double>40.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="39" column="0" colspan="4">
+              <widget class="QLabel" name="label_20">
+               <property name="font">
+                <font>
+                 <pointsize>7</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>Triggered when a base station disconnects</string>
+               </property>
+              </widget>
+             </item>
+             <item row="14" column="0" colspan="4">
+              <widget class="Line" name="line_3">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="1">
+              <widget class="QDoubleSpinBox" name="lowTemperatureSoft">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="suffix">
+                <string>°C</string>
+               </property>
+               <property name="decimals">
+                <number>1</number>
+               </property>
+               <property name="minimum">
+                <double>-50.000000000000000</double>
+               </property>
+               <property name="maximum">
+                <double>200.000000000000000</double>
+               </property>
+               <property name="value">
+                <double>5.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="37" column="0" colspan="4">
+              <widget class="Line" name="line_8">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+              </widget>
+             </item>
+             <item row="17" column="1">
+              <widget class="QDoubleSpinBox" name="lowHumiditySoft">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="suffix">
+                <string> %RH</string>
+               </property>
+               <property name="decimals">
+                <number>1</number>
+               </property>
+               <property name="maximum">
+                <double>100.000000000000000</double>
+               </property>
+               <property name="value">
+                <double>20.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="29" column="0" colspan="4">
+              <widget class="QLabel" name="label_6">
+               <property name="font">
+                <font>
+                 <pointsize>7</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>Triggered when a sensor is low on battery</string>
+               </property>
+              </widget>
+             </item>
+             <item row="10" column="0" colspan="4">
+              <widget class="QCheckBox" name="highTemperatureWatch">
+               <property name="text">
+                <string>High Temperature</string>
+               </property>
+               <property name="icon">
+                <iconset resource="../res/res.qrc">
+                 <normaloff>:/icons/ui/temperature.png</normaloff>:/icons/ui/temperature.png</iconset>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="3">
+              <widget class="QDoubleSpinBox" name="lowTemperatureHard">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="suffix">
+                <string>°C</string>
+               </property>
+               <property name="decimals">
+                <number>1</number>
+               </property>
+               <property name="minimum">
+                <double>-50.000000000000000</double>
+               </property>
+               <property name="maximum">
+                <double>200.000000000000000</double>
+               </property>
+               <property name="value">
+                <double>2.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="27" column="0" colspan="4">
+              <spacer name="verticalSpacer_5">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeType">
+                <enum>QSizePolicy::Fixed</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>1</width>
+                 <height>4</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item row="20" column="0" colspan="4">
+              <widget class="Line" name="line_4">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+              </widget>
+             </item>
+             <item row="17" column="2">
+              <widget class="QLabel" name="label_16">
+               <property name="font">
+                <font>
+                 <weight>75</weight>
+                 <bold>true</bold>
+                </font>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">QLabel { color : #011fFF; }</string>
+               </property>
+               <property name="text">
+                <string>Hard Threshold:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="23" column="2">
+              <widget class="QLabel" name="label_18">
+               <property name="font">
+                <font>
+                 <weight>75</weight>
+                 <bold>true</bold>
+                </font>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">QLabel { color : #ff2015; }</string>
+               </property>
+               <property name="text">
+                <string>Hard Threshold:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="21" column="0" colspan="4">
+              <spacer name="verticalSpacer_4">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeType">
+                <enum>QSizePolicy::Fixed</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>1</width>
+                 <height>4</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item row="42" column="0" colspan="4">
+              <widget class="QCheckBox" name="sendEmailAction">
+               <property name="text">
+                <string>Send Email</string>
+               </property>
+               <property name="icon">
+                <iconset resource="../res/res.qrc">
+                 <normaloff>:/icons/ui/email.png</normaloff>:/icons/ui/email.png</iconset>
+               </property>
+              </widget>
+             </item>
+             <item row="8" column="0" colspan="4">
+              <widget class="Line" name="line_2">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+              </widget>
+             </item>
+             <item row="36" column="0" colspan="4">
+              <widget class="QLabel" name="label_19">
+               <property name="font">
+                <font>
+                 <pointsize>7</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>Triggered when a sensor skips communication rounds due to interference</string>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="2">
+              <widget class="QLabel" name="label_12">
+               <property name="font">
+                <font>
+                 <weight>75</weight>
+                 <bold>true</bold>
+                </font>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">QLabel { color : #011fFF; }</string>
+               </property>
+               <property name="text">
+                <string>Hard Threshold:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="0" colspan="4">
+              <widget class="QCheckBox" name="lowTemperatureWatch">
+               <property name="text">
+                <string>Low Temperature</string>
+               </property>
+               <property name="icon">
+                <iconset resource="../res/res.qrc">
+                 <normaloff>:/icons/ui/temperature.png</normaloff>:/icons/ui/temperature.png</iconset>
+               </property>
+              </widget>
+             </item>
+             <item row="33" column="0" colspan="4">
+              <widget class="QLabel" name="label_7">
+               <property name="font">
+                <font>
+                 <pointsize>7</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>Triggered when a sensor cannot reliably communicate with the base station</string>
+               </property>
+               <property name="wordWrap">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="43" column="0" colspan="4">
+              <widget class="QLabel" name="label_9">
+               <property name="font">
+                <font>
+                 <pointsize>7</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>Sends an email to this address when any ov the above conditions triggers</string>
+               </property>
+              </widget>
+             </item>
+             <item row="17" column="3">
+              <widget class="QDoubleSpinBox" name="lowHumidityHard">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="suffix">
+                <string> %RH</string>
+               </property>
+               <property name="decimals">
+                <number>1</number>
+               </property>
+               <property name="value">
+                <double>10.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="11" column="3">
+              <widget class="QDoubleSpinBox" name="highTemperatureHard">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="suffix">
+                <string>°C</string>
+               </property>
+               <property name="decimals">
+                <number>1</number>
+               </property>
+               <property name="minimum">
+                <double>-50.000000000000000</double>
+               </property>
+               <property name="maximum">
+                <double>200.000000000000000</double>
+               </property>
+               <property name="value">
+                <double>50.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="0" colspan="4">
+              <spacer name="verticalSpacer">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeType">
+                <enum>QSizePolicy::Fixed</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>1</width>
+                 <height>4</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item row="23" column="3">
+              <widget class="QDoubleSpinBox" name="highHumidityHard">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="suffix">
+                <string> %RH</string>
+               </property>
+               <property name="decimals">
+                <number>1</number>
+               </property>
+               <property name="value">
+                <double>90.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0" colspan="4">
+              <widget class="Line" name="line">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+              </widget>
+             </item>
+             <item row="44" column="0">
+              <widget class="QLabel" name="label_8">
+               <property name="enabled">
+                <bool>true</bool>
+               </property>
+               <property name="text">
+                <string>Resend Email Every:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="19" column="0" colspan="4">
+              <widget class="QLabel" name="label_4">
+               <property name="font">
+                <font>
+                 <pointsize>7</pointsize>
+                </font>
+               </property>
+               <property name="text">
+                <string>Triggered when the humidity is below the set point</string>
+               </property>
+              </widget>
+             </item>
+             <item row="9" column="0" colspan="4">
+              <spacer name="verticalSpacer_2">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeType">
+                <enum>QSizePolicy::Fixed</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>1</width>
+                 <height>4</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item row="38" column="0">
+              <widget class="QCheckBox" name="baseStationDisconnectedWatch">
+               <property name="text">
+                <string>Base Station Disconnected</string>
+               </property>
+               <property name="icon">
+                <iconset resource="../res/res.qrc">
+                 <normaloff>:/icons/ui/station.png</normaloff>:/icons/ui/station.png</iconset>
+               </property>
+              </widget>
+             </item>
+             <item row="26" column="0" colspan="4">
+              <widget class="Line" name="line_5">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+              </widget>
+             </item>
+             <item row="23" column="1">
+              <widget class="QDoubleSpinBox" name="highHumiditySoft">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="suffix">
+                <string> %RH</string>
+               </property>
+               <property name="decimals">
+                <number>1</number>
+               </property>
+               <property name="value">
+                <double>80.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="31" column="0" colspan="4">
+              <spacer name="verticalSpacer_6">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeType">
+                <enum>QSizePolicy::Fixed</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>1</width>
+                 <height>4</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item row="40" column="0" colspan="4">
+              <widget class="Line" name="line_9">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+         </layout>
+        </widget>
        </widget>
       </item>
       <item>

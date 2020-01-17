@@ -186,7 +186,6 @@ public:
 
         std::string name;
         Mac mac = {};
-        //QHostAddress address;
     };
 
     typedef uint32_t BaseStationId;
@@ -194,6 +193,8 @@ public:
     {
         BaseStationDescriptor descriptor;
         BaseStationId id = 0;
+        bool isConnected = false;
+        Clock::time_point lastConnectedTimePoint = Clock::now();
     };
 
     size_t getBaseStationCount() const;
@@ -204,6 +205,7 @@ public:
     bool addBaseStation(BaseStationDescriptor const& descriptor);
     bool setBaseStation(BaseStationId id, BaseStationDescriptor const& descriptor);
     void removeBaseStation(size_t index);
+    void setBaseStationConnected(BaseStationId id, bool connected);
 
     ////////////////////////////////////////////////////////////////////////////
 
@@ -348,6 +350,7 @@ public:
         ErrorCounters errorCounters;
 
         Clock::time_point lastCommsTimePoint = Clock::time_point(Clock::duration::zero());
+        bool blackout = false; //not saved
 
         //which is the last confirmed measurement for this sensor.
         uint32_t lastConfirmedMeasurementIndex = 0;
@@ -372,6 +375,8 @@ public:
         float rtMeasurementTemperature = 0;
         float rtMeasurementHumidity = 0;
         float rtMeasurementVcc = 0;
+
+        Clock::time_point addedTimePoint = Clock::now(); //not saved
     };
 
     size_t getSensorCount() const;
@@ -462,7 +467,8 @@ public:
 
         bool lowVccWatch = false;
         bool lowSignalWatch = false;
-//        bool sensorErrorsWatch = false;
+        bool sensorBlackoutWatch = false;
+        bool baseStationDisconnectedWatch = false;
 
         bool sendEmailAction = false;
 
@@ -476,6 +482,7 @@ public:
         AlarmId id = 0;
 
         std::map<SensorId, uint32_t> triggersPerSensor;
+        std::map<BaseStationId, uint32_t> triggersPerBaseStation;
         Clock::time_point lastTriggeredTimePoint = Clock::time_point(Clock::duration::zero());
     };
 
@@ -511,6 +518,8 @@ public:
 
             LowVcc              = 1 << 8,
             LowSignal           = 1 << 9,
+            SensorBlackout      = 1 << 10,
+            BaseStationDisconnected = 1 << 11,
 
 			HighSoft            = HighHumiditySoft | HighTemperatureSoft,
 			HighHard            = HighHumidityHard | HighTemperatureHard,
@@ -642,7 +651,8 @@ signals:
     void measurementsRemoved(SensorId id);
     void measurementsChanged();
 
-   void alarmTriggersChanged(AlarmId alarmId, Measurement const& m, uint32_t oldTriggers, AlarmTriggers triggers);
+   void alarmSensorTriggersChanged(AlarmId alarmId, SensorId sensorId, std::optional<Measurement> measurement, uint32_t oldTriggers, AlarmTriggers triggers);
+   void alarmBaseStationTriggersChanged(AlarmId alarmId, BaseStationId baseStationId, uint32_t oldTriggers, AlarmTriggers triggers);
    void alarmStillTriggered(AlarmId alarmId);
 
 private:
@@ -650,7 +660,8 @@ private:
     void checkRepetitiveAlarms();
 	bool isReportTriggered(Report const& report) const;
     void checkReports();
-    AlarmTriggers _computeAlarmTriggers(Alarm& alarm, Measurement const& m);
+    void checkForDisconnectedBaseStations();
+    void checkForBlackoutSensors();
     size_t _getFilteredMeasurements(Filter const& filter, std::vector<Measurement>* result) const;
 
     //static inline MeasurementId computeMeasurementId(MeasurementDescriptor const& md);
@@ -662,7 +673,13 @@ private:
     uint32_t computeNextMeasurementIndex(Sensor const& sensor) const;
     uint32_t computeNextRealTimeMeasurementIndex() const;
     Clock::time_point computeMeasurementTimepoint(MeasurementDescriptor const& md) const;
-    AlarmTriggers computeAlarmTriggers(Measurement const& m);
+
+    AlarmTriggers computeAlarmTriggersForMeasurement(Measurement const& m);
+    AlarmTriggers _computeAlarmTriggersForMeasurement(Alarm& alarm, Measurement const& m);
+	AlarmTriggers computeAlarmTriggersForSensor(Sensor const& s);
+	AlarmTriggers _computeAlarmTriggersForSensor(Alarm& alarm, Sensor const& s);
+    AlarmTriggers computeAlarmTriggersForBaseStation(BaseStation const& bs);
+    AlarmTriggers _computeAlarmTriggersForBaseStation(Alarm& alarm, BaseStation const& ba);
 
     struct Data
     {

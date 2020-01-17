@@ -17,8 +17,7 @@ public:
         Name,
         Temperature,
         Humidity,
-        LowBattery,
-        LowSignal,
+        Others,
     };
 
     void refresh();

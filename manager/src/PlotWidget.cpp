@@ -625,8 +625,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
                 {
                     plot.oldValue = value;
                 }
-                double oldValue = *plot.oldValue;
-                value = oldValue * 0.6 + value * 0.4;
+                value = *plot.oldValue * 0.8 + value * 0.2;
                 plot.oldValue = value;
             }
             plot.keys.push_back(time);
