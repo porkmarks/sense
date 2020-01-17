@@ -183,7 +183,7 @@ void AlarmsWidget::removeAlarms()
     }
 
     size_t index = static_cast<size_t>(_index);
-    DB::Alarm const& alarm = m_db->getAlarm(index);
+    DB::Alarm alarm = m_db->getAlarm(index);
 
     int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete alarm '%1'").arg(alarm.descriptor.name.c_str()));
     if (response != QMessageBox::Yes)

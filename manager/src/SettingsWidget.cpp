@@ -312,7 +312,7 @@ void SettingsWidget::sendTestEmail()
     QString errorMessage;
 
     std::atomic_int step = { 0 };
-    std::thread thread([&errorMessage, &errorMessageMutex, &step, settings]()
+    std::thread thread([this, &errorMessage, &errorMessageMutex, &step, settings]()
     {
         SmtpClient::ConnectionType connectionType = SmtpClient::SslConnection;
         switch (settings.connection)

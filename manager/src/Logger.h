@@ -75,6 +75,7 @@ signals:
 private:
     void addToDB(std::string const& message, Type type);
 
+	mutable std::recursive_mutex m_mutex;
     sqlite3* m_sqlite = nullptr;
 	std::shared_ptr<sqlite3_stmt> m_insertStmt;
 };

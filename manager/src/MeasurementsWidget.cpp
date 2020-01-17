@@ -462,7 +462,7 @@ void MeasurementsWidget::selectSensors()
         m_selectedSensorIds.clear();
         for (size_t i = 0; i < sensorCount; i++)
         {
-            DB::Sensor const& sensor = m_db->getSensor(i);
+            DB::Sensor sensor = m_db->getSensor(i);
             if (ui.filter->getSensorModel().isSensorChecked(sensor.id))
             {
                 m_selectedSensorIds.insert(sensor.id);

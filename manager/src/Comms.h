@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <QUdpSocket>
 #include <QTcpSocket>
+#include <QThread>
+#include <QTimer>
 
 #include "DB.h"
 #include "Data_Defs.h"
@@ -22,11 +24,13 @@ public:
     Comms();
     ~Comms();
 
+    void init();
+
     typedef std::array<uint8_t, 6> Mac;
 
     QHostAddress getBaseStationAddress(Mac const& mac) const;
     bool isBaseStationConnected(Mac const& mac) const;
-    bool connectToBaseStation(DB& db, Mac const& mac);
+    void connectToBaseStation(DB& db, Mac const& mac);
 
     struct BaseStationDescriptor
     {
@@ -35,24 +39,25 @@ public:
         bool operator==(BaseStationDescriptor const& other) const { return mac == other.mac && address == other.address; }
     };
 
-    size_t getDiscoveredBaseStationCount() const;
-    const BaseStationDescriptor& getDiscoveredBaseStation(size_t index) const;
-
-    void process();
+    std::vector<BaseStationDescriptor> getDiscoveredBaseStations() const;
 
 signals:
     void baseStationDiscovered(BaseStationDescriptor const& bs);
     void baseStationConnected(BaseStationDescriptor const& bs);
     void baseStationDisconnected(BaseStationDescriptor const& bs);
 
+private slots:
+    void _connectToBaseStation(DB* db, Mac mac);
+
 private:
     using Channel = util::comms::Channel<data::Server_Message, QTcpSocketAdapter>;
 
     struct InitializedBaseStation
     {
-        InitializedBaseStation(DB& db, const BaseStationDescriptor& descriptor)
+        InitializedBaseStation(QObject* parent, DB& db, const BaseStationDescriptor& descriptor)
             : db(db)
             , descriptor(descriptor)
+            , socketAdapter(parent)
             , channel(socketAdapter)
         {
         }
@@ -84,6 +89,7 @@ private slots:
     void disconnectedFromBaseStation(InitializedBaseStation* cbs);
     void sensorAdded(InitializedBaseStation& cbs, DB::SensorId id);
     void sensorRemoved(InitializedBaseStation& cbs, DB::SensorId id);
+    void process();
 
 private:
     void reconnectToBaseStation(InitializedBaseStation* cbs);
@@ -115,10 +121,14 @@ private:
     void processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::v1::Pair_Request const& payload);
     void processRevertedRadioStateToNormal(InitializedBaseStation& cbs);
 
+    QTimer m_timer;
     QUdpSocket m_broadcastSocket;
 
+	mutable std::recursive_mutex m_mutex;
     std::vector<BaseStationDescriptor> m_discoveredBaseStations;
-    std::vector<std::unique_ptr<InitializedBaseStation>> m_initializedBaseStations;
+    std::vector<InitializedBaseStation*> m_initializedBaseStations;
+
+	QThread m_thread;
 };
 
 namespace std

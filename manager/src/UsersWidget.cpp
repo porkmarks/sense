@@ -195,7 +195,7 @@ void UsersWidget::removeUsers()
     }
 
     size_t index = static_cast<size_t>(_index);
-	DB::User const& user = m_db->getUser(index);
+	DB::User user = m_db->getUser(index);
 
     int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete user '%1'").arg(user.descriptor.name.c_str()));
     if (response != QMessageBox::Yes)

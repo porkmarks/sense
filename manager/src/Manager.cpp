@@ -140,6 +140,8 @@ Manager::Manager(QWidget *parent)
     checkIfAdminExists();
 
     login();
+
+    m_comms.init();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -239,7 +241,7 @@ void Manager::login()
             }
 
             size_t userIndex = static_cast<size_t>(_userIndex);
-			DB::User const& user = m_db.getUser(userIndex);
+			DB::User user = m_db.getUser(userIndex);
 
 #ifdef CHECK_PASSWORD
             Crypt crypt;
@@ -390,7 +392,7 @@ void Manager::userLoggedIn(DB::UserId id)
     else
     {
         size_t index = static_cast<size_t>(_index);
-		DB::User const& user = m_db.getUser(index);
+		DB::User user = m_db.getUser(index);
         setWindowTitle(QString("Manager (%1)").arg(user.descriptor.name.c_str()));
     }
 }
@@ -399,11 +401,13 @@ void Manager::userLoggedIn(DB::UserId id)
 
 void Manager::baseStationDiscovered(Comms::BaseStationDescriptor const& commsBS)
 {
+	auto id = std::this_thread::get_id();
+
 	int32_t _bsIndex = m_db.findBaseStationIndexByMac(commsBS.mac);
 	if (_bsIndex >= 0)
 	{
 		size_t bsIndex = static_cast<size_t>(_bsIndex);
-		DB::BaseStation const& bs = m_db.getBaseStation(static_cast<size_t>(bsIndex));
+		DB::BaseStation bs = m_db.getBaseStation(static_cast<size_t>(bsIndex));
 		m_comms.connectToBaseStation(m_db, bs.descriptor.mac);
 	}
 }
@@ -502,7 +506,8 @@ void Manager::process()
 //        m_ui.statusbar->showMessage("");
 //    }
 
-    m_comms.process();
+    auto id = std::this_thread::get_id();
+
 	m_db.process();
 
     processBackups();

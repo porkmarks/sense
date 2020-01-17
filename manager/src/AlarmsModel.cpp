@@ -98,7 +98,7 @@ QVariant AlarmsModel::data(QModelIndex const& index, int role) const
         return QVariant();
     }
 
-    DB::Alarm const& alarm = m_db.getAlarm(static_cast<size_t>(index.row()));
+    DB::Alarm alarm = m_db.getAlarm(static_cast<size_t>(index.row()));
     DB::AlarmDescriptor const& descriptor = alarm.descriptor;
 
     Column column = static_cast<Column>(index.column());

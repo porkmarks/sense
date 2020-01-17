@@ -1,6 +1,7 @@
 #include "Comms.h"
 #include <cassert>
 #include <iostream>
+#include <QApplication>
 
 #include "Logger.h"
 #include "Utils.h"
@@ -49,27 +50,63 @@ bool unpack(C const& c, T& t, size_t& offset, size_t maxSize)
 //////////////////////////////////////////////////////////////////////////
 
 Comms::Comms()
+    : m_timer(this)
+    , m_broadcastSocket(this)
 {
-    m_broadcastSocket.bind(5555, QUdpSocket::ShareAddress);
-
-    connect(&m_broadcastSocket, &QUdpSocket::readyRead, this, &Comms::broadcastReceived);
+	qRegisterMetaType<BaseStationDescriptor>("BaseStationDescriptor");
+	qRegisterMetaType<Mac>("Mac");
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 Comms::~Comms()
 {
-    m_discoveredBaseStations.clear();
-    for (std::unique_ptr<InitializedBaseStation>& cbs: m_initializedBaseStations)
-    {
-        cbs->socketAdapter.getSocket().disconnect();
-    }
+	connect(&m_thread, &QThread::finished, [this]
+	{
+		std::lock_guard<std::recursive_mutex> lg(m_mutex);
+        m_timer.stop();
+		m_discoveredBaseStations.clear();
+
+		for (InitializedBaseStation* cbs : m_initializedBaseStations)
+		{
+			delete cbs;// ->socketAdapter.getSocket().disconnect();
+		}
+		m_initializedBaseStations.clear();
+	});
+
+    m_thread.quit();
+    m_thread.wait();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Comms::init() 
+{
+	moveToThread(&m_thread);
+
+	QObject::connect(&m_broadcastSocket, &QUdpSocket::readyRead, this, &Comms::broadcastReceived);
+	QObject::connect(&m_timer, &QTimer::timeout, this, &Comms::process);
+
+    connect(&m_thread, &QThread::started, [this] 
+    { 
+		m_broadcastSocket.bind(5555, QUdpSocket::ShareAddress);
+
+		m_timer.setSingleShot(false);
+        m_timer.setInterval(1);
+        m_timer.start(); 
+    });
+
+    m_thread.start(QThread::Priority::HighPriority);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void Comms::broadcastReceived()
 {
+	std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
+	auto id = std::this_thread::get_id();
+
     while (m_broadcastSocket.hasPendingDatagrams())
     {
         if (m_broadcastSocket.pendingDatagramSize() == 6)
@@ -79,10 +116,10 @@ void Comms::broadcastReceived()
             {
                 //reconnect?
                 {
-                    auto it = std::find_if(m_initializedBaseStations.begin(), m_initializedBaseStations.end(), [&bs](std::unique_ptr<InitializedBaseStation> const& cbs) { return cbs->descriptor.mac == bs.mac; });
+                    auto it = std::find_if(m_initializedBaseStations.begin(), m_initializedBaseStations.end(), [&bs](InitializedBaseStation* const& cbs) { return cbs->descriptor.mac == bs.mac; });
                     if (it != m_initializedBaseStations.end() && (*it)->isConnected == false && (*it)->isConnecting == false)
                     {
-                        reconnectToBaseStation(it->get());
+                        reconnectToBaseStation(*it);
                     }
                 }
 
@@ -106,51 +143,65 @@ void Comms::broadcastReceived()
 
 //////////////////////////////////////////////////////////////////////////
 
-bool Comms::connectToBaseStation(DB& db, Mac const& mac)
+void Comms::connectToBaseStation(DB& db, Mac const& mac)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
+	auto id = std::this_thread::get_id();
+
+	QMetaObject::invokeMethod(this, "_connectToBaseStation", Qt::QueuedConnection, Q_ARG(DB*, &db), Q_ARG(Mac, mac));
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Comms::_connectToBaseStation(DB* db, Mac mac)
+{
+	std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
+	auto id = std::this_thread::get_id();
+
 	{
-		auto it = std::find_if(m_initializedBaseStations.begin(), m_initializedBaseStations.end(), [&mac](std::unique_ptr<InitializedBaseStation> const& _bs) { return _bs->descriptor.mac == mac; });
+		auto it = std::find_if(m_initializedBaseStations.begin(), m_initializedBaseStations.end(), [&mac](InitializedBaseStation* const& _bs) { return _bs->descriptor.mac == mac; });
 		if (it != m_initializedBaseStations.end())
 		{
 			s_logger.logWarning(QString("Attempting to connect to already connected BS %1.").arg(utils::getMacStr(mac).c_str()));
-			return false;
+			return;
 		}
 	}
 
-    auto it = std::find_if(m_discoveredBaseStations.begin(), m_discoveredBaseStations.end(), [&mac](Comms::BaseStationDescriptor const& _bs) { return _bs.mac == mac; });
-    if (it == m_discoveredBaseStations.end())
-    {
-        s_logger.logWarning(QString("Attempting to connect to undiscovered BS %1. Postponed until discovery.").arg(utils::getMacStr(mac).c_str()));
-        return false;
-    }
+	auto it = std::find_if(m_discoveredBaseStations.begin(), m_discoveredBaseStations.end(), [&mac](Comms::BaseStationDescriptor const& _bs) { return _bs.mac == mac; });
+	if (it == m_discoveredBaseStations.end())
+	{
+		s_logger.logWarning(QString("Attempting to connect to undiscovered BS %1. Postponed until discovery.").arg(utils::getMacStr(mac).c_str()));
+		return;
+	}
 
-    s_logger.logInfo(QString("Attempting to connect to BS %1").arg(utils::getMacStr(mac).c_str()));
+	s_logger.logInfo(QString("Attempting to connect to BS %1").arg(utils::getMacStr(mac).c_str()));
 
-    InitializedBaseStation* cbsPtr = new InitializedBaseStation(db, *it);
-    std::unique_ptr<InitializedBaseStation> cbs(cbsPtr);
-    m_initializedBaseStations.push_back(std::move(cbs));
+	InitializedBaseStation* cbs = new InitializedBaseStation(this, *db, *it);
+	m_initializedBaseStations.push_back(cbs);
 
-    cbsPtr->connections.push_back(connect(&cbsPtr->socketAdapter.getSocket(), &QTcpSocket::connected, [this, cbsPtr]() { connectedToBaseStation(cbsPtr); }));
-    cbsPtr->connections.push_back(connect(&cbsPtr->socketAdapter.getSocket(), &QTcpSocket::disconnected, [this, cbsPtr]() { disconnectedFromBaseStation(cbsPtr); }));
-    cbsPtr->connections.push_back(connect(&cbsPtr->socketAdapter.getSocket(), static_cast<void(QTcpSocket::*)(QAbstractSocket::SocketError)>(&QTcpSocket::error), [this, cbsPtr]()
-    {
-        s_logger.logCritical(QString("Socket error for BS %1: %2").arg(utils::getMacStr(cbsPtr->descriptor.mac).c_str()).arg(cbsPtr->socketAdapter.getSocket().errorString()));
-        disconnectedFromBaseStation(cbsPtr);
-    }));
+	cbs->connections.push_back(QObject::connect(&cbs->socketAdapter.getSocket(), &QTcpSocket::connected, [this, cbs]() { connectedToBaseStation(cbs); }));
+    cbs->connections.push_back(QObject::connect(&cbs->socketAdapter.getSocket(), &QTcpSocket::disconnected, [this, cbs]() { disconnectedFromBaseStation(cbs); }));
+    cbs->connections.push_back(QObject::connect(&cbs->socketAdapter.getSocket(), static_cast<void(QTcpSocket::*)(QAbstractSocket::SocketError)>(&QTcpSocket::error), [this, cbs]()
+	{
+		s_logger.logCritical(QString("Socket error for BS %1: %2").arg(utils::getMacStr(cbs->descriptor.mac).c_str()).arg(cbs->socketAdapter.getSocket().errorString()));
+		disconnectedFromBaseStation(cbs);
+	}));
 
-    cbsPtr->isConnecting = true;
-    cbsPtr->socketAdapter.getSocket().connectToHost(it->address, 4444);
+    cbs->isConnecting = true;
+    cbs->socketAdapter.getSocket().connectToHost(it->address, 4444);
 
-    cbsPtr->connections.push_back(connect(&db, &DB::sensorAdded, [this, cbsPtr](DB::SensorId id) { sensorAdded(*cbsPtr, id); }));
-    cbsPtr->connections.push_back(connect(&db, &DB::sensorRemoved, [this, cbsPtr](DB::SensorId id) { sensorRemoved(*cbsPtr, id); }));
-
-    return true;
+    cbs->connections.push_back(QObject::connect(db, &DB::sensorAdded, [this, cbs](DB::SensorId id) { sensorAdded(*cbs, id); }));
+    cbs->connections.push_back(QObject::connect(db, &DB::sensorRemoved, [this, cbs](DB::SensorId id) { sensorRemoved(*cbs, id); }));
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void Comms::reconnectToBaseStation(InitializedBaseStation* cbs)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
     if (cbs->isConnecting)
     {
         return;
@@ -165,6 +216,10 @@ void Comms::reconnectToBaseStation(InitializedBaseStation* cbs)
 
 void Comms::connectedToBaseStation(InitializedBaseStation* cbs)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
+	auto id = std::this_thread::get_id();
+
     if (cbs)
     {
         s_logger.logInfo(QString("Connected to BS %1").arg(utils::getMacStr(cbs->descriptor.mac).c_str()));
@@ -191,6 +246,10 @@ void Comms::connectedToBaseStation(InitializedBaseStation* cbs)
 
 void Comms::disconnectedFromBaseStation(InitializedBaseStation* cbs)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
+	auto id = std::this_thread::get_id();
+
     if (cbs)
     {
         bool wasConnected = cbs->isConnected;
@@ -211,7 +270,9 @@ void Comms::disconnectedFromBaseStation(InitializedBaseStation* cbs)
 
 bool Comms::isBaseStationConnected(Mac const& mac) const
 {
-    auto it = std::find_if(m_initializedBaseStations.begin(), m_initializedBaseStations.end(), [&mac](std::unique_ptr<InitializedBaseStation> const& cbs) { return cbs->descriptor.mac == mac; });
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
+    auto it = std::find_if(m_initializedBaseStations.begin(), m_initializedBaseStations.end(), [&mac](InitializedBaseStation* cbs) { return cbs->descriptor.mac == mac; });
     return (it != m_initializedBaseStations.end() && (*it)->isConnected == true);
 }
 
@@ -219,8 +280,10 @@ bool Comms::isBaseStationConnected(Mac const& mac) const
 
 QHostAddress Comms::getBaseStationAddress(Mac const& mac) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
     {
-        auto it = std::find_if(m_initializedBaseStations.begin(), m_initializedBaseStations.end(), [&mac](std::unique_ptr<InitializedBaseStation> const& cbs) { return cbs->descriptor.mac == mac; });
+        auto it = std::find_if(m_initializedBaseStations.begin(), m_initializedBaseStations.end(), [&mac](InitializedBaseStation* cbs) { return cbs->descriptor.mac == mac; });
         if (it != m_initializedBaseStations.end())
         {
             return (*it)->descriptor.address;
@@ -452,7 +515,7 @@ void Comms::processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, Senso
         return;
     }
 
-    DB::Sensor const& sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
+    DB::Sensor sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
 
     std::vector<DB::MeasurementDescriptor> measurements;
     uint32_t count = std::min<uint32_t>(measurementBatch.count, data::sensor::v1::Measurement_Batch_Request::MAX_COUNT);
@@ -521,12 +584,12 @@ void Comms::processSensorReq_ConfigRequest(InitializedBaseStation& cbs, SensorRe
         return;
     }
 
-    DB::Sensor const& sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
+    DB::Sensor sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
 
     DB::SensorInputDetails details = createSensorInputDetails(sensor, configRequest);
     cbs.db.setSensorInputDetails(details);
 
-	DB::SensorSettings const& sensorSettings = cbs.db.getSensorSettings();
+	DB::SensorSettings sensorSettings = cbs.db.getSensorSettings();
     DB::SensorOutputDetails outputDetails = cbs.db.computeSensorOutputDetails(sensor.id);
     DB::Sensor::Calibration reportedCalibration{ static_cast<float>(configRequest.calibration.temperature_bias) / 100.f,
                 static_cast<float>(configRequest.calibration.humidity_bias) / 100.f};
@@ -551,7 +614,7 @@ void Comms::processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, Sen
         return;
     }
 
-    DB::Sensor const& sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
+    DB::Sensor sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
 
     data::sensor::v1::First_Config_Response response;
 
@@ -574,7 +637,7 @@ void Comms::processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, Sen
     cbs.db.setSensorInputDetails(details);
 
     {
-		DB::SensorSettings const& sensorSettings = cbs.db.getSensorSettings();
+		DB::SensorSettings sensorSettings = cbs.db.getSensorSettings();
         DB::SensorOutputDetails outputDetails = cbs.db.computeSensorOutputDetails(sensor.id);
 		fillConfig(response, sensorSettings, sensor, outputDetails, sensor.calibration);
     }
@@ -613,7 +676,7 @@ void Comms::processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequ
         return;
     }
 
-    DB::Sensor const& sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
+    DB::Sensor sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
 
     data::sensor::v1::Pair_Response response;
     response.address = sensor.address;
@@ -627,76 +690,74 @@ void Comms::processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequ
 
 //////////////////////////////////////////////////////////////////////////
 
-size_t Comms::getDiscoveredBaseStationCount() const
+std::vector<Comms::BaseStationDescriptor> Comms::getDiscoveredBaseStations() const
 {
-    return m_discoveredBaseStations.size();
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-const Comms::BaseStationDescriptor& Comms::getDiscoveredBaseStation(size_t index) const
-{
-    return m_discoveredBaseStations[index];
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+    return m_discoveredBaseStations;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void Comms::process()
 {
-//    static DB::Clock::time_point lastFakeDiscovery = DB::Clock::now();
-//    if (DB::Clock::now() - lastFakeDiscovery >= std::chrono::seconds(1))
-//    {
-//        lastFakeDiscovery = DB::Clock::now();
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-//        BaseStationDescriptor bs;
-//        bs.mac = {0xB8, 0x27, 0xEB, 0xDA, 0x89, 0x1B };
-//        {
-//            auto it = std::find_if(m_discoveredBaseStations.begin(), m_discoveredBaseStations.end(), [&bs](Comms::BaseStationDescriptor const& _bs) { return _bs.mac == bs.mac; });
-//            if (it == m_discoveredBaseStations.end())
-//            {
-//                m_discoveredBaseStations.push_back(bs);
-//                emit baseStationDiscovered(bs);
-//            }
-//        }
-//    }
+	//    static DB::Clock::time_point lastFakeDiscovery = DB::Clock::now();
+	//    if (DB::Clock::now() - lastFakeDiscovery >= std::chrono::seconds(1))
+	//    {
+	//        lastFakeDiscovery = DB::Clock::now();
 
-    data::Server_Message message;
-    for (std::unique_ptr<InitializedBaseStation>& cbs: m_initializedBaseStations)
-    {
-        if (!cbs->isConnected)
-        {
-            continue;
-        }
+	//        BaseStationDescriptor bs;
+	//        bs.mac = {0xB8, 0x27, 0xEB, 0xDA, 0x89, 0x1B };
+	//        {
+	//            auto it = std::find_if(m_discoveredBaseStations.begin(), m_discoveredBaseStations.end(), [&bs](Comms::BaseStationDescriptor const& _bs) { return _bs.mac == bs.mac; });
+	//            if (it == m_discoveredBaseStations.end())
+	//            {
+	//                m_discoveredBaseStations.push_back(bs);
+	//                emit baseStationDiscovered(bs);
+	//            }
+	//        }
+	//    }
 
-        if (DB::Clock::now() - cbs->lastPingTP > std::chrono::seconds(2))
-        {
-            sendPing(*cbs);
-        }
-        if (DB::Clock::now() - cbs->lastTalkTP > std::chrono::seconds(10))
-        {
-           disconnectedFromBaseStation(cbs.get());
-           continue;
-        }
+    auto id = std::this_thread::get_id();
 
-        while (cbs->channel.get_next_message(message))
-        {
-            cbs->lastTalkTP = DB::Clock::now(); //this represents communication so reset the pong
-            switch (message)
-            {
-            case data::Server_Message::PONG:
-                processPong(*cbs);
-                break;
-            case data::Server_Message::SENSOR_REQ:
-                processSensorReq(*cbs);
-                break;
+	data::Server_Message message;
+	for (InitializedBaseStation* cbs : m_initializedBaseStations)
+	{
+		if (!cbs->isConnected)
+		{
+			continue;
+		}
+
+		if (DB::Clock::now() - cbs->lastPingTP > std::chrono::seconds(2))
+		{
+			sendPing(*cbs);
+		}
+		if (DB::Clock::now() - cbs->lastTalkTP > std::chrono::seconds(10))
+		{
+			disconnectedFromBaseStation(cbs);
+			continue;
+		}
+
+		while (cbs->channel.get_next_message(message))
+		{
+			cbs->lastTalkTP = DB::Clock::now(); //this represents communication so reset the pong
+			switch (message)
+			{
+			case data::Server_Message::PONG:
+				processPong(*cbs);
+				break;
+			case data::Server_Message::SENSOR_REQ:
+				processSensorReq(*cbs);
+				break;
 			case data::Server_Message::REVERTED_RADIO_STATE_TO_NORMAL:
 				processRevertedRadioStateToNormal(*cbs);
 				break;
-            default:
-                s_logger.logCritical(QString("Invalid message received: %1").arg(int(message)));
-            }
-        }
-    }
+			default:
+				s_logger.logCritical(QString("Invalid message received: %1").arg(int(message)));
+			}
+		}
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////

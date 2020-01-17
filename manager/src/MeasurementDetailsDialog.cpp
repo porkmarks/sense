@@ -62,7 +62,7 @@ void MeasurementDetailsDialog::setMeasurement(DB::Measurement const& measurement
     int32_t sensorIndex = m_db.findSensorIndexById(m_measurement.descriptor.sensorId);
     if (sensorIndex >= 0)
 	{
-        DB::Sensor const& sensor = m_db.getSensor((size_t)sensorIndex);
+        DB::Sensor sensor = m_db.getSensor((size_t)sensorIndex);
 		m_ui.sensor->setText(QString("%1 (S/N %2)").arg(sensor.descriptor.name.c_str()).arg(sensor.serialNumber, 8, 16, QChar('0')));
 	}
     else

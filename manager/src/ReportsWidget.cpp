@@ -178,7 +178,7 @@ void ReportsWidget::removeReports()
     }
 
     size_t index = static_cast<size_t>(_index);
-    DB::Report const& report = m_db->getReport(index);
+    DB::Report report = m_db->getReport(index);
 
     int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete report '%1'").arg(report.descriptor.name.c_str()));
     if (response != QMessageBox::Yes)

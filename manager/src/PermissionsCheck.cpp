@@ -12,7 +12,7 @@ extern std::string k_passwordHashReferenceText;
 
 bool adminCheck(DB& db, QWidget* parent)
 {
-	DB::User const* user = db.getLoggedInUser();
+	std::optional<DB::User> user = db.getLoggedInUser();
 	if (user && user->descriptor.type == DB::UserDescriptor::Type::Admin)
     {
         return true;
@@ -39,7 +39,7 @@ bool adminCheck(DB& db, QWidget* parent)
         }
 
         size_t userIndex = static_cast<size_t>(_userIndex);
-		DB::User const& user = db.getUser(userIndex);
+		DB::User user = db.getUser(userIndex);
 		if (user.descriptor.type != DB::UserDescriptor::Type::Admin)
         {
             s_logger.logCritical(QString("Invalid login credentials (user '%1' not admin)").arg(ui.username->text()).toUtf8().data());
@@ -68,7 +68,7 @@ bool adminCheck(DB& db, QWidget* parent)
 
 bool hasPermission(DB& db, DB::UserDescriptor::Permissions permission)
 {
-	DB::User const* user = db.getLoggedInUser();
+    std::optional<DB::User> user = db.getLoggedInUser();
     if (!user)
     {
         return false;

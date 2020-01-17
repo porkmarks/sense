@@ -45,7 +45,7 @@ void ConfigureReportDialog::sendReportNow()
     if (getDescriptor(report.descriptor))
     {
         Emailer emailer(m_db);
-        emailer.sendReportEmail(report);
+        emailer.sendReportEmail(report, DB::Clock::now() - std::chrono::hours(24), DB::Clock::now());
         QMessageBox::information(this, "Done", "The report email was scheduled to be sent.");
     }
 }
@@ -122,7 +122,7 @@ bool ConfigureReportDialog::getDescriptor(DB::ReportDescriptor& descriptor)
         size_t sensorCount = m_db.getSensorCount();
         for (size_t i = 0; i < sensorCount; i++)
         {
-            DB::Sensor const& sensor = m_db.getSensor(i);
+            DB::Sensor sensor = m_db.getSensor(i);
             if (m_ui.sensorFilter->getSensorModel().isSensorChecked(sensor.id))
             {
                 descriptor.sensors.insert(sensor.id);

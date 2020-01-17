@@ -51,6 +51,9 @@ static uint32_t k_highThresholdSoftColor = 0xFFf37736;
 static uint32_t k_highThresholdHardColor = 0xFFff2015;
 static uint32_t k_inRangeColor = 0xFF00b159;
 
+uint32_t getDominatingTriggerColor(uint32_t trigger);
+const char* getDominatingTriggerName(uint32_t trigger);
+
 float getBatteryLevel(float vcc);
 QIcon getBatteryIcon(DB::SensorSettings const& settings, float vcc);
 float getSignalLevel(int16_t dBm);

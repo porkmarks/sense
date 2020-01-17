@@ -15,8 +15,9 @@ class QTcpSocketAdapter : public QObject
     typedef std::vector<uint8_t> TX_Buffer_t;
     typedef std::vector<uint8_t> RX_Buffer_t;
 public:
-    QTcpSocketAdapter()
-        : m_socket(new QTcpSocket(this))
+    QTcpSocketAdapter(QObject* parent)
+        : QObject(parent)
+        , m_socket(new QTcpSocket(this))
     {
         m_socket->setSocketOption(QAbstractSocket::LowDelayOption, true);
     }
@@ -26,10 +27,6 @@ public:
         for (QMetaObject::Connection& c : m_connections)
         {
             QObject::disconnect(c);
-        }
-        if (m_socket)
-        {
-            m_socket->deleteLater();
         }
     }
 

@@ -136,7 +136,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Alarms)
         {
-            return static_cast<uint32_t>(std::bitset<8>(measurement.alarmTriggers).count());
+            return static_cast<uint32_t>(std::bitset<32>(measurement.alarmTriggers.current).count());
         }
 
         return data(index, Qt::DisplayRole);
@@ -218,7 +218,7 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Alarms)
         {
-            return measurement.alarmTriggers;
+            return measurement.alarmTriggers.current;
         }
     }
 

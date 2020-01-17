@@ -28,8 +28,6 @@ public:
 
     typedef std::chrono::system_clock Clock;
 
-    void test();
-
     void process();
 
 	static Result<void> create(sqlite3& db);
@@ -167,7 +165,7 @@ public:
 	};
 
 	size_t getUserCount() const;
-	User const& getUser(size_t index) const;
+	User getUser(size_t index) const;
 	int32_t findUserIndexByName(std::string const& name) const;
 	int32_t findUserIndexById(UserId id) const;
 	int32_t findUserIndexByPasswordHash(std::string const& passwordHash) const;
@@ -177,7 +175,7 @@ public:
 	bool needsAdmin() const;
 	void setLoggedInUserId(UserId id);
 	UserId getLoggedInUserId() const;
-	User const* getLoggedInUser() const;
+	std::optional<User> getLoggedInUser() const;
 	bool isLoggedInAsAdmin() const;
 
     ////////////////////////////////////////////////////////////////////////////
@@ -199,7 +197,7 @@ public:
     };
 
     size_t getBaseStationCount() const;
-    BaseStation const& getBaseStation(size_t index) const;
+    BaseStation getBaseStation(size_t index) const;
     int32_t findBaseStationIndexByName(std::string const& name) const;
     int32_t findBaseStationIndexById(BaseStationId id) const;
     int32_t findBaseStationIndexByMac(BaseStationDescriptor::Mac const& mac) const;
@@ -217,7 +215,7 @@ public:
 	};
 
 	Result<void> setSensorSettings(SensorSettings const& settings);
-    SensorSettings const& getSensorSettings() const;
+    SensorSettings getSensorSettings() const;
 
     struct SensorTimeConfigDescriptor
     {
@@ -239,10 +237,10 @@ public:
     Result<void> setSensorTimeConfigs(std::vector<SensorTimeConfig> const& configs);
 
     size_t getSensorTimeConfigCount() const;
-    SensorTimeConfig const& getSensorTimeConfig(size_t index) const;
-    SensorTimeConfig const& getLastSensorTimeConfig() const;
+    SensorTimeConfig getSensorTimeConfig(size_t index) const;
+    SensorTimeConfig getLastSensorTimeConfig() const;
     Clock::duration computeActualCommsPeriod(SensorTimeConfigDescriptor const& descriptor) const;
-	SensorTimeConfig const& findSensorTimeConfigForMeasurementIndex(uint32_t index) const;
+	SensorTimeConfig findSensorTimeConfigForMeasurementIndex(uint32_t index) const;
 
     struct SensorErrors
     {
@@ -264,6 +262,21 @@ public:
         int16_t b2s = 0;
     };
 
+    struct AlarmTriggers
+    {
+        uint32_t current = 0;
+        uint32_t added = 0; //what was added
+        uint32_t removed = 0; //what was silenced
+        AlarmTriggers operator|(AlarmTriggers const& other) const { return { current | other.current, added | other.added, removed | other.removed }; }
+		AlarmTriggers operator|(uint32_t other) const { return { current | other, added | other, removed | other}; }
+		AlarmTriggers& operator|=(AlarmTriggers const& other) { current |= other.current; added |= other.added; removed |= other.removed; return *this; };
+        AlarmTriggers& operator|=(uint32_t other) { current |= other; added |= other; removed |= other; return *this; };
+        AlarmTriggers operator&(AlarmTriggers const& other) const { return { current & other.current, added & other.added, removed & other.removed }; }
+		AlarmTriggers operator&(uint32_t other) const { return { current & other, added & other, removed & other}; }
+		AlarmTriggers& operator&=(AlarmTriggers const& other) { current &= other.current; added &= other.added; removed &= other.removed; return *this; };
+        AlarmTriggers& operator&=(uint32_t other) { current &= other; added &= other; removed &= other; return *this; };
+    };
+
     struct MeasurementDescriptor
     {
         SensorId sensorId = 0;
@@ -280,7 +293,7 @@ public:
         MeasurementDescriptor descriptor;
         Clock::time_point timePoint;
         Clock::time_point receivedTimePoint;
-        uint32_t alarmTriggers = 0;
+        AlarmTriggers alarmTriggers;
     };
 
     struct ErrorCounters
@@ -362,7 +375,7 @@ public:
     };
 
     size_t getSensorCount() const;
-    Sensor const& getSensor(size_t index) const;
+    Sensor getSensor(size_t index) const;
     Result<void> addSensor(SensorDescriptor const& descriptor);
     Result<void> setSensor(SensorId id, SensorDescriptor const& descriptor);
     Result<void> setSensorCalibration(SensorId id, Sensor::Calibration const& calibration);
@@ -467,7 +480,7 @@ public:
     };
 
     size_t getAlarmCount() const;
-    Alarm const& getAlarm(size_t index) const;
+    Alarm getAlarm(size_t index) const;
     int32_t findAlarmIndexByName(std::string const& name) const;
     int32_t findAlarmIndexById(AlarmId id) const;
     Result<void> addAlarm(AlarmDescriptor const& descriptor);
@@ -498,6 +511,11 @@ public:
 
             LowVcc              = 1 << 8,
             LowSignal           = 1 << 9,
+
+			HighSoft            = HighHumiditySoft | HighTemperatureSoft,
+			HighHard            = HighHumidityHard | HighTemperatureHard,
+			LowSoft             = LowHumiditySoft | LowTemperatureSoft,
+			LowHard             = LowHumidityHard | LowTemperatureHard,
         };
     };
 
@@ -529,7 +547,7 @@ public:
     };
 
     size_t getReportCount() const;
-    Report const& getReport(size_t index) const;
+    Report getReport(size_t index) const;
     int32_t findReportIndexByName(std::string const& name) const;
     int32_t findReportIndexById(ReportId id) const;
     Result<void> addReport(ReportDescriptor const& descriptor);
@@ -618,13 +636,13 @@ signals:
     void reportAdded(ReportId id);
     void reportRemoved(ReportId id);
     void reportChanged(ReportId id);
-	void reportTriggered(ReportId id);
+	void reportTriggered(ReportId id, Clock::time_point from, Clock::time_point to);
 
     void measurementsAdded(SensorId id);
     void measurementsRemoved(SensorId id);
     void measurementsChanged();
 
-   void alarmTriggersChanged(AlarmId alarmId, Measurement const& m, uint32_t oldTriggers, uint32_t newTriggers, uint32_t addedTriggers, uint32_t removedTriggers);
+   void alarmTriggersChanged(AlarmId alarmId, Measurement const& m, uint32_t oldTriggers, AlarmTriggers triggers);
    void alarmStillTriggered(AlarmId alarmId);
 
 private:
@@ -632,7 +650,7 @@ private:
     void checkRepetitiveAlarms();
 	bool isReportTriggered(Report const& report) const;
     void checkReports();
-    uint32_t _computeAlarmTriggers(Alarm& alarm, Measurement const& m);
+    AlarmTriggers _computeAlarmTriggers(Alarm& alarm, Measurement const& m);
     size_t _getFilteredMeasurements(Filter const& filter, std::vector<Measurement>* result) const;
 
     //static inline MeasurementId computeMeasurementId(MeasurementDescriptor const& md);
@@ -644,7 +662,7 @@ private:
     uint32_t computeNextMeasurementIndex(Sensor const& sensor) const;
     uint32_t computeNextRealTimeMeasurementIndex() const;
     Clock::time_point computeMeasurementTimepoint(MeasurementDescriptor const& md) const;
-    uint32_t computeAlarmTriggers(Measurement const& m);
+    AlarmTriggers computeAlarmTriggers(Measurement const& m);
 
     struct Data
     {

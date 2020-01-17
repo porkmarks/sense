@@ -165,7 +165,7 @@ void SensorsWidget::unbindSensor()
     }
 
     size_t index = static_cast<size_t>(_index);
-    DB::Sensor const& sensor = m_db->getSensor(index);
+    DB::Sensor sensor = m_db->getSensor(index);
 
     int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete sensor '%1'?\nThis will delete all the measurements from this\nsensor as well.").arg(sensor.descriptor.name.c_str()));
     if (response != QMessageBox::Yes)

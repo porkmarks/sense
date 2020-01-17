@@ -102,7 +102,7 @@ QVariant ReportsModel::data(QModelIndex const& index, int role) const
         return QVariant();
     }
 
-    DB::Report const& report = m_db.getReport(indexRow);
+    DB::Report report = m_db.getReport(indexRow);
     DB::ReportDescriptor const& descriptor = report.descriptor;
 
     Column column = static_cast<Column>(index.column());

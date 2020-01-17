@@ -73,9 +73,16 @@ private:
     struct Plot
     {
 		QCPGraph* graph = nullptr;
-		util::Butterworth<qreal> lpf;
+        std::optional<double> oldValue;
 		QVector<double> keys;
 		QVector<double> values;
+        struct AlarmIndicator
+        {
+            double key = 0;
+            double value = 0;
+            DB::AlarmTriggers triggers;
+        };
+		QVector<AlarmIndicator> alarmIndicators;
 		QCPAxis* axis = nullptr;
     };
 
@@ -98,6 +105,7 @@ private:
     Annotation m_annotation;
     std::vector<Annotation> m_annotations;
 
+    const Plot* findAnnotationPlot(const Annotation& annotation) const;
 	QCPGraph* findAnnotationGraph(const Annotation& annotation) const;
 
 //    QChart* m_chart = nullptr;
@@ -114,9 +122,8 @@ private:
     QCPLayer* m_annotationsLayer = nullptr;
     QCPAxis* m_axisDate = nullptr;
     std::array<QCPAxis*, (size_t)PlotType::Count> m_plotAxis;
+    std::vector<QCPAbstractItem*> m_indicatorItems;
 
-    bool m_useSmoothing = true;
-    bool m_fitMeasurements = true;
     std::set<DB::SensorId> m_selectedSensorIds;
 
     Ui::PlotWidget m_ui;

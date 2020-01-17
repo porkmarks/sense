@@ -35,8 +35,8 @@ private:
     void setStatus(size_t row, std::string const& status);
     void setAddress(size_t row, QHostAddress const& address);
 
-
     Ui::BaseStationsWidget m_ui;
+	mutable std::recursive_mutex m_mutex;
     Comms* m_comms = nullptr;
 	DB* m_db = nullptr;
     QStandardItemModel m_model;

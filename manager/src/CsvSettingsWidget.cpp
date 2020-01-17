@@ -71,7 +71,6 @@ void CsvSettingsWidget::refreshPreview()
         data.measurement.id = 1000;
         data.measurement.timePoint = DB::Clock::now() - std::chrono::hours(24);
         data.measurement.receivedTimePoint = data.measurement.timePoint + std::chrono::minutes(1);
-        data.measurement.alarmTriggers = 0;
         data.measurement.descriptor.temperature = 22.f;
         data.measurement.descriptor.humidity = 32.f;
         data.measurement.descriptor.index = 2000;

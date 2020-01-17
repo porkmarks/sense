@@ -101,7 +101,7 @@ QVariant UsersModel::data(QModelIndex const& index, int role) const
         return QVariant();
     }
 
-	DB::User const& user = m_db.getUser(indexRow);
+	DB::User user = m_db.getUser(indexRow);
 	DB::UserDescriptor const& descriptor = user.descriptor;
 
     Column column = static_cast<Column>(index.column());

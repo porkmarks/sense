@@ -34,7 +34,7 @@ std::array<const char*, (size_t)PlotWidget::PlotType::Count> k_plotUnits = { "°
 std::array<float, (size_t)PlotWidget::PlotType::Count> k_plotPenWidths = { 2.f, 2.f, 1.f, 1.f };
 std::array<Qt::PenStyle, (size_t)PlotWidget::PlotType::Count> k_plotPenStyles = { Qt::SolidLine, Qt::DashLine, Qt::DotLine, Qt::DashDotDotLine };
 std::array<const char*, (size_t)PlotWidget::PlotType::Count> k_plotNames = { "Temperature", "Humidity", "Battery", "Signal" };
-std::array<qreal, (size_t)PlotWidget::PlotType::Count> k_plotMinRange = { 5.0, 10.0, 0.1, 0.1 };
+std::array<double, (size_t)PlotWidget::PlotType::Count> k_plotMinRange = { 5.0, 10.0, 0.1, 0.1 };
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -70,7 +70,8 @@ void PlotWidget::init(DB& db)
     m_uiConnections.push_back(connect(m_ui.selectSensors, &QPushButton::released, this, &PlotWidget::selectSensors, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.exportData, &QPushButton::released, this, &PlotWidget::exportData));
 
-    m_uiConnections.push_back(connect(m_ui.fitMeasurements, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.fitVertically, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.fitHorizontally, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.minTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.maxTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.minHumidity, &QDoubleSpinBox::editingFinished, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
@@ -144,7 +145,8 @@ void PlotWidget::loadSettings()
     bool showHumidity = m_ui.showHumidity->isChecked();
     bool showBattery = m_ui.showBattery->isChecked();
     bool showSignal = m_ui.showSignal->isChecked();
-    bool fitMeasurements = m_ui.fitMeasurements->isChecked();
+    bool fitVertically = m_ui.fitVertically->isChecked();
+    bool fitHorizontally = m_ui.fitHorizontally->isChecked();
     bool useSmoothing = m_ui.useSmoothing->isChecked();
     double minHumidity = m_ui.minHumidity->value();
     double maxHumidity = m_ui.maxHumidity->value();
@@ -156,7 +158,8 @@ void PlotWidget::loadSettings()
     m_ui.showHumidity->blockSignals(true);
     m_ui.showBattery->blockSignals(true);
     m_ui.showSignal->blockSignals(true);
-    m_ui.fitMeasurements->blockSignals(true);
+    m_ui.fitVertically->blockSignals(true);
+    m_ui.fitHorizontally->blockSignals(true);
     m_ui.useSmoothing->blockSignals(true);
     m_ui.minHumidity->blockSignals(true);
     m_ui.maxHumidity->blockSignals(true);
@@ -169,7 +172,8 @@ void PlotWidget::loadSettings()
     //not loading these on purpose
 //     m_ui.showBattery->setChecked(settings.value("filter/showBattery", false).toBool());
 //     m_ui.showSignal->setChecked(settings.value("filter/showSignal", false).toBool());
-    m_ui.fitMeasurements->setChecked(settings.value("filter/fitMeasurements", true).toBool());
+    m_ui.fitVertically->setChecked(settings.value("filter/fitVertically", true).toBool());
+	m_ui.fitHorizontally->setChecked(settings.value("filter/fitHorizontally", true).toBool());
     m_ui.useSmoothing->setChecked(settings.value("rendering/useSmoothing", true).toBool());
     m_ui.minHumidity->setValue(settings.value("rendering/minHumidity", 0.0).toDouble());
     m_ui.maxHumidity->setValue(settings.value("rendering/maxHumidity", 100.0).toDouble());
@@ -180,17 +184,18 @@ void PlotWidget::loadSettings()
     m_ui.showHumidity->blockSignals(false);
     m_ui.showBattery->blockSignals(false);
     m_ui.showSignal->blockSignals(false);
-    m_ui.fitMeasurements->blockSignals(false);
+    m_ui.fitVertically->blockSignals(false);
+	m_ui.fitHorizontally->blockSignals(false);
     m_ui.useSmoothing->blockSignals(false);
     m_ui.minHumidity->blockSignals(false);
     m_ui.maxHumidity->blockSignals(false);
     m_ui.minTemperature->blockSignals(false);
     m_ui.maxTemperature->blockSignals(false);
 
-    m_ui.minTemperature->setEnabled(!m_ui.fitMeasurements->isChecked());
-    m_ui.maxTemperature->setEnabled(!m_ui.fitMeasurements->isChecked());
-    m_ui.minHumidity->setEnabled(!m_ui.fitMeasurements->isChecked());
-    m_ui.maxHumidity->setEnabled(!m_ui.fitMeasurements->isChecked());
+    m_ui.minTemperature->setEnabled(!m_ui.fitVertically->isChecked());
+    m_ui.maxTemperature->setEnabled(!m_ui.fitVertically->isChecked());
+    m_ui.minHumidity->setEnabled(!m_ui.fitVertically->isChecked());
+    m_ui.maxHumidity->setEnabled(!m_ui.fitVertically->isChecked());
 
     m_selectedSensorIds.clear();
     QList<QVariant> ssid = settings.value("filter/selectedSensors", QList<QVariant>()).toList();
@@ -210,22 +215,23 @@ void PlotWidget::loadSettings()
     {
         for (size_t i = 0; i < m_db->getSensorCount(); i++)
         {
-            DB::Sensor const& sensor = m_db->getSensor(i);
+            DB::Sensor sensor = m_db->getSensor(i);
             m_selectedSensorIds.insert(sensor.id);
         }
     }
 
     if (showTemperature != m_ui.showTemperature->isChecked() ||
-            showHumidity != m_ui.showHumidity->isChecked() ||
-            showBattery != m_ui.showBattery->isChecked() ||
-            showSignal != m_ui.showSignal->isChecked() ||
-            fitMeasurements != m_ui.fitMeasurements->isChecked() ||
-            useSmoothing != m_ui.useSmoothing->isChecked() ||
-            minHumidity != m_ui.minHumidity->value() ||
-            maxHumidity != m_ui.maxHumidity->value() ||
-            minTemperature != m_ui.minTemperature->value() ||
-            maxTemperature != m_ui.maxTemperature->value() ||
-            selectedSensorIds != m_selectedSensorIds)
+        showHumidity != m_ui.showHumidity->isChecked() ||
+        showBattery != m_ui.showBattery->isChecked() ||
+        showSignal != m_ui.showSignal->isChecked() ||
+        fitVertically != m_ui.fitVertically->isChecked() ||
+		fitHorizontally != m_ui.fitHorizontally->isChecked() ||
+        useSmoothing != m_ui.useSmoothing->isChecked() ||
+        minHumidity != m_ui.minHumidity->value() ||
+        maxHumidity != m_ui.maxHumidity->value() ||
+        minTemperature != m_ui.minTemperature->value() ||
+        maxTemperature != m_ui.maxTemperature->value() ||
+        selectedSensorIds != m_selectedSensorIds)
     {
         refresh();
     }
@@ -243,7 +249,8 @@ void PlotWidget::saveSettings()
 	//not saving these on purpose
 //     settings.setValue("filter/showBattery", m_ui.showBattery->isChecked());
 //     settings.setValue("filter/showSignal", m_ui.showSignal->isChecked());
-    settings.setValue("filter/fitMeasurements", m_ui.fitMeasurements->isChecked());
+    settings.setValue("filter/fitVertically", m_ui.fitVertically->isChecked());
+	settings.setValue("filter/fitHorizontally", m_ui.fitHorizontally->isChecked());
     settings.setValue("rendering/useSmoothing", m_ui.useSmoothing->isChecked());
     settings.setValue("rendering/minHumidity", m_ui.minHumidity->value());
     settings.setValue("rendering/maxHumidity", m_ui.maxHumidity->value());
@@ -270,10 +277,12 @@ DB::Filter PlotWidget::createFilter() const
         filter.sensorIds = m_selectedSensorIds;
     }
 
+    DB::SensorTimeConfig timeConfig = m_db->getLastSensorTimeConfig();
+
     //filter.useTimePointFilter = m_ui.dateTimeFilter->isChecked();
     filter.useTimePointFilter = true;
-    filter.timePointFilter.min = DB::Clock::from_time_t(m_ui.dateTimeFilter->getFromDateTime().toTime_t());
-    filter.timePointFilter.max = DB::Clock::from_time_t(m_ui.dateTimeFilter->getToDateTime().toTime_t());
+    filter.timePointFilter.min = DB::Clock::from_time_t(m_ui.dateTimeFilter->getFromDateTime().toTime_t()) - timeConfig.descriptor.measurementPeriod;
+    filter.timePointFilter.max = DB::Clock::from_time_t(m_ui.dateTimeFilter->getToDateTime().toTime_t()) + timeConfig.descriptor.measurementPeriod;
 
     return filter;
 }
@@ -328,9 +337,6 @@ void PlotWidget::refresh()
 {
     m_scheduleTimer.reset();
 
-    m_useSmoothing = m_ui.useSmoothing->isChecked();
-    m_fitMeasurements = m_ui.fitMeasurements->isChecked();
-
     DB::Filter filter = createFilter();
     applyFilter(filter);
 }
@@ -379,7 +385,7 @@ void PlotWidget::selectSensors()
         m_selectedSensorIds.clear();
         for (size_t i = 0; i < sensorCount; i++)
         {
-            DB::Sensor const& sensor = m_db->getSensor(i);
+            DB::Sensor sensor = m_db->getSensor(i);
             if (ui.filter->getSensorModel().isSensorChecked(sensor.id))
             {
                 m_selectedSensorIds.insert(sensor.id);
@@ -544,15 +550,20 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
     {
         m_plot->removeGraph(m_plot->graph(0));
     }
+    for (QCPAbstractItem* item: m_indicatorItems)
+	{
+        m_plot->removeItem(item);
+	}
+    m_indicatorItems.clear();
 
     uint64_t minTS = std::numeric_limits<uint64_t>::max();
     uint64_t maxTS = std::numeric_limits<uint64_t>::lowest();
 
-    std::array<std::pair<qreal, qreal>, (size_t)PlotType::Count> plotMinMax;
+    std::array<std::pair<double, double>, (size_t)PlotType::Count> plotMinMax;
     for (size_t plotIndex = 0; plotIndex < plotMinMax.size(); plotIndex++)
     {
-		plotMinMax[plotIndex].first = std::numeric_limits<qreal>::max();
-		plotMinMax[plotIndex].second = std::numeric_limits<qreal>::lowest();
+		plotMinMax[plotIndex].first = std::numeric_limits<double>::max();
+		plotMinMax[plotIndex].second = std::numeric_limits<double>::lowest();
     }
 
     std::vector<DB::Measurement> measurements = m_db->getFilteredMeasurements(m_filter);
@@ -562,24 +573,9 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
 
     std::sort(measurements.begin(), measurements.end(), [](DB::Measurement const& a, DB::Measurement const& b) { return a.timePoint < b.timePoint; });
 
-	float measurementFrequency = 1.f;
-	if (!measurements.empty())
-	{
-		DB::SensorTimeConfig const& stc = m_db->findSensorTimeConfigForMeasurementIndex(measurements.front().descriptor.index);
-        measurementFrequency = 1.f / std::chrono::duration<float>(stc.descriptor.measurementPeriod).count();
-	}
-    float maxCutoffFrequency = measurementFrequency / 3.f;
-    std::array<float, (size_t)PlotType::Count> plotCutoffFrequencies = 
-    { 
-        std::min(maxCutoffFrequency, 1.f / (60.f * 10.f)), 
-        std::min(maxCutoffFrequency, 1.f / (60.f * 10.f)), 
-        std::min(maxCutoffFrequency, 1.f / (60.f * 60.f)), 
-        std::min(maxCutoffFrequency, 1.f / (60.f * 2.f)) 
-    };
-
     for (size_t i = 0; i < m_db->getSensorCount(); i++)
     {
-        DB::Sensor const& sensor = m_db->getSensor(i);
+        DB::Sensor sensor = m_db->getSensor(i);
         if (m_selectedSensorIds.find(sensor.id) != m_selectedSensorIds.end())
         {
             GraphData& graphData = m_graphs[sensor.id];
@@ -587,9 +583,9 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
 			for (size_t plotIndex = 0; plotIndex < graphData.plots.size(); plotIndex++)
 			{
 				Plot& plot = graphData.plots[plotIndex];
-				plot.lpf.setup(1, measurementFrequency, plotCutoffFrequencies[plotIndex]);
 				plot.keys.reserve(8192);
 				plot.values.reserve(8192);
+                plot.alarmIndicators.clear();
 			}
             graphData.lastIndex = -1;
         }
@@ -614,36 +610,67 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         for (size_t plotIndex = 0; plotIndex < graphData.plots.size(); plotIndex++)
         {
             Plot& plot = graphData.plots[plotIndex];
-            qreal value = 0;
+            uint32_t alarmTriggerMask = 0;
+            double value = 0;
             switch ((PlotType)plotIndex)
             {
-            case PlotType::Temperature: value = m.descriptor.temperature; break;
-            case PlotType::Humidity: value = m.descriptor.humidity; break;
-            case PlotType::Battery: value = utils::getBatteryLevel(m.descriptor.vcc) * 100.0; break;
-            case PlotType::Signal: value = utils::getSignalLevel(std::min(m.descriptor.signalStrength.b2s, m.descriptor.signalStrength.s2b)) * 100.0; break;
+            case PlotType::Temperature: value = m.descriptor.temperature; alarmTriggerMask = DB::AlarmTrigger::Temperature; break;
+            case PlotType::Humidity: value = m.descriptor.humidity; alarmTriggerMask = DB::AlarmTrigger::Humidity; break;
+            case PlotType::Battery: value = utils::getBatteryLevel(m.descriptor.vcc) * 100.0; alarmTriggerMask = DB::AlarmTrigger::LowVcc; break;
+            case PlotType::Signal: value = utils::getSignalLevel(std::min(m.descriptor.signalStrength.b2s, m.descriptor.signalStrength.s2b)) * 100.0; alarmTriggerMask = DB::AlarmTrigger::LowSignal; break;
             }
-            if (m_useSmoothing)
+            if (m_ui.useSmoothing->isChecked())
             {
-                plot.lpf.process(value);
+                if (!plot.oldValue.has_value() || gap)
+                {
+                    plot.oldValue = value;
+                }
+                double oldValue = *plot.oldValue;
+                value = oldValue * 0.6 + value * 0.4;
+                plot.oldValue = value;
             }
             plot.keys.push_back(time);
             plot.values.push_back(gap ? qQNaN() : value);
+            if ((m.alarmTriggers.added & alarmTriggerMask) || (m.alarmTriggers.removed & alarmTriggerMask))
+            {
+                plot.alarmIndicators.push_back({ double(time), value, m.alarmTriggers & alarmTriggerMask });
+            }
             auto& minMax = plotMinMax[plotIndex];
             minMax.first = std::min(minMax.first, value);
             minMax.second = std::max(minMax.second, value);
         }
     }
 
-    m_axisDate->setRange(m_ui.dateTimeFilter->getFromDateTime().toTime_t(), m_ui.dateTimeFilter->getToDateTime().toTime_t());
+	if (m_ui.fitHorizontally->isChecked())
+    {
+        uint64_t d = maxTS - minTS;
+		if (d < 10)
+		{
+			uint64_t center = (maxTS + minTS) / 2;
+			minTS = center - 10 / 2;
+			maxTS = center + 10 / 2;
+		}
+        else
+        {
+            //make sure the fitting doesn't show more than the date time range
+            minTS = std::max<uint64_t>(minTS, m_ui.dateTimeFilter->getFromDateTime().toTime_t());
+            maxTS = std::min<uint64_t>(maxTS, m_ui.dateTimeFilter->getToDateTime().toTime_t());
+        }
+		m_axisDate->setRange(minTS, maxTS);
+    }
+    else
+	{
+		m_axisDate->setRange(m_ui.dateTimeFilter->getFromDateTime().toTime_t(), m_ui.dateTimeFilter->getToDateTime().toTime_t());
+	}
 
-    if (m_fitMeasurements)
+    if (m_ui.fitVertically->isChecked())
     {
 		for (size_t plotIndex = 0; plotIndex < plotMinMax.size(); plotIndex++)
 		{
             auto& minMax = plotMinMax[plotIndex];
 			if (std::abs(minMax.second - minMax.first) < k_plotMinRange[plotIndex])
 			{
-				qreal center = (minMax.first + minMax.second) / 2.0;
+                double center = (minMax.first + minMax.second) / 2.0;
                 minMax.first = center - k_plotMinRange[plotIndex] / 2.0;
                 minMax.second = center + k_plotMinRange[plotIndex] / 2.0;
 			}
@@ -711,6 +738,21 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
                 graph->setName(QString("%1 %2").arg(graphData.sensor.descriptor.name.c_str()).arg(k_plotNames[plotIndex]));
                 graph->setData(plot.keys, plot.values);
                 plot.graph = graph;
+
+                for (Plot::AlarmIndicator const& ai : plot.alarmIndicators)
+                {
+					// add the phase tracer (red circle) which sticks to the graph data (and gets updated in bracketDataSlot by timer event):
+					QCPItemTracer* item = new QCPItemTracer(m_plot);
+					item->setGraph(graph);
+					item->setGraphKey(ai.key);
+					item->setInterpolating(true);
+					item->setStyle(QCPItemTracer::tsCircle);
+                    QColor color = utils::getDominatingTriggerColor(ai.triggers.added ? ai.triggers.added : ai.triggers.current);
+					item->setPen(QPen(color));
+					item->setBrush(color);
+					item->setSize(7);
+                    m_indicatorItems.push_back(item);
+                }
             }
         }
     }
@@ -877,6 +919,8 @@ void PlotWidget::showAnnotation(const QPointF& pos)
         return found;
     };
 
+	double delta = m_axisDate->pixelToCoord(2) - m_axisDate->pixelToCoord(1);
+
     const GraphData* bestGraphData = nullptr;
     PlotType plotType = PlotType::Temperature;
     for (const auto& pair: m_graphs)
@@ -886,7 +930,12 @@ void PlotWidget::showAnnotation(const QPointF& pos)
         {
             const Plot& plot = graphData.plots[plotIndex];
             QCPGraph* graph = plot.graph;
-            if (graph && computeClosestPoint(graph, pos))
+            if (!graph)
+            {
+                continue;
+            }
+                
+            if (computeClosestPoint(graph, pos))
             {
                 bestGraphData = &graphData;
                 plotType = (PlotType)plotIndex;
@@ -896,6 +945,26 @@ void PlotWidget::showAnnotation(const QPointF& pos)
 
     if (bestGraphData)
     {
+		const Plot& plot = bestGraphData->plots[(size_t)plotType];
+
+		//now snap to the closest alarm indicator
+		double bestDistance = std::numeric_limits<double>::max();
+		std::optional<Plot::AlarmIndicator> bestAlarmIndicator;
+		for (Plot::AlarmIndicator const& ai : plot.alarmIndicators)
+		{
+			double d = std::abs(ai.key - key);
+			if (d < delta && d < bestDistance)
+			{
+				bestAlarmIndicator = ai;
+				bestDistance = d;
+			}
+		}
+		if (bestAlarmIndicator.has_value())
+		{
+			key = bestAlarmIndicator->key;
+			value = bestAlarmIndicator->value;
+		}
+
         createAnnotation(bestGraphData->sensor.id, QPointF(), key, value, bestGraphData->sensor, plotType);
     }
     else
@@ -906,15 +975,27 @@ void PlotWidget::showAnnotation(const QPointF& pos)
 
 //////////////////////////////////////////////////////////////////////////
 
+const PlotWidget::Plot* PlotWidget::findAnnotationPlot(const Annotation& annotation) const
+{
+	auto it = m_graphs.find(annotation.sensorId);
+	if (it == m_graphs.end())
+	{
+		return nullptr;
+	}
+	const GraphData& gd = it->second;
+	return &gd.plots[(size_t)annotation.plotType];
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 QCPGraph* PlotWidget::findAnnotationGraph(const Annotation& annotation) const
 {
-    auto it = m_graphs.find(annotation.sensorId);
-    if (it == m_graphs.end())
+    const Plot* plot = findAnnotationPlot(annotation);
+    if (!plot)
     {
         return nullptr;
     }
-    const GraphData& gd = it->second;
-    return gd.plots[(size_t)annotation.plotType].graph;
+    return plot->graph;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -955,23 +1036,52 @@ void PlotWidget::createAnnotation(DB::SensorId sensorId, QPointF point, double k
     m_annotation.sensorId = sensorId;
     m_annotation.plotType = plotType;
 
-	QCPGraph* graph = findAnnotationGraph(m_annotation);
-    if (!graph)
+	const Plot* plot = findAnnotationPlot(m_annotation);
+    if (!plot)
     {
         return;
     }
 
-    QColor color = graph->pen().color();
+    QString alarmStr;
+    for (Plot::AlarmIndicator const& ai : plot->alarmIndicators)
+    {
+        if (std::abs(ai.key - key) < 0.5)
+        {
+            if (ai.triggers.added)
+			{
+                alarmStr = QString("<p>Triggered: <span style=\"color:#%1;\"><b>%2</b></span></p>")
+                    .arg(utils::getDominatingTriggerColor(ai.triggers.added) & 0xFFFFFF, 6, 16, QChar('0'))
+                    .arg(utils::getDominatingTriggerName(ai.triggers.added));
+			}
+            else
+            {
+				alarmStr = QString("<p>Recovered to: <span style=\"color:#%1;\"><b>%2</b></span></p>")
+                    .arg(utils::getDominatingTriggerColor(ai.triggers.current) & 0xFFFFFF, 6, 16, QChar('0'))
+                    .arg(utils::getDominatingTriggerName(ai.triggers.current));
+            }
+            break;
+        }
+    }
+
+	m_annotation.toolTip->setAnchor(plot->graph, point, key, value);
+
+    QColor color = k_colors[sensor.id % k_colors.size()];
+	double brightness = (0.2126 * color.redF() + 0.7152 * color.greenF() + 0.0722 * color.blueF());
+	if (brightness > 0.6) //make sure the color is not too bright
+	{
+		color.setHslF(color.hueF(), color.saturationF(), 0.4);
+	}
+
     QDateTime dt = QDateTime::fromSecsSinceEpoch(static_cast<int64_t>(key));
 	QString dateTimeFormatStr = utils::getQDateTimeFormatString(m_db->getGeneralSettings().dateTimeFormat);
-    m_annotation.toolTip->setText(graph, QString("<p style=\"color:%1;\"><b>%2</b></p>%3<br>%4: <b>%5%6</b>")
-                                    .arg(color.name())
-                                    .arg(sensor.descriptor.name.c_str())
-                                    .arg(dt.toString(dateTimeFormatStr))
-                                    .arg(k_plotNames[(size_t)plotType])
-                                    .arg(value, 0, 'f', 1)
-                                    .arg(k_plotUnits[(size_t)plotType]));
-	m_annotation.toolTip->setAnchor(graph, point, key, value);
+    m_annotation.toolTip->setText(plot->graph, QString("<span style=\"color:#%1;\"><b>%2</b></span><br>%3<br>%4: <b>%5%6</b>%7")
+                                  .arg(color.rgba() & 0xFFFFFF, 6, 16, QChar('0'))
+                                  .arg(sensor.descriptor.name.c_str())
+                                  .arg(dt.toString(dateTimeFormatStr))
+                                  .arg(k_plotNames[(size_t)plotType])
+                                  .arg(value, 0, 'f', 1)
+                                  .arg(k_plotUnits[(size_t)plotType])
+                                  .arg(alarmStr));
 }
 
 //////////////////////////////////////////////////////////////////////////

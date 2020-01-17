@@ -638,19 +638,12 @@ static bool request_config()
         uint8_t size = sizeof(data::sensor::v1::Config_Response);
         uint8_t raw_buffer[packet_raw_size(size)];
         uint8_t* buffer = s_radio.receive_packet(raw_buffer, size, chrono::millis(2000));
-        if (buffer)
-        {
-            if (size == sizeof(data::sensor::v1::Config_Response) && check_rx_packet(buffer, data::sensor::v1::Type::CONFIG_RESPONSE))
-            {
-                s_last_input_dBm = s_radio.get_last_input_dBm();
-                const data::sensor::v1::Config_Response* ptr = reinterpret_cast<const data::sensor::v1::Config_Response*>(s_radio.get_rx_packet_payload(buffer));
-                return apply_config(*ptr);
-            }
-        }
-        else
-        {
-            s_comms_errors++;
-        }
+        if (size == sizeof(data::sensor::v1::Config_Response) && check_rx_packet(buffer, data::sensor::v1::Type::CONFIG_RESPONSE))
+    	{
+        	s_last_input_dBm = s_radio.get_last_input_dBm();
+	        const data::sensor::v1::Config_Response* ptr = reinterpret_cast<const data::sensor::v1::Config_Response*>(s_radio.get_rx_packet_payload(buffer));
+        	return apply_config(*ptr);
+    	}
     }
     else
     {

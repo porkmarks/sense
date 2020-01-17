@@ -91,6 +91,7 @@ bool Logger::load(sqlite3& db)
 
 void Logger::logVerbose(std::string const& message)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
     addToDB(message, Type::VERBOSE);
 
     std::cout << "VERBOSE: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
@@ -117,6 +118,7 @@ void Logger::logVerbose(char const* message)
 
 void Logger::logInfo(std::string const& message)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
     addToDB(message, Type::INFO);
 
     std::cout << "INFO: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
@@ -141,6 +143,7 @@ void Logger::logInfo(char const* message)
 
 void Logger::logWarning(std::string const& message)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
     addToDB(message, Type::WARNING);
 
     std::cout << "WARNING: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
@@ -167,6 +170,7 @@ void Logger::logWarning(char const* message)
 
 void Logger::logCritical(std::string const& message)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
     addToDB(message, Type::CRITICAL);
 
     std::cout << "ERROR: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
@@ -207,6 +211,8 @@ void Logger::addToDB(std::string const& message, Type type)
 
 std::vector<Logger::LogLine> Logger::getFilteredLogLines(Filter const& filter) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
     std::vector<LogLine> result;
     result.reserve(16384);
 

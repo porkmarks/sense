@@ -175,7 +175,7 @@ void ConfigureAlarmDialog::accept()
         size_t sensorCount = m_db.getSensorCount();
         for (size_t i = 0; i < sensorCount; i++)
         {
-            DB::Sensor const& sensor = m_db.getSensor(i);
+            DB::Sensor sensor = m_db.getSensor(i);
             if (m_ui.sensorFilter->getSensorModel().isSensorChecked(sensor.id))
             {
                 descriptor.sensors.insert(sensor.id);

@@ -71,13 +71,9 @@ void BaseStationsWidget::init(Comms& comms, DB& db)
     m_comms = &comms;
     m_db = &db;
 
-    m_uiConnections.push_back(connect(m_comms, &Comms::baseStationDiscovered, this, &BaseStationsWidget::baseStationDiscovered));
-    m_uiConnections.push_back(connect(m_comms, &Comms::baseStationConnected, this, &BaseStationsWidget::baseStationConnected));
-    m_uiConnections.push_back(connect(m_comms, &Comms::baseStationDisconnected, this, &BaseStationsWidget::baseStationDisconnected));
-
     for (size_t i = 0; i < db.getBaseStationCount(); i++)
     {
-        DB::BaseStation const& bs = db.getBaseStation(i);
+        DB::BaseStation bs = db.getBaseStation(i);
 
         QStandardItem* nameItem = new QStandardItem();
         QStandardItem* macItem = new QStandardItem();
@@ -109,21 +105,24 @@ void BaseStationsWidget::init(Comms& comms, DB& db)
         m_baseStationDescriptors.push_back(bs.descriptor);
     }
 
-	for (size_t i = 0; i < m_comms->getDiscoveredBaseStationCount(); i++)
+	for (Comms::BaseStationDescriptor const& bsd: m_comms->getDiscoveredBaseStations())
 	{
-		Comms::BaseStationDescriptor const& bsd = m_comms->getDiscoveredBaseStation(i);
         baseStationDiscovered(bsd);
 	}
 
     setPermissions();
 	m_uiConnections.push_back(connect(&db, &DB::userLoggedIn, this, &BaseStationsWidget::setPermissions));
-}
 
+	m_uiConnections.push_back(connect(m_comms, &Comms::baseStationDiscovered, this, &BaseStationsWidget::baseStationDiscovered));
+	m_uiConnections.push_back(connect(m_comms, &Comms::baseStationConnected, this, &BaseStationsWidget::baseStationConnected));
+	m_uiConnections.push_back(connect(m_comms, &Comms::baseStationDisconnected, this, &BaseStationsWidget::baseStationDisconnected));
+}
 
 //////////////////////////////////////////////////////////////////////////
 
 void BaseStationsWidget::setPermissions()
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -156,6 +155,8 @@ void BaseStationsWidget::setAddress(size_t row, QHostAddress const& address)
 
 void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
 	if (!hasPermissionOrCanLoginAsAdmin(*m_db, DB::UserDescriptor::PermissionAddRemoveBaseStations, this))
     {
         QMessageBox::critical(this, "Error", "You don't have permission to add base stations.");
@@ -190,8 +191,8 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
         if (_bsIndex >= 0)
         {
             size_t bsIndex = static_cast<size_t>(_bsIndex);
-            bool connected = m_comms->connectToBaseStation(*m_db, descriptor.mac);
-            setStatus(bsIndex, connected ? "Connected" : "Disconnected");
+            setStatus(bsIndex, "Disconnected");
+            m_comms->connectToBaseStation(*m_db, descriptor.mac);
             setName(bsIndex, descriptor.name);
         }
         else
@@ -209,11 +210,13 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
 
 void BaseStationsWidget::baseStationConnected(Comms::BaseStationDescriptor const& commsBS)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
     int32_t _bsIndex = m_db->findBaseStationIndexByMac(commsBS.mac);
     if (_bsIndex >= 0)
     {
         size_t bsIndex = static_cast<size_t>(_bsIndex);
-        //DB::BaseStation const& bs = db.getBaseStation(bsIndex);
+        //DB::BaseStation bs = db.getBaseStation(bsIndex);
         setStatus(bsIndex, "Connected");
         setAddress(bsIndex, commsBS.address);
         return;
@@ -224,11 +227,13 @@ void BaseStationsWidget::baseStationConnected(Comms::BaseStationDescriptor const
 
 void BaseStationsWidget::baseStationDisconnected(Comms::BaseStationDescriptor const& commsBS)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
     int32_t _bsIndex = m_db->findBaseStationIndexByMac(commsBS.mac);
     if (_bsIndex >= 0)
     {
         size_t bsIndex = static_cast<size_t>(_bsIndex);
-        DB::BaseStation const& bs = m_db->getBaseStation(bsIndex);
+        DB::BaseStation bs = m_db->getBaseStation(bsIndex);
         setStatus(bsIndex, "Disconnected");
         setAddress(bsIndex, commsBS.address);
         showDisconnectionMessageBox(bs, commsBS.address);
@@ -240,6 +245,8 @@ void BaseStationsWidget::baseStationDisconnected(Comms::BaseStationDescriptor co
 
 void BaseStationsWidget::showDisconnectionMessageBox(DB::BaseStation const& bs, const QHostAddress& address)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
     //can't do this modal thing here!!
 //    QMessageBox::critical(this, "Error", QString("Base Station %1, %2 has disconnected at %3")
 //                    .arg(bs.descriptor.name.c_str())
@@ -251,11 +258,15 @@ void BaseStationsWidget::showDisconnectionMessageBox(DB::BaseStation const& bs, 
 
 void BaseStationsWidget::baseStationDiscovered(Comms::BaseStationDescriptor const& commsBS)
 {
+	auto id = std::this_thread::get_id();
+
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
     int32_t _bsIndex = m_db->findBaseStationIndexByMac(commsBS.mac);
     if (_bsIndex >= 0)
     {
         size_t bsIndex = static_cast<size_t>(_bsIndex);
-        DB::BaseStation const& bs = m_db->getBaseStation(static_cast<size_t>(bsIndex));
+        DB::BaseStation bs = m_db->getBaseStation(static_cast<size_t>(bsIndex));
         bool connected = m_comms->isBaseStationConnected(bs.descriptor.mac);
         setStatus(bsIndex, connected ? "Connected" : "Disconnected");
         setAddress(bsIndex, commsBS.address);

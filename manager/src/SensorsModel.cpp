@@ -68,7 +68,7 @@ size_t SensorsModel::getSensorCount() const
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::Sensor const& SensorsModel::getSensor(size_t index) const
+DB::Sensor SensorsModel::getSensor(size_t index) const
 {
     return m_db.getSensor(index);
 }
@@ -97,7 +97,7 @@ void SensorsModel::sensorAdded(DB::SensorId id)
         return;
     }
 
-    //DB::Sensor const& sensor = m_db.getSensor(sensorIndex);
+    //DB::Sensor sensor = m_db.getSensor(sensorIndex);
 
     emit beginInsertRows(QModelIndex(), (int)m_sensors.size(), (int)m_sensors.size());
     SensorData sd;
@@ -268,7 +268,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         return QVariant();
     }
     size_t dbSensorIndex = static_cast<size_t>(_dbSensorIndex);
-    DB::Sensor const& sensor = m_db.getSensor(dbSensorIndex);
+    DB::Sensor sensor = m_db.getSensor(dbSensorIndex);
 
     Column column = static_cast<Column>(index.column());
     if (role == Qt::CheckStateRole && m_showCheckboxes)
@@ -412,7 +412,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         else if (column == Column::Alarms)
         {
             Result<DB::Measurement> res = m_db.getLastMeasurementForSensor(sensor.id);
-            return (res == success) ? res.payload().alarmTriggers : -1;
+            return (res == success) ? res.payload().alarmTriggers.current : -1;
         }
         else
         {

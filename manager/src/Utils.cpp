@@ -476,6 +476,24 @@ bool exportCsvTo(std::ostream& stream, DB::GeneralSettings const& settings, DB::
 	return true;
 }
 
+uint32_t getDominatingTriggerColor(uint32_t trigger)
+{
+	if (trigger & (DB::AlarmTrigger::HighHard | DB::AlarmTrigger::LowSignal | DB::AlarmTrigger::LowVcc)) return utils::k_highThresholdHardColor;
+	else if (trigger & (DB::AlarmTrigger::LowHard)) return utils::k_lowThresholdHardColor;
+	else if (trigger & (DB::AlarmTrigger::HighSoft)) return utils::k_highThresholdSoftColor;
+	else if (trigger & (DB::AlarmTrigger::LowSoft)) return utils::k_lowThresholdSoftColor;
+	else return utils::k_inRangeColor;
+}
+const char* getDominatingTriggerName(uint32_t trigger)
+{
+	if (trigger & (DB::AlarmTrigger::HighHard)) return "Very High";
+	else if (trigger & (DB::AlarmTrigger::LowHard)) return "Very Low";
+	else if (trigger & (DB::AlarmTrigger::HighSoft)) return "High";
+	else if (trigger & (DB::AlarmTrigger::LowSoft)) return "Low";
+	else if (trigger & (DB::AlarmTrigger::LowSignal | DB::AlarmTrigger::LowVcc)) return "Low";
+	else return "Normal";
+}
+
 float getBatteryLevel(float vcc)
 {
     float level = std::max(std::min(vcc, k_maxBatteryLevel) - k_minBatteryLevel, 0.f) / (k_maxBatteryLevel - k_minBatteryLevel);
