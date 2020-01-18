@@ -22,7 +22,7 @@ private:
     void loadSettings();
     void saveSettings();
     void closeEvent(QCloseEvent* event) override;
-    void setupErrorCountersUI();
+    void setupStatsUI();
 
     Ui::SensorDetailsDialog m_ui;
 

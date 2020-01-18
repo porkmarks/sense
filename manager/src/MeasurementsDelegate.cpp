@@ -44,25 +44,25 @@ void MeasurementsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& 
         QPoint pos = option.rect.topLeft() + QPoint(k_iconMargin.width(), k_iconMargin.height());
         int32_t iconSize = option.rect.height();
 
-        if (alarmTriggers & DB::AlarmTrigger::LowTemperature)
+        if (alarmTriggers & DB::AlarmTrigger::LowTemperatureMask)
         {
             static QIcon icon(":/icons/ui/temperature.png");
             painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
             pos.setX(pos.x() + iconSize + k_iconMargin.width());
         }
-		if (alarmTriggers & DB::AlarmTrigger::HighTemperature)
+		if (alarmTriggers & DB::AlarmTrigger::HighTemperatureMask)
 		{
 			static QIcon icon(":/icons/ui/temperature.png");
 			painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
 			pos.setX(pos.x() + iconSize + k_iconMargin.width());
 		}
-        if (alarmTriggers & DB::AlarmTrigger::LowHumidity)
+        if (alarmTriggers & DB::AlarmTrigger::LowHumidityMask)
         {
             static QIcon icon(":/icons/ui/humidity.png");
             painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
             pos.setX(pos.x() + iconSize + k_iconMargin.width());
         }
-		if (alarmTriggers & DB::AlarmTrigger::HighHumidity)
+		if (alarmTriggers & DB::AlarmTrigger::HighHumidityMask)
 		{
 			static QIcon icon(":/icons/ui/humidity.png");
 			painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
@@ -105,19 +105,19 @@ QSize MeasurementsDelegate::sizeHint(const QStyleOptionViewItem& option, const Q
         int32_t width = 0;
         int32_t iconSize = option.rect.height();
 
-        if (alarmTriggers & DB::AlarmTrigger::LowTemperature)
+        if (alarmTriggers & DB::AlarmTrigger::LowTemperatureMask)
         {
             width += iconSize + k_iconMargin.width();
         }
-		if (alarmTriggers & DB::AlarmTrigger::HighTemperature)
+		if (alarmTriggers & DB::AlarmTrigger::HighTemperatureMask)
 		{
 			width += iconSize + k_iconMargin.width();
 		}
-        if (alarmTriggers & DB::AlarmTrigger::LowHumidity)
+        if (alarmTriggers & DB::AlarmTrigger::LowHumidityMask)
         {
             width += iconSize + k_iconMargin.width();
         }
-		if (alarmTriggers & DB::AlarmTrigger::HighHumidity)
+		if (alarmTriggers & DB::AlarmTrigger::HighHumidityMask)
 		{
 			width += iconSize + k_iconMargin.width();
 		}

@@ -95,9 +95,8 @@ struct Calibration
 {
     int16_t temperature_bias = 0; //*100
     int16_t humidity_bias = 0; //*100
-    uint8_t reserved[16] = {};
 };
-static_assert(sizeof(Calibration) == 20, "");
+static_assert(sizeof(Calibration) == 4, "");
 
 enum class Reboot_Flag : uint8_t
 {
@@ -108,10 +107,21 @@ enum class Reboot_Flag : uint8_t
     REBOOT_UNKNOWN = 1 << 4,
 };
 
+struct Stats
+{
+	uint8_t reboot_flags = 0;
+    uint8_t comms_errors = 0;
+    uint8_t comms_retries = 0;
+    uint32_t asleep_ms = 0;
+    uint32_t awake_ms = 0;
+    uint16_t comms_rounds = 0;
+    uint16_t measurement_rounds = 0;
+};
+static_assert(sizeof(Stats) == 15, "");
+
 struct Config_Request
 {
-    uint8_t reboot_flags = 0;
-    uint8_t comms_errors = 0;
+    Stats stats;
     uint32_t first_measurement_index = 0;
     uint32_t measurement_count = 0;
     QSS b2s_qss = { 255 };
@@ -120,9 +130,8 @@ struct Config_Request
     QVCC qvcc;
 
     Calibration calibration;
-    uint32_t reserved[3];
 };
-static_assert(sizeof(Config_Request) == 49, "");
+static_assert(sizeof(Config_Request) == 34, "");
 
 struct Config_Response
 {
@@ -138,8 +147,9 @@ struct Config_Response
 
     bool sleeping = false;
     int8_t power = 15;
+    uint8_t retries = 1;
 };
-static_assert(sizeof(Config_Response) == 42, "");
+static_assert(sizeof(Config_Response) == 27, "");
 
 struct Descriptor
 {
@@ -147,27 +157,26 @@ struct Descriptor
     uint8_t hardware_version = 0;
     uint8_t software_version = 0;
     uint32_t serial_number;
-    uint8_t reserved[16];
 };
 
 struct First_Config_Request : Config_Request
 {
     Descriptor descriptor;
 };
-static_assert(sizeof(First_Config_Request) == 72, "");
+static_assert(sizeof(First_Config_Request) == 41, "");
 
 struct First_Config_Response : Config_Response
 {
     uint32_t first_measurement_index = 0;
 };
-static_assert(sizeof(First_Config_Response) == 46, "");
+static_assert(sizeof(First_Config_Response) == 31, "");
 
 struct Pair_Request
 {
     Descriptor descriptor;
     Calibration calibration;
 };
-static_assert(sizeof(Pair_Request) == 43, "");
+static_assert(sizeof(Pair_Request) == 11, "");
 
 struct Pair_Response
 {

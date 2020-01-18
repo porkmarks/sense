@@ -88,4 +88,3 @@ private:
     uint8_t m_first_group_idx = 0;
     uint8_t m_group_count = 0;
 };
-

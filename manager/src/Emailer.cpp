@@ -128,7 +128,7 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, s
 		QString signalStrengthStr;
 
         DB::Measurement const& m = *measurement;
-		if (newTriggers & DB::AlarmTrigger::Temperature)
+		if (newTriggers & DB::AlarmTrigger::TemperatureMask)
 		{
 			if (newTriggers & DB::AlarmTrigger::HighTemperatureHard)
 				temperatureStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very High: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
@@ -139,12 +139,12 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, s
 			else if (newTriggers & DB::AlarmTrigger::LowTemperatureSoft)
 				temperatureStr = QString(alertTemplateStr).arg(utils::k_lowThresholdSoftColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Low: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
 		}
-		else if (oldTriggers & DB::AlarmTrigger::Temperature)
+		else if (oldTriggers & DB::AlarmTrigger::TemperatureMask)
 			temperatureStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Recovered: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
 		else
 			temperatureStr = QString(R"X(%1&deg;C)X").arg(m.descriptor.temperature, 0, 'f', 1);
 
-		if (newTriggers & DB::AlarmTrigger::Humidity)
+		if (newTriggers & DB::AlarmTrigger::HumidityMask)
 		{
 			if (newTriggers & DB::AlarmTrigger::HighHumidityHard)
 				humidityStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very High: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
@@ -155,7 +155,7 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, s
 			else if (newTriggers & DB::AlarmTrigger::LowHumiditySoft)
 				humidityStr = QString(alertTemplateStr).arg(utils::k_lowThresholdSoftColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Low: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
 		}
-		else if (oldTriggers & DB::AlarmTrigger::Humidity)
+		else if (oldTriggers & DB::AlarmTrigger::HumidityMask)
 			humidityStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Recovered: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
 		else
 			humidityStr = QString(R"X(%1&deg;C)X").arg(m.descriptor.humidity, 0, 'f', 1);

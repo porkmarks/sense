@@ -501,6 +501,7 @@ static void fillConfig(data::sensor::v1::Config_Response& config, DB::SensorSett
     config.calibration.temperature_bias = static_cast<int16_t>((sensor.calibration.temperatureBias) * 100.f);
     config.calibration.humidity_bias = static_cast<int16_t>((sensor.calibration.humidityBias) * 100.f);
     config.power = sensorSettings.radioPower;
+    config.retries = sensorSettings.retries;
     config.sleeping = sensor.shouldSleep;
 }
 
@@ -561,13 +562,18 @@ DB::SensorInputDetails Comms::createSensorInputDetails(DB::Sensor const& sensor,
     configRequest.measurement.unpack(details.measurementHumidity, details.measurementTemperature);
     details.measurementVcc = data::sensor::v1::unpack_qvcc(configRequest.qvcc);
 
-    details.hasErrorCountersDelta = true;
-    details.errorCountersDelta.commsFailures = configRequest.comms_errors;
-    details.errorCountersDelta.resetReboots = (configRequest.reboot_flags & int(data::sensor::v1::Reboot_Flag::REBOOT_RESET)) ? 1 : 0;
-    details.errorCountersDelta.unknownReboots = (configRequest.reboot_flags & int(data::sensor::v1::Reboot_Flag::REBOOT_UNKNOWN)) ? 1 : 0;
-    details.errorCountersDelta.brownoutReboots = (configRequest.reboot_flags & int(data::sensor::v1::Reboot_Flag::REBOOT_BROWNOUT)) ? 1 : 0;
-    details.errorCountersDelta.powerOnReboots = (configRequest.reboot_flags & int(data::sensor::v1::Reboot_Flag::REBOOT_POWER_ON)) ? 1 : 0;
-    details.errorCountersDelta.watchdogReboots = (configRequest.reboot_flags & int(data::sensor::v1::Reboot_Flag::REBOOT_WATCHDOG)) ? 1 : 0;
+    details.hasStatsDelta = true;
+    details.statsDelta.commsFailures = configRequest.stats.comms_errors;
+    details.statsDelta.resetReboots = (configRequest.stats.reboot_flags & int(data::sensor::v1::Reboot_Flag::REBOOT_RESET)) ? 1 : 0;
+    details.statsDelta.unknownReboots = (configRequest.stats.reboot_flags & int(data::sensor::v1::Reboot_Flag::REBOOT_UNKNOWN)) ? 1 : 0;
+    details.statsDelta.brownoutReboots = (configRequest.stats.reboot_flags & int(data::sensor::v1::Reboot_Flag::REBOOT_BROWNOUT)) ? 1 : 0;
+    details.statsDelta.powerOnReboots = (configRequest.stats.reboot_flags & int(data::sensor::v1::Reboot_Flag::REBOOT_POWER_ON)) ? 1 : 0;
+    details.statsDelta.watchdogReboots = (configRequest.stats.reboot_flags & int(data::sensor::v1::Reboot_Flag::REBOOT_WATCHDOG)) ? 1 : 0;
+	details.statsDelta.commsRetries = configRequest.stats.comms_retries;
+	details.statsDelta.awake = std::chrono::milliseconds(configRequest.stats.awake_ms);
+	details.statsDelta.asleep = std::chrono::milliseconds(configRequest.stats.asleep_ms);
+	details.statsDelta.commsRounds = configRequest.stats.comms_rounds;
+	details.statsDelta.measurementRounds = configRequest.stats.measurement_rounds;
 
     return details;
 }

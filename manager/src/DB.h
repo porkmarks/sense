@@ -212,6 +212,7 @@ public:
 	struct SensorSettings
 	{
 		int8_t radioPower = 10; //dBm.
+		uint8_t retries = 2;
 		float alertBatteryLevel = 0.1f; //0 - 1 mu
 		float alertSignalStrengthLevel = 0.1f; //0 - 1 mu
 	};
@@ -233,7 +234,6 @@ public:
         Clock::time_point baselineMeasurementTimePoint = Clock::time_point(Clock::duration::zero());
         uint32_t baselineMeasurementIndex = 0;
     };
-
 
     Result<void> addSensorTimeConfig(SensorTimeConfigDescriptor const& descriptor);
     Result<void> setSensorTimeConfigs(std::vector<SensorTimeConfig> const& configs);
@@ -298,9 +298,9 @@ public:
         AlarmTriggers alarmTriggers;
     };
 
-    struct ErrorCounters
+    struct SensorStats
     {
-        uint32_t commsBlackouts = 0; //skipped coms cycles
+        uint32_t commsBlackouts = 0; //skipped comms cycles
         uint32_t commsFailures = 0; //generic comms failures reported by the sensor
         //various reboot reasons
         uint32_t unknownReboots = 0; 
@@ -308,6 +308,12 @@ public:
         uint32_t resetReboots = 0;
         uint32_t brownoutReboots = 0;
         uint32_t watchdogReboots = 0;
+
+		uint32_t commsRetries = 0;
+		Clock::duration asleep = Clock::duration::zero();
+        Clock::duration awake = Clock::duration::zero();
+		uint16_t commsRounds = 0;
+		uint16_t measurementRounds = 0;
     };
 
     struct SensorDescriptor
@@ -347,7 +353,7 @@ public:
         bool shouldSleep = false; //the command given to the sensor
         Clock::time_point sleepStateTimePoint = Clock::time_point(Clock::duration::zero());
 
-        ErrorCounters errorCounters;
+        SensorStats stats;
 
         Clock::time_point lastCommsTimePoint = Clock::time_point(Clock::duration::zero());
         bool blackout = false; //not saved
@@ -386,7 +392,7 @@ public:
     Result<void> setSensorCalibration(SensorId id, Sensor::Calibration const& calibration);
     Result<void> setSensorSleep(SensorId id, bool sleep);
     Result<SensorId> bindSensor(uint32_t serialNumber, uint8_t sensorType, uint8_t hardwareVersion, uint8_t softwareRevision, Sensor::Calibration const& calibration);
-    Result<void> clearErrorCounters(SensorId id);
+    Result<void> clearSensorStats(SensorId id);
 
     struct SensorInputDetails
     {
@@ -413,8 +419,8 @@ public:
         bool hasSleepingData = false;
         bool sleeping = false;
 
-        bool hasErrorCountersDelta = false;
-        ErrorCounters errorCountersDelta;
+        bool hasStatsDelta = false;
+        SensorStats statsDelta;
     };
 
     bool setSensorInputDetails(SensorInputDetails const& details);
@@ -500,31 +506,36 @@ public:
     {
         enum
         {
+			//triggers generated from measurements
             LowTemperatureSoft  = 1 << 0,
             LowTemperatureHard  = 1 << 1,
-            LowTemperature      = LowTemperatureSoft | LowTemperatureHard,
+            LowTemperatureMask  = LowTemperatureSoft | LowTemperatureHard,
             HighTemperatureSoft = 1 << 2,
             HighTemperatureHard = 1 << 3,
-            HighTemperature     = HighTemperatureSoft | HighTemperatureHard,
-            Temperature         = LowTemperature | HighTemperature,
-
+            HighTemperatureMask = HighTemperatureSoft | HighTemperatureHard,
+            TemperatureMask     = LowTemperatureMask | HighTemperatureMask,
 			LowHumiditySoft     = 1 << 4,
 			LowHumidityHard     = 1 << 5,
-			LowHumidity         = LowHumiditySoft | LowHumidityHard,
+			LowHumidityMask     = LowHumiditySoft | LowHumidityHard,
 			HighHumiditySoft    = 1 << 6,
 			HighHumidityHard    = 1 << 7,
-			HighHumidity        = HighHumiditySoft | HighHumidityHard,
-            Humidity            = LowHumidity | HighHumidity,
-
+			HighHumidityMask    = HighHumiditySoft | HighHumidityHard,
+            HumidityMask        = LowHumidityMask | HighHumidityMask,
             LowVcc              = 1 << 8,
             LowSignal           = 1 << 9,
+            MeasurementMask     = TemperatureMask | HumidityMask | LowVcc | LowSignal,
+
+			//triggers generated from sensors
             SensorBlackout      = 1 << 10,
+			SensorMask          = SensorBlackout,
+
+			//base station triggers
             BaseStationDisconnected = 1 << 11,
 
-			HighSoft            = HighHumiditySoft | HighTemperatureSoft,
-			HighHard            = HighHumidityHard | HighTemperatureHard,
-			LowSoft             = LowHumiditySoft | LowTemperatureSoft,
-			LowHard             = LowHumidityHard | LowTemperatureHard,
+			HighSoftMask        = HighHumiditySoft | HighTemperatureSoft,
+			HighHardMask        = HighHumidityHard | HighTemperatureHard,
+			LowSoftMask         = LowHumiditySoft | LowTemperatureSoft,
+			LowHardMask         = LowHumidityHard | LowTemperatureHard,
         };
     };
 

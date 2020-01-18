@@ -224,7 +224,7 @@ std::pair<std::string, int32_t> computeDurationString(DB::Clock::duration d)
 	{
 		sprintf(buf, "%dm %02ds", minutes, seconds);
 	}
-	else if (seconds > 0)
+	else if (seconds >= 0)
 	{
 		sprintf(buf, "%ds", seconds);
 	}
@@ -478,18 +478,18 @@ bool exportCsvTo(std::ostream& stream, DB::GeneralSettings const& settings, DB::
 
 uint32_t getDominatingTriggerColor(uint32_t trigger)
 {
-	if (trigger & (DB::AlarmTrigger::HighHard | DB::AlarmTrigger::LowSignal | DB::AlarmTrigger::LowVcc)) return utils::k_highThresholdHardColor;
-	else if (trigger & (DB::AlarmTrigger::LowHard)) return utils::k_lowThresholdHardColor;
-	else if (trigger & (DB::AlarmTrigger::HighSoft)) return utils::k_highThresholdSoftColor;
-	else if (trigger & (DB::AlarmTrigger::LowSoft)) return utils::k_lowThresholdSoftColor;
+	if (trigger & (DB::AlarmTrigger::HighHardMask | DB::AlarmTrigger::LowSignal | DB::AlarmTrigger::LowVcc)) return utils::k_highThresholdHardColor;
+	else if (trigger & (DB::AlarmTrigger::LowHardMask)) return utils::k_lowThresholdHardColor;
+	else if (trigger & (DB::AlarmTrigger::HighSoftMask)) return utils::k_highThresholdSoftColor;
+	else if (trigger & (DB::AlarmTrigger::LowSoftMask)) return utils::k_lowThresholdSoftColor;
 	else return utils::k_inRangeColor;
 }
 const char* getDominatingTriggerName(uint32_t trigger)
 {
-	if (trigger & (DB::AlarmTrigger::HighHard)) return "Very High";
-	else if (trigger & (DB::AlarmTrigger::LowHard)) return "Very Low";
-	else if (trigger & (DB::AlarmTrigger::HighSoft)) return "High";
-	else if (trigger & (DB::AlarmTrigger::LowSoft)) return "Low";
+	if (trigger & (DB::AlarmTrigger::HighHardMask)) return "Very High";
+	else if (trigger & (DB::AlarmTrigger::LowHardMask)) return "Very Low";
+	else if (trigger & (DB::AlarmTrigger::HighSoftMask)) return "High";
+	else if (trigger & (DB::AlarmTrigger::LowSoftMask)) return "Low";
 	else if (trigger & (DB::AlarmTrigger::LowSignal | DB::AlarmTrigger::LowVcc)) return "Low";
 	else return "Normal";
 }

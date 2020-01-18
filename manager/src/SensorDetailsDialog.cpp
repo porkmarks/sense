@@ -142,28 +142,33 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
     m_ui.hardwareVersion->setText(QString("%1").arg((int)m_sensor.deviceInfo.hardwareVersion));
     m_ui.softwareVersion->setText(QString("%1").arg((int)m_sensor.deviceInfo.softwareVersion));
 
-    setupErrorCountersUI();
+	setupStatsUI();
 
     connect(m_ui.clearStats, &QPushButton::clicked, [this]()
     {
-        Result<void> result = m_db.clearErrorCounters(m_sensor.id);
+        Result<void> result = m_db.clearSensorStats(m_sensor.id);
         Q_ASSERT(result == success);
-        m_sensor.errorCounters = DB::ErrorCounters();
-        setupErrorCountersUI();
+        m_sensor.stats = DB::SensorStats();
+        setupStatsUI();
     });
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void SensorDetailsDialog::setupErrorCountersUI()
+void SensorDetailsDialog::setupStatsUI()
 {
-	m_ui.commsBlackouts->setText(QString("%1").arg(m_sensor.errorCounters.commsBlackouts));
-	m_ui.commsFailures->setText(QString("%1").arg(m_sensor.errorCounters.commsFailures));
-	m_ui.unknownReboots->setText(QString("%1").arg(m_sensor.errorCounters.unknownReboots));
-	m_ui.brownoutReboots->setText(QString("%1").arg(m_sensor.errorCounters.brownoutReboots));
-	m_ui.watchdogReboots->setText(QString("%1").arg(m_sensor.errorCounters.watchdogReboots));
-	m_ui.resets->setText(QString("%1").arg(m_sensor.errorCounters.resetReboots));
-	m_ui.powerOnReboots->setText(QString("%1").arg(m_sensor.errorCounters.powerOnReboots));
+	m_ui.commsBlackouts->setText(QString("%1").arg(m_sensor.stats.commsBlackouts));
+	m_ui.commsFailures->setText(QString("%1").arg(m_sensor.stats.commsFailures));
+	m_ui.unknownReboots->setText(QString("%1").arg(m_sensor.stats.unknownReboots));
+	m_ui.brownoutReboots->setText(QString("%1").arg(m_sensor.stats.brownoutReboots));
+	m_ui.watchdogReboots->setText(QString("%1").arg(m_sensor.stats.watchdogReboots));
+	m_ui.resets->setText(QString("%1").arg(m_sensor.stats.resetReboots));
+	m_ui.powerOnReboots->setText(QString("%1").arg(m_sensor.stats.powerOnReboots));
+	m_ui.commsRetries->setText(QString("%1").arg(m_sensor.stats.commsRetries));
+	m_ui.asleep->setText(QString("%1").arg(utils::computeDurationString(m_sensor.stats.asleep).first.c_str()));
+	m_ui.awake->setText(QString("%1").arg(utils::computeDurationString(m_sensor.stats.awake).first.c_str()));
+	m_ui.commsRounds->setText(QString("%1").arg(m_sensor.stats.commsRounds));
+	m_ui.measurementRounds->setText(QString("%1").arg(m_sensor.stats.measurementRounds));
 }
 
 //////////////////////////////////////////////////////////////////////////

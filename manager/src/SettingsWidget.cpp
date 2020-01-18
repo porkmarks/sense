@@ -119,6 +119,7 @@ void SettingsWidget::setPermissions()
 	m_ui.ftpTab->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeFtpSettings));
 	m_ui.batteryCapacity->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
 	m_ui.radioPower->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
+	m_ui.retries->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
 	m_ui.batteryAlertThreshold->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
 	m_ui.signalStrengthAlertThreshold->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
 	m_ui.sensorsCommsPeriod->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
@@ -634,6 +635,7 @@ void SettingsWidget::applySensorTimeConfig()
 void SettingsWidget::setSensorSettings(DB::SensorSettings const& settings)
 {
 	m_ui.radioPower->setValue(settings.radioPower);
+	m_ui.retries->setValue(settings.retries);
     m_ui.batteryAlertThreshold->setValue(std::clamp(settings.alertBatteryLevel * 100.f, 0.f, 100.f));
     m_ui.signalStrengthAlertThreshold->setValue(std::clamp(settings.alertSignalStrengthLevel * 100.f, 0.f, 100.f));
 }
@@ -644,6 +646,7 @@ Result<DB::SensorSettings> SettingsWidget::getSensorSettings() const
 {
     DB::SensorSettings settings = m_db->getSensorSettings();
 	settings.radioPower = static_cast<int8_t>(m_ui.radioPower->value());
+	settings.retries = static_cast<int8_t>(m_ui.retries->value());
     settings.alertBatteryLevel = std::clamp((float)m_ui.batteryAlertThreshold->value() / 100.f, 0.f, 1.f);
     settings.alertSignalStrengthLevel = std::clamp((float)m_ui.signalStrengthAlertThreshold->value() / 100.f, 0.f, 1.f);
     return settings;
