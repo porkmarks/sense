@@ -25,6 +25,8 @@ public:
 	static Result<void> create(sqlite3& db);
     bool load(sqlite3& db);
 
+    void setStdOutput(bool value);
+
     enum class Type : uint8_t
     {
         VERBOSE = 0,
@@ -74,6 +76,8 @@ signals:
 
 private:
     void addToDB(std::string const& message, Type type);
+
+    bool m_stdOutput = true;
 
 	mutable std::recursive_mutex m_mutex;
     sqlite3* m_sqlite = nullptr;

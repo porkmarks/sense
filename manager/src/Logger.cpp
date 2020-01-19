@@ -89,13 +89,23 @@ bool Logger::load(sqlite3& db)
 
 //////////////////////////////////////////////////////////////////////////
 
+void Logger::setStdOutput(bool value)
+{
+    m_stdOutput = value;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void Logger::logVerbose(std::string const& message)
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
     addToDB(message, Type::VERBOSE);
 
-    std::cout << "VERBOSE: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
-    std::cout.flush();
+    if (m_stdOutput)
+    {
+        std::cout << "VERBOSE: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
+        std::cout.flush();
+    }
 
     emit logLinesAdded();
 }
@@ -121,8 +131,11 @@ void Logger::logInfo(std::string const& message)
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
     addToDB(message, Type::INFO);
 
-    std::cout << "INFO: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
-    std::cout.flush();
+    if (m_stdOutput)
+    {
+        std::cout << "INFO: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
+        std::cout.flush();
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -146,8 +159,11 @@ void Logger::logWarning(std::string const& message)
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
     addToDB(message, Type::WARNING);
 
-    std::cout << "WARNING: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
-    std::cout.flush();
+    if (m_stdOutput)
+    {
+        std::cout << "WARNING: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
+        std::cout.flush();
+    }
 
     emit logLinesAdded();
 }
@@ -173,8 +189,11 @@ void Logger::logCritical(std::string const& message)
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
     addToDB(message, Type::CRITICAL);
 
-    std::cout << "ERROR: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
-    std::cout.flush();
+    if (m_stdOutput)
+    {
+        std::cout << "ERROR: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
+        std::cout.flush();
+    }
 
     emit logLinesAdded();
 }

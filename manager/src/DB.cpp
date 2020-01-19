@@ -4,7 +4,6 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
-#include <QApplication>
 #include <QDateTime>
 #include <QDir>
 #include <QByteArray>
@@ -83,13 +82,13 @@ Result<void> DB::create(sqlite3& db)
 		const char* sql = "CREATE TABLE CsvSettings (id INTEGER PRIMARY KEY, dateTimeFormatOverride INTEGER, unitsFormat INTEGER, "
 			"exportId BOOLEAN, exportIndex BOOLEAN, exportSensorName BOOLEAN, exportSensorSN BOOLEAN, exportTimePoint BOOLEAN, exportReceivedTimePoint BOOLEAN, "
 			"exportTemperature BOOLEAN, exportHumidity BOOLEAN, exportBattery BOOLEAN, exportSignal BOOLEAN, "
-			"decimalPlaces INTEGER);";
+            "decimalPlaces INTEGER, separator STRING);";
 		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
 		}
-		const char* sqlInsert = "INSERT INTO CsvSettings VALUES(0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);";
+        const char* sqlInsert = "INSERT INTO CsvSettings VALUES(0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ',');";
 		if (sqlite3_exec(&db, sqlInsert, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
@@ -178,7 +177,7 @@ Result<void> DB::create(sqlite3& db)
 	{
 		const char* sql = "CREATE TABLE Alarms (id INTEGER PRIMARY KEY, name STRING, filterSensors BOOLEAN, sensors STRING, lowTemperatureWatch BOOLEAN, lowTemperatureSoft REAL, lowTemperatureHard REAL, highTemperatureWatch BOOLEAN, highTemperatureSoft REAL, highTemperatureHard REAL, "
             "lowHumidityWatch BOOLEAN, lowHumiditySoft REAL, lowHumidityHard REAL, highHumidityWatch BOOLEAN, highHumiditySoft REAL, highHumidityHard REAL, "
-			"lowVccWatch BOOLEAN, lowSignalWatch BOOLEAN, sendEmailAction BOOLEAN, resendPeriod INTEGER, triggersPerSensor STRING, triggersPerBaseStation STRING, lastTriggeredTimePoint DATETIME);";
+            "lowVccWatch BOOLEAN, lowSignalWatch BOOLEAN, sensorBlackoutWatch BOOLEAN, baseStationDisconnectedWatch BOOLEAN, sendEmailAction BOOLEAN, resendPeriod INTEGER, triggersPerSensor STRING, triggersPerBaseStation STRING, lastTriggeredTimePoint DATETIME);";
 		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
@@ -325,7 +324,7 @@ Result<void> DB::load(sqlite3& db)
 		//	"decimalPlaces INTEGER
 		const char* sql = "SELECT dateTimeFormatOverride, unitsFormat, exportId, exportIndex, exportSensorName, exportSensorSN, exportTimePoint, exportReceivedTimePoint, "
 			"exportTemperature, exportHumidity, exportBattery, exportSignal, "
-			"decimalPlaces FROM CsvSettings;";
+            "decimalPlaces, separator FROM CsvSettings;";
 		sqlite3_stmt* stmt;
 		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
 		{
@@ -354,7 +353,8 @@ Result<void> DB::load(sqlite3& db)
 		data.csvSettings.exportBattery = sqlite3_column_int(stmt, 10) ? true : false;
 		data.csvSettings.exportSignal = sqlite3_column_int(stmt, 11) ? true : false;
 		data.csvSettings.decimalPlaces = (uint32_t)sqlite3_column_int(stmt, 12);
-	}
+        data.csvSettings.separator = (const char*)sqlite3_column_text(stmt, 13);
+    }
 	{
 		//id INTEGER PRIMARY KEY, host STRING, port INTEGER, connection INTEGER, username STRING, password STRING, sender STRING, recipients STRING
 		const char* sql = "SELECT host, port, connection, username, password, sender, recipients FROM EmailSettings;";
@@ -1347,13 +1347,6 @@ bool DB::addBaseStation(BaseStationDescriptor const& descriptor)
     BaseStationDescriptor::Mac const& mac = descriptor.mac;
     char macStr[128];
     sprintf(macStr, "%X_%X_%X_%X_%X_%X", mac[0]&0xFF, mac[1]&0xFF, mac[2]&0xFF, mac[3]&0xFF, mac[4]&0xFF, mac[5]&0xFF);
-
-    std::unique_ptr<DB> db(new DB());
-    if (db->load(*m_sqlite) != success)
-    {
-        s_logger.logCritical(QString("Cannot load db for Base Station '%1' / %2").arg(descriptor.name.c_str()).arg(macStr).toUtf8().data());
-        return false;
-    }
 
     s_logger.logInfo(QString("Adding base station '%1' / %2").arg(descriptor.name.c_str()).arg(utils::getMacStr(descriptor.mac).c_str()));
 
@@ -3380,7 +3373,7 @@ void DB::save(Data& data, bool newTransaction) const
 		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO CsvSettings (id, dateTimeFormatOverride, unitsFormat, "
 						   "exportId, exportIndex, exportSensorName, exportSensorSN, exportTimePoint, exportReceivedTimePoint, "
 						   "exportTemperature, exportHumidity, exportBattery, exportSignal, "
-						   "decimalPlaces) VALUES (0, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13);", -1, &stmt, NULL);
+                           "decimalPlaces, separator) VALUES (0, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14);", -1, &stmt, NULL);
 		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
 
 		sqlite3_bind_int64(stmt, 1, data.csvSettings.dateTimeFormatOverride.has_value() ? (int)data.csvSettings.dateTimeFormatOverride.value() : -1);
@@ -3396,7 +3389,8 @@ void DB::save(Data& data, bool newTransaction) const
 		sqlite3_bind_int(stmt, 11, data.csvSettings.exportBattery ? 1 : 0);
 		sqlite3_bind_int(stmt, 12, data.csvSettings.exportSignal ? 1 : 0);
 		sqlite3_bind_int64(stmt, 13, data.csvSettings.decimalPlaces);
-		if (sqlite3_step(stmt) != SQLITE_DONE)
+        sqlite3_bind_text(stmt, 14, data.csvSettings.separator.c_str(), -1, SQLITE_STATIC);
+        if (sqlite3_step(stmt) != SQLITE_DONE)
 		{
 			s_logger.logCritical(QString("Failed to save csv settings: %1").arg(sqlite3_errmsg(m_sqlite)));
 			return;
