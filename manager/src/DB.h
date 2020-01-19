@@ -300,6 +300,8 @@ public:
 		AlarmTriggers operator&(uint32_t other) const { return { current & other, added & other, removed & other}; }
 		AlarmTriggers& operator&=(AlarmTriggers const& other) { current &= other.current; added &= other.added; removed &= other.removed; return *this; };
         AlarmTriggers& operator&=(uint32_t other) { current &= other; added &= other; removed &= other; return *this; };
+        bool operator==(AlarmTriggers const& other) const { return current == other.current && added == other.added && removed == other.removed; }
+        bool operator!=(AlarmTriggers const& other) const { return !operator==(other); }
     };
 
     struct MeasurementDescriptor
@@ -381,8 +383,10 @@ public:
         IClock::time_point lastCommsTimePoint = IClock::time_point(IClock::duration::zero());
         bool blackout = false; //not saved
 
-        //which is the last confirmed measurement for this sensor.
+        //which is the last confirmed measurement for this sensor
         uint32_t lastConfirmedMeasurementIndex = 0;
+        //up to which index did alarms process measurements for this sensor
+        uint32_t lastAlarmProcessesMeasurementIndex = 0;
 
         //the range of stored measurements in this sensor
         uint32_t firstStoredMeasurementIndex = 0;
@@ -695,6 +699,7 @@ private:
     void checkReports();
     void checkForDisconnectedBaseStations();
     void checkForBlackoutSensors();
+    void checkMeasurementTriggers();
     size_t _getFilteredMeasurements(Filter const& filter, std::vector<Measurement>* result) const;
     Result<void> _addSensorTimeConfig(SensorTimeConfigDescriptor const& descriptor);
 
@@ -708,12 +713,10 @@ private:
     uint32_t computeNextRealTimeMeasurementIndex() const;
     IClock::time_point computeMeasurementTimepoint(MeasurementDescriptor const& md) const;
 
-    AlarmTriggers computeAlarmTriggersForMeasurement(Measurement const& m);
-    AlarmTriggers _computeAlarmTriggersForMeasurement(Alarm& alarm, Measurement const& m);
-	AlarmTriggers computeAlarmTriggersForSensor(Sensor const& s);
-	AlarmTriggers _computeAlarmTriggersForSensor(Alarm& alarm, Sensor const& s);
-    AlarmTriggers computeAlarmTriggersForBaseStation(BaseStation const& bs);
-    AlarmTriggers _computeAlarmTriggersForBaseStation(Alarm& alarm, BaseStation const& ba);
+    AlarmTriggers computeSensorAlarmTriggers(Sensor& sensor, std::optional<Measurement> measurement);
+    AlarmTriggers _computeSensorAlarmTriggers(Alarm& alarm, Sensor& sensor, std::optional<Measurement> measurement);
+    AlarmTriggers computeBaseStationAlarmTriggers(BaseStation const& bs);
+    AlarmTriggers _computeBaseStationAlarmTriggers(Alarm& alarm, BaseStation const& ba);
 
     struct Data
     {

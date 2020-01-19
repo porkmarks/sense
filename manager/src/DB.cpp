@@ -169,7 +169,7 @@ Result<void> DB::create(sqlite3& db)
 		const char* sql = "CREATE TABLE Sensors (id INTEGER PRIMARY KEY, name STRING, address INTEGER, sensorType INTEGER, hardwareVersion INTEGER, softwareVersion INTEGER, "
             "temperatureBias REAL, humidityBias REAL, serialNumber INTEGER, state INTEGER, shouldSleep BOOLEAN, sleepStateTimePoint DATETIME, statsCommsBlackouts INTEGER, statsCommsFailures INTEGER, "
             "statsUnknownReboots INTEGER, statsPowerOnReboots INTEGER, statsResetReboots INTEGER, statsBrownoutReboots INTEGER, statsWatchdogReboots INTEGER, statsCommsRetries INTEGER, statsAsleep INTEGER, statsAwake INTEGER, statsCommsRounds INTEGER, statsMeasurementRounds INTEGER, "
-			"lastCommsTimePoint DATETIME, lastConfirmedMeasurementIndex INTEGER, "
+			"lastCommsTimePoint DATETIME, lastConfirmedMeasurementIndex INTEGER, lastAlarmProcessesMeasurementIndex INTEGER, "
             "firstStoredMeasurementIndex INTEGER, storedMeasurementCount INTEGER, estimatedStoredMeasurementCount INTEGER, lastSignalStrengthB2S INTEGER, averageSignalStrengthB2S INTEGER, averageSignalStrengthS2B INTEGER, "
             "isRTMeasurementValid BOOLEAN, rtMeasurementTemperature REAL, rtMeasurementHumidity REAL, rtMeasurementVcc REAL);";
 		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
@@ -265,10 +265,10 @@ Result<void> DB::load(sqlite3& db)
 		if (sqlite3_prepare_v2(&db, "REPLACE INTO Sensors (id, name, address, sensorType, hardwareVersion, softwareVersion, "
 						                       "temperatureBias, humidityBias, serialNumber, state, shouldSleep, sleepStateTimePoint, statsCommsBlackouts, statsCommsFailures, "
 						                       "statsUnknownReboots, statsPowerOnReboots, statsResetReboots, statsBrownoutReboots, statsWatchdogReboots, statsCommsRetries, statsAsleep, statsAwake, statsCommsRounds, statsMeasurementRounds, "
-											   "lastCommsTimePoint, lastConfirmedMeasurementIndex, "
+											   "lastCommsTimePoint, lastConfirmedMeasurementIndex, lastAlarmProcessesMeasurementIndex, "
 						                       "firstStoredMeasurementIndex, storedMeasurementCount, estimatedStoredMeasurementCount, lastSignalStrengthB2S, averageSignalStrengthB2S, averageSignalStrengthS2B, "
 						                       "isRTMeasurementValid, rtMeasurementTemperature, rtMeasurementHumidity, rtMeasurementVcc) "
-						            "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36);", -1, &stmt, NULL) != SQLITE_OK)
+						            "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36, ?37);", -1, &stmt, NULL) != SQLITE_OK)
 		{
 			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -507,7 +507,7 @@ Result<void> DB::load(sqlite3& db)
 		const char* sql = "SELECT id, name, address, sensorType, hardwareVersion, softwareVersion, "
 			 			        "temperatureBias, humidityBias, serialNumber, state, shouldSleep, sleepStateTimePoint, statsCommsBlackouts, statsCommsFailures, "
 			 			        "statsUnknownReboots, statsPowerOnReboots, statsResetReboots, statsBrownoutReboots, statsWatchdogReboots, statsCommsRetries, statsAsleep, statsAwake, statsCommsRounds, statsMeasurementRounds, "
-							    "lastCommsTimePoint, lastConfirmedMeasurementIndex, "
+							    "lastCommsTimePoint, lastConfirmedMeasurementIndex, lastAlarmProcessesMeasurementIndex, "
 			 			        "firstStoredMeasurementIndex, storedMeasurementCount, estimatedStoredMeasurementCount, lastSignalStrengthB2S, averageSignalStrengthB2S, averageSignalStrengthS2B, "
 			 			        "isRTMeasurementValid, rtMeasurementTemperature, rtMeasurementHumidity, rtMeasurementVcc "
                           "FROM Sensors;";
@@ -548,6 +548,7 @@ Result<void> DB::load(sqlite3& db)
 			s.stats.measurementRounds = (uint32_t)sqlite3_column_int64(stmt, index++);
 			s.lastCommsTimePoint = IClock::from_time_t(sqlite3_column_int64(stmt, index++));
 			s.lastConfirmedMeasurementIndex = (uint32_t)sqlite3_column_int64(stmt, index++);
+			s.lastAlarmProcessesMeasurementIndex = (uint32_t)sqlite3_column_int64(stmt, index++);
 			s.firstStoredMeasurementIndex = (uint32_t)sqlite3_column_int64(stmt, index++);
 			s.storedMeasurementCount = (uint32_t)sqlite3_column_int64(stmt, index++);
 			s.estimatedStoredMeasurementCount = (uint32_t)sqlite3_column_int64(stmt, index++);
@@ -558,7 +559,7 @@ Result<void> DB::load(sqlite3& db)
 			s.rtMeasurementTemperature = (float)sqlite3_column_double(stmt, index++);
 			s.rtMeasurementHumidity = (float)sqlite3_column_double(stmt, index++);
 			s.rtMeasurementVcc = (float)sqlite3_column_double(stmt, index++);
-			Q_ASSERT(index == 36);
+			Q_ASSERT(index == 37);
 			data.sensors.push_back(std::move(s));
 		}
 	}
@@ -741,6 +742,416 @@ Result<void> DB::load(sqlite3& db)
     return success;
 }
 
+//////////////////////////////////////////////////////////////////////////
+
+void DB::scheduleSave()
+{
+	m_saveScheduled = true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void DB::save(bool newTransaction)
+{
+	save(m_data, newTransaction);
+	m_saveScheduled = false;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void DB::save(Data& data, bool newTransaction) const
+{
+	IClock::time_point start = m_clock->now();
+
+	if (newTransaction)
+	{
+		sqlite3_exec(m_sqlite, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+	}
+	utils::epilogue epi([this, newTransaction]
+	{
+		if (newTransaction)
+		{
+			sqlite3_exec(m_sqlite, "END TRANSACTION;", NULL, NULL, NULL);
+		}
+	});
+
+	if (data.generalSettingsChanged)
+	{
+		data.generalSettingsChanged = false;
+		sqlite3_stmt* stmt;
+		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO GeneralSettings (id, dateTimeFormat) VALUES (0, ?1);", -1, &stmt, NULL);
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+		sqlite3_bind_int64(stmt, 1, (int)data.generalSettings.dateTimeFormat);
+		if (sqlite3_step(stmt) != SQLITE_DONE)
+		{
+			s_logger.logCritical(QString("Failed to save general settings: %1").arg(sqlite3_errmsg(m_sqlite)));
+			return;
+		}
+	}
+
+	if (data.csvSettingsChanged)
+	{
+		data.csvSettingsChanged = false;
+		sqlite3_stmt* stmt;
+		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO CsvSettings (id, dateTimeFormatOverride, unitsFormat, "
+						   "exportId, exportIndex, exportSensorName, exportSensorSN, exportTimePoint, exportReceivedTimePoint, "
+						   "exportTemperature, exportHumidity, exportBattery, exportSignal, "
+						   "decimalPlaces, separator) VALUES (0, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14);", -1, &stmt, NULL);
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+		sqlite3_bind_int64(stmt, 1, data.csvSettings.dateTimeFormatOverride.has_value() ? (int)data.csvSettings.dateTimeFormatOverride.value() : -1);
+		sqlite3_bind_int64(stmt, 2, (int)data.csvSettings.unitsFormat);
+		sqlite3_bind_int(stmt, 3, data.csvSettings.exportId ? 1 : 0);
+		sqlite3_bind_int(stmt, 4, data.csvSettings.exportIndex ? 1 : 0);
+		sqlite3_bind_int(stmt, 5, data.csvSettings.exportSensorName ? 1 : 0);
+		sqlite3_bind_int(stmt, 6, data.csvSettings.exportSensorSN ? 1 : 0);
+		sqlite3_bind_int(stmt, 7, data.csvSettings.exportTimePoint ? 1 : 0);
+		sqlite3_bind_int(stmt, 8, data.csvSettings.exportReceivedTimePoint ? 1 : 0);
+		sqlite3_bind_int(stmt, 9, data.csvSettings.exportTemperature ? 1 : 0);
+		sqlite3_bind_int(stmt, 10, data.csvSettings.exportHumidity ? 1 : 0);
+		sqlite3_bind_int(stmt, 11, data.csvSettings.exportBattery ? 1 : 0);
+		sqlite3_bind_int(stmt, 12, data.csvSettings.exportSignal ? 1 : 0);
+		sqlite3_bind_int64(stmt, 13, data.csvSettings.decimalPlaces);
+		sqlite3_bind_text(stmt, 14, data.csvSettings.separator.c_str(), -1, SQLITE_STATIC);
+		if (sqlite3_step(stmt) != SQLITE_DONE)
+		{
+			s_logger.logCritical(QString("Failed to save csv settings: %1").arg(sqlite3_errmsg(m_sqlite)));
+			return;
+		}
+	}
+
+	if (data.emailSettingsChanged)
+	{
+		data.emailSettingsChanged = false;
+		sqlite3_stmt* stmt;
+		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO EmailSettings (id, host, port, connection, username, password, sender, recipients) VALUES (0, ?1, ?2, ?3, ?4, ?5, ?6, ?7);", -1, &stmt, NULL);
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+		sqlite3_bind_text(stmt, 1, data.emailSettings.host.c_str(), -1, SQLITE_STATIC);
+		sqlite3_bind_int64(stmt, 2, data.emailSettings.port);
+		sqlite3_bind_int(stmt, 3, (int)data.emailSettings.connection);
+		sqlite3_bind_text(stmt, 4, data.emailSettings.username.c_str(), -1, SQLITE_STATIC);
+		sqlite3_bind_text(stmt, 5, data.emailSettings.password.c_str(), -1, SQLITE_STATIC);
+		sqlite3_bind_text(stmt, 6, data.emailSettings.sender.c_str(), -1, SQLITE_STATIC);
+		std::string recipients = std::accumulate(data.emailSettings.recipients.begin(), data.emailSettings.recipients.end(), std::string(";"));
+		sqlite3_bind_text(stmt, 7, recipients.c_str(), -1, SQLITE_TRANSIENT);
+		if (sqlite3_step(stmt) != SQLITE_DONE)
+		{
+			s_logger.logCritical(QString("Failed to save email settings: %1").arg(sqlite3_errmsg(m_sqlite)));
+			return;
+		}
+	}
+
+	if (data.ftpSettingsChanged)
+	{
+		data.ftpSettingsChanged = false;
+		sqlite3_stmt* stmt;
+		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO FtpSettings (id, host, port, username, password, folder, uploadBackups, uploadPeriod) VALUES (0, ?1, ?2, ?3, ?4, ?5, ?6, ?7);", -1, &stmt, NULL);
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+		sqlite3_bind_text(stmt, 1, data.ftpSettings.host.c_str(), -1, SQLITE_STATIC);
+		sqlite3_bind_int64(stmt, 2, data.ftpSettings.port);
+		sqlite3_bind_text(stmt, 3, data.ftpSettings.username.c_str(), -1, SQLITE_STATIC);
+		sqlite3_bind_text(stmt, 4, data.ftpSettings.password.c_str(), -1, SQLITE_STATIC);
+		sqlite3_bind_text(stmt, 5, data.ftpSettings.folder.c_str(), -1, SQLITE_STATIC);
+		sqlite3_bind_int(stmt, 6, data.ftpSettings.uploadBackups ? 1 : 0);
+		sqlite3_bind_int64(stmt, 7, std::chrono::duration_cast<std::chrono::seconds>(data.ftpSettings.uploadBackupsPeriod).count());
+		if (sqlite3_step(stmt) != SQLITE_DONE)
+		{
+			s_logger.logCritical(QString("Failed to save ftp settings: %1").arg(sqlite3_errmsg(m_sqlite)));
+			return;
+		}
+	}
+
+	if (data.usersChanged || data.usersAddedOrRemoved)
+	{
+		if (data.usersAddedOrRemoved)
+		{
+			const char* sql = "DELETE FROM Users;";
+			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
+			{
+				s_logger.logCritical(QString("Failed to clear users: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+		}
+		sqlite3_stmt* stmt;
+		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO Users (id, name, passwordHash, permissions, type, lastLogin) VALUES(?1, ?2, ?3, ?4, ?5, ?6);", -1, &stmt, NULL);
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+		for (User const& user : data.users)
+		{
+			sqlite3_bind_int64(stmt, 1, user.id);
+			sqlite3_bind_text(stmt, 2, user.descriptor.name.c_str(), -1, SQLITE_STATIC);
+			sqlite3_bind_text(stmt, 3, user.descriptor.passwordHash.c_str(), -1, SQLITE_STATIC);
+			sqlite3_bind_int64(stmt, 4, user.descriptor.permissions);
+			sqlite3_bind_int(stmt, 5, (int)user.descriptor.type);
+			sqlite3_bind_int64(stmt, 6, IClock::to_time_t(user.lastLogin));
+			if (sqlite3_step(stmt) != SQLITE_DONE)
+			{
+				s_logger.logCritical(QString("Failed to save user: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+			sqlite3_reset(stmt);
+		}
+		data.usersAddedOrRemoved = false;
+		data.usersChanged = false;
+	}
+	if (data.baseStationsChanged || data.baseStationsAddedOrRemoved)
+	{
+		if (data.baseStationsAddedOrRemoved)
+		{
+			const char* sql = "DELETE FROM BaseStations;";
+			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
+			{
+				s_logger.logCritical(QString("Failed to clear base stations: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+		}
+		sqlite3_stmt* stmt = m_saveBaseStationsStmt.get();
+		for (BaseStation const& bs : data.baseStations)
+		{
+			sqlite3_bind_int64(stmt, 1, bs.id);
+			sqlite3_bind_text(stmt, 2, bs.descriptor.name.c_str(), -1, SQLITE_STATIC);
+			sqlite3_bind_text(stmt, 3, utils::getMacStr(bs.descriptor.mac).c_str(), -1, SQLITE_TRANSIENT);
+			if (sqlite3_step(stmt) != SQLITE_DONE)
+			{
+				s_logger.logCritical(QString("Failed to save base station: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+			sqlite3_reset(stmt);
+		}
+		data.baseStationsAddedOrRemoved = false;
+		data.baseStationsChanged = false;
+	}
+	if (data.sensorTimeConfigsChanged)
+	{
+		{
+			const char* sql = "DELETE FROM SensorTimeConfigs;";
+			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
+			{
+				s_logger.logCritical(QString("Failed to clear sensor configs: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+		}
+		sqlite3_stmt* stmt = m_saveSensorTimeConfigsStmt.get();
+		for (SensorTimeConfig const& sc : data.sensorTimeConfigs)
+		{
+			sqlite3_bind_int64(stmt, 1, IClock::to_time_t(sc.baselineMeasurementTimePoint));
+			sqlite3_bind_int64(stmt, 2, sc.baselineMeasurementIndex);
+			sqlite3_bind_int64(stmt, 3, std::chrono::duration_cast<std::chrono::seconds>(sc.descriptor.measurementPeriod).count());
+			sqlite3_bind_int64(stmt, 4, std::chrono::duration_cast<std::chrono::seconds>(sc.descriptor.commsPeriod).count());
+			if (sqlite3_step(stmt) != SQLITE_DONE)
+			{
+				s_logger.logCritical(QString("Failed to save sensor config: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+			sqlite3_reset(stmt);
+		}
+		data.sensorTimeConfigsChanged = false;
+	}
+	if (data.sensorSettingsChanged)
+	{
+		data.sensorSettingsChanged = false;
+		sqlite3_stmt* stmt = m_saveSensorSettingsStmt.get();
+
+		sqlite3_bind_int64(stmt, 1, data.sensorSettings.radioPower);
+		sqlite3_bind_int64(stmt, 2, data.sensorSettings.retries);
+		sqlite3_bind_double(stmt, 3, data.sensorSettings.alertBatteryLevel);
+		sqlite3_bind_double(stmt, 4, data.sensorSettings.alertSignalStrengthLevel);
+
+		const char* xx = sqlite3_expanded_sql(stmt);
+
+		if (sqlite3_step(stmt) != SQLITE_DONE)
+		{
+			s_logger.logCritical(QString("Failed to save sensor settings: %1").arg(sqlite3_errmsg(m_sqlite)));
+			return;
+		}
+		sqlite3_reset(stmt);
+	}
+	if (data.sensorsChanged || data.sensorsAddedOrRemoved)
+	{
+		if (data.sensorsAddedOrRemoved)
+		{
+			const char* sql = "DELETE FROM Sensors;";
+			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
+			{
+				s_logger.logCritical(QString("Failed to clear sensors: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+		}
+		sqlite3_stmt* stmt = m_saveSensorsStmt.get();
+		for (Sensor const& s : data.sensors)
+		{
+			int index = 1;
+			sqlite3_bind_int64(stmt, index++, s.id);
+			sqlite3_bind_text(stmt, index++, s.descriptor.name.c_str(), -1, SQLITE_STATIC);
+			sqlite3_bind_int64(stmt, index++, s.address);
+			sqlite3_bind_int64(stmt, index++, s.deviceInfo.sensorType);
+			sqlite3_bind_int64(stmt, index++, s.deviceInfo.hardwareVersion);
+			sqlite3_bind_int64(stmt, index++, s.deviceInfo.softwareVersion);
+
+			sqlite3_bind_double(stmt, index++, s.calibration.temperatureBias);
+			sqlite3_bind_double(stmt, index++, s.calibration.humidityBias);
+
+			sqlite3_bind_int64(stmt, index++, s.serialNumber);
+			sqlite3_bind_int64(stmt, index++, (int)s.state);
+			sqlite3_bind_int(stmt, index++, s.shouldSleep ? 1 : 0);
+			sqlite3_bind_int64(stmt, index++, IClock::to_time_t(s.sleepStateTimePoint));
+
+			sqlite3_bind_int64(stmt, index++, s.stats.commsBlackouts);
+			sqlite3_bind_int64(stmt, index++, s.stats.commsFailures);
+			sqlite3_bind_int64(stmt, index++, s.stats.unknownReboots);
+			sqlite3_bind_int64(stmt, index++, s.stats.powerOnReboots);
+			sqlite3_bind_int64(stmt, index++, s.stats.resetReboots);
+			sqlite3_bind_int64(stmt, index++, s.stats.brownoutReboots);
+			sqlite3_bind_int64(stmt, index++, s.stats.watchdogReboots);
+			sqlite3_bind_int64(stmt, index++, s.stats.commsRetries);
+			sqlite3_bind_int64(stmt, index++, std::chrono::duration_cast<std::chrono::milliseconds>(s.stats.asleep).count());
+			sqlite3_bind_int64(stmt, index++, std::chrono::duration_cast<std::chrono::milliseconds>(s.stats.awake).count());
+			sqlite3_bind_int64(stmt, index++, s.stats.commsRounds);
+			sqlite3_bind_int64(stmt, index++, s.stats.measurementRounds);
+
+			sqlite3_bind_int64(stmt, index++, IClock::to_time_t(s.lastCommsTimePoint));
+
+			sqlite3_bind_int64(stmt, index++, s.lastConfirmedMeasurementIndex);
+			sqlite3_bind_int64(stmt, index++, s.lastAlarmProcessesMeasurementIndex);
+			sqlite3_bind_int64(stmt, index++, s.firstStoredMeasurementIndex);
+			sqlite3_bind_int64(stmt, index++, s.storedMeasurementCount);
+			sqlite3_bind_int64(stmt, index++, s.estimatedStoredMeasurementCount);
+
+			sqlite3_bind_int64(stmt, index++, s.lastSignalStrengthB2S);
+			sqlite3_bind_int64(stmt, index++, s.averageSignalStrength.b2s);
+			sqlite3_bind_int64(stmt, index++, s.averageSignalStrength.s2b);
+
+			sqlite3_bind_int(stmt, index++, s.isRTMeasurementValid ? 1 : 0);
+			sqlite3_bind_double(stmt, index++, s.rtMeasurementTemperature);
+			sqlite3_bind_double(stmt, index++, s.rtMeasurementHumidity);
+			sqlite3_bind_double(stmt, index++, s.rtMeasurementVcc);
+			Q_ASSERT(index == 38);
+			if (sqlite3_step(stmt) != SQLITE_DONE)
+			{
+				s_logger.logCritical(QString("Failed to save sensor: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+			sqlite3_reset(stmt);
+		}
+		data.sensorsAddedOrRemoved = false;
+		data.sensorsChanged = false;
+	}
+	if (data.alarmsChanged || data.alarmsAddedOrRemoved)
+	{
+		if (data.alarmsAddedOrRemoved)
+		{
+			const char* sql = "DELETE FROM Alarms;";
+			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
+			{
+				s_logger.logCritical(QString("Failed to clear alarms: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+		}
+		sqlite3_stmt* stmt = m_saveAlarmsStmt.get();
+		for (Alarm const& a : data.alarms)
+		{
+			int index = 1;
+			sqlite3_bind_int64(stmt, index++, a.id);
+			sqlite3_bind_text(stmt, index++, a.descriptor.name.c_str(), -1, SQLITE_STATIC);
+			sqlite3_bind_int(stmt, index++, a.descriptor.filterSensors ? 1 : 0);
+			std::string sensors;
+			for (SensorId id : a.descriptor.sensors)
+			{
+				sensors += std::to_string(id) + ";";
+			}
+			sqlite3_bind_text(stmt, index++, sensors.c_str(), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_int(stmt, index++, a.descriptor.lowTemperatureWatch ? 1 : 0);
+			sqlite3_bind_double(stmt, index++, a.descriptor.lowTemperatureSoft);
+			sqlite3_bind_double(stmt, index++, a.descriptor.lowTemperatureHard);
+			sqlite3_bind_int(stmt, index++, a.descriptor.highTemperatureWatch ? 1 : 0);
+			sqlite3_bind_double(stmt, index++, a.descriptor.highTemperatureSoft);
+			sqlite3_bind_double(stmt, index++, a.descriptor.highTemperatureHard);
+			sqlite3_bind_int(stmt, index++, a.descriptor.lowHumidityWatch ? 1 : 0);
+			sqlite3_bind_double(stmt, index++, a.descriptor.lowHumiditySoft);
+			sqlite3_bind_double(stmt, index++, a.descriptor.lowHumidityHard);
+			sqlite3_bind_int(stmt, index++, a.descriptor.highHumidityWatch ? 1 : 0);
+			sqlite3_bind_double(stmt, index++, a.descriptor.highHumiditySoft);
+			sqlite3_bind_double(stmt, index++, a.descriptor.highHumidityHard);
+			sqlite3_bind_int(stmt, index++, a.descriptor.lowVccWatch ? 1 : 0);
+			sqlite3_bind_int(stmt, index++, a.descriptor.lowSignalWatch ? 1 : 0);
+			sqlite3_bind_int(stmt, index++, a.descriptor.sensorBlackoutWatch ? 1 : 0);
+			sqlite3_bind_int(stmt, index++, a.descriptor.baseStationDisconnectedWatch ? 1 : 0);
+			sqlite3_bind_int(stmt, index++, a.descriptor.sendEmailAction ? 1 : 0);
+			sqlite3_bind_int64(stmt, index++, std::chrono::duration_cast<std::chrono::seconds>(a.descriptor.resendPeriod).count());
+			{
+				std::string triggers;
+				for (auto p : a.triggersPerSensor)
+				{
+					triggers += std::to_string(p.first) + "/" + std::to_string(p.second) + ";";
+				}
+				sqlite3_bind_text(stmt, index++, triggers.c_str(), -1, SQLITE_TRANSIENT);
+			}
+			{
+				std::string triggers;
+				for (auto p : a.triggersPerBaseStation)
+				{
+					triggers += std::to_string(p.first) + "/" + std::to_string(p.second) + ";";
+				}
+				sqlite3_bind_text(stmt, index++, triggers.c_str(), -1, SQLITE_TRANSIENT);
+			}
+			sqlite3_bind_int64(stmt, index++, IClock::to_time_t(a.lastTriggeredTimePoint));
+			if (sqlite3_step(stmt) != SQLITE_DONE)
+			{
+				s_logger.logCritical(QString("Failed to save alarms: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+			Q_ASSERT(index == 26);
+			sqlite3_reset(stmt);
+		}
+		data.alarmsAddedOrRemoved = false;
+		data.alarmsChanged = false;
+	}
+	if (data.reportsChanged || data.reportsAddedOrRemoved)
+	{
+		if (data.reportsAddedOrRemoved)
+		{
+			const char* sql = "DELETE FROM Reports;";
+			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
+			{
+				s_logger.logCritical(QString("Failed to clear reports: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+		}
+		sqlite3_stmt* stmt = m_saveReportsStmt.get();
+		for (Report const& r : data.reports)
+		{
+			sqlite3_bind_int64(stmt, 1, r.id);
+			sqlite3_bind_text(stmt, 2, r.descriptor.name.c_str(), -1, SQLITE_STATIC);
+			sqlite3_bind_int(stmt, 3, (int)r.descriptor.period);
+			sqlite3_bind_int64(stmt, 4, std::chrono::duration_cast<std::chrono::seconds>(r.descriptor.customPeriod).count());
+			sqlite3_bind_int64(stmt, 5, r.descriptor.filterSensors ? 1 : 0);
+			std::string sensors;
+			for (SensorId id : r.descriptor.sensors)
+			{
+				sensors += std::to_string(id) + ";";
+			}
+			sqlite3_bind_text(stmt, 6, sensors.c_str(), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_int64(stmt, 7, IClock::to_time_t(r.lastTriggeredTimePoint));
+			if (sqlite3_step(stmt) != SQLITE_DONE)
+			{
+				s_logger.logCritical(QString("Failed to save report: %1").arg(sqlite3_errmsg(m_sqlite)));
+				return;
+			}
+			sqlite3_reset(stmt);
+		}
+		data.reportsAddedOrRemoved = false;
+		data.reportsChanged = false;
+	}
+
+	//    std::cout << QString("Done saving DB. Time: %3s\n").arg(std::chrono::duration<float>(m_clock->now() - start).count()).toUtf8().data();
+	//    std::cout.flush();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void DB::close()
 {
 	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
@@ -767,14 +1178,7 @@ void DB::close()
 	m_data = Data();
 }
 
-//void DB::test()
-//{
-//    for (PackedMeasurement const& pm: m_mainData.measurements.begin()->second)
-//    {
-//        Measurement measurement = unpack(m_mainData.measurements.begin()->first, pm);
-//        computeTriggeredAlarm(measurement.descriptor);
-//    }
-//}
+//////////////////////////////////////////////////////////////////////////
 
 sqlite3* DB::getSqliteDB()
 {
@@ -840,7 +1244,7 @@ void DB::checkForDisconnectedBaseStations()
 	{
 		if (!bs.isConnected && m_clock->now() - bs.lastConnectedTimePoint > std::chrono::minutes(1))
 		{
-			computeAlarmTriggersForBaseStation(bs);
+			computeBaseStationAlarmTriggers(bs);
 		}
 	}
 }
@@ -873,14 +1277,99 @@ void DB::checkForBlackoutSensors()
 				s.stats.commsBlackouts++;
 				saveSensors = true;
 			}
-
-			computeAlarmTriggersForSensor(s);
+			computeSensorAlarmTriggers(s, std::nullopt);
 		}
 	}
 
 	if (saveSensors)
 	{
 		scheduleSave();
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void DB::checkMeasurementTriggers()
+{
+	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+
+	if (m_data.sensors.empty() || m_data.alarms.empty())
+	{
+		Q_ASSERT(false);
+		return;
+	}
+
+	bool dataChanged = false;
+	std::vector<Measurement> measurements;
+	//gathered changed triggers
+	for (Sensor& sensor : m_data.sensors)
+	{
+		if (sensor.lastConfirmedMeasurementIndex <= sensor.lastAlarmProcessesMeasurementIndex)
+		{
+			//nothing new happened
+			continue;
+		}
+
+		QString sql = QString("SELECT id, timePoint, receivedTimePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggersCurrent, alarmTriggersAdded, alarmTriggersRemoved "
+								"FROM Measurements "
+								"WHERE idx > %1 AND idx <= %2 AND sensorId = %3;").arg(sensor.lastAlarmProcessesMeasurementIndex).arg(sensor.lastConfirmedMeasurementIndex).arg(sensor.id);
+		sqlite3_stmt* stmt;
+		if (sqlite3_prepare_v2(m_sqlite, sql.toUtf8().data(), -1, &stmt, 0) != SQLITE_OK)
+		{
+			const char* msg = sqlite3_errmsg(m_sqlite);
+			Q_ASSERT(false);
+			continue;
+		}
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+		while (sqlite3_step(stmt) == SQLITE_ROW)
+		{
+			Measurement m = unpackMeasurement(stmt);
+			m.alarmTriggers = computeSensorAlarmTriggers(sensor, m);
+			measurements.push_back(m);
+		}
+		sensor.lastAlarmProcessesMeasurementIndex = sensor.lastConfirmedMeasurementIndex;
+		dataChanged = true;
+	}
+
+	if (!measurements.empty() || dataChanged)
+	{
+		sqlite3_exec(m_sqlite, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+		utils::epilogue epi([this] { sqlite3_exec(m_sqlite, "END TRANSACTION;", NULL, NULL, NULL); });
+
+		for (Measurement const& m : measurements)
+		{
+			QString sql = QString("UPDATE Measurements "
+								  "SET alarmTriggersCurrent = ?1, alarmTriggersAdded = ?2, alarmTriggersRemoved = ?3 "
+								  "WHERE id = ?4;");
+			sqlite3_stmt* stmt;
+			if (sqlite3_prepare_v2(m_sqlite, sql.toUtf8().data(), -1, &stmt, 0) != SQLITE_OK)
+			{
+				const char* msg = sqlite3_errmsg(m_sqlite);
+				Q_ASSERT(false);
+				continue;
+			}
+			utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+			sqlite3_bind_double(stmt, 1, m.alarmTriggers.current);
+			sqlite3_bind_double(stmt, 2, m.alarmTriggers.added);
+			sqlite3_bind_double(stmt, 3, m.alarmTriggers.removed);
+			sqlite3_bind_int64(stmt, 4, m.id);
+			if (sqlite3_step(stmt) != SQLITE_DONE)
+			{
+				const char* msg = sqlite3_errmsg(m_sqlite);
+				Q_ASSERT(false);
+				continue;
+			}
+		}
+
+		m_data.sensorsChanged = true;
+		save(false);
+	}
+
+	if (!measurements.empty())
+	{
+		emit measurementsChanged();
 	}
 }
 
@@ -898,6 +1387,7 @@ void DB::process()
 	checkReports();
 	checkForDisconnectedBaseStations();
 	checkForBlackoutSensors();
+	checkMeasurementTriggers();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1467,7 +1957,7 @@ void DB::setBaseStationConnected(BaseStationId id, bool connected)
 	bs.lastConnectedTimePoint = m_clock->now();
 	if (connected)
 	{
-		computeAlarmTriggersForBaseStation(bs);
+		computeBaseStationAlarmTriggers(bs);
 	}
 
 	m_data.baseStationsChanged = true;
@@ -2387,7 +2877,7 @@ int32_t DB::findAlarmIndexById(AlarmId id) const
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::AlarmTriggers DB::computeAlarmTriggersForMeasurement(Measurement const& m)
+DB::AlarmTriggers DB::computeSensorAlarmTriggers(Sensor& sensor, std::optional<Measurement> measurement)
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
@@ -2395,7 +2885,7 @@ DB::AlarmTriggers DB::computeAlarmTriggersForMeasurement(Measurement const& m)
 
     for (Alarm& alarm: m_data.alarms)
     {
-		AlarmTriggers triggers = _computeAlarmTriggersForMeasurement(alarm, m);
+		AlarmTriggers triggers = _computeSensorAlarmTriggers(alarm, sensor, measurement);
         allTriggers |= triggers;
     }
 
@@ -2404,7 +2894,7 @@ DB::AlarmTriggers DB::computeAlarmTriggersForMeasurement(Measurement const& m)
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::AlarmTriggers DB::_computeAlarmTriggersForMeasurement(Alarm& alarm, Measurement const& m)
+DB::AlarmTriggers DB::_computeSensorAlarmTriggers(Alarm& alarm, Sensor& sensor, std::optional<Measurement> measurement)
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
@@ -2414,80 +2904,89 @@ DB::AlarmTriggers DB::_computeAlarmTriggersForMeasurement(Alarm& alarm, Measurem
     AlarmDescriptor const& ad = alarm.descriptor;
     if (ad.filterSensors)
     {
-        if (ad.sensors.find(m.descriptor.sensorId) == ad.sensors.end())
+        if (ad.sensors.find(sensor.id) == ad.sensors.end())
         {
 			sensorWatched = false;
         }
     }
 
+	uint32_t oldTriggers = 0;
+	auto it = alarm.triggersPerSensor.find(sensor.id);
+	if (it != alarm.triggersPerSensor.end())
+	{
+		oldTriggers = it->second;
+	}
+
 	if (sensorWatched)
 	{
-		if (ad.highTemperatureWatch && m.descriptor.temperature > ad.highTemperatureSoft)
+		if (measurement.has_value())
 		{
-			currentTriggers |= AlarmTrigger::MeasurementHighTemperatureSoft;
-		}
-		if (ad.highTemperatureWatch && m.descriptor.temperature > ad.highTemperatureHard)
-		{
-			currentTriggers |= AlarmTrigger::MeasurementHighTemperatureHard;
-		}
-		if (ad.lowTemperatureWatch && m.descriptor.temperature < ad.lowTemperatureSoft)
-		{
-			currentTriggers |= AlarmTrigger::MeasurementLowTemperatureSoft;
-		}
-		if (ad.lowTemperatureWatch && m.descriptor.temperature < ad.lowTemperatureHard)
-		{
-			currentTriggers |= AlarmTrigger::MeasurementLowTemperatureHard;
-		}
+			Measurement const& m = *measurement;
+			if (ad.highTemperatureWatch && m.descriptor.temperature > ad.highTemperatureSoft)
+			{
+				currentTriggers |= AlarmTrigger::MeasurementHighTemperatureSoft;
+			}
+			if (ad.highTemperatureWatch && m.descriptor.temperature > ad.highTemperatureHard)
+			{
+				currentTriggers |= AlarmTrigger::MeasurementHighTemperatureHard;
+			}
+			if (ad.lowTemperatureWatch && m.descriptor.temperature < ad.lowTemperatureSoft)
+			{
+				currentTriggers |= AlarmTrigger::MeasurementLowTemperatureSoft;
+			}
+			if (ad.lowTemperatureWatch && m.descriptor.temperature < ad.lowTemperatureHard)
+			{
+				currentTriggers |= AlarmTrigger::MeasurementLowTemperatureHard;
+			}
 
-		if (ad.highHumidityWatch && m.descriptor.humidity > ad.highHumiditySoft)
-		{
-			currentTriggers |= AlarmTrigger::MeasurementHighHumiditySoft;
-		}
-		if (ad.highHumidityWatch && m.descriptor.humidity > ad.highHumidityHard)
-		{
-			currentTriggers |= AlarmTrigger::MeasurementHighHumidityHard;
-		}
-		if (ad.lowHumidityWatch && m.descriptor.humidity < ad.lowHumiditySoft)
-		{
-			currentTriggers |= AlarmTrigger::MeasurementLowHumiditySoft;
-		}
-		if (ad.lowHumidityWatch && m.descriptor.humidity < ad.lowHumidityHard)
-		{
-			currentTriggers |= AlarmTrigger::MeasurementLowHumidityHard;
-		}
+			if (ad.highHumidityWatch && m.descriptor.humidity > ad.highHumiditySoft)
+			{
+				currentTriggers |= AlarmTrigger::MeasurementHighHumiditySoft;
+			}
+			if (ad.highHumidityWatch && m.descriptor.humidity > ad.highHumidityHard)
+			{
+				currentTriggers |= AlarmTrigger::MeasurementHighHumidityHard;
+			}
+			if (ad.lowHumidityWatch && m.descriptor.humidity < ad.lowHumiditySoft)
+			{
+				currentTriggers |= AlarmTrigger::MeasurementLowHumiditySoft;
+			}
+			if (ad.lowHumidityWatch && m.descriptor.humidity < ad.lowHumidityHard)
+			{
+				currentTriggers |= AlarmTrigger::MeasurementLowHumidityHard;
+			}
 
-		if (ad.lowVccWatch && utils::getBatteryLevel(m.descriptor.vcc) <= m_data.sensorSettings.alertBatteryLevel)
-		{
-			currentTriggers |= AlarmTrigger::MeasurementLowVcc;
-		}
+			if (ad.lowVccWatch && utils::getBatteryLevel(m.descriptor.vcc) <= m_data.sensorSettings.alertBatteryLevel)
+			{
+				currentTriggers |= AlarmTrigger::MeasurementLowVcc;
+			}
 
-		if (ad.lowSignalWatch && utils::getSignalLevel(std::min(m.descriptor.signalStrength.b2s, m.descriptor.signalStrength.s2b)) <= m_data.sensorSettings.alertSignalStrengthLevel)
+			if (ad.lowSignalWatch && utils::getSignalLevel(std::min(m.descriptor.signalStrength.b2s, m.descriptor.signalStrength.s2b)) <= m_data.sensorSettings.alertSignalStrengthLevel)
+			{
+				currentTriggers |= AlarmTrigger::MeasurementLowSignal;
+			}
+		}
+		else
 		{
-			currentTriggers |= AlarmTrigger::MeasurementLowSignal;
+			//keep measurement triggers
+			currentTriggers = oldTriggers & AlarmTrigger::MeasurementMask;
 		}
 	}
 
-    uint32_t oldTriggers = 0;
-    auto it = alarm.triggersPerSensor.find(m.descriptor.sensorId);
-    if (it != alarm.triggersPerSensor.end())
-    {
-        oldTriggers = it->second;
-		//keep sensor related triggers
-		if (sensorWatched)
-		{
-			currentTriggers |= oldTriggers & AlarmTrigger::SensorMask;
-		}
+	if (ad.sensorBlackoutWatch && sensor.blackout)
+	{
+		currentTriggers |= AlarmTrigger::SensorBlackout;
 	}
 
     if (currentTriggers != oldTriggers)
     {
         if (currentTriggers == 0)
         {
-            alarm.triggersPerSensor.erase(m.descriptor.sensorId);
+            alarm.triggersPerSensor.erase(sensor.id);
         }
         else
         {
-            alarm.triggersPerSensor[m.descriptor.sensorId] = currentTriggers;
+            alarm.triggersPerSensor[sensor.id] = currentTriggers;
         }
 		m_data.alarmsChanged = true;
     }
@@ -2503,14 +3002,14 @@ DB::AlarmTriggers DB::_computeAlarmTriggersForMeasurement(Alarm& alarm, Measurem
 
         s_logger.logInfo(QString("Alarm '%1' triggers for measurement index %2 have changed: old %3, new %4, added %5, removed %6")
                          .arg(ad.name.c_str())
-                         .arg(m.descriptor.index)
+                         .arg(measurement.has_value() ? std::to_string(measurement->descriptor.index).c_str() : "N/A")
                          .arg(oldTriggers)
                          .arg(currentTriggers)
                          .arg(triggers.added)
                          .arg(triggers.removed));
 
 		alarm.lastTriggeredTimePoint = m_clock->now();
-        emit alarmSensorTriggersChanged(alarm.id, m.descriptor.sensorId, m, oldTriggers, triggers);
+        emit alarmSensorTriggersChanged(alarm.id, sensor.id, measurement, oldTriggers, triggers);
     }
 
     return triggers;
@@ -2518,7 +3017,7 @@ DB::AlarmTriggers DB::_computeAlarmTriggersForMeasurement(Alarm& alarm, Measurem
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::AlarmTriggers DB::computeAlarmTriggersForSensor(Sensor const& s)
+DB::AlarmTriggers DB::computeBaseStationAlarmTriggers(BaseStation const& bs)
 {
 	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
@@ -2526,7 +3025,7 @@ DB::AlarmTriggers DB::computeAlarmTriggersForSensor(Sensor const& s)
 
 	for (Alarm& alarm : m_data.alarms)
 	{
-		AlarmTriggers triggers = _computeAlarmTriggersForSensor(alarm, s);
+		AlarmTriggers triggers = _computeBaseStationAlarmTriggers(alarm, bs);
 		allTriggers |= triggers;
 	}
 
@@ -2535,100 +3034,7 @@ DB::AlarmTriggers DB::computeAlarmTriggersForSensor(Sensor const& s)
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::AlarmTriggers DB::_computeAlarmTriggersForSensor(Alarm& alarm, Sensor const& s)
-{
-	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
-
-	uint32_t currentTriggers = 0;
-
-	bool sensorWatched = true;
-	AlarmDescriptor const& ad = alarm.descriptor;
-	if (ad.filterSensors)
-	{
-		if (ad.sensors.find(s.id) == ad.sensors.end())
-		{
-			sensorWatched = false;
-		}
-	}
-
-	if (sensorWatched)
-	{
-		if (ad.sensorBlackoutWatch && s.blackout)
-		{
-			currentTriggers |= AlarmTrigger::SensorBlackout;
-		}
-	}
-
-	uint32_t oldTriggers = 0;
-	auto it = alarm.triggersPerSensor.find(s.id);
-	if (it != alarm.triggersPerSensor.end())
-	{
-		oldTriggers = it->second;
-
-		//keep measurement related triggers
-		if (sensorWatched)
-		{
-			currentTriggers |= oldTriggers & AlarmTrigger::MeasurementMask;
-		}
-	}
-
-	if (currentTriggers != oldTriggers)
-	{
-		if (currentTriggers == 0)
-		{
-			alarm.triggersPerSensor.erase(s.id);
-		}
-		else
-		{
-			alarm.triggersPerSensor[s.id] = currentTriggers;
-		}
-		m_data.alarmsChanged = true;
-	}
-
-	AlarmTriggers triggers;
-	triggers.current = currentTriggers;
-
-	uint32_t diff = oldTriggers ^ currentTriggers;
-	if (diff != 0)
-	{
-		triggers.removed = diff & oldTriggers;
-		triggers.added = diff & currentTriggers;
-
-		s_logger.logInfo(QString("Alarm '%1' triggers for sensor %2 have changed: old %3, new %4, added %5, removed %6")
-						 .arg(ad.name.c_str())
-						 .arg(s.descriptor.name.c_str())
-						 .arg(oldTriggers)
-						 .arg(currentTriggers)
-						 .arg(triggers.added)
-						 .arg(triggers.removed));
-
-		alarm.lastTriggeredTimePoint = m_clock->now();
-		emit alarmSensorTriggersChanged(alarm.id, s.id, std::nullopt, oldTriggers, triggers);
-	}
-
-	return triggers;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-DB::AlarmTriggers DB::computeAlarmTriggersForBaseStation(BaseStation const& bs)
-{
-	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
-
-	AlarmTriggers allTriggers;
-
-	for (Alarm& alarm : m_data.alarms)
-	{
-		AlarmTriggers triggers = _computeAlarmTriggersForBaseStation(alarm, bs);
-		allTriggers |= triggers;
-	}
-
-	return allTriggers;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-DB::AlarmTriggers DB::_computeAlarmTriggersForBaseStation(Alarm& alarm, BaseStation const& bs)
+DB::AlarmTriggers DB::_computeBaseStationAlarmTriggers(Alarm& alarm, BaseStation const& bs)
 {
 	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
@@ -2938,7 +3344,7 @@ bool DB::addSingleSensorMeasurements(SensorId sensorId, std::vector<MeasurementD
 				m.descriptor = md;
 				m.timePoint = computeMeasurementTimepoint(md);
                 m.receivedTimePoint = m_clock->now();
-				m.alarmTriggers = computeAlarmTriggersForMeasurement(m);
+				//m.alarmTriggers = computeAlarmTriggersForMeasurement(m);
                 asyncMeasurements.emplace_back(m);
 
 				sqlite3_bind_int64(stmt, 1, IClock::to_time_t(m.timePoint));
@@ -3373,413 +3779,6 @@ DB::SignalStrength DB::computeAverageSignalStrength(SensorId sensorId, Data cons
     avg.b2s = static_cast<int16_t>(avgb2s);
     avg.s2b = static_cast<int16_t>(avgs2b);
 	return avg;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void DB::scheduleSave()
-{
-    m_saveScheduled = true;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void DB::save(bool newTransaction)
-{
-    save(m_data, newTransaction);
-    m_saveScheduled = false;
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void DB::save(Data& data, bool newTransaction) const
-{
-	IClock::time_point start = m_clock->now();
-
-	if (newTransaction)
-	{
-		sqlite3_exec(m_sqlite, "BEGIN TRANSACTION;", NULL, NULL, NULL);
-	}
-	utils::epilogue epi([this, newTransaction] 
-	{ 
-		if (newTransaction)
-		{
-			sqlite3_exec(m_sqlite, "END TRANSACTION;", NULL, NULL, NULL);
-		}
-	});
-
-	if (data.generalSettingsChanged)
-	{
-		data.generalSettingsChanged = false;
-		sqlite3_stmt* stmt;
-		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO GeneralSettings (id, dateTimeFormat) VALUES (0, ?1);", -1, &stmt, NULL);
-		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
-
-		sqlite3_bind_int64(stmt, 1, (int)data.generalSettings.dateTimeFormat);
-		if (sqlite3_step(stmt) != SQLITE_DONE)
-		{
-			s_logger.logCritical(QString("Failed to save general settings: %1").arg(sqlite3_errmsg(m_sqlite)));
-			return;
-		}
-	}
-
-	if (data.csvSettingsChanged)
-	{
-		data.csvSettingsChanged = false;
-		sqlite3_stmt* stmt;
-		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO CsvSettings (id, dateTimeFormatOverride, unitsFormat, "
-						   "exportId, exportIndex, exportSensorName, exportSensorSN, exportTimePoint, exportReceivedTimePoint, "
-						   "exportTemperature, exportHumidity, exportBattery, exportSignal, "
-                           "decimalPlaces, separator) VALUES (0, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14);", -1, &stmt, NULL);
-		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
-
-		sqlite3_bind_int64(stmt, 1, data.csvSettings.dateTimeFormatOverride.has_value() ? (int)data.csvSettings.dateTimeFormatOverride.value() : -1);
-		sqlite3_bind_int64(stmt, 2, (int)data.csvSettings.unitsFormat);
-		sqlite3_bind_int(stmt, 3, data.csvSettings.exportId ? 1 : 0);
-		sqlite3_bind_int(stmt, 4, data.csvSettings.exportIndex ? 1 : 0);
-		sqlite3_bind_int(stmt, 5, data.csvSettings.exportSensorName ? 1 : 0);
-		sqlite3_bind_int(stmt, 6, data.csvSettings.exportSensorSN ? 1 : 0);
-		sqlite3_bind_int(stmt, 7, data.csvSettings.exportTimePoint ? 1 : 0);
-		sqlite3_bind_int(stmt, 8, data.csvSettings.exportReceivedTimePoint ? 1 : 0);
-		sqlite3_bind_int(stmt, 9, data.csvSettings.exportTemperature ? 1 : 0);
-		sqlite3_bind_int(stmt, 10, data.csvSettings.exportHumidity ? 1 : 0);
-		sqlite3_bind_int(stmt, 11, data.csvSettings.exportBattery ? 1 : 0);
-		sqlite3_bind_int(stmt, 12, data.csvSettings.exportSignal ? 1 : 0);
-		sqlite3_bind_int64(stmt, 13, data.csvSettings.decimalPlaces);
-        sqlite3_bind_text(stmt, 14, data.csvSettings.separator.c_str(), -1, SQLITE_STATIC);
-        if (sqlite3_step(stmt) != SQLITE_DONE)
-		{
-			s_logger.logCritical(QString("Failed to save csv settings: %1").arg(sqlite3_errmsg(m_sqlite)));
-			return;
-		}
-	}
-
-	if (data.emailSettingsChanged)
-	{
-		data.emailSettingsChanged = false;
-		sqlite3_stmt* stmt;
-		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO EmailSettings (id, host, port, connection, username, password, sender, recipients) VALUES (0, ?1, ?2, ?3, ?4, ?5, ?6, ?7);", -1, &stmt, NULL);
-		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
-
-		sqlite3_bind_text(stmt, 1, data.emailSettings.host.c_str(), -1, SQLITE_STATIC);
-		sqlite3_bind_int64(stmt, 2, data.emailSettings.port);
-		sqlite3_bind_int(stmt, 3, (int)data.emailSettings.connection);
-		sqlite3_bind_text(stmt, 4, data.emailSettings.username.c_str(), -1, SQLITE_STATIC);
-		sqlite3_bind_text(stmt, 5, data.emailSettings.password.c_str(), -1, SQLITE_STATIC);
-		sqlite3_bind_text(stmt, 6, data.emailSettings.sender.c_str(), -1, SQLITE_STATIC);
-		std::string recipients = std::accumulate(data.emailSettings.recipients.begin(), data.emailSettings.recipients.end(), std::string(";"));
-		sqlite3_bind_text(stmt, 7, recipients.c_str(), -1, SQLITE_TRANSIENT);
-		if (sqlite3_step(stmt) != SQLITE_DONE)
-		{
-			s_logger.logCritical(QString("Failed to save email settings: %1").arg(sqlite3_errmsg(m_sqlite)));
-			return;
-		}
-	}
-
-	if (data.ftpSettingsChanged)
-	{
-		data.ftpSettingsChanged = false;
-		sqlite3_stmt* stmt;
-		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO FtpSettings (id, host, port, username, password, folder, uploadBackups, uploadPeriod) VALUES (0, ?1, ?2, ?3, ?4, ?5, ?6, ?7);", -1, &stmt, NULL);
-		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
-
-		sqlite3_bind_text(stmt, 1, data.ftpSettings.host.c_str(), -1, SQLITE_STATIC);
-		sqlite3_bind_int64(stmt, 2, data.ftpSettings.port);
-		sqlite3_bind_text(stmt, 3, data.ftpSettings.username.c_str(), -1, SQLITE_STATIC);
-		sqlite3_bind_text(stmt, 4, data.ftpSettings.password.c_str(), -1, SQLITE_STATIC);
-		sqlite3_bind_text(stmt, 5, data.ftpSettings.folder.c_str(), -1, SQLITE_STATIC);
-		sqlite3_bind_int(stmt, 6, data.ftpSettings.uploadBackups ? 1 : 0);
-		sqlite3_bind_int64(stmt, 7, std::chrono::duration_cast<std::chrono::seconds>(data.ftpSettings.uploadBackupsPeriod).count());
-		if (sqlite3_step(stmt) != SQLITE_DONE)
-		{
-			s_logger.logCritical(QString("Failed to save ftp settings: %1").arg(sqlite3_errmsg(m_sqlite)));
-			return;
-		}
-	}
-
-	if (data.usersChanged || data.usersAddedOrRemoved)
-	{
-		if (data.usersAddedOrRemoved)
-		{
-			const char* sql = "DELETE FROM Users;";
-			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
-			{
-				s_logger.logCritical(QString("Failed to clear users: %1").arg(sqlite3_errmsg(m_sqlite)));
-				return;
-			}
-		}
-		sqlite3_stmt* stmt;
-		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO Users (id, name, passwordHash, permissions, type, lastLogin) VALUES(?1, ?2, ?3, ?4, ?5, ?6);", -1, &stmt, NULL);
-		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
-
-		for (User const& user : data.users)
-		{
-			sqlite3_bind_int64(stmt, 1, user.id);
-			sqlite3_bind_text(stmt, 2, user.descriptor.name.c_str(), -1, SQLITE_STATIC);
-			sqlite3_bind_text(stmt, 3, user.descriptor.passwordHash.c_str(), -1, SQLITE_STATIC);
-			sqlite3_bind_int64(stmt, 4, user.descriptor.permissions);
-			sqlite3_bind_int(stmt, 5, (int)user.descriptor.type);
-			sqlite3_bind_int64(stmt, 6, IClock::to_time_t(user.lastLogin));
-			if (sqlite3_step(stmt) != SQLITE_DONE)
-			{
-				s_logger.logCritical(QString("Failed to save user: %1").arg(sqlite3_errmsg(m_sqlite)));
-				return;
-			}
-			sqlite3_reset(stmt);
-		}
-		data.usersAddedOrRemoved = false;
-		data.usersChanged = false;
-	}
-	if (data.baseStationsChanged || data.baseStationsAddedOrRemoved)
- 	{
-		if (data.baseStationsAddedOrRemoved)
-	    {
-		    const char* sql = "DELETE FROM BaseStations;";
-		    if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
-		    {
-			    s_logger.logCritical(QString("Failed to clear base stations: %1").arg(sqlite3_errmsg(m_sqlite)));
-			    return;
-		    }
-	    }
-		sqlite3_stmt* stmt = m_saveBaseStationsStmt.get();
-		for (BaseStation const& bs : data.baseStations)
-		{
-			sqlite3_bind_int64(stmt, 1, bs.id);
-			sqlite3_bind_text(stmt, 2, bs.descriptor.name.c_str(), -1, SQLITE_STATIC);
-			sqlite3_bind_text(stmt, 3, utils::getMacStr(bs.descriptor.mac).c_str(), -1, SQLITE_TRANSIENT);
-			if (sqlite3_step(stmt) != SQLITE_DONE)
-			{
-				s_logger.logCritical(QString("Failed to save base station: %1").arg(sqlite3_errmsg(m_sqlite)));
-				return;
-			}
-			sqlite3_reset(stmt);
-		}
-		data.baseStationsAddedOrRemoved = false;
-		data.baseStationsChanged = false;
-	}
-	if (data.sensorTimeConfigsChanged)
- 	{
-		{
-			const char* sql = "DELETE FROM SensorTimeConfigs;";
-			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
-			{
-				s_logger.logCritical(QString("Failed to clear sensor configs: %1").arg(sqlite3_errmsg(m_sqlite)));
-				return;
-			}
-		}
-		sqlite3_stmt* stmt = m_saveSensorTimeConfigsStmt.get();
-		for (SensorTimeConfig const& sc : data.sensorTimeConfigs)
-		{
-			sqlite3_bind_int64(stmt, 1, IClock::to_time_t(sc.baselineMeasurementTimePoint));
-			sqlite3_bind_int64(stmt, 2, sc.baselineMeasurementIndex);
-			sqlite3_bind_int64(stmt, 3, std::chrono::duration_cast<std::chrono::seconds>(sc.descriptor.measurementPeriod).count());
-			sqlite3_bind_int64(stmt, 4, std::chrono::duration_cast<std::chrono::seconds>(sc.descriptor.commsPeriod).count());
-			if (sqlite3_step(stmt) != SQLITE_DONE)
-			{
-				s_logger.logCritical(QString("Failed to save sensor config: %1").arg(sqlite3_errmsg(m_sqlite)));
-				return;
-			}
-			sqlite3_reset(stmt);
-		}
-		data.sensorTimeConfigsChanged = false;
-	}
-	if (data.sensorSettingsChanged)
-	{
-		data.sensorSettingsChanged = false;
-        sqlite3_stmt* stmt = m_saveSensorSettingsStmt.get();
-
-		sqlite3_bind_int64(stmt, 1, data.sensorSettings.radioPower);
-		sqlite3_bind_int64(stmt, 2, data.sensorSettings.retries);
-		sqlite3_bind_double(stmt, 3, data.sensorSettings.alertBatteryLevel);
-		sqlite3_bind_double(stmt, 4, data.sensorSettings.alertSignalStrengthLevel);
-
-		const char* xx = sqlite3_expanded_sql(stmt);
-
-		if (sqlite3_step(stmt) != SQLITE_DONE)
-		{
-			s_logger.logCritical(QString("Failed to save sensor settings: %1").arg(sqlite3_errmsg(m_sqlite)));
-			return;
-		}
-		sqlite3_reset(stmt);
-	}
-	if (data.sensorsChanged || data.sensorsAddedOrRemoved)
- 	{
-		if (data.sensorsAddedOrRemoved)
-		{
-			const char* sql = "DELETE FROM Sensors;";
-			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
-			{
-				s_logger.logCritical(QString("Failed to clear sensors: %1").arg(sqlite3_errmsg(m_sqlite)));
-				return;
-			}
-		}
-		sqlite3_stmt* stmt = m_saveSensorsStmt.get();
-		for (Sensor const& s : data.sensors)
-		{
-			int index = 1;
-			sqlite3_bind_int64(stmt, index++, s.id);
-			sqlite3_bind_text(stmt, index++, s.descriptor.name.c_str(), -1, SQLITE_STATIC);
-			sqlite3_bind_int64(stmt, index++, s.address);
-			sqlite3_bind_int64(stmt, index++, s.deviceInfo.sensorType);
-			sqlite3_bind_int64(stmt, index++, s.deviceInfo.hardwareVersion);
-			sqlite3_bind_int64(stmt, index++, s.deviceInfo.softwareVersion);
-
-			sqlite3_bind_double(stmt, index++, s.calibration.temperatureBias);
-			sqlite3_bind_double(stmt, index++, s.calibration.humidityBias);
-
-			sqlite3_bind_int64(stmt, index++, s.serialNumber);
-			sqlite3_bind_int64(stmt, index++, (int)s.state);
-			sqlite3_bind_int(stmt, index++, s.shouldSleep ? 1 : 0);
-			sqlite3_bind_int64(stmt, index++, IClock::to_time_t(s.sleepStateTimePoint));
-
-			sqlite3_bind_int64(stmt, index++, s.stats.commsBlackouts);
-			sqlite3_bind_int64(stmt, index++, s.stats.commsFailures);
-			sqlite3_bind_int64(stmt, index++, s.stats.unknownReboots);
-			sqlite3_bind_int64(stmt, index++, s.stats.powerOnReboots);
-			sqlite3_bind_int64(stmt, index++, s.stats.resetReboots);
-			sqlite3_bind_int64(stmt, index++, s.stats.brownoutReboots);
-			sqlite3_bind_int64(stmt, index++, s.stats.watchdogReboots);
-			sqlite3_bind_int64(stmt, index++, s.stats.commsRetries);
-			sqlite3_bind_int64(stmt, index++, std::chrono::duration_cast<std::chrono::milliseconds>(s.stats.asleep).count());
-			sqlite3_bind_int64(stmt, index++, std::chrono::duration_cast<std::chrono::milliseconds>(s.stats.awake).count());
-			sqlite3_bind_int64(stmt, index++, s.stats.commsRounds);
-			sqlite3_bind_int64(stmt, index++, s.stats.measurementRounds);
-
-			sqlite3_bind_int64(stmt, index++, IClock::to_time_t(s.lastCommsTimePoint));
-
-			sqlite3_bind_int64(stmt, index++, s.lastConfirmedMeasurementIndex);
-			sqlite3_bind_int64(stmt, index++, s.firstStoredMeasurementIndex);
-			sqlite3_bind_int64(stmt, index++, s.storedMeasurementCount);
-			sqlite3_bind_int64(stmt, index++, s.estimatedStoredMeasurementCount);
-
-			sqlite3_bind_int64(stmt, index++, s.lastSignalStrengthB2S);
-			sqlite3_bind_int64(stmt, index++, s.averageSignalStrength.b2s);
-			sqlite3_bind_int64(stmt, index++, s.averageSignalStrength.s2b);
-
-			sqlite3_bind_int(stmt, index++, s.isRTMeasurementValid ? 1 : 0);
-			sqlite3_bind_double(stmt, index++, s.rtMeasurementTemperature);
-			sqlite3_bind_double(stmt, index++, s.rtMeasurementHumidity);
-			sqlite3_bind_double(stmt, index++, s.rtMeasurementVcc);
-			Q_ASSERT(index == 37);
-			if (sqlite3_step(stmt) != SQLITE_DONE)
-			{
-				s_logger.logCritical(QString("Failed to save sensor: %1").arg(sqlite3_errmsg(m_sqlite)));
-				return;
-			}
-			sqlite3_reset(stmt);
-		}
-		data.sensorsAddedOrRemoved = false;
-		data.sensorsChanged = false;
-	}
-	if (data.alarmsChanged || data.alarmsAddedOrRemoved)
- 	{
-		if (data.alarmsAddedOrRemoved)
-		{
-			const char* sql = "DELETE FROM Alarms;";
-			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
-			{
-				s_logger.logCritical(QString("Failed to clear alarms: %1").arg(sqlite3_errmsg(m_sqlite)));
-				return;
-			}
-		}
-		sqlite3_stmt* stmt = m_saveAlarmsStmt.get();
-		for (Alarm const& a : data.alarms)
-		{
-			int index = 1;
-			sqlite3_bind_int64(stmt, index++, a.id);
-			sqlite3_bind_text(stmt, index++, a.descriptor.name.c_str(), -1, SQLITE_STATIC);
-			sqlite3_bind_int(stmt, index++, a.descriptor.filterSensors ? 1 : 0);
-			std::string sensors;
-			for (SensorId id : a.descriptor.sensors)
-			{
-				sensors += std::to_string(id) + ";";
-			}
-			sqlite3_bind_text(stmt, index++, sensors.c_str(), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_int(stmt, index++, a.descriptor.lowTemperatureWatch ? 1 : 0);
-			sqlite3_bind_double(stmt, index++, a.descriptor.lowTemperatureSoft);
-			sqlite3_bind_double(stmt, index++, a.descriptor.lowTemperatureHard);
-			sqlite3_bind_int(stmt, index++, a.descriptor.highTemperatureWatch ? 1 : 0);
-			sqlite3_bind_double(stmt, index++, a.descriptor.highTemperatureSoft);
-			sqlite3_bind_double(stmt, index++, a.descriptor.highTemperatureHard);
-			sqlite3_bind_int(stmt, index++, a.descriptor.lowHumidityWatch ? 1 : 0);
-			sqlite3_bind_double(stmt, index++, a.descriptor.lowHumiditySoft);
-			sqlite3_bind_double(stmt, index++, a.descriptor.lowHumidityHard);
-			sqlite3_bind_int(stmt, index++, a.descriptor.highHumidityWatch ? 1 : 0);
-			sqlite3_bind_double(stmt, index++, a.descriptor.highHumiditySoft);
-			sqlite3_bind_double(stmt, index++, a.descriptor.highHumidityHard);
-			sqlite3_bind_int(stmt, index++, a.descriptor.lowVccWatch ? 1 : 0);
-			sqlite3_bind_int(stmt, index++, a.descriptor.lowSignalWatch ? 1 : 0);
-			sqlite3_bind_int(stmt, index++, a.descriptor.sensorBlackoutWatch ? 1 : 0);
-			sqlite3_bind_int(stmt, index++, a.descriptor.baseStationDisconnectedWatch ? 1 : 0);
-			sqlite3_bind_int(stmt, index++, a.descriptor.sendEmailAction ? 1 : 0);
-			sqlite3_bind_int64(stmt, index++, std::chrono::duration_cast<std::chrono::seconds>(a.descriptor.resendPeriod).count());
-			{
-				std::string triggers;
-				for (auto p : a.triggersPerSensor)
-				{
-					triggers += std::to_string(p.first) + "/" + std::to_string(p.second) + ";";
-				}
-				sqlite3_bind_text(stmt, index++, triggers.c_str(), -1, SQLITE_TRANSIENT);
-			}
-			{
-				std::string triggers;
-				for (auto p : a.triggersPerBaseStation)
-				{
-					triggers += std::to_string(p.first) + "/" + std::to_string(p.second) + ";";
-				}
-				sqlite3_bind_text(stmt, index++, triggers.c_str(), -1, SQLITE_TRANSIENT);
-			}
-			sqlite3_bind_int64(stmt, index++, IClock::to_time_t(a.lastTriggeredTimePoint));
-			if (sqlite3_step(stmt) != SQLITE_DONE)
-			{
-				s_logger.logCritical(QString("Failed to save alarms: %1").arg(sqlite3_errmsg(m_sqlite)));
-				return;
-			}
-			Q_ASSERT(index == 26);
-			sqlite3_reset(stmt);
-		}
-		data.alarmsAddedOrRemoved = false;
-		data.alarmsChanged = false;
-	}
-	if (data.reportsChanged || data.reportsAddedOrRemoved)
- 	{
-		if (data.reportsAddedOrRemoved)
-		{
-			const char* sql = "DELETE FROM Reports;";
-			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
-			{
-				s_logger.logCritical(QString("Failed to clear reports: %1").arg(sqlite3_errmsg(m_sqlite)));
-				return;
-			}
-		}
-		sqlite3_stmt* stmt = m_saveReportsStmt.get();
-		for (Report const& r : data.reports)
-		{
-			sqlite3_bind_int64(stmt, 1, r.id);
-			sqlite3_bind_text(stmt, 2, r.descriptor.name.c_str(), -1, SQLITE_STATIC);
-			sqlite3_bind_int(stmt, 3, (int)r.descriptor.period);
-			sqlite3_bind_int64(stmt, 4, std::chrono::duration_cast<std::chrono::seconds>(r.descriptor.customPeriod).count());
-			sqlite3_bind_int64(stmt, 5, r.descriptor.filterSensors ? 1 : 0);
-			std::string sensors;
-			for (SensorId id : r.descriptor.sensors)
-			{
-				sensors += std::to_string(id) + ";";
-			}
-			sqlite3_bind_text(stmt, 6, sensors.c_str(), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_int64(stmt, 7, IClock::to_time_t(r.lastTriggeredTimePoint));
-			if (sqlite3_step(stmt) != SQLITE_DONE)
-			{
-				s_logger.logCritical(QString("Failed to save report: %1").arg(sqlite3_errmsg(m_sqlite)));
-				return;
-			}
-			sqlite3_reset(stmt);
-		}
-		data.reportsAddedOrRemoved = false;
-		data.reportsChanged = false;
-	}
-
-//    std::cout << QString("Done saving DB. Time: %3s\n").arg(std::chrono::duration<float>(m_clock->now() - start).count()).toUtf8().data();
-//    std::cout.flush();
 }
 
 //////////////////////////////////////////////////////////////////////////
