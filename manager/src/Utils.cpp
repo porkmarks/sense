@@ -235,7 +235,7 @@ std::pair<std::string, int32_t> computeDurationString(IClock::duration d)
 
 std::pair<std::string, int32_t> computeRelativeTimePointString(IClock::time_point tp)
 {
-	return computeDurationString(tp - Clock().now());
+	return computeDurationString(tp - IClock::rtNow());
 }
 
 uint32_t getSensorStorageCapacity(DB::Sensor const& sensor)

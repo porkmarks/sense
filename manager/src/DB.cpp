@@ -31,13 +31,13 @@ Q_DECLARE_METATYPE(DB::Measurement);
 //////////////////////////////////////////////////////////////////////////
 
 DB::DB()
-	: DB(std::make_shared<Clock>())
+	: DB(std::make_shared<SystemClock>())
 {
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::DB(std::shared_ptr<Clock> clock)
+DB::DB(std::shared_ptr<IClock> clock)
 	: m_clock(std::move(clock))
 {
 	qRegisterMetaType<UserId>("UserId");

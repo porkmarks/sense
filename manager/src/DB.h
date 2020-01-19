@@ -29,7 +29,7 @@ public:
     virtual time_point now() = 0;
 };
 
-class Clock : public IClock
+class SystemClock : public IClock
 {
 public:
     time_point now() override
@@ -44,7 +44,7 @@ class DB : public QObject
     Q_OBJECT
 public:
     DB();
-    DB(std::shared_ptr<Clock> clock);
+    DB(std::shared_ptr<IClock> clock);
     ~DB();
 
     void process();
