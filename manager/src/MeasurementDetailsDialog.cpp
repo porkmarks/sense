@@ -70,8 +70,8 @@ void MeasurementDetailsDialog::setMeasurement(DB::Measurement const& measurement
 		m_ui.sensor->setText("N/A");
     }
 
-    m_ui.timestamp->setText(utils::toString<DB::Clock>(m_measurement.timePoint, m_db.getGeneralSettings().dateTimeFormat));
-    m_ui.receivedTimestamp->setText(utils::toString<DB::Clock>(m_measurement.receivedTimePoint, m_db.getGeneralSettings().dateTimeFormat));
+    m_ui.timestamp->setText(utils::toString<IClock>(m_measurement.timePoint, m_db.getGeneralSettings().dateTimeFormat));
+    m_ui.receivedTimestamp->setText(utils::toString<IClock>(m_measurement.receivedTimePoint, m_db.getGeneralSettings().dateTimeFormat));
 
 	{
 		float vcc = m_measurement.descriptor.vcc;

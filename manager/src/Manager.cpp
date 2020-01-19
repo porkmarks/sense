@@ -38,11 +38,11 @@ Manager::Manager(QWidget *parent)
 
     {
 		std::pair<std::string, time_t> bkf = utils::getMostRecentBackup("sense.db", s_dataFolder + "/backups/hourly");
-		m_lastHourlyBackupTP = bkf.first.empty() ? DB::Clock::now() : DB::Clock::from_time_t(bkf.second);
+		m_lastHourlyBackupTP = bkf.first.empty() ? IClock::rtNow() : IClock::from_time_t(bkf.second);
 		bkf = utils::getMostRecentBackup("sense.db", s_dataFolder + "/backups/daily");
-		m_lastDailyBackupTP = bkf.first.empty() ? DB::Clock::now() : DB::Clock::from_time_t(bkf.second);
+		m_lastDailyBackupTP = bkf.first.empty() ? IClock::rtNow() : IClock::from_time_t(bkf.second);
 		bkf = utils::getMostRecentBackup("sense.db", s_dataFolder + "/backups/weekly");
-		m_lastWeeklyBackupTP = bkf.first.empty() ? DB::Clock::now() : DB::Clock::from_time_t(bkf.second);
+		m_lastWeeklyBackupTP = bkf.first.empty() ? IClock::rtNow() : IClock::from_time_t(bkf.second);
     }
 
 	{
@@ -475,7 +475,7 @@ void Manager::readSettings()
 
 void Manager::processBackups()
 {
-	DB::Clock::time_point now = DB::Clock::now();
+	IClock::time_point now = IClock::rtNow();
     if (now - m_lastHourlyBackupTP >= std::chrono::hours(1))
     {
         m_lastHourlyBackupTP = now;

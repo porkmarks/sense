@@ -68,7 +68,7 @@ private:
     bool insertRows(int position, int rows, QModelIndex const& parent = QModelIndex()) override;
     bool removeRows(int position, int rows, QModelIndex const& parent = QModelIndex()) override;
 
-    void startAutoRefresh(DB::Clock::duration timer);
+	void startAutoRefresh(IClock::duration timer);
 
 private slots:
 	void startSlowAutoRefresh();

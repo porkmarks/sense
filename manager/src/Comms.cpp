@@ -226,7 +226,7 @@ void Comms::connectedToBaseStation(InitializedBaseStation* cbs)
 
         cbs->isConnecting = false;
         cbs->isConnected = true;
-        cbs->lastTalkTP = DB::Clock::now(); //this represents communication so reset the pong
+        cbs->lastTalkTP = IClock::rtNow(); //this represents communication so reset the pong
 
         emit baseStationConnected(cbs->descriptor);
         cbs->socketAdapter.start();
@@ -321,7 +321,7 @@ void Comms::sendPing(Comms::InitializedBaseStation& cbs)
     size_t offset = 0;
     pack(buffer, ++cbs.lastPingId, offset);
     cbs.channel.send(data::Server_Message::PING, buffer.data(), offset);
-    cbs.lastPingTP = DB::Clock::now();
+    cbs.lastPingTP = IClock::rtNow();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -347,7 +347,7 @@ void Comms::sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const&
 
 void Comms::processPong(InitializedBaseStation& cbs)
 {
-    cbs.lastTalkTP = DB::Clock::now(); //this represents communication so reset the pong
+    cbs.lastTalkTP = IClock::rtNow(); //this represents communication so reset the pong
     //std::cout << "PONG" << std::endl;
 }
 
@@ -483,7 +483,7 @@ void Comms::processSensorReq(InitializedBaseStation& cbs, SensorRequest const& r
 
 static void fillConfig(data::sensor::v1::Config_Response& config, DB::SensorSettings const& sensorSettings, DB::Sensor const& sensor, DB::SensorOutputDetails const& sensorOutputDetails, DB::Sensor::Calibration const& reportedCalibration)
 {
-    DB::Clock::time_point now = DB::Clock::now();
+    IClock::time_point now = IClock::rtNow();
 
     config.next_measurement_delay =
             chrono::seconds(std::chrono::duration_cast<std::chrono::seconds>(sensorOutputDetails.nextMeasurementTimePoint - now).count());
@@ -708,10 +708,10 @@ void Comms::process()
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
-	//    static DB::Clock::time_point lastFakeDiscovery = DB::Clock::now();
-	//    if (DB::Clock::now() - lastFakeDiscovery >= std::chrono::seconds(1))
+	//    static IClock::time_point lastFakeDiscovery = IClock::rtNow();
+	//    if (IClock::rtNow() - lastFakeDiscovery >= std::chrono::seconds(1))
 	//    {
-	//        lastFakeDiscovery = DB::Clock::now();
+	//        lastFakeDiscovery = IClock::rtNow();
 
 	//        BaseStationDescriptor bs;
 	//        bs.mac = {0xB8, 0x27, 0xEB, 0xDA, 0x89, 0x1B };
@@ -735,11 +735,11 @@ void Comms::process()
 			continue;
 		}
 
-		if (DB::Clock::now() - cbs->lastPingTP > std::chrono::seconds(2))
+		if (IClock::rtNow() - cbs->lastPingTP > std::chrono::seconds(2))
 		{
 			sendPing(*cbs);
 		}
-		if (DB::Clock::now() - cbs->lastTalkTP > std::chrono::seconds(10))
+		if (IClock::rtNow() - cbs->lastTalkTP > std::chrono::seconds(10))
 		{
 			disconnectedFromBaseStation(cbs);
 			continue;
@@ -747,7 +747,7 @@ void Comms::process()
 
 		while (cbs->channel.get_next_message(message))
 		{
-			cbs->lastTalkTP = DB::Clock::now(); //this represents communication so reset the pong
+			cbs->lastTalkTP = IClock::rtNow(); //this represents communication so reset the pong
 			switch (message)
 			{
 			case data::Server_Message::PONG:

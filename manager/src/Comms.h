@@ -77,8 +77,8 @@ private:
         bool isConnected = false;
 
         uint32_t lastPingId = 0;
-        DB::Clock::time_point lastPingTP = DB::Clock::time_point(DB::Clock::duration::zero());
-        DB::Clock::time_point lastTalkTP = DB::Clock::time_point(DB::Clock::duration::zero());
+        IClock::time_point lastPingTP = IClock::time_point(IClock::duration::zero());
+        IClock::time_point lastTalkTP = IClock::time_point(IClock::duration::zero());
 
         std::vector<QMetaObject::Connection> connections;
     };

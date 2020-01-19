@@ -36,7 +36,7 @@ Emailer::~Emailer()
 
 //////////////////////////////////////////////////////////////////////////
 
-void Emailer::reportTriggered(DB::ReportId reportId, DB::Clock::time_point from, DB::Clock::time_point to)
+void Emailer::reportTriggered(DB::ReportId reportId, IClock::time_point from, IClock::time_point to)
 {
 	int32_t reportIndex = m_db.findReportIndexById(reportId);
 	if (reportIndex < 0)
@@ -191,8 +191,8 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, s
 </table>
     )X").arg(sensor.descriptor.name.c_str())
 			.arg(sensor.serialNumber, 8, 16, QChar('0'))
-			.arg(utils::toString<DB::Clock>(m.timePoint, m_db.getGeneralSettings().dateTimeFormat))
-			.arg(utils::toString<DB::Clock>(m.receivedTimePoint, m_db.getGeneralSettings().dateTimeFormat))
+			.arg(utils::toString<IClock>(m.timePoint, m_db.getGeneralSettings().dateTimeFormat))
+			.arg(utils::toString<IClock>(m.receivedTimePoint, m_db.getGeneralSettings().dateTimeFormat))
 			.arg(temperatureStr)
 			.arg(humidityStr)
 			.arg(batteryStr)
@@ -328,7 +328,7 @@ std::optional<utils::CsvData> Emailer::getCsvData(std::vector<DB::Measurement> c
 
 //////////////////////////////////////////////////////////////////////////
 
-void Emailer::sendReportEmail(DB::Report const& report, DB::Clock::time_point from, DB::Clock::time_point to)
+void Emailer::sendReportEmail(DB::Report const& report, IClock::time_point from, IClock::time_point to)
 {
     QString dateTimeFormatStr = utils::getQDateTimeFormatString(m_db.getGeneralSettings().dateTimeFormat);
 
@@ -353,8 +353,8 @@ void Emailer::sendReportEmail(DB::Report const& report, DB::Clock::time_point fr
         break;
     }
 
-    QDateTime startDt = QDateTime::fromTime_t(DB::Clock::to_time_t(from));
-    QDateTime endDt = QDateTime::fromTime_t(DB::Clock::to_time_t(to));
+    QDateTime startDt = QDateTime::fromTime_t(IClock::to_time_t(from));
+    QDateTime endDt = QDateTime::fromTime_t(IClock::to_time_t(to));
 
     DB::Filter filter;
     filter.useTimePointFilter = true;
@@ -440,7 +440,7 @@ void Emailer::sendReportEmail(DB::Report const& report, DB::Clock::time_point fr
         for (DB::Measurement const& m: measurements)
         {
             QDateTime dt;
-            dt.setTime_t(DB::Clock::to_time_t(m.timePoint));
+            dt.setTime_t(IClock::to_time_t(m.timePoint));
             std::string sensorName = "N/A";
             int32_t _sensorIndex = m_db.findSensorIndexById(m.descriptor.sensorId);
             if (_sensorIndex < 0)

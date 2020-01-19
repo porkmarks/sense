@@ -118,9 +118,9 @@ void ExportDataDialog::accept()
     if (filter.useTimePointFilter)
     {
         defaultFilename = "report";
-        defaultFilename += QDateTime::fromTime_t(DB::Clock::to_time_t(filter.timePointFilter.min)).toString("dd_MM_yyyy_HH_mm").toUtf8().data();
+        defaultFilename += QDateTime::fromTime_t(IClock::to_time_t(filter.timePointFilter.min)).toString("dd_MM_yyyy_HH_mm").toUtf8().data();
         defaultFilename += "-";
-        defaultFilename += QDateTime::fromTime_t(DB::Clock::to_time_t(filter.timePointFilter.max)).toString("dd_MM_yyyy_HH_mm").toUtf8().data();
+        defaultFilename += QDateTime::fromTime_t(IClock::to_time_t(filter.timePointFilter.max)).toString("dd_MM_yyyy_HH_mm").toUtf8().data();
         defaultFilename += ".csv";
     }
 

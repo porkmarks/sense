@@ -197,7 +197,7 @@ std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac)
 	return macStr;
 }
 
-std::pair<std::string, int32_t> computeDurationString(DB::Clock::duration d)
+std::pair<std::string, int32_t> computeDurationString(IClock::duration d)
 {
 	int32_t totalSeconds = std::chrono::duration_cast<std::chrono::seconds>(d).count();
 	int32_t seconds = std::abs(totalSeconds);
@@ -233,9 +233,9 @@ std::pair<std::string, int32_t> computeDurationString(DB::Clock::duration d)
 	return std::make_pair(str, totalSeconds);
 }
 
-std::pair<std::string, int32_t> computeRelativeTimePointString(DB::Clock::time_point tp)
+std::pair<std::string, int32_t> computeRelativeTimePointString(IClock::time_point tp)
 {
-	return computeDurationString(tp - DB::Clock::now());
+	return computeDurationString(tp - Clock().now());
 }
 
 uint32_t getSensorStorageCapacity(DB::Sensor const& sensor)
@@ -250,7 +250,7 @@ uint32_t getSensorStorageCapacity(DB::Sensor const& sensor)
 	return 0;
 }
 
-DB::Clock::duration computeBatteryLife(float capacity, DB::Clock::duration measurementPeriod, DB::Clock::duration commsPeriod, float power, uint8_t retries, uint8_t hardwareVersion)
+IClock::duration computeBatteryLife(float capacity, IClock::duration measurementPeriod, IClock::duration commsPeriod, float power, uint8_t retries, uint8_t hardwareVersion)
 {
 	float idleMAh = 0.01f;
 	float commsMAh = 0;
@@ -404,14 +404,14 @@ bool exportCsvTo(std::ostream& stream, DB::GeneralSettings const& settings, DB::
 		if (csvSettings.exportTimePoint)
 		{
 			DB::DateTimeFormat dateTimeFormat = csvSettings.dateTimeFormatOverride.has_value() ? *csvSettings.dateTimeFormatOverride : settings.dateTimeFormat;
-			QString str = toString<DB::Clock>(m.timePoint, dateTimeFormat);
+			QString str = toString<IClock>(m.timePoint, dateTimeFormat);
 			stream << str.toUtf8().data();
 			stream << csvSettings.separator;
 		}
 		if (csvSettings.exportReceivedTimePoint)
 		{
 			DB::DateTimeFormat dateTimeFormat = csvSettings.dateTimeFormatOverride.has_value() ? *csvSettings.dateTimeFormatOverride : settings.dateTimeFormat;
-			QString str = toString<DB::Clock>(m.receivedTimePoint, dateTimeFormat);
+			QString str = toString<IClock>(m.receivedTimePoint, dateTimeFormat);
 			stream << str.toUtf8().data();
 			stream << csvSettings.separator;
 		}

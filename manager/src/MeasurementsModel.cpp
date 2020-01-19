@@ -112,11 +112,11 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
     {
         if (column == Column::Timestamp)
         {
-            return static_cast<qlonglong>(DB::Clock::to_time_t(measurement.timePoint));
+            return static_cast<qlonglong>(IClock::to_time_t(measurement.timePoint));
         }
 		else if (column == Column::ReceivedTimestamp)
 		{
-			return static_cast<qlonglong>(DB::Clock::to_time_t(measurement.receivedTimePoint));
+			return static_cast<qlonglong>(IClock::to_time_t(measurement.receivedTimePoint));
 		}
         else if (column == Column::Temperature)
         {
@@ -191,11 +191,11 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Timestamp)
         {
-			return utils::toString<DB::Clock>(measurement.timePoint, m_db.getGeneralSettings().dateTimeFormat);
+			return utils::toString<IClock>(measurement.timePoint, m_db.getGeneralSettings().dateTimeFormat);
         }
 		else if (column == Column::ReceivedTimestamp)
 		{
-			return utils::toString<DB::Clock>(measurement.receivedTimePoint, m_db.getGeneralSettings().dateTimeFormat);
+			return utils::toString<IClock>(measurement.receivedTimePoint, m_db.getGeneralSettings().dateTimeFormat);
 		}
         else if (column == Column::Temperature)
         {
@@ -238,9 +238,9 @@ void MeasurementsModel::setFilter(DB::Filter const& filter)
 {
     beginResetModel();
     m_filter = filter;
-    //auto start = DB::Clock::now();
+    //auto start = IClock::now();
     m_measurements = m_db.getFilteredMeasurements(m_filter);
-    //std::cout << "XXX: " << std::chrono::duration_cast<std::chrono::microseconds>(DB::Clock::now() - start).count() << "\n";
+    //std::cout << "XXX: " << std::chrono::duration_cast<std::chrono::microseconds>(IClock::now() - start).count() << "\n";
     endResetModel();
 
     Q_EMIT layoutChanged();
@@ -280,7 +280,7 @@ void MeasurementsModel::startFastAutoRefresh()
 
 //////////////////////////////////////////////////////////////////////////
 
-void MeasurementsModel::startAutoRefresh(DB::Clock::duration timer)
+void MeasurementsModel::startAutoRefresh(IClock::duration timer)
 {
 	m_refreshTimer->start(std::chrono::duration_cast<std::chrono::milliseconds>(timer).count());
 }

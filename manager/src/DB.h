@@ -19,14 +19,33 @@ struct sqlite3;
 struct sqlite3_stmt;
 class Emailer;
 
+class IClock : public std::chrono::system_clock
+{
+public:
+    static time_point rtNow()
+    {
+        return std::chrono::system_clock::now();
+    }
+    virtual time_point now() = 0;
+};
+
+class Clock : public IClock
+{
+public:
+    time_point now() override
+    {
+        return std::chrono::system_clock::now();
+    }
+};
+
+
 class DB : public QObject
 {
     Q_OBJECT
 public:
     DB();
+    DB(std::shared_ptr<Clock> clock);
     ~DB();
-
-    typedef std::chrono::system_clock Clock;
 
     void process();
 
@@ -116,7 +135,7 @@ public:
 		std::string password;
 		std::string folder;
 		bool uploadBackups = false;
-		Clock::duration uploadBackupsPeriod = std::chrono::hours(24);
+		IClock::duration uploadBackupsPeriod = std::chrono::hours(24);
 	};
 
 	bool setFtpSettings(FtpSettings const& settings);
@@ -163,7 +182,7 @@ public:
 	{
 		UserDescriptor descriptor;
 		UserId id = 0;
-		Clock::time_point lastLogin = Clock::time_point(Clock::duration::zero());
+        IClock::time_point lastLogin = IClock::time_point(IClock::duration::zero());
 	};
 
 	size_t getUserCount() const;
@@ -191,12 +210,12 @@ public:
     };
 
     typedef uint32_t BaseStationId;
-    struct BaseStation
+    struct BaseStation 
     {
         BaseStationDescriptor descriptor;
         BaseStationId id = 0;
         bool isConnected = false;
-        Clock::time_point lastConnectedTimePoint = Clock::now();
+        IClock::time_point lastConnectedTimePoint = IClock::time_point(IClock::duration::zero());
     };
 
     size_t getBaseStationCount() const;
@@ -214,7 +233,7 @@ public:
 	struct SensorSettings
 	{
 		int8_t radioPower = 10; //dBm.
-		uint8_t retries = 2;
+		uint8_t retries = 2; //1 - 10
 		float alertBatteryLevel = 0.1f; //0 - 1 mu
 		float alertSignalStrengthLevel = 0.1f; //0 - 1 mu
 	};
@@ -222,18 +241,20 @@ public:
 	Result<void> setSensorSettings(SensorSettings const& settings);
     SensorSettings getSensorSettings() const;
 
+    //////////////////////////////////////////////////////////////////////////
+
     struct SensorTimeConfigDescriptor
     {
-        Clock::duration measurementPeriod = std::chrono::minutes(5);
-        Clock::duration commsPeriod = std::chrono::minutes(10);
+        IClock::duration measurementPeriod = std::chrono::minutes(5);
+        IClock::duration commsPeriod = std::chrono::minutes(10);
     };
 
     struct SensorTimeConfig
     {
         SensorTimeConfigDescriptor descriptor;
-        Clock::duration computedCommsPeriod = std::chrono::minutes(10);
+        IClock::duration computedCommsPeriod = std::chrono::minutes(10);
         //when did this config become active?
-        Clock::time_point baselineMeasurementTimePoint = Clock::time_point(Clock::duration::zero());
+        IClock::time_point baselineMeasurementTimePoint = IClock::time_point(IClock::duration::zero());
         uint32_t baselineMeasurementIndex = 0;
     };
 
@@ -243,7 +264,7 @@ public:
     size_t getSensorTimeConfigCount() const;
     SensorTimeConfig getSensorTimeConfig(size_t index) const;
     SensorTimeConfig getLastSensorTimeConfig() const;
-    Clock::duration computeActualCommsPeriod(SensorTimeConfigDescriptor const& descriptor) const;
+    IClock::duration computeActualCommsPeriod(SensorTimeConfigDescriptor const& descriptor) const;
 	SensorTimeConfig findSensorTimeConfigForMeasurementIndex(uint32_t index) const;
 
     struct SensorErrors
@@ -295,8 +316,8 @@ public:
     {
         MeasurementId id = 0;
         MeasurementDescriptor descriptor;
-        Clock::time_point timePoint;
-        Clock::time_point receivedTimePoint;
+        IClock::time_point timePoint;
+        IClock::time_point receivedTimePoint;
         AlarmTriggers alarmTriggers;
     };
 
@@ -312,8 +333,8 @@ public:
         uint32_t watchdogReboots = 0;
 
 		uint32_t commsRetries = 0;
-		Clock::duration asleep = Clock::duration::zero();
-        Clock::duration awake = Clock::duration::zero();
+        IClock::duration asleep = IClock::duration::zero();
+        IClock::duration awake = IClock::duration::zero();
 		uint16_t commsRounds = 0;
 		uint16_t measurementRounds = 0;
     };
@@ -353,11 +374,11 @@ public:
         SensorSerialNumber serialNumber = 0;
         State state = State::Active; //the current state of the sensor
         bool shouldSleep = false; //the command given to the sensor
-        Clock::time_point sleepStateTimePoint = Clock::time_point(Clock::duration::zero());
+        IClock::time_point sleepStateTimePoint = IClock::time_point(IClock::duration::zero());
 
         SensorStats stats;
 
-        Clock::time_point lastCommsTimePoint = Clock::time_point(Clock::duration::zero());
+        IClock::time_point lastCommsTimePoint = IClock::time_point(IClock::duration::zero());
         bool blackout = false; //not saved
 
         //which is the last confirmed measurement for this sensor.
@@ -384,7 +405,7 @@ public:
         float rtMeasurementHumidity = 0;
         float rtMeasurementVcc = 0;
 
-        Clock::time_point addedTimePoint = Clock::now(); //not saved
+        IClock::time_point addedTimePoint = IClock::time_point(IClock::duration::zero()); //not saved
     };
 
     size_t getSensorCount() const;
@@ -416,7 +437,7 @@ public:
         int16_t signalStrengthB2S = 0; //dBm
 
         bool hasLastCommsTimePoint = false;
-        Clock::time_point lastCommsTimePoint = Clock::time_point(Clock::duration::zero());
+        IClock::time_point lastCommsTimePoint = IClock::time_point(IClock::duration::zero());
 
         bool hasSleepingData = false;
         bool sleeping = false;
@@ -430,10 +451,10 @@ public:
 
     struct SensorOutputDetails
     {
-        Clock::duration commsPeriod = Clock::duration::zero();
-        Clock::time_point nextCommsTimePoint = Clock::time_point(Clock::duration::zero());
-        Clock::duration measurementPeriod = Clock::duration::zero();
-        Clock::time_point nextMeasurementTimePoint = Clock::time_point(Clock::duration::zero());
+        IClock::duration commsPeriod = IClock::duration::zero();
+        IClock::time_point nextCommsTimePoint = IClock::time_point(IClock::duration::zero());
+        IClock::duration measurementPeriod = IClock::duration::zero();
+        IClock::time_point nextMeasurementTimePoint = IClock::time_point(IClock::duration::zero());
         uint32_t nextRealTimeMeasurementIndex = 0; //the next measurement index for the crt date/time
         uint32_t nextMeasurementIndex = 0; //the next measurement index for this sensor
         //uint32_t baselineMeasurementIndex = 0; //this sensor will measure starting from this index only
@@ -480,7 +501,7 @@ public:
 
         bool sendEmailAction = false;
 
-		Clock::duration resendPeriod = std::chrono::hours(1 * 24);
+        IClock::duration resendPeriod = std::chrono::hours(1 * 24);
     };
 
     typedef uint32_t AlarmId;
@@ -491,7 +512,7 @@ public:
 
         std::map<SensorId, uint32_t> triggersPerSensor;
         std::map<BaseStationId, uint32_t> triggersPerBaseStation;
-        Clock::time_point lastTriggeredTimePoint = Clock::time_point(Clock::duration::zero());
+        IClock::time_point lastTriggeredTimePoint = IClock::time_point(IClock::duration::zero());
     };
 
     size_t getAlarmCount() const;
@@ -553,7 +574,7 @@ public:
         };
 
         Period period = Period::Weekly;
-        Clock::duration customPeriod = std::chrono::hours(48);
+        IClock::duration customPeriod = std::chrono::hours(48);
 
         bool filterSensors = false;
         std::set<SensorId> sensors;
@@ -564,7 +585,7 @@ public:
     {
         ReportDescriptor descriptor;
         ReportId id = 0;
-        Clock::time_point lastTriggeredTimePoint = Clock::time_point(Clock::duration::zero());
+        IClock::time_point lastTriggeredTimePoint = IClock::time_point(IClock::duration::zero());
     };
 
     size_t getReportCount() const;
@@ -594,7 +615,7 @@ public:
         std::set<SensorId> sensorIds;
 
         bool useTimePointFilter = false;
-        Range<Clock::time_point> timePointFilter;
+        Range<IClock::time_point> timePointFilter;
 
         bool useTemperatureFilter = false;
         Range<float> temperatureFilter;
@@ -657,7 +678,7 @@ signals:
     void reportAdded(ReportId id);
     void reportRemoved(ReportId id);
     void reportChanged(ReportId id);
-	void reportTriggered(ReportId id, Clock::time_point from, Clock::time_point to);
+	void reportTriggered(ReportId id, IClock::time_point from, IClock::time_point to);
 
     void measurementsAdded(SensorId id);
     void measurementsRemoved(SensorId id);
@@ -681,11 +702,11 @@ private:
     //static inline SensorId getSensorIdFromMeasurementId(MeasurementId id);
     static Measurement unpackMeasurement(sqlite3_stmt* stmt);
 
-    Clock::time_point computeNextCommsTimePoint(Sensor const& sensor, size_t sensorIndex) const;
-    Clock::time_point computeNextMeasurementTimePoint(Sensor const& sensor) const;
+    IClock::time_point computeNextCommsTimePoint(Sensor const& sensor, size_t sensorIndex) const;
+    IClock::time_point computeNextMeasurementTimePoint(Sensor const& sensor) const;
     uint32_t computeNextMeasurementIndex(Sensor const& sensor) const;
     uint32_t computeNextRealTimeMeasurementIndex() const;
-    Clock::time_point computeMeasurementTimepoint(MeasurementDescriptor const& md) const;
+    IClock::time_point computeMeasurementTimepoint(MeasurementDescriptor const& md) const;
 
     AlarmTriggers computeAlarmTriggersForMeasurement(Measurement const& m);
     AlarmTriggers _computeAlarmTriggersForMeasurement(Alarm& alarm, Measurement const& m);
@@ -754,6 +775,7 @@ private:
 	std::shared_ptr<sqlite3_stmt> m_addMeasurementsStmt;
 
 	std::unique_ptr<Emailer> m_emailer;
+    std::shared_ptr<IClock> m_clock;
 
     mutable std::recursive_mutex m_dataMutex;
     Data m_data;

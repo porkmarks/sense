@@ -48,9 +48,9 @@ private:
     Ui::Manager m_ui;
     int m_currentTabIndex = 0;
 
-	DB::Clock::time_point m_lastHourlyBackupTP;
-    DB::Clock::time_point m_lastDailyBackupTP;
-    DB::Clock::time_point m_lastWeeklyBackupTP;
+    IClock::time_point m_lastHourlyBackupTP;
+    IClock::time_point m_lastDailyBackupTP;
+    IClock::time_point m_lastWeeklyBackupTP;
 };
 
 

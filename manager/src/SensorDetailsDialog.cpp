@@ -73,7 +73,7 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
         auto pair = utils::computeRelativeTimePointString(m_sensor.sleepStateTimePoint);
         std::string str = pair.first;
         str = (pair.second > 0) ? "In " + str : str + " ago";
-		m_ui.sleepState->setText(QString("(sleeping since %1, %2)").arg(utils::toString<DB::Clock>(m_sensor.sleepStateTimePoint, m_db.getGeneralSettings().dateTimeFormat)).arg(str.c_str()));
+		m_ui.sleepState->setText(QString("(sleeping since %1, %2)").arg(utils::toString<IClock>(m_sensor.sleepStateTimePoint, m_db.getGeneralSettings().dateTimeFormat)).arg(str.c_str()));
     }
     else if (m_sensor.state == DB::Sensor::State::Active)
     {
@@ -122,13 +122,13 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
     }
 
 
-    if (DB::Clock::to_time_t(m_sensor.lastCommsTimePoint) > 0)
+    if (IClock::to_time_t(m_sensor.lastCommsTimePoint) > 0)
     {
         auto pair = utils::computeRelativeTimePointString(m_sensor.lastCommsTimePoint);
         std::string str = pair.first;
         str = (pair.second > 0) ? "In " + str : str + " ago";
 
-        m_ui.lastComms->setText(QString("%1 (%2)").arg(utils::toString<DB::Clock>(m_sensor.lastCommsTimePoint, m_db.getGeneralSettings().dateTimeFormat)).arg(str.c_str()));
+        m_ui.lastComms->setText(QString("%1 (%2)").arg(utils::toString<IClock>(m_sensor.lastCommsTimePoint, m_db.getGeneralSettings().dateTimeFormat)).arg(str.c_str()));
     }
     else
     {

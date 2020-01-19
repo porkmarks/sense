@@ -515,16 +515,16 @@ void SettingsWidget::testFtpSettings()
         return;
     }
 
-	static const DB::Clock::duration timeout = std::chrono::seconds(10);
+	static const IClock::duration timeout = std::chrono::seconds(10);
 
     QFtp* ftp = new QFtp(this);
 
     ftp->connectToHost(settings.host.c_str(), settings.port);
 
-	DB::Clock::time_point start = DB::Clock::now();
+	IClock::time_point start = IClock::rtNow();
     while (ftp->hasPendingCommands())
     {
-        if (DB::Clock::now() - start > timeout)
+        if (IClock::rtNow() - start > timeout)
         {
             QMessageBox::critical(this, "Error", "Connection timed out.");
             return;
@@ -537,10 +537,10 @@ void SettingsWidget::testFtpSettings()
     }
 
     ftp->login(settings.username.c_str(), settings.password.c_str());
-    start = DB::Clock::now();
+    start = IClock::rtNow();
     while (ftp->hasPendingCommands())
     {
-        if (DB::Clock::now() - start > timeout)
+        if (IClock::rtNow() - start > timeout)
         {
             QMessageBox::critical(this, "Error", "Authentication timed out.");
             return;
@@ -553,10 +553,10 @@ void SettingsWidget::testFtpSettings()
     }
 
     ftp->cd(settings.folder.c_str());
-    start = DB::Clock::now();
+    start = IClock::rtNow();
     while (ftp->hasPendingCommands())
     {
-        if (DB::Clock::now() - start > timeout)
+        if (IClock::rtNow() - start > timeout)
         {
             QMessageBox::critical(this, "Error", "Selecting folder timed out.");
             return;
@@ -707,12 +707,12 @@ void SettingsWidget::computeBatteryLife()
 
     DB::SensorTimeConfigDescriptor descriptor = timeConfigResult.extract_payload();
     DB::SensorSettings settings = settingsResult.extract_payload();
-    DB::Clock::duration d = utils::computeBatteryLife(m_ui.batteryCapacity->value(),
-                                                      descriptor.measurementPeriod,
-                                                      m_db->computeActualCommsPeriod(descriptor),
-                                                      settings.radioPower,
-                                                      settings.retries,
-                                                      hardwareVersion);
+	IClock::duration d = utils::computeBatteryLife(m_ui.batteryCapacity->value(),
+                                                   descriptor.measurementPeriod,
+                                                   m_db->computeActualCommsPeriod(descriptor),
+                                                   settings.radioPower,
+                                                   settings.retries,
+                                                   hardwareVersion);
 
     int64_t seconds = std::chrono::duration_cast<std::chrono::seconds>(d).count();
     int64_t days = seconds / (24 * 3600);

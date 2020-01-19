@@ -24,10 +24,10 @@ QString toString(typename Clock::time_point tp, DB::DateTimeFormat format)
 
 std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac);
 
-std::pair<std::string, int32_t> computeDurationString(DB::Clock::duration d);
-std::pair<std::string, int32_t> computeRelativeTimePointString(DB::Clock::time_point tp);
+std::pair<std::string, int32_t> computeDurationString(IClock::duration d);
+std::pair<std::string, int32_t> computeRelativeTimePointString(IClock::time_point tp);
 uint32_t getSensorStorageCapacity(DB::Sensor const& sensor);
-DB::Clock::duration computeBatteryLife(float capacity, DB::Clock::duration measurementPeriod, DB::Clock::duration commsPeriod, float power, uint8_t retries, uint8_t hardwareVersion);
+IClock::duration computeBatteryLife(float capacity, IClock::duration measurementPeriod, IClock::duration commsPeriod, float power, uint8_t retries, uint8_t hardwareVersion);
 
 struct CsvData
 {

@@ -68,27 +68,27 @@ void MeasurementsWidget::init(DB& db)
 //    sd.name = "test1";
 //    m_db->addSensor(sd);
 
-//    DB::Clock::time_point start = DB::Clock::now();
+//    IClock::time_point start = IClock::now();
 //    for (size_t index = 0; index < 500; index++)
 //    {
 //        DB::Measurement m;
 //        m.sensorId = m_db->getSensor(m_db->findSensorIndexByName(sd.name)).id;
 //        m.index = index;
-//        m.timePoint = DB::Clock::now() - std::chrono::seconds(index * 1000);
+//        m.timePoint = IClock::now() - std::chrono::seconds(index * 1000);
 //        m.vcc = std::min((index / 1000.f) + 2.f, 3.3f);
 //        m.temperature = std::min((index / 1000.f) * 55.f, 100.f);
 //        m.humidity = std::min((index / 1000.f) * 100.f, 100.f);
 //        m_db->addMeasurement(m);
 //    }
-//    std::cout << "Time to add: " << (std::chrono::duration<float>(DB::Clock::now() - start).count()) << "\n";
+//    std::cout << "Time to add: " << (std::chrono::duration<float>(IClock::now() - start).count()) << "\n";
 
 //    DB::Filter filter;
-//    start = DB::Clock::now();
+//    start = IClock::now();
 //    for (size_t i = 0; i < 1; i++)
 //    {
 //        std::vector<DB::Measurement> result = m_db->getFilteredMeasurements(filter);
 //    }
-//    std::cout << "Time to filter: " << (std::chrono::duration<float>(DB::Clock::now() - start).count()) << "\n";
+//    std::cout << "Time to filter: " << (std::chrono::duration<float>(IClock::now() - start).count()) << "\n";
 //
 //    refresh();
 
@@ -281,8 +281,8 @@ DB::Filter MeasurementsWidget::createFilter() const
 
     //filter.useTimePointFilter = m_ui.dateTimeFilter->isChecked();
     filter.useTimePointFilter = true;
-    filter.timePointFilter.min = DB::Clock::from_time_t(m_ui.dateTimeFilter->getFromDateTime().toTime_t());
-    filter.timePointFilter.max = DB::Clock::from_time_t(m_ui.dateTimeFilter->getToDateTime().toTime_t());
+	filter.timePointFilter.min = IClock::from_time_t(m_ui.dateTimeFilter->getFromDateTime().toTime_t());
+    filter.timePointFilter.max = IClock::from_time_t(m_ui.dateTimeFilter->getToDateTime().toTime_t());
 
     filter.useTemperatureFilter = m_ui.useTemperature->isChecked();
     filter.temperatureFilter.min = static_cast<float>(m_ui.minTemperature->value());
@@ -325,7 +325,7 @@ void MeasurementsWidget::scheduleSlowRefresh()
 
 //////////////////////////////////////////////////////////////////////////
 
-void MeasurementsWidget::scheduleRefresh(DB::Clock::duration dt)
+void MeasurementsWidget::scheduleRefresh(IClock::duration dt)
 {
     int duration = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(dt).count());
     if (m_scheduleTimer && m_scheduleTimer->remainingTime() < duration)
@@ -345,7 +345,7 @@ void MeasurementsWidget::refresh()
 {
     m_scheduleTimer.reset();
 
-    DB::Clock::time_point start = DB::Clock::now();
+	IClock::time_point start = IClock::rtNow();
 
     m_ui.list->header()->setSectionHidden((int)MeasurementsModel::Column::Temperature, !m_ui.showTemperature->isChecked());
     m_ui.list->header()->setSectionHidden((int)MeasurementsModel::Column::Humidity, !m_ui.showHumidity->isChecked());
@@ -360,7 +360,7 @@ void MeasurementsWidget::refresh()
     m_ui.exportData->setEnabled(m_model->getMeasurementCount() > 0);
 
 	std::cout << (QString("Refreshed measurements: %3ms\n")
-				  .arg(std::chrono::duration_cast<std::chrono::milliseconds>(DB::Clock::now() - start).count())).toStdString();
+				  .arg(std::chrono::duration_cast<std::chrono::milliseconds>(IClock::rtNow() - start).count())).toStdString();
 }
 
 //////////////////////////////////////////////////////////////////////////

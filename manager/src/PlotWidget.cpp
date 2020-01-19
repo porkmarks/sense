@@ -281,8 +281,8 @@ DB::Filter PlotWidget::createFilter() const
 
     //filter.useTimePointFilter = m_ui.dateTimeFilter->isChecked();
     filter.useTimePointFilter = true;
-    filter.timePointFilter.min = DB::Clock::from_time_t(m_ui.dateTimeFilter->getFromDateTime().toTime_t()) - timeConfig.descriptor.measurementPeriod;
-    filter.timePointFilter.max = DB::Clock::from_time_t(m_ui.dateTimeFilter->getToDateTime().toTime_t()) + timeConfig.descriptor.measurementPeriod;
+    filter.timePointFilter.min = IClock::from_time_t(m_ui.dateTimeFilter->getFromDateTime().toTime_t()) - timeConfig.descriptor.measurementPeriod;
+    filter.timePointFilter.max = IClock::from_time_t(m_ui.dateTimeFilter->getToDateTime().toTime_t()) + timeConfig.descriptor.measurementPeriod;
 
     return filter;
 }
@@ -317,7 +317,7 @@ void PlotWidget::scheduleSlowRefresh()
 
 //////////////////////////////////////////////////////////////////////////
 
-void PlotWidget::scheduleRefresh(DB::Clock::duration dt)
+void PlotWidget::scheduleRefresh(IClock::duration dt)
 {
     int duration = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(dt).count());
     if (m_scheduleTimer && m_scheduleTimer->remainingTime() < duration)
@@ -593,7 +593,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
 
     for (DB::Measurement const& m : measurements)
     {
-        time_t time = DB::Clock::to_time_t(m.timePoint);
+        time_t time = IClock::to_time_t(m.timePoint);
         minTS = std::min(minTS, static_cast<uint64_t>(time));
         maxTS = std::max(maxTS, static_cast<uint64_t>(time));
 

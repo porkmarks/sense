@@ -69,7 +69,7 @@ void CsvSettingsWidget::refreshPreview()
     {
         utils::CsvData data;
         data.measurement.id = 1000;
-        data.measurement.timePoint = DB::Clock::now() - std::chrono::hours(24);
+		data.measurement.timePoint = IClock::rtNow() - std::chrono::hours(24);
         data.measurement.receivedTimePoint = data.measurement.timePoint + std::chrono::minutes(1);
         data.measurement.descriptor.temperature = 22.f;
         data.measurement.descriptor.humidity = 32.f;

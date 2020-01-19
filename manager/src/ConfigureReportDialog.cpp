@@ -45,7 +45,7 @@ void ConfigureReportDialog::sendReportNow()
     if (getDescriptor(report.descriptor))
     {
         Emailer emailer(m_db);
-        emailer.sendReportEmail(report, DB::Clock::now() - std::chrono::hours(24), DB::Clock::now());
+        emailer.sendReportEmail(report, IClock::rtNow() - std::chrono::hours(24), IClock::rtNow());
         QMessageBox::information(this, "Done", "The report email was scheduled to be sent.");
     }
 }

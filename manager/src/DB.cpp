@@ -23,14 +23,22 @@
 
 extern Logger s_logger;
 
-const DB::Clock::duration MEASUREMENT_JITTER = std::chrono::seconds(10);
-const DB::Clock::duration COMMS_DURATION = std::chrono::seconds(10);
+const IClock::duration MEASUREMENT_JITTER = std::chrono::seconds(10);
+const IClock::duration COMMS_DURATION = std::chrono::seconds(10);
 
 Q_DECLARE_METATYPE(DB::Measurement);
 
 //////////////////////////////////////////////////////////////////////////
 
 DB::DB()
+	: DB(std::make_shared<Clock>())
+{
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+DB::DB(std::shared_ptr<Clock> clock)
+	: m_clock(std::move(clock))
 {
 	qRegisterMetaType<UserId>("UserId");
     qRegisterMetaType<BaseStationId>("BaseStationId");
@@ -221,7 +229,7 @@ Result<void> DB::create(sqlite3& db)
 
 Result<void> DB::load(sqlite3& db)
 {
-    Clock::time_point start = Clock::now();
+	IClock::time_point start = m_clock->now();
 
     Data data;
 
@@ -420,7 +428,7 @@ Result<void> DB::load(sqlite3& db)
 			user.descriptor.passwordHash = (char const*)sqlite3_column_text(stmt, 2);
 			user.descriptor.permissions = sqlite3_column_int(stmt, 3);
 			user.descriptor.type = (UserDescriptor::Type)sqlite3_column_int(stmt, 4);
-			user.lastLogin = Clock::from_time_t(sqlite3_column_int64(stmt, 5));
+			user.lastLogin = IClock::from_time_t(sqlite3_column_int64(stmt, 5));
 			data.users.push_back(std::move(user));
 		}
 	}
@@ -464,7 +472,7 @@ Result<void> DB::load(sqlite3& db)
 		while (sqlite3_step(stmt) == SQLITE_ROW)
 		{
             SensorTimeConfig sc;
-			sc.baselineMeasurementTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 0));
+			sc.baselineMeasurementTimePoint = IClock::from_time_t(sqlite3_column_int64(stmt, 0));
 			sc.baselineMeasurementIndex = sqlite3_column_int64(stmt, 1);
 			sc.descriptor.measurementPeriod = std::chrono::seconds(sqlite3_column_int64(stmt, 2));
 			sc.descriptor.commsPeriod = std::chrono::seconds(sqlite3_column_int64(stmt, 3));
@@ -525,7 +533,7 @@ Result<void> DB::load(sqlite3& db)
 			s.serialNumber = (uint32_t)sqlite3_column_int64(stmt, index++);
 			s.state = (Sensor::State)sqlite3_column_int64(stmt, index++);
 			s.shouldSleep = sqlite3_column_int64(stmt, index++) ? true : false;
-			s.sleepStateTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, index++));
+			s.sleepStateTimePoint = IClock::from_time_t(sqlite3_column_int64(stmt, index++));
 			s.stats.commsBlackouts = (uint32_t)sqlite3_column_int64(stmt, index++);
 			s.stats.commsFailures = (uint32_t)sqlite3_column_int64(stmt, index++);
 			s.stats.unknownReboots = (uint32_t)sqlite3_column_int64(stmt, index++);
@@ -538,7 +546,7 @@ Result<void> DB::load(sqlite3& db)
 			s.stats.awake = std::chrono::milliseconds(sqlite3_column_int64(stmt, index++));
 			s.stats.commsRounds = (uint32_t)sqlite3_column_int64(stmt, index++);
 			s.stats.measurementRounds = (uint32_t)sqlite3_column_int64(stmt, index++);
-			s.lastCommsTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, index++));
+			s.lastCommsTimePoint = IClock::from_time_t(sqlite3_column_int64(stmt, index++));
 			s.lastConfirmedMeasurementIndex = (uint32_t)sqlite3_column_int64(stmt, index++);
 			s.firstStoredMeasurementIndex = (uint32_t)sqlite3_column_int64(stmt, index++);
 			s.storedMeasurementCount = (uint32_t)sqlite3_column_int64(stmt, index++);
@@ -637,7 +645,7 @@ Result<void> DB::load(sqlite3& db)
 					}
 				}
 			}
-			a.lastTriggeredTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, index++));
+			a.lastTriggeredTimePoint = IClock::from_time_t(sqlite3_column_int64(stmt, index++));
 			Q_ASSERT(index == 25);
 			data.alarms.push_back(std::move(a));
 		}
@@ -666,7 +674,7 @@ Result<void> DB::load(sqlite3& db)
 			{
 				r.descriptor.sensors.insert(atoll(str.trimmed().toUtf8().data()));
 			}
-			r.lastTriggeredTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 6));
+			r.lastTriggeredTimePoint = IClock::from_time_t(sqlite3_column_int64(stmt, 6));
 			data.reports.push_back(std::move(r));
 		}
     }
@@ -720,7 +728,7 @@ Result<void> DB::load(sqlite3& db)
 			data.sensorTimeConfigsChanged = true;
         }
 
-        s_logger.logVerbose(QString("Done loading DB. Time: %3s").arg(std::chrono::duration<float>(Clock::now() - start).count()));
+        s_logger.logVerbose(QString("Done loading DB. Time: %3s").arg(std::chrono::duration<float>(m_clock->now() - start).count()));
     }
 
 	m_sqlite = &db;
@@ -735,6 +743,7 @@ Result<void> DB::load(sqlite3& db)
 
 void DB::close()
 {
+	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 	if (!m_sqlite)
 	{
 		return;
@@ -754,6 +763,8 @@ void DB::close()
 	m_saveReportsStmt = nullptr;
 	m_addMeasurementsStmt = nullptr;
 	m_sqlite = nullptr;
+
+	m_data = Data();
 }
 
 //void DB::test()
@@ -780,10 +791,10 @@ void DB::checkRepetitiveAlarms()
 	for (Alarm& alarm : m_data.alarms)
 	{
         if ((!alarm.triggersPerSensor.empty() || !alarm.triggersPerBaseStation.empty()) && 
-			(Clock::now() - alarm.lastTriggeredTimePoint >= alarm.descriptor.resendPeriod))
+			(m_clock->now() - alarm.lastTriggeredTimePoint >= alarm.descriptor.resendPeriod))
         {
             emit alarmStillTriggered(alarm.id);
-            alarm.lastTriggeredTimePoint = Clock::now();
+            alarm.lastTriggeredTimePoint = m_clock->now();
 			m_data.alarmsChanged = true;
 			triggerSave = true;
         }
@@ -806,8 +817,8 @@ void DB::checkReports()
 	{
 		if (isReportTriggered(report))
 		{
-			emit reportTriggered(report.id, report.lastTriggeredTimePoint, Clock::now());
-			report.lastTriggeredTimePoint = Clock::now();
+			emit reportTriggered(report.id, report.lastTriggeredTimePoint, m_clock->now());
+			report.lastTriggeredTimePoint = m_clock->now();
 			m_data.reportsChanged = true;
 			triggerSave = true;
 		}
@@ -827,7 +838,7 @@ void DB::checkForDisconnectedBaseStations()
 
 	for (BaseStation& bs: m_data.baseStations)
 	{
-		if (!bs.isConnected && Clock::now() - bs.lastConnectedTimePoint > std::chrono::minutes(1))
+		if (!bs.isConnected && m_clock->now() - bs.lastConnectedTimePoint > std::chrono::minutes(1))
 		{
 			computeAlarmTriggersForBaseStation(bs);
 		}
@@ -845,7 +856,7 @@ void DB::checkForBlackoutSensors()
 	for (Sensor& s : m_data.sensors)
 	{
 		bool wasBlackout = s.blackout;
-		if (s.state == Sensor::State::Active && Clock::now() - s.lastCommsTimePoint > timeConfig.descriptor.commsPeriod * 1.5f)
+		if (s.state == Sensor::State::Active && m_clock->now() - s.lastCommsTimePoint > timeConfig.descriptor.commsPeriod * 1.5f)
 		{
 			s.blackout = true;
 		}
@@ -855,7 +866,7 @@ void DB::checkForBlackoutSensors()
 		}
 
 		//only send emails 2 rounds after being added to avoid slamming every time the program is started
-		if (Clock::now() - s.addedTimePoint > timeConfig.descriptor.commsPeriod * 2) 
+		if (m_clock->now() - s.addedTimePoint > timeConfig.descriptor.commsPeriod * 2)
 		{
 			if (!wasBlackout && s.blackout)
 			{
@@ -1294,38 +1305,38 @@ DB::SensorSettings DB::getSensorSettings() const
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-DB::Clock::duration DB::computeActualCommsPeriod(SensorTimeConfigDescriptor const& config) const
+IClock::duration DB::computeActualCommsPeriod(SensorTimeConfigDescriptor const& config) const
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    Clock::duration max_period = m_data.sensors.size() * COMMS_DURATION;
-    Clock::duration period = std::max(config.commsPeriod, max_period);
+	IClock::duration max_period = m_data.sensors.size() * COMMS_DURATION;
+	IClock::duration period = std::max(config.commsPeriod, max_period);
     return std::max(period, config.measurementPeriod + MEASUREMENT_JITTER);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-DB::Clock::time_point DB::computeNextMeasurementTimePoint(Sensor const& sensor) const
+IClock::time_point DB::computeNextMeasurementTimePoint(Sensor const& sensor) const
 {
     uint32_t nextMeasurementIndex = computeNextMeasurementIndex(sensor);
     SensorTimeConfig config = findSensorTimeConfigForMeasurementIndex(nextMeasurementIndex);
 
     uint32_t index = nextMeasurementIndex >= config.baselineMeasurementIndex ? nextMeasurementIndex - config.baselineMeasurementIndex : 0;
-    Clock::time_point tp = config.baselineMeasurementTimePoint + config.descriptor.measurementPeriod * index;
+	IClock::time_point tp = config.baselineMeasurementTimePoint + config.descriptor.measurementPeriod * index;
     return tp;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-DB::Clock::time_point DB::computeNextCommsTimePoint(Sensor const& /*sensor*/, size_t sensorIndex) const
+IClock::time_point DB::computeNextCommsTimePoint(Sensor const& /*sensor*/, size_t sensorIndex) const
 {
     SensorTimeConfig config = getLastSensorTimeConfig();
-    Clock::duration period = computeActualCommsPeriod(config.descriptor);
+	IClock::duration period = computeActualCommsPeriod(config.descriptor);
 
-    Clock::time_point now = Clock::now();
+	IClock::time_point now = m_clock->now();
     uint32_t index = static_cast<uint32_t>(std::ceil(((now - config.baselineMeasurementTimePoint) / period))) + 1;
 
-    Clock::time_point start = config.baselineMeasurementTimePoint + period * index;
+	IClock::time_point start = config.baselineMeasurementTimePoint + period * index;
     return start + sensorIndex * COMMS_DURATION;
 }
 
@@ -1382,6 +1393,7 @@ bool DB::addBaseStation(BaseStationDescriptor const& descriptor)
     s_logger.logInfo(QString("Adding base station '%1' / %2").arg(descriptor.name.c_str()).arg(utils::getMacStr(descriptor.mac).c_str()));
 
     BaseStation baseStation;
+	baseStation.lastConnectedTimePoint = m_clock->now();
     baseStation.descriptor = descriptor;
     baseStation.id = ++m_data.lastBaseStationId;
 
@@ -1452,7 +1464,7 @@ void DB::setBaseStationConnected(BaseStationId id, bool connected)
 	}
 
 	bs.isConnected = connected;
-	bs.lastConnectedTimePoint = Clock::now();
+	bs.lastConnectedTimePoint = m_clock->now();
 	if (connected)
 	{
 		computeAlarmTriggersForBaseStation(bs);
@@ -1574,7 +1586,7 @@ DB::SensorOutputDetails DB::computeSensorOutputDetails(SensorId id) const
 uint32_t DB::computeNextRealTimeMeasurementIndex() const
 {
     SensorTimeConfig config = getLastSensorTimeConfig();
-    Clock::time_point now = Clock::now();
+	IClock::time_point now = m_clock->now();
     uint32_t index = static_cast<uint32_t>(std::ceil((now - config.baselineMeasurementTimePoint) / config.descriptor.measurementPeriod)) + config.baselineMeasurementIndex;
     return index;
 }
@@ -1607,7 +1619,7 @@ Result<void> DB::_addSensorTimeConfig(SensorTimeConfigDescriptor const& descript
 
 		SensorTimeConfig c = findSensorTimeConfigForMeasurementIndex(nextRealTimeMeasurementIndex);
 		uint32_t index = nextRealTimeMeasurementIndex >= c.baselineMeasurementIndex ? nextRealTimeMeasurementIndex - c.baselineMeasurementIndex : 0;
-		Clock::time_point nextMeasurementTP = c.baselineMeasurementTimePoint + c.descriptor.measurementPeriod * index;
+		IClock::time_point nextMeasurementTP = c.baselineMeasurementTimePoint + c.descriptor.measurementPeriod * index;
 
 		m_data.sensorTimeConfigs.erase(std::remove_if(m_data.sensorTimeConfigs.begin(), m_data.sensorTimeConfigs.end(), [&nextRealTimeMeasurementIndex](SensorTimeConfig const& c)
 		{
@@ -1619,7 +1631,7 @@ Result<void> DB::_addSensorTimeConfig(SensorTimeConfigDescriptor const& descript
 	else
 	{
 		config.baselineMeasurementIndex = 0;
-		config.baselineMeasurementTimePoint = Clock::now();
+		config.baselineMeasurementTimePoint = m_clock->now();
 	}
 
 	m_data.sensorTimeConfigs.push_back(config);
@@ -1741,6 +1753,7 @@ Result<void> DB::addSensor(SensorDescriptor const& descriptor)
 
     {
         Sensor sensor;
+		sensor.addedTimePoint = m_clock->now();
         sensor.descriptor.name = descriptor.name;
         sensor.id = ++m_data.lastSensorId;
         sensor.state = Sensor::State::Unbound;
@@ -1899,7 +1912,7 @@ Result<void> DB::setSensorSleep(SensorId id, bool sleep)
 
 	DB::SensorTimeConfig config = getLastSensorTimeConfig();
     bool hasMeasurements = sensor.estimatedStoredMeasurementCount > 0;
-    bool commedRecently = (DB::Clock::now() - sensor.lastCommsTimePoint) < config.descriptor.commsPeriod * 2;
+    bool commedRecently = (DB::m_clock->now() - sensor.lastCommsTimePoint) < config.descriptor.commsPeriod * 2;
     bool allowedToSleep = !hasMeasurements && commedRecently;
     if (sleep && !sensor.shouldSleep && !allowedToSleep)
     {
@@ -2027,7 +2040,7 @@ bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
                 if (sensor.state != Sensor::State::Sleeping && d.sleeping)
                 {
                     //mark the moment the sensor went to sleep
-                    sensor.sleepStateTimePoint = Clock::now();
+                    sensor.sleepStateTimePoint = m_clock->now();
                 }
                 sensor.state = d.sleeping ? Sensor::State::Sleeping : Sensor::State::Active;
             }
@@ -2496,7 +2509,7 @@ DB::AlarmTriggers DB::_computeAlarmTriggersForMeasurement(Alarm& alarm, Measurem
                          .arg(triggers.added)
                          .arg(triggers.removed));
 
-		alarm.lastTriggeredTimePoint = Clock::now();
+		alarm.lastTriggeredTimePoint = m_clock->now();
         emit alarmSensorTriggersChanged(alarm.id, m.descriptor.sensorId, m, oldTriggers, triggers);
     }
 
@@ -2589,7 +2602,7 @@ DB::AlarmTriggers DB::_computeAlarmTriggersForSensor(Alarm& alarm, Sensor const&
 						 .arg(triggers.added)
 						 .arg(triggers.removed));
 
-		alarm.lastTriggeredTimePoint = Clock::now();
+		alarm.lastTriggeredTimePoint = m_clock->now();
 		emit alarmSensorTriggersChanged(alarm.id, s.id, std::nullopt, oldTriggers, triggers);
 	}
 
@@ -2664,7 +2677,7 @@ DB::AlarmTriggers DB::_computeAlarmTriggersForBaseStation(Alarm& alarm, BaseStat
 						 .arg(triggers.added)
 						 .arg(triggers.removed));
 
-		alarm.lastTriggeredTimePoint = Clock::now();
+		alarm.lastTriggeredTimePoint = m_clock->now();
 		emit alarmBaseStationTriggersChanged(alarm.id, bs.id, oldTriggers, triggers);
 	}
 
@@ -2805,7 +2818,7 @@ bool DB::isReportTriggered(Report const& report) const
     {
         QDateTime dt = QDateTime::currentDateTime();
         dt.setTime(QTime(9, 0));
-        if (Clock::to_time_t(report.lastTriggeredTimePoint) < dt.toTime_t() && Clock::to_time_t(Clock::now()) >= dt.toTime_t())
+        if (IClock::to_time_t(report.lastTriggeredTimePoint) < dt.toTime_t() && IClock::to_time_t(m_clock->now()) >= dt.toTime_t())
         {
             return true;
         }
@@ -2815,7 +2828,7 @@ bool DB::isReportTriggered(Report const& report) const
         QDateTime dt = QDateTime::currentDateTime();
         dt.setDate(dt.date().addDays(-dt.date().dayOfWeek()));
         dt.setTime(QTime(9, 0));
-        if (Clock::to_time_t(report.lastTriggeredTimePoint) < dt.toTime_t() && Clock::to_time_t(Clock::now()) >= dt.toTime_t())
+        if (IClock::to_time_t(report.lastTriggeredTimePoint) < dt.toTime_t() && IClock::to_time_t(m_clock->now()) >= dt.toTime_t())
         {
             return true;
         }
@@ -2826,15 +2839,15 @@ bool DB::isReportTriggered(Report const& report) const
         date = QDate(date.year(), date.month(), 1);
         QDateTime dt(date, QTime(9, 0));
 
-        if (Clock::to_time_t(report.lastTriggeredTimePoint) < dt.toTime_t() && Clock::to_time_t(Clock::now()) >= dt.toTime_t())
+        if (IClock::to_time_t(report.lastTriggeredTimePoint) < dt.toTime_t() && IClock::to_time_t(m_clock->now()) >= dt.toTime_t())
         {
             return true;
         }
     }
     else if (report.descriptor.period == ReportDescriptor::Period::Custom)
     {
-        Clock::time_point now = Clock::now();
-        Clock::duration d = now - report.lastTriggeredTimePoint;
+		IClock::time_point now = m_clock->now();
+		IClock::duration d = now - report.lastTriggeredTimePoint;
         if (d >= report.descriptor.customPeriod)
         {
             return true;
@@ -2924,12 +2937,12 @@ bool DB::addSingleSensorMeasurements(SensorId sensorId, std::vector<MeasurementD
 				//measurement.id = id;
 				m.descriptor = md;
 				m.timePoint = computeMeasurementTimepoint(md);
-                m.receivedTimePoint = Clock::now();
+                m.receivedTimePoint = m_clock->now();
 				m.alarmTriggers = computeAlarmTriggersForMeasurement(m);
                 asyncMeasurements.emplace_back(m);
 
-				sqlite3_bind_int64(stmt, 1, Clock::to_time_t(m.timePoint));
-				sqlite3_bind_int64(stmt, 2, Clock::to_time_t(m.receivedTimePoint));
+				sqlite3_bind_int64(stmt, 1, IClock::to_time_t(m.timePoint));
+				sqlite3_bind_int64(stmt, 2, IClock::to_time_t(m.receivedTimePoint));
 				sqlite3_bind_int64(stmt, 3, md.index);
 				sqlite3_bind_int64(stmt, 4, md.sensorId);
 				sqlite3_bind_double(stmt, 5, md.temperature);
@@ -3021,13 +3034,13 @@ void DB::addAsyncMeasurements()
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::Clock::time_point DB::computeMeasurementTimepoint(MeasurementDescriptor const& md) const
+IClock::time_point DB::computeMeasurementTimepoint(MeasurementDescriptor const& md) const
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
 	SensorTimeConfig config = findSensorTimeConfigForMeasurementIndex(md.index);
     uint32_t index = md.index >= config.baselineMeasurementIndex ? md.index - config.baselineMeasurementIndex : 0;
-    Clock::time_point tp = config.baselineMeasurementTimePoint + config.descriptor.measurementPeriod * index;
+	IClock::time_point tp = config.baselineMeasurementTimePoint + config.descriptor.measurementPeriod * index;
     return tp;
 }
 
@@ -3089,9 +3102,9 @@ static std::string getQueryWherePart(DB::Filter const& filter)
 	if (filter.useTimePointFilter)
 	{
         std::string str = " timePoint >= ";
-        str += std::to_string(DB::Clock::to_time_t(filter.timePointFilter.min));
+        str += std::to_string(IClock::to_time_t(filter.timePointFilter.min));
         str += " AND timePoint <= ";
-        str += std::to_string(DB::Clock::to_time_t(filter.timePointFilter.max));
+        str += std::to_string(IClock::to_time_t(filter.timePointFilter.max));
         conditions.push_back(str);
 	}
 	if (filter.useSensorFilter)
@@ -3159,7 +3172,7 @@ static std::string getQueryWherePart(DB::Filter const& filter)
 
 size_t DB::_getFilteredMeasurements(Filter const& filter, std::vector<DB::Measurement>* out) const
 {
-    Clock::time_point start = Clock::now();
+	IClock::time_point start = m_clock->now();
 
     size_t count = 0;
 
@@ -3193,7 +3206,7 @@ size_t DB::_getFilteredMeasurements(Filter const& filter, std::vector<DB::Measur
 	}
 
 	std::cout << (QString("Computed filtered measurements: %3ms\n")
-				  .arg(std::chrono::duration_cast<std::chrono::milliseconds>(DB::Clock::now() - start).count())).toStdString();
+				  .arg(std::chrono::duration_cast<std::chrono::milliseconds>(DB::m_clock->now() - start).count())).toStdString();
 
     return count;
 }
@@ -3295,8 +3308,8 @@ DB::Measurement DB::unpackMeasurement(sqlite3_stmt* stmt)
 {
 	Measurement m;
 	m.id = sqlite3_column_int64(stmt, 0);
-	m.timePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 1));
-	m.receivedTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 2));
+	m.timePoint = IClock::from_time_t(sqlite3_column_int64(stmt, 1));
+	m.receivedTimePoint = IClock::from_time_t(sqlite3_column_int64(stmt, 2));
 	m.descriptor.index = sqlite3_column_int64(stmt, 3);
 	m.descriptor.sensorId = (uint32_t)sqlite3_column_int64(stmt, 4);
 	m.descriptor.temperature = (float)sqlite3_column_double(stmt, 5);
@@ -3381,7 +3394,7 @@ void DB::save(bool newTransaction)
 
 void DB::save(Data& data, bool newTransaction) const
 {
-    Clock::time_point start = Clock::now();
+	IClock::time_point start = m_clock->now();
 
 	if (newTransaction)
 	{
@@ -3506,7 +3519,7 @@ void DB::save(Data& data, bool newTransaction) const
 			sqlite3_bind_text(stmt, 3, user.descriptor.passwordHash.c_str(), -1, SQLITE_STATIC);
 			sqlite3_bind_int64(stmt, 4, user.descriptor.permissions);
 			sqlite3_bind_int(stmt, 5, (int)user.descriptor.type);
-			sqlite3_bind_int64(stmt, 6, Clock::to_time_t(user.lastLogin));
+			sqlite3_bind_int64(stmt, 6, IClock::to_time_t(user.lastLogin));
 			if (sqlite3_step(stmt) != SQLITE_DONE)
 			{
 				s_logger.logCritical(QString("Failed to save user: %1").arg(sqlite3_errmsg(m_sqlite)));
@@ -3557,7 +3570,7 @@ void DB::save(Data& data, bool newTransaction) const
 		sqlite3_stmt* stmt = m_saveSensorTimeConfigsStmt.get();
 		for (SensorTimeConfig const& sc : data.sensorTimeConfigs)
 		{
-			sqlite3_bind_int64(stmt, 1, Clock::to_time_t(sc.baselineMeasurementTimePoint));
+			sqlite3_bind_int64(stmt, 1, IClock::to_time_t(sc.baselineMeasurementTimePoint));
 			sqlite3_bind_int64(stmt, 2, sc.baselineMeasurementIndex);
 			sqlite3_bind_int64(stmt, 3, std::chrono::duration_cast<std::chrono::seconds>(sc.descriptor.measurementPeriod).count());
 			sqlite3_bind_int64(stmt, 4, std::chrono::duration_cast<std::chrono::seconds>(sc.descriptor.commsPeriod).count());
@@ -3617,7 +3630,7 @@ void DB::save(Data& data, bool newTransaction) const
 			sqlite3_bind_int64(stmt, index++, s.serialNumber);
 			sqlite3_bind_int64(stmt, index++, (int)s.state);
 			sqlite3_bind_int(stmt, index++, s.shouldSleep ? 1 : 0);
-			sqlite3_bind_int64(stmt, index++, Clock::to_time_t(s.sleepStateTimePoint));
+			sqlite3_bind_int64(stmt, index++, IClock::to_time_t(s.sleepStateTimePoint));
 
 			sqlite3_bind_int64(stmt, index++, s.stats.commsBlackouts);
 			sqlite3_bind_int64(stmt, index++, s.stats.commsFailures);
@@ -3632,7 +3645,7 @@ void DB::save(Data& data, bool newTransaction) const
 			sqlite3_bind_int64(stmt, index++, s.stats.commsRounds);
 			sqlite3_bind_int64(stmt, index++, s.stats.measurementRounds);
 
-			sqlite3_bind_int64(stmt, index++, Clock::to_time_t(s.lastCommsTimePoint));
+			sqlite3_bind_int64(stmt, index++, IClock::to_time_t(s.lastCommsTimePoint));
 
 			sqlite3_bind_int64(stmt, index++, s.lastConfirmedMeasurementIndex);
 			sqlite3_bind_int64(stmt, index++, s.firstStoredMeasurementIndex);
@@ -3716,7 +3729,7 @@ void DB::save(Data& data, bool newTransaction) const
 				}
 				sqlite3_bind_text(stmt, index++, triggers.c_str(), -1, SQLITE_TRANSIENT);
 			}
-			sqlite3_bind_int64(stmt, index++, Clock::to_time_t(a.lastTriggeredTimePoint));
+			sqlite3_bind_int64(stmt, index++, IClock::to_time_t(a.lastTriggeredTimePoint));
 			if (sqlite3_step(stmt) != SQLITE_DONE)
 			{
 				s_logger.logCritical(QString("Failed to save alarms: %1").arg(sqlite3_errmsg(m_sqlite)));
@@ -3753,7 +3766,7 @@ void DB::save(Data& data, bool newTransaction) const
 				sensors += std::to_string(id) + ";";
 			}
 			sqlite3_bind_text(stmt, 6, sensors.c_str(), -1, SQLITE_TRANSIENT);
-			sqlite3_bind_int64(stmt, 7, Clock::to_time_t(r.lastTriggeredTimePoint));
+			sqlite3_bind_int64(stmt, 7, IClock::to_time_t(r.lastTriggeredTimePoint));
 			if (sqlite3_step(stmt) != SQLITE_DONE)
 			{
 				s_logger.logCritical(QString("Failed to save report: %1").arg(sqlite3_errmsg(m_sqlite)));
@@ -3765,7 +3778,7 @@ void DB::save(Data& data, bool newTransaction) const
 		data.reportsChanged = false;
 	}
 
-//    std::cout << QString("Done saving DB. Time: %3s\n").arg(std::chrono::duration<float>(Clock::now() - start).count()).toUtf8().data();
+//    std::cout << QString("Done saving DB. Time: %3s\n").arg(std::chrono::duration<float>(m_clock->now() - start).count()).toUtf8().data();
 //    std::cout.flush();
 }
 

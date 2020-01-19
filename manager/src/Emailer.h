@@ -23,12 +23,12 @@ public:
 
     using EmailSettings = DB::EmailSettings;
 
-    void sendReportEmail(DB::Report const& report, DB::Clock::time_point from, DB::Clock::time_point to);
+    void sendReportEmail(DB::Report const& report, IClock::time_point from, IClock::time_point to);
 
 private slots:
     void alarmSensorTriggersChanged(DB::AlarmId alarmId, DB::SensorId sensorId, std::optional<DB::Measurement> measurement, uint32_t oldTriggers, DB::AlarmTriggers triggers);
 	void alarmStillTriggered(DB::AlarmId alarmId);
-	void reportTriggered(DB::ReportId reportId, DB::Clock::time_point from, DB::Clock::time_point to);
+	void reportTriggered(DB::ReportId reportId, IClock::time_point from, IClock::time_point to);
 
 private:
     DB& m_db;

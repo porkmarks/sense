@@ -67,7 +67,7 @@ private:
     DB* m_db = nullptr;
     DB::Filter m_filter;
 
-    void scheduleRefresh(DB::Clock::duration dt);
+	void scheduleRefresh(IClock::duration dt);
     std::unique_ptr<QTimer> m_scheduleTimer;
 
     struct Plot
