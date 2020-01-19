@@ -507,23 +507,27 @@ public:
         enum
         {
 			//triggers generated from measurements
-            LowTemperatureSoft  = 1 << 0,
-            LowTemperatureHard  = 1 << 1,
-            LowTemperatureMask  = LowTemperatureSoft | LowTemperatureHard,
-            HighTemperatureSoft = 1 << 2,
-            HighTemperatureHard = 1 << 3,
-            HighTemperatureMask = HighTemperatureSoft | HighTemperatureHard,
-            TemperatureMask     = LowTemperatureMask | HighTemperatureMask,
-			LowHumiditySoft     = 1 << 4,
-			LowHumidityHard     = 1 << 5,
-			LowHumidityMask     = LowHumiditySoft | LowHumidityHard,
-			HighHumiditySoft    = 1 << 6,
-			HighHumidityHard    = 1 << 7,
-			HighHumidityMask    = HighHumiditySoft | HighHumidityHard,
-            HumidityMask        = LowHumidityMask | HighHumidityMask,
-            LowVcc              = 1 << 8,
-            LowSignal           = 1 << 9,
-            MeasurementMask     = TemperatureMask | HumidityMask | LowVcc | LowSignal,
+            MeasurementLowTemperatureSoft   = 1 << 0,
+            MeasurementLowTemperatureHard   = 1 << 1,
+            MeasurementLowTemperatureMask   = MeasurementLowTemperatureSoft | MeasurementLowTemperatureHard,
+            MeasurementHighTemperatureSoft  = 1 << 2,
+            MeasurementHighTemperatureHard  = 1 << 3,
+            MeasurementHighTemperatureMask  = MeasurementHighTemperatureSoft | MeasurementHighTemperatureHard,
+            MeasurementTemperatureMask      = MeasurementLowTemperatureMask | MeasurementHighTemperatureMask,
+			MeasurementLowHumiditySoft      = 1 << 4,
+			MeasurementLowHumidityHard      = 1 << 5,
+			MeasurementLowHumidityMask      = MeasurementLowHumiditySoft | MeasurementLowHumidityHard,
+			MeasurementHighHumiditySoft     = 1 << 6,
+			MeasurementHighHumidityHard     = 1 << 7,
+			MeasurementHighHumidityMask     = MeasurementHighHumiditySoft | MeasurementHighHumidityHard,
+            MeasurementHumidityMask         = MeasurementLowHumidityMask | MeasurementHighHumidityMask,
+            MeasurementLowVcc               = 1 << 8,
+            MeasurementLowSignal            = 1 << 9,
+			MeasurementHighSoftMask         = MeasurementHighHumiditySoft | MeasurementHighTemperatureSoft,
+			MeasurementHighHardMask         = MeasurementHighHumidityHard | MeasurementHighTemperatureHard,
+			MeasurementLowSoftMask          = MeasurementLowHumiditySoft | MeasurementLowTemperatureSoft,
+			MeasurementLowHardMask          = MeasurementLowHumidityHard | MeasurementLowTemperatureHard,
+            MeasurementMask                 = MeasurementTemperatureMask | MeasurementHumidityMask | MeasurementLowVcc | MeasurementLowSignal,
 
 			//triggers generated from sensors
             SensorBlackout      = 1 << 10,
@@ -531,11 +535,6 @@ public:
 
 			//base station triggers
             BaseStationDisconnected = 1 << 11,
-
-			HighSoftMask        = HighHumiditySoft | HighTemperatureSoft,
-			HighHardMask        = HighHumidityHard | HighTemperatureHard,
-			LowSoftMask         = LowHumiditySoft | LowTemperatureSoft,
-			LowHardMask         = LowHumidityHard | LowTemperatureHard,
         };
     };
 

@@ -128,50 +128,50 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, s
 		QString signalStrengthStr;
 
         DB::Measurement const& m = *measurement;
-		if (newTriggers & DB::AlarmTrigger::TemperatureMask)
+		if (newTriggers & DB::AlarmTrigger::MeasurementTemperatureMask)
 		{
-			if (newTriggers & DB::AlarmTrigger::HighTemperatureHard)
+			if (newTriggers & DB::AlarmTrigger::MeasurementHighTemperatureHard)
 				temperatureStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very High: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
-			else if (newTriggers & DB::AlarmTrigger::HighTemperatureSoft)
+			else if (newTriggers & DB::AlarmTrigger::MeasurementHighTemperatureSoft)
 				temperatureStr = QString(alertTemplateStr).arg(utils::k_highThresholdSoftColor & 0xFFFFFF, 6, 16, QChar('0')).arg("High: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
-			else if (newTriggers & DB::AlarmTrigger::LowTemperatureHard)
+			else if (newTriggers & DB::AlarmTrigger::MeasurementLowTemperatureHard)
 				temperatureStr = QString(alertTemplateStr).arg(utils::k_lowThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very Low: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
-			else if (newTriggers & DB::AlarmTrigger::LowTemperatureSoft)
+			else if (newTriggers & DB::AlarmTrigger::MeasurementLowTemperatureSoft)
 				temperatureStr = QString(alertTemplateStr).arg(utils::k_lowThresholdSoftColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Low: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
 		}
-		else if (oldTriggers & DB::AlarmTrigger::TemperatureMask)
+		else if (oldTriggers & DB::AlarmTrigger::MeasurementTemperatureMask)
 			temperatureStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Recovered: ").arg(m.descriptor.temperature, 0, 'f', 1).arg("&deg;C");
 		else
 			temperatureStr = QString(R"X(%1&deg;C)X").arg(m.descriptor.temperature, 0, 'f', 1);
 
-		if (newTriggers & DB::AlarmTrigger::HumidityMask)
+		if (newTriggers & DB::AlarmTrigger::MeasurementHumidityMask)
 		{
-			if (newTriggers & DB::AlarmTrigger::HighHumidityHard)
+			if (newTriggers & DB::AlarmTrigger::MeasurementHighHumidityHard)
 				humidityStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very High: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
-			else if (newTriggers & DB::AlarmTrigger::HighHumiditySoft)
+			else if (newTriggers & DB::AlarmTrigger::MeasurementHighHumiditySoft)
 				humidityStr = QString(alertTemplateStr).arg(utils::k_highThresholdSoftColor & 0xFFFFFF, 6, 16, QChar('0')).arg("High: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
-			else if (newTriggers & DB::AlarmTrigger::LowHumidityHard)
+			else if (newTriggers & DB::AlarmTrigger::MeasurementLowHumidityHard)
 				humidityStr = QString(alertTemplateStr).arg(utils::k_lowThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very Low: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
-			else if (newTriggers & DB::AlarmTrigger::LowHumiditySoft)
+			else if (newTriggers & DB::AlarmTrigger::MeasurementLowHumiditySoft)
 				humidityStr = QString(alertTemplateStr).arg(utils::k_lowThresholdSoftColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Low: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
 		}
-		else if (oldTriggers & DB::AlarmTrigger::HumidityMask)
+		else if (oldTriggers & DB::AlarmTrigger::MeasurementHumidityMask)
 			humidityStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Recovered: ").arg(m.descriptor.humidity, 0, 'f', 1).arg("%");
 		else
 			humidityStr = QString(R"X(%1&deg;C)X").arg(m.descriptor.humidity, 0, 'f', 1);
 
 		int batteryPercentage = static_cast<int>(utils::getBatteryLevel(m.descriptor.vcc) * 100.f);
-		if (newTriggers & DB::AlarmTrigger::LowVcc)
+		if (newTriggers & DB::AlarmTrigger::MeasurementLowVcc)
 			batteryStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very Low: ").arg(batteryPercentage).arg("%");
-		else if (oldTriggers & DB::AlarmTrigger::LowVcc)
+		else if (oldTriggers & DB::AlarmTrigger::MeasurementLowVcc)
 			batteryStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Recovered: ").arg(batteryPercentage).arg("%");
 		else
 			batteryStr = QString(R"X(%1%)X").arg(batteryPercentage);
 
 		int signalStrengthPercentage = static_cast<int>(utils::getSignalLevel(std::min(m.descriptor.signalStrength.s2b, m.descriptor.signalStrength.b2s)) * 100.f);
-		if (newTriggers & DB::AlarmTrigger::LowSignal)
+		if (newTriggers & DB::AlarmTrigger::MeasurementLowSignal)
 			signalStrengthStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Very Low: ").arg(signalStrengthPercentage).arg("%");
-		else if (oldTriggers & DB::AlarmTrigger::LowSignal)
+		else if (oldTriggers & DB::AlarmTrigger::MeasurementLowSignal)
 			signalStrengthStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Recovered: ").arg(signalStrengthPercentage).arg("%");
 		else
 			signalStrengthStr = QString(R"X(%1%)X").arg(signalStrengthPercentage);
@@ -262,16 +262,16 @@ void Emailer::sendAlarmRetriggerEmail(DB::Alarm const& alarm)
 	auto toString = [](uint32_t triggers)
 	{
 		std::string str;
-		str += (triggers & DB::AlarmTrigger::LowTemperatureSoft) ? "Low Temperature, " : "";
-		str += (triggers & DB::AlarmTrigger::LowTemperatureHard) ? "Low Temperature, " : "";
-		str += (triggers & DB::AlarmTrigger::HighTemperatureSoft) ? "High Temperature, " : "";
-		str += (triggers & DB::AlarmTrigger::HighTemperatureHard) ? "High Temperature, " : "";
-		str += (triggers & DB::AlarmTrigger::LowHumiditySoft) ? "Low Humidity, " : "";
-		str += (triggers & DB::AlarmTrigger::LowHumidityHard) ? "Low Humidity, " : "";
-		str += (triggers & DB::AlarmTrigger::HighHumiditySoft) ? "High Humidity, " : "";
-		str += (triggers & DB::AlarmTrigger::HighHumidityHard) ? "High Humidity, " : "";
-		str += (triggers & DB::AlarmTrigger::LowVcc) ? "Low Battery, " : "";
-		str += (triggers & DB::AlarmTrigger::LowSignal) ? "Low Signal, " : "";
+		str += (triggers & DB::AlarmTrigger::MeasurementLowTemperatureSoft) ? "Low Temperature, " : "";
+		str += (triggers & DB::AlarmTrigger::MeasurementLowTemperatureHard) ? "Low Temperature, " : "";
+		str += (triggers & DB::AlarmTrigger::MeasurementHighTemperatureSoft) ? "High Temperature, " : "";
+		str += (triggers & DB::AlarmTrigger::MeasurementHighTemperatureHard) ? "High Temperature, " : "";
+		str += (triggers & DB::AlarmTrigger::MeasurementLowHumiditySoft) ? "Low Humidity, " : "";
+		str += (triggers & DB::AlarmTrigger::MeasurementLowHumidityHard) ? "Low Humidity, " : "";
+		str += (triggers & DB::AlarmTrigger::MeasurementHighHumiditySoft) ? "High Humidity, " : "";
+		str += (triggers & DB::AlarmTrigger::MeasurementHighHumidityHard) ? "High Humidity, " : "";
+		str += (triggers & DB::AlarmTrigger::MeasurementLowVcc) ? "Low Battery, " : "";
+		str += (triggers & DB::AlarmTrigger::MeasurementLowSignal) ? "Low Signal, " : "";
 		if (!str.empty())
 		{
 			str.pop_back(); //' '

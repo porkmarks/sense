@@ -250,7 +250,7 @@ uint32_t getSensorStorageCapacity(DB::Sensor const& sensor)
 	return 0;
 }
 
-DB::Clock::duration computeBatteryLife(float capacity, DB::Clock::duration measurementPeriod, DB::Clock::duration commsPeriod, float power, uint8_t hardwareVersion)
+DB::Clock::duration computeBatteryLife(float capacity, DB::Clock::duration measurementPeriod, DB::Clock::duration commsPeriod, float power, uint8_t retries, uint8_t hardwareVersion)
 {
 	float idleMAh = 0.01f;
 	float commsMAh = 0;
@@ -274,6 +274,7 @@ DB::Clock::duration computeBatteryLife(float capacity, DB::Clock::duration measu
 	commsMAh = minCommsMAh + (maxCommsMAh - minCommsMAh) * powerMu;
 
 	float commsDuration = 2.f;
+	commsDuration += commsDuration * std::max(float(retries - 1), 0.f) * 0.02f; //2% failure rate
 	float commsPeriodS = std::chrono::duration<float>(commsPeriod).count();
 
 	float measurementDuration = 1.f;
@@ -478,19 +479,19 @@ bool exportCsvTo(std::ostream& stream, DB::GeneralSettings const& settings, DB::
 
 uint32_t getDominatingTriggerColor(uint32_t trigger)
 {
-	if (trigger & (DB::AlarmTrigger::HighHardMask | DB::AlarmTrigger::LowSignal | DB::AlarmTrigger::LowVcc)) return utils::k_highThresholdHardColor;
-	else if (trigger & (DB::AlarmTrigger::LowHardMask)) return utils::k_lowThresholdHardColor;
-	else if (trigger & (DB::AlarmTrigger::HighSoftMask)) return utils::k_highThresholdSoftColor;
-	else if (trigger & (DB::AlarmTrigger::LowSoftMask)) return utils::k_lowThresholdSoftColor;
+	if (trigger & (DB::AlarmTrigger::MeasurementHighHardMask | DB::AlarmTrigger::MeasurementLowSignal | DB::AlarmTrigger::MeasurementLowVcc)) return utils::k_highThresholdHardColor;
+	else if (trigger & (DB::AlarmTrigger::MeasurementLowHardMask)) return utils::k_lowThresholdHardColor;
+	else if (trigger & (DB::AlarmTrigger::MeasurementHighSoftMask)) return utils::k_highThresholdSoftColor;
+	else if (trigger & (DB::AlarmTrigger::MeasurementLowSoftMask)) return utils::k_lowThresholdSoftColor;
 	else return utils::k_inRangeColor;
 }
 const char* getDominatingTriggerName(uint32_t trigger)
 {
-	if (trigger & (DB::AlarmTrigger::HighHardMask)) return "Very High";
-	else if (trigger & (DB::AlarmTrigger::LowHardMask)) return "Very Low";
-	else if (trigger & (DB::AlarmTrigger::HighSoftMask)) return "High";
-	else if (trigger & (DB::AlarmTrigger::LowSoftMask)) return "Low";
-	else if (trigger & (DB::AlarmTrigger::LowSignal | DB::AlarmTrigger::LowVcc)) return "Low";
+	if (trigger & (DB::AlarmTrigger::MeasurementHighHardMask)) return "Very High";
+	else if (trigger & (DB::AlarmTrigger::MeasurementLowHardMask)) return "Very Low";
+	else if (trigger & (DB::AlarmTrigger::MeasurementHighSoftMask)) return "High";
+	else if (trigger & (DB::AlarmTrigger::MeasurementLowSoftMask)) return "Low";
+	else if (trigger & (DB::AlarmTrigger::MeasurementLowSignal | DB::AlarmTrigger::MeasurementLowVcc)) return "Low";
 	else return "Normal";
 }
 

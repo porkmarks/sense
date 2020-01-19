@@ -575,41 +575,42 @@ Result<void> DB::load(sqlite3& db)
 		while (sqlite3_step(stmt) == SQLITE_ROW)
 		{
 			Alarm a;
-            a.id = sqlite3_column_int64(stmt, 0);
-			a.descriptor.name = (char const*)sqlite3_column_text(stmt, 1);
-            a.descriptor.filterSensors = sqlite3_column_int64(stmt, 2) ? true : false;
+			int index = 0;
+            a.id = sqlite3_column_int64(stmt, index++);
+			a.descriptor.name = (char const*)sqlite3_column_text(stmt, index++);
+            a.descriptor.filterSensors = sqlite3_column_int64(stmt, index++) ? true : false;
 			{
-				QString sensors = (char const*)sqlite3_column_text(stmt, 3);
+				QString sensors = (char const*)sqlite3_column_text(stmt, index++);
 				QStringList l = sensors.split(QChar(';'), QString::SkipEmptyParts);
 				for (QString str : l)
 				{
 					a.descriptor.sensors.insert(atoll(str.trimmed().toUtf8().data()));
 				}
 			}
-            a.descriptor.lowTemperatureWatch = sqlite3_column_int64(stmt, 4) ? true : false;
-            a.descriptor.lowTemperatureSoft = (float)sqlite3_column_double(stmt, 5);
-            a.descriptor.lowTemperatureHard = (float)sqlite3_column_double(stmt, 6);
+            a.descriptor.lowTemperatureWatch = sqlite3_column_int64(stmt, index++) ? true : false;
+            a.descriptor.lowTemperatureSoft = (float)sqlite3_column_double(stmt, index++);
+            a.descriptor.lowTemperatureHard = (float)sqlite3_column_double(stmt, index++);
             std::tie(a.descriptor.lowTemperatureHard, a.descriptor.lowTemperatureSoft) = std::minmax(a.descriptor.lowTemperatureSoft, a.descriptor.lowTemperatureHard);
-			a.descriptor.highTemperatureWatch = sqlite3_column_int64(stmt, 7) ? true : false;
-			a.descriptor.highTemperatureSoft = (float)sqlite3_column_double(stmt, 8);
-			a.descriptor.highTemperatureHard = (float)sqlite3_column_double(stmt, 9);
+			a.descriptor.highTemperatureWatch = sqlite3_column_int64(stmt, index++) ? true : false;
+			a.descriptor.highTemperatureSoft = (float)sqlite3_column_double(stmt, index++);
+			a.descriptor.highTemperatureHard = (float)sqlite3_column_double(stmt, index++);
 			std::tie(a.descriptor.highTemperatureSoft, a.descriptor.highTemperatureHard) = std::minmax(a.descriptor.highTemperatureSoft, a.descriptor.highTemperatureHard);
-			a.descriptor.lowHumidityWatch = sqlite3_column_int64(stmt, 10) ? true : false;
-			a.descriptor.lowHumiditySoft = (float)sqlite3_column_double(stmt, 11);
-			a.descriptor.lowHumidityHard = (float)sqlite3_column_double(stmt, 12);
+			a.descriptor.lowHumidityWatch = sqlite3_column_int64(stmt, index++) ? true : false;
+			a.descriptor.lowHumiditySoft = (float)sqlite3_column_double(stmt, index++);
+			a.descriptor.lowHumidityHard = (float)sqlite3_column_double(stmt, index++);
 			std::tie(a.descriptor.lowHumidityHard, a.descriptor.lowHumiditySoft) = std::minmax(a.descriptor.lowHumiditySoft, a.descriptor.lowHumidityHard);
-			a.descriptor.highHumidityWatch = sqlite3_column_int64(stmt, 13) ? true : false;
-			a.descriptor.highHumiditySoft = (float)sqlite3_column_double(stmt, 14);
-			a.descriptor.highHumidityHard = (float)sqlite3_column_double(stmt, 15);
+			a.descriptor.highHumidityWatch = sqlite3_column_int64(stmt, index++) ? true : false;
+			a.descriptor.highHumiditySoft = (float)sqlite3_column_double(stmt, index++);
+			a.descriptor.highHumidityHard = (float)sqlite3_column_double(stmt, index++);
 			std::tie(a.descriptor.highHumiditySoft, a.descriptor.highHumidityHard) = std::minmax(a.descriptor.highHumiditySoft, a.descriptor.highHumidityHard);
-			a.descriptor.lowVccWatch = sqlite3_column_int64(stmt, 16);
-			a.descriptor.lowSignalWatch = sqlite3_column_int64(stmt, 17);
-			a.descriptor.sensorBlackoutWatch = sqlite3_column_int64(stmt, 18);
-			a.descriptor.baseStationDisconnectedWatch = sqlite3_column_int64(stmt, 19);
-			a.descriptor.sendEmailAction = sqlite3_column_int64(stmt, 20);
-            a.descriptor.resendPeriod = std::chrono::seconds(sqlite3_column_int64(stmt, 21));
+			a.descriptor.lowVccWatch = sqlite3_column_int64(stmt, index++);
+			a.descriptor.lowSignalWatch = sqlite3_column_int64(stmt, index++);
+			a.descriptor.sensorBlackoutWatch = sqlite3_column_int64(stmt, index++);
+			a.descriptor.baseStationDisconnectedWatch = sqlite3_column_int64(stmt, index++);
+			a.descriptor.sendEmailAction = sqlite3_column_int64(stmt, index++);
+            a.descriptor.resendPeriod = std::chrono::seconds(sqlite3_column_int64(stmt, index++));
 			{
-				QString triggers = (char const*)sqlite3_column_text(stmt, 22);
+				QString triggers = (char const*)sqlite3_column_text(stmt, index++);
 				QStringList l = triggers.split(QChar(';'), QString::SkipEmptyParts);
 				for (QString str : l)
 				{
@@ -625,7 +626,7 @@ Result<void> DB::load(sqlite3& db)
 				}
 			}
 			{
-				QString triggers = (char const*)sqlite3_column_text(stmt, 23);
+				QString triggers = (char const*)sqlite3_column_text(stmt, index++);
 				QStringList l = triggers.split(QChar(';'), QString::SkipEmptyParts);
 				for (QString str : l)
 				{
@@ -640,7 +641,8 @@ Result<void> DB::load(sqlite3& db)
 					}
 				}
 			}
-			a.lastTriggeredTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, 24));
+			a.lastTriggeredTimePoint = Clock::from_time_t(sqlite3_column_int64(stmt, index++));
+			Q_ASSERT(index == 25);
 			data.alarms.push_back(std::move(a));
 		}
 	}
@@ -2372,46 +2374,46 @@ DB::AlarmTriggers DB::_computeAlarmTriggersForMeasurement(Alarm& alarm, Measurem
 	{
 		if (ad.highTemperatureWatch && m.descriptor.temperature > ad.highTemperatureSoft)
 		{
-			currentTriggers |= AlarmTrigger::HighTemperatureSoft;
+			currentTriggers |= AlarmTrigger::MeasurementHighTemperatureSoft;
 		}
 		if (ad.highTemperatureWatch && m.descriptor.temperature > ad.highTemperatureHard)
 		{
-			currentTriggers |= AlarmTrigger::HighTemperatureHard;
+			currentTriggers |= AlarmTrigger::MeasurementHighTemperatureHard;
 		}
 		if (ad.lowTemperatureWatch && m.descriptor.temperature < ad.lowTemperatureSoft)
 		{
-			currentTriggers |= AlarmTrigger::LowTemperatureSoft;
+			currentTriggers |= AlarmTrigger::MeasurementLowTemperatureSoft;
 		}
 		if (ad.lowTemperatureWatch && m.descriptor.temperature < ad.lowTemperatureHard)
 		{
-			currentTriggers |= AlarmTrigger::LowTemperatureHard;
+			currentTriggers |= AlarmTrigger::MeasurementLowTemperatureHard;
 		}
 
 		if (ad.highHumidityWatch && m.descriptor.humidity > ad.highHumiditySoft)
 		{
-			currentTriggers |= AlarmTrigger::HighHumiditySoft;
+			currentTriggers |= AlarmTrigger::MeasurementHighHumiditySoft;
 		}
 		if (ad.highHumidityWatch && m.descriptor.humidity > ad.highHumidityHard)
 		{
-			currentTriggers |= AlarmTrigger::HighHumidityHard;
+			currentTriggers |= AlarmTrigger::MeasurementHighHumidityHard;
 		}
 		if (ad.lowHumidityWatch && m.descriptor.humidity < ad.lowHumiditySoft)
 		{
-			currentTriggers |= AlarmTrigger::LowHumiditySoft;
+			currentTriggers |= AlarmTrigger::MeasurementLowHumiditySoft;
 		}
 		if (ad.lowHumidityWatch && m.descriptor.humidity < ad.lowHumidityHard)
 		{
-			currentTriggers |= AlarmTrigger::LowHumidityHard;
+			currentTriggers |= AlarmTrigger::MeasurementLowHumidityHard;
 		}
 
 		if (ad.lowVccWatch && utils::getBatteryLevel(m.descriptor.vcc) <= m_data.sensorSettings.alertBatteryLevel)
 		{
-			currentTriggers |= AlarmTrigger::LowVcc;
+			currentTriggers |= AlarmTrigger::MeasurementLowVcc;
 		}
 
 		if (ad.lowSignalWatch && utils::getSignalLevel(std::min(m.descriptor.signalStrength.b2s, m.descriptor.signalStrength.s2b)) <= m_data.sensorSettings.alertSignalStrengthLevel)
 		{
-			currentTriggers |= AlarmTrigger::LowSignal;
+			currentTriggers |= AlarmTrigger::MeasurementLowSignal;
 		}
 	}
 
@@ -3415,7 +3417,7 @@ void DB::save(Data& data, bool newTransaction) const
 		sqlite3_bind_text(stmt, 5, data.emailSettings.password.c_str(), -1, SQLITE_STATIC);
 		sqlite3_bind_text(stmt, 6, data.emailSettings.sender.c_str(), -1, SQLITE_STATIC);
 		std::string recipients = std::accumulate(data.emailSettings.recipients.begin(), data.emailSettings.recipients.end(), std::string(";"));
-		sqlite3_bind_text(stmt, 7, recipients.c_str(), -1, SQLITE_STATIC);
+		sqlite3_bind_text(stmt, 7, recipients.c_str(), -1, SQLITE_TRANSIENT);
 		if (sqlite3_step(stmt) != SQLITE_DONE)
 		{
 			s_logger.logCritical(QString("Failed to save email settings: %1").arg(sqlite3_errmsg(m_sqlite)));
@@ -3632,40 +3634,41 @@ void DB::save(Data& data, bool newTransaction) const
 		sqlite3_stmt* stmt = m_saveAlarmsStmt.get();
 		for (Alarm const& a : data.alarms)
 		{
-			sqlite3_bind_int64(stmt, 1, a.id);
-			sqlite3_bind_text(stmt, 2, a.descriptor.name.c_str(), -1, SQLITE_STATIC);
-			sqlite3_bind_int(stmt, 3, a.descriptor.filterSensors ? 1 : 0);
+			int index = 1;
+			sqlite3_bind_int64(stmt, index++, a.id);
+			sqlite3_bind_text(stmt, index++, a.descriptor.name.c_str(), -1, SQLITE_STATIC);
+			sqlite3_bind_int(stmt, index++, a.descriptor.filterSensors ? 1 : 0);
 			std::string sensors;
 			for (SensorId id : a.descriptor.sensors)
 			{
 				sensors += std::to_string(id) + ";";
 			}
-			sqlite3_bind_text(stmt, 4, sensors.c_str(), -1, SQLITE_STATIC);
-			sqlite3_bind_int(stmt, 5, a.descriptor.lowTemperatureWatch ? 1 : 0);
-			sqlite3_bind_double(stmt, 6, a.descriptor.lowTemperatureSoft);
-			sqlite3_bind_double(stmt, 7, a.descriptor.lowTemperatureHard);
-			sqlite3_bind_int(stmt, 8, a.descriptor.highTemperatureWatch ? 1 : 0);
-			sqlite3_bind_double(stmt, 9, a.descriptor.highTemperatureSoft);
-			sqlite3_bind_double(stmt, 10, a.descriptor.highTemperatureHard);
-			sqlite3_bind_int(stmt, 11, a.descriptor.lowHumidityWatch ? 1 : 0);
-			sqlite3_bind_double(stmt, 12, a.descriptor.lowHumiditySoft);
-			sqlite3_bind_double(stmt, 13, a.descriptor.lowHumidityHard);
-			sqlite3_bind_int(stmt, 14, a.descriptor.highHumidityWatch ? 1 : 0);
-			sqlite3_bind_double(stmt, 15, a.descriptor.highHumiditySoft);
-			sqlite3_bind_double(stmt, 16, a.descriptor.highHumidityHard);
-			sqlite3_bind_int(stmt, 17, a.descriptor.lowVccWatch ? 1 : 0);
-			sqlite3_bind_int(stmt, 18, a.descriptor.lowSignalWatch ? 1 : 0);
-			sqlite3_bind_int(stmt, 19, a.descriptor.sensorBlackoutWatch ? 1 : 0);
-			sqlite3_bind_int(stmt, 20, a.descriptor.baseStationDisconnectedWatch ? 1 : 0);
-			sqlite3_bind_int(stmt, 21, a.descriptor.sendEmailAction ? 1 : 0);
-			sqlite3_bind_int64(stmt, 22, std::chrono::duration_cast<std::chrono::seconds>(a.descriptor.resendPeriod).count());
+			sqlite3_bind_text(stmt, index++, sensors.c_str(), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_int(stmt, index++, a.descriptor.lowTemperatureWatch ? 1 : 0);
+			sqlite3_bind_double(stmt, index++, a.descriptor.lowTemperatureSoft);
+			sqlite3_bind_double(stmt, index++, a.descriptor.lowTemperatureHard);
+			sqlite3_bind_int(stmt, index++, a.descriptor.highTemperatureWatch ? 1 : 0);
+			sqlite3_bind_double(stmt, index++, a.descriptor.highTemperatureSoft);
+			sqlite3_bind_double(stmt, index++, a.descriptor.highTemperatureHard);
+			sqlite3_bind_int(stmt, index++, a.descriptor.lowHumidityWatch ? 1 : 0);
+			sqlite3_bind_double(stmt, index++, a.descriptor.lowHumiditySoft);
+			sqlite3_bind_double(stmt, index++, a.descriptor.lowHumidityHard);
+			sqlite3_bind_int(stmt, index++, a.descriptor.highHumidityWatch ? 1 : 0);
+			sqlite3_bind_double(stmt, index++, a.descriptor.highHumiditySoft);
+			sqlite3_bind_double(stmt, index++, a.descriptor.highHumidityHard);
+			sqlite3_bind_int(stmt, index++, a.descriptor.lowVccWatch ? 1 : 0);
+			sqlite3_bind_int(stmt, index++, a.descriptor.lowSignalWatch ? 1 : 0);
+			sqlite3_bind_int(stmt, index++, a.descriptor.sensorBlackoutWatch ? 1 : 0);
+			sqlite3_bind_int(stmt, index++, a.descriptor.baseStationDisconnectedWatch ? 1 : 0);
+			sqlite3_bind_int(stmt, index++, a.descriptor.sendEmailAction ? 1 : 0);
+			sqlite3_bind_int64(stmt, index++, std::chrono::duration_cast<std::chrono::seconds>(a.descriptor.resendPeriod).count());
 			{
 				std::string triggers;
 				for (auto p : a.triggersPerSensor)
 				{
 					triggers += std::to_string(p.first) + "/" + std::to_string(p.second) + ";";
 				}
-				sqlite3_bind_text(stmt, 23, triggers.c_str(), -1, SQLITE_STATIC);
+				sqlite3_bind_text(stmt, index++, triggers.c_str(), -1, SQLITE_TRANSIENT);
 			}
 			{
 				std::string triggers;
@@ -3673,14 +3676,15 @@ void DB::save(Data& data, bool newTransaction) const
 				{
 					triggers += std::to_string(p.first) + "/" + std::to_string(p.second) + ";";
 				}
-				sqlite3_bind_text(stmt, 24, triggers.c_str(), -1, SQLITE_STATIC);
+				sqlite3_bind_text(stmt, index++, triggers.c_str(), -1, SQLITE_TRANSIENT);
 			}
-			sqlite3_bind_int64(stmt, 25, Clock::to_time_t(a.lastTriggeredTimePoint));
+			sqlite3_bind_int64(stmt, index++, Clock::to_time_t(a.lastTriggeredTimePoint));
 			if (sqlite3_step(stmt) != SQLITE_DONE)
 			{
 				s_logger.logCritical(QString("Failed to save alarms: %1").arg(sqlite3_errmsg(m_sqlite)));
 				return;
 			}
+			Q_ASSERT(index == 26);
 			sqlite3_reset(stmt);
 		}
 		data.alarmsAddedOrRemoved = false;
@@ -3710,7 +3714,7 @@ void DB::save(Data& data, bool newTransaction) const
 			{
 				sensors += std::to_string(id) + ";";
 			}
-			sqlite3_bind_text(stmt, 6, sensors.c_str(), -1, SQLITE_STATIC);
+			sqlite3_bind_text(stmt, 6, sensors.c_str(), -1, SQLITE_TRANSIENT);
 			sqlite3_bind_int64(stmt, 7, Clock::to_time_t(r.lastTriggeredTimePoint));
 			if (sqlite3_step(stmt) != SQLITE_DONE)
 			{

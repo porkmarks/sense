@@ -614,10 +614,10 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
             double value = 0;
             switch ((PlotType)plotIndex)
             {
-            case PlotType::Temperature: value = m.descriptor.temperature; alarmTriggerMask = DB::AlarmTrigger::TemperatureMask; break;
-            case PlotType::Humidity: value = m.descriptor.humidity; alarmTriggerMask = DB::AlarmTrigger::HumidityMask; break;
-            case PlotType::Battery: value = utils::getBatteryLevel(m.descriptor.vcc) * 100.0; alarmTriggerMask = DB::AlarmTrigger::LowVcc; break;
-            case PlotType::Signal: value = utils::getSignalLevel(std::min(m.descriptor.signalStrength.b2s, m.descriptor.signalStrength.s2b)) * 100.0; alarmTriggerMask = DB::AlarmTrigger::LowSignal; break;
+            case PlotType::Temperature: value = m.descriptor.temperature; alarmTriggerMask = DB::AlarmTrigger::MeasurementTemperatureMask; break;
+            case PlotType::Humidity: value = m.descriptor.humidity; alarmTriggerMask = DB::AlarmTrigger::MeasurementHumidityMask; break;
+            case PlotType::Battery: value = utils::getBatteryLevel(m.descriptor.vcc) * 100.0; alarmTriggerMask = DB::AlarmTrigger::MeasurementLowVcc; break;
+            case PlotType::Signal: value = utils::getSignalLevel(std::min(m.descriptor.signalStrength.b2s, m.descriptor.signalStrength.s2b)) * 100.0; alarmTriggerMask = DB::AlarmTrigger::MeasurementLowSignal; break;
             }
             if (m_ui.useSmoothing->isChecked())
             {

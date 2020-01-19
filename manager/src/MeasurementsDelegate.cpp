@@ -44,37 +44,37 @@ void MeasurementsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& 
         QPoint pos = option.rect.topLeft() + QPoint(k_iconMargin.width(), k_iconMargin.height());
         int32_t iconSize = option.rect.height();
 
-        if (alarmTriggers & DB::AlarmTrigger::LowTemperatureMask)
+        if (alarmTriggers & DB::AlarmTrigger::MeasurementLowTemperatureMask)
         {
             static QIcon icon(":/icons/ui/temperature.png");
             painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
             pos.setX(pos.x() + iconSize + k_iconMargin.width());
         }
-		if (alarmTriggers & DB::AlarmTrigger::HighTemperatureMask)
+		if (alarmTriggers & DB::AlarmTrigger::MeasurementHighTemperatureMask)
 		{
 			static QIcon icon(":/icons/ui/temperature.png");
 			painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
 			pos.setX(pos.x() + iconSize + k_iconMargin.width());
 		}
-        if (alarmTriggers & DB::AlarmTrigger::LowHumidityMask)
+        if (alarmTriggers & DB::AlarmTrigger::MeasurementLowHumidityMask)
         {
             static QIcon icon(":/icons/ui/humidity.png");
             painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
             pos.setX(pos.x() + iconSize + k_iconMargin.width());
         }
-		if (alarmTriggers & DB::AlarmTrigger::HighHumidityMask)
+		if (alarmTriggers & DB::AlarmTrigger::MeasurementHighHumidityMask)
 		{
 			static QIcon icon(":/icons/ui/humidity.png");
 			painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
 			pos.setX(pos.x() + iconSize + k_iconMargin.width());
 		}
-        if (alarmTriggers & DB::AlarmTrigger::LowVcc)
+        if (alarmTriggers & DB::AlarmTrigger::MeasurementLowVcc)
         {
             static QIcon icon(":/icons/ui/battery-0.png");
             painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
             pos.setX(pos.x() + iconSize + k_iconMargin.width());
         }
-        if (alarmTriggers & DB::AlarmTrigger::LowSignal)
+        if (alarmTriggers & DB::AlarmTrigger::MeasurementLowSignal)
         {
             static QIcon icon(":/icons/ui/signal-0.png");
             painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
@@ -105,27 +105,27 @@ QSize MeasurementsDelegate::sizeHint(const QStyleOptionViewItem& option, const Q
         int32_t width = 0;
         int32_t iconSize = option.rect.height();
 
-        if (alarmTriggers & DB::AlarmTrigger::LowTemperatureMask)
+        if (alarmTriggers & DB::AlarmTrigger::MeasurementLowTemperatureMask)
         {
             width += iconSize + k_iconMargin.width();
         }
-		if (alarmTriggers & DB::AlarmTrigger::HighTemperatureMask)
+		if (alarmTriggers & DB::AlarmTrigger::MeasurementHighTemperatureMask)
 		{
 			width += iconSize + k_iconMargin.width();
 		}
-        if (alarmTriggers & DB::AlarmTrigger::LowHumidityMask)
+        if (alarmTriggers & DB::AlarmTrigger::MeasurementLowHumidityMask)
         {
             width += iconSize + k_iconMargin.width();
         }
-		if (alarmTriggers & DB::AlarmTrigger::HighHumidityMask)
+		if (alarmTriggers & DB::AlarmTrigger::MeasurementHighHumidityMask)
 		{
 			width += iconSize + k_iconMargin.width();
 		}
-        if (alarmTriggers & DB::AlarmTrigger::LowVcc)
+        if (alarmTriggers & DB::AlarmTrigger::MeasurementLowVcc)
         {
             width += iconSize + k_iconMargin.width();
         }
-        if (alarmTriggers & DB::AlarmTrigger::LowSignal)
+        if (alarmTriggers & DB::AlarmTrigger::MeasurementLowSignal)
         {
             width += iconSize + k_iconMargin.width();
         }

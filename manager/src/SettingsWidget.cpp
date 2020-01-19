@@ -56,6 +56,7 @@ void SettingsWidget::init(Comms& comms, DB& db)
     }));
 
     m_uiConnections.push_back(connect(m_ui.radioPower, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
+    m_uiConnections.push_back(connect(m_ui.retries, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
     m_uiConnections.push_back(connect(m_ui.sensorsMeasurementPeriod, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
     m_uiConnections.push_back(connect(m_ui.sensorsCommsPeriod, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
     m_uiConnections.push_back(connect(m_ui.batteryCapacity, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged), this, &SettingsWidget::computeBatteryLife));
@@ -710,6 +711,7 @@ void SettingsWidget::computeBatteryLife()
                                                       descriptor.measurementPeriod,
                                                       m_db->computeActualCommsPeriod(descriptor),
                                                       settings.radioPower,
+                                                      settings.retries,
                                                       hardwareVersion);
 
     int64_t seconds = std::chrono::duration_cast<std::chrono::seconds>(d).count();
