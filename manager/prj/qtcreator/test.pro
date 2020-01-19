@@ -11,6 +11,7 @@ CONFIG += c++17
 DEFINES += QT_DEPRECATED_WARNINGS
 
 INCLUDEPATH += ../../src
+INCLUDEPATH += ../../src/tests
 INCLUDEPATH += ../../src/sqlite
 INCLUDEPATH += ../../src/Smtp
 INCLUDEPATH += ../../../common/src
@@ -41,7 +42,8 @@ SOURCES += \
     ../../src/Smtp/mimeattachment.cpp \
     ../../src/Smtp/emailaddress.cpp \
     ../../src/Logger.cpp \
-    ../../src/testmain.cpp
+    ../../src/tests/testMain.cpp \
+    ../../src/tests/testUtils.cpp
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
@@ -68,4 +70,5 @@ HEADERS += \
     ../../src/Smtp/mimeattachment.h \
     ../../src/Smtp/emailaddress.h \
     ../../src/Smtp/SmtpMime \
-    ../../src/Logger.h
+    ../../src/Logger.h \
+    ../../src/tests/testUtils.h
