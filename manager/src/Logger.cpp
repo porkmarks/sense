@@ -47,7 +47,7 @@ Logger::Logger()
 
 Logger::~Logger()
 {
-	m_insertStmt = nullptr;
+    close();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -89,9 +89,21 @@ bool Logger::load(sqlite3& db)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Logger::setStdOutput(bool value)
+void Logger::close()
 {
-    m_stdOutput = value;
+    if (!m_sqlite)
+    {
+        return;
+    }
+    m_insertStmt = nullptr;
+    m_sqlite = nullptr;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Logger::setStdOutput(Type minType)
+{
+    m_stdOutputMinType = minType;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -101,7 +113,7 @@ void Logger::logVerbose(std::string const& message)
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
     addToDB(message, Type::VERBOSE);
 
-    if (m_stdOutput)
+    if (m_stdOutputMinType <= Type::VERBOSE)
     {
         std::cout << "VERBOSE: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
         std::cout.flush();
@@ -131,7 +143,7 @@ void Logger::logInfo(std::string const& message)
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
     addToDB(message, Type::INFO);
 
-    if (m_stdOutput)
+    if (m_stdOutputMinType <= Type::INFO)
     {
         std::cout << "INFO: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
         std::cout.flush();
@@ -159,7 +171,7 @@ void Logger::logWarning(std::string const& message)
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
     addToDB(message, Type::WARNING);
 
-    if (m_stdOutput)
+    if (m_stdOutputMinType <= Type::WARNING)
     {
         std::cout << "WARNING: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
         std::cout.flush();
@@ -189,7 +201,7 @@ void Logger::logCritical(std::string const& message)
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
     addToDB(message, Type::CRITICAL);
 
-    if (m_stdOutput)
+    if (m_stdOutputMinType <= Type::CRITICAL)
     {
         std::cout << "ERROR: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": " << message << "\n";
         std::cout.flush();

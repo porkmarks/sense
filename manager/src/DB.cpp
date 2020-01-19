@@ -50,11 +50,7 @@ DB::DB()
 
 DB::~DB()
 {
-	addAsyncMeasurements();
-	if (m_saveScheduled)
-	{
-		save(true);
-	}
+	close();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -697,6 +693,7 @@ Result<void> DB::load(sqlite3& db)
 		data.lastReportId = std::max(data.lastReportId, report.id);
 	}
 
+	bool needsSave = false;
     {
         std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
         m_data = data;
@@ -713,7 +710,8 @@ Result<void> DB::load(sqlite3& db)
         //refresh computed comms period
         if (m_data.sensorTimeConfigs.empty())
         {
-            addSensorTimeConfig(SensorTimeConfigDescriptor()).ignore();
+            _addSensorTimeConfig(SensorTimeConfigDescriptor()).ignore();
+			needsSave = true;
         }
         else
         {
@@ -727,7 +725,35 @@ Result<void> DB::load(sqlite3& db)
 
 	m_sqlite = &db;
 
+	if (needsSave)
+	{
+		save(true);
+	}
+
     return success;
+}
+
+void DB::close()
+{
+	if (!m_sqlite)
+	{
+		return;
+	}
+
+	addAsyncMeasurements();
+	if (m_saveScheduled)
+	{
+		save(true);
+	}
+
+	m_saveBaseStationsStmt = nullptr;
+	m_saveSensorTimeConfigsStmt = nullptr;
+	m_saveSensorSettingsStmt = nullptr;
+	m_saveSensorsStmt = nullptr;
+	m_saveAlarmsStmt = nullptr;
+	m_saveReportsStmt = nullptr;
+	m_addMeasurementsStmt = nullptr;
+	m_sqlite = nullptr;
 }
 
 //void DB::test()
@@ -738,6 +764,11 @@ Result<void> DB::load(sqlite3& db)
 //        computeTriggeredAlarm(measurement.descriptor);
 //    }
 //}
+
+sqlite3* DB::getSqliteDB()
+{
+	return m_sqlite;
+}
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -1550,61 +1581,74 @@ uint32_t DB::computeNextRealTimeMeasurementIndex() const
 
 //////////////////////////////////////////////////////////////////////////
 
-Result<void> DB::addSensorTimeConfig(SensorTimeConfigDescriptor const& descriptor)
+Result<void> DB::_addSensorTimeConfig(SensorTimeConfigDescriptor const& descriptor)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    if (descriptor.commsPeriod < std::chrono::seconds(30))
-    {
-        return Error("Comms period cannot be lower than 30 seconds");
-    }
-    if (descriptor.measurementPeriod < std::chrono::seconds(10))
-    {
-        return Error("Measurement period cannot be lower than 10 seconds");
-    }
-    if (descriptor.commsPeriod < descriptor.measurementPeriod)
-    {
-        return Error("Comms period cannot be lower than the measurement period");
-    }
+	if (descriptor.commsPeriod < std::chrono::seconds(30))
+	{
+		return Error("Comms period cannot be lower than 30 seconds");
+	}
+	if (descriptor.measurementPeriod < std::chrono::seconds(10))
+	{
+		return Error("Measurement period cannot be lower than 10 seconds");
+	}
+	if (descriptor.commsPeriod < descriptor.measurementPeriod)
+	{
+		return Error("Comms period cannot be lower than the measurement period");
+	}
 
-    SensorTimeConfig config;
-    config.descriptor = descriptor;
+	SensorTimeConfig config;
+	config.descriptor = descriptor;
 
-    if (!m_data.sensorTimeConfigs.empty())
-    {
-        uint32_t nextRealTimeMeasurementIndex = computeNextRealTimeMeasurementIndex();
+	if (!m_data.sensorTimeConfigs.empty())
+	{
+		uint32_t nextRealTimeMeasurementIndex = computeNextRealTimeMeasurementIndex();
 
-        SensorTimeConfig c = findSensorTimeConfigForMeasurementIndex(nextRealTimeMeasurementIndex);
-        uint32_t index = nextRealTimeMeasurementIndex >= c.baselineMeasurementIndex ? nextRealTimeMeasurementIndex - c.baselineMeasurementIndex : 0;
-        Clock::time_point nextMeasurementTP = c.baselineMeasurementTimePoint + c.descriptor.measurementPeriod * index;
+		SensorTimeConfig c = findSensorTimeConfigForMeasurementIndex(nextRealTimeMeasurementIndex);
+		uint32_t index = nextRealTimeMeasurementIndex >= c.baselineMeasurementIndex ? nextRealTimeMeasurementIndex - c.baselineMeasurementIndex : 0;
+		Clock::time_point nextMeasurementTP = c.baselineMeasurementTimePoint + c.descriptor.measurementPeriod * index;
 
-        m_data.sensorTimeConfigs.erase(std::remove_if(m_data.sensorTimeConfigs.begin(), m_data.sensorTimeConfigs.end(), [&nextRealTimeMeasurementIndex](SensorTimeConfig const& c)
-        {
-            return c.baselineMeasurementIndex == nextRealTimeMeasurementIndex;
-        }), m_data.sensorTimeConfigs.end());
-        config.baselineMeasurementIndex = nextRealTimeMeasurementIndex;
-        config.baselineMeasurementTimePoint = nextMeasurementTP;
-    }
-    else
-    {
-        config.baselineMeasurementIndex = 0;
-        config.baselineMeasurementTimePoint = Clock::now();
-    }
+		m_data.sensorTimeConfigs.erase(std::remove_if(m_data.sensorTimeConfigs.begin(), m_data.sensorTimeConfigs.end(), [&nextRealTimeMeasurementIndex](SensorTimeConfig const& c)
+		{
+			return c.baselineMeasurementIndex == nextRealTimeMeasurementIndex;
+		}), m_data.sensorTimeConfigs.end());
+		config.baselineMeasurementIndex = nextRealTimeMeasurementIndex;
+		config.baselineMeasurementTimePoint = nextMeasurementTP;
+	}
+	else
+	{
+		config.baselineMeasurementIndex = 0;
+		config.baselineMeasurementTimePoint = Clock::now();
+	}
 
-    m_data.sensorTimeConfigs.push_back(config);
-    while (m_data.sensorTimeConfigs.size() > 100)
-    {
-        m_data.sensorTimeConfigs.erase(m_data.sensorTimeConfigs.begin());
-    }
-    m_data.sensorTimeConfigs.back().computedCommsPeriod = computeActualCommsPeriod(m_data.sensorTimeConfigs.back().descriptor); //make sure the computed commd config is up-to-date
+	m_data.sensorTimeConfigs.push_back(config);
+	while (m_data.sensorTimeConfigs.size() > 100)
+	{
+		m_data.sensorTimeConfigs.erase(m_data.sensorTimeConfigs.begin());
+	}
+	m_data.sensorTimeConfigs.back().computedCommsPeriod = computeActualCommsPeriod(m_data.sensorTimeConfigs.back().descriptor); //make sure the computed commd config is up-to-date
 	m_data.sensorTimeConfigsChanged = true;
 
-    emit sensorTimeConfigAdded();
+	emit sensorTimeConfigAdded();
 
-    s_logger.logInfo("Added sensors config");
+	s_logger.logInfo("Added sensors config");
 
+	return success;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+Result<void> DB::addSensorTimeConfig(SensorTimeConfigDescriptor const& descriptor)
+{
+	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+
+	Result<void> result = _addSensorTimeConfig(descriptor);
+	if (result != success)
+	{
+		return result;
+	}
 	save(true);
-
     return success;
 }
 
@@ -3721,8 +3765,8 @@ void DB::save(Data& data, bool newTransaction) const
 		data.reportsChanged = false;
 	}
 
-    std::cout << QString("Done saving DB. Time: %3s\n").arg(std::chrono::duration<float>(Clock::now() - start).count()).toUtf8().data();
-    std::cout.flush();
+//    std::cout << QString("Done saving DB. Time: %3s\n").arg(std::chrono::duration<float>(Clock::now() - start).count()).toUtf8().data();
+//    std::cout.flush();
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -2,89 +2,8 @@
 #include "Logger.h"
 #include <iostream>
 #include "DB.h"
-#include "sqlite3.h"
+#include "testUtils.h"
 #include <set>
-
-Logger s_logger;
-
-#define CHECK_SUCCESS(x) \
-{\
-    auto __result = x;\
-    if (__result != success)\
-    {\
-        std::cout << "Failed @" << __LINE__ << "/" << #x << ":" << __result.error().what() << std::endl;\
-    }\
-}
-#define CHECK_FAILURE(x) \
-{\
-    auto __result = x;\
-    if (__result == success)\
-    {\
-        std::cout << "Failed @" << __LINE__ << "/" << #x << ": Expected failure, got success" << std::endl;\
-    }\
-}
-#define CHECK_TRUE(x) \
-{\
-    auto __result = x;\
-    if (!__result)\
-    {\
-        std::cout << "Failed @" << __LINE__ << "/" << #x << ": Expected true, got false" << std::endl;\
-    }\
-}
-#define CHECK_FALSE(x) \
-{\
-    auto __result = x;\
-    if (__result)\
-    {\
-        std::cout << "Failed @" << __LINE__ << "/" << #x << ": Expected false, got true" << std::endl;\
-    }\
-}
-#define CHECK_EQUALS(x, y) \
-{\
-    auto __x = x;\
-    auto __y = y;\
-    if (__x != __y)\
-    {\
-        std::cout << "Failed @" << __LINE__ << "/" << #x << " == " << #y << ": Expected " << std::to_string(__y) << ", got " << std::to_string(__x) << std::endl;\
-    }\
-}
-
-
-void createDB(DB& db)
-{
-    std::string filename = "sense.db";
-    remove(filename.c_str());
-    sqlite3* sqlite;
-    if (sqlite3_open_v2(filename.c_str(), &sqlite, SQLITE_OPEN_READWRITE, nullptr))
-    {
-        if (sqlite3_open_v2(filename.c_str(), &sqlite, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr))
-        {
-            exit(-1);
-        }
-    }
-    s_logger.setStdOutput(false);
-    CHECK_SUCCESS(s_logger.create(*sqlite));
-    CHECK_TRUE(s_logger.load(*sqlite));
-    CHECK_SUCCESS(db.create(*sqlite));
-    CHECK_SUCCESS(db.load(*sqlite));
-}
-void loadDB(DB& db)
-{
-    std::string filename = "sense.db";
-    sqlite3* sqlite;
-    if (sqlite3_open_v2(filename.c_str(), &sqlite, SQLITE_OPEN_READWRITE, nullptr))
-    {
-        exit(-1);
-    }
-    s_logger.setStdOutput(false);
-    CHECK_TRUE(s_logger.load(*sqlite));
-    CHECK_SUCCESS(db.load(*sqlite));
-}
-void saveDB(DB& db)
-{
-    db.process(); //processing to trigger delayed saves
-}
-
 
 void testGeneralSettings()
 {
@@ -108,12 +27,13 @@ void testGeneralSettings()
             settings.dateTimeFormat = format;
             db.setGeneralSettings(settings);
             CHECK_TRUE(db.getGeneralSettings().dateTimeFormat == format);
-            saveDB(db);
+            closeDB(db);
         }
         {
             DB db;
             loadDB(db);
             CHECK_TRUE(db.getGeneralSettings().dateTimeFormat == format);
+            closeDB(db);
         }
     }
 }
@@ -123,6 +43,7 @@ void testCsvSettings()
     std::cout << "Testing CSV Settings\n";
 
     {
+        std::cout << "\tTesting date time formats\n";
         std::set<std::optional<DB::DateTimeFormat>> formats =
         {
             DB::DateTimeFormat::DD_MM_YYYY_Dash,
@@ -143,16 +64,18 @@ void testCsvSettings()
                 db.setCsvSettings(settings);
 
                 CHECK_TRUE(db.getCsvSettings().dateTimeFormatOverride == format);
-                saveDB(db);
+                closeDB(db);
             }
             {
                 DB db;
                 loadDB(db);
                 CHECK_TRUE(db.getCsvSettings().dateTimeFormatOverride == format);
+                closeDB(db);
             }
         }
     }
     {
+        std::cout << "\tTesting units formats\n";
         std::set<DB::CsvSettings::UnitsFormat> formats =
         {
             DB::CsvSettings::UnitsFormat::None,
@@ -171,16 +94,18 @@ void testCsvSettings()
                 db.setCsvSettings(settings);
 
                 CHECK_TRUE(db.getCsvSettings().unitsFormat == format);
-                saveDB(db);
+                closeDB(db);
             }
             {
                 DB db;
                 loadDB(db);
                 CHECK_TRUE(db.getCsvSettings().unitsFormat == format);
+                closeDB(db);
             }
         }
     }
 
+    std::cout << "\tTesting export flags\n";
 #define CHECK_BOOL(name)                                        \
     for (auto value: { true, false })                           \
     {                                                           \
@@ -191,12 +116,13 @@ void testCsvSettings()
             settings.name = value;                              \
             db.setCsvSettings(settings);                        \
             CHECK_TRUE(db.getCsvSettings().name == value);      \
-            saveDB(db);                                         \
+            closeDB(db);                                        \
         }                                                       \
         {                                                       \
             DB db;                                              \
             loadDB(db);                                         \
             CHECK_TRUE(db.getCsvSettings().name == value);      \
+            closeDB(db);                                        \
         }                                                       \
     }
     CHECK_BOOL(exportId);
@@ -212,6 +138,7 @@ void testCsvSettings()
 #undef CHECK_BOOL
 
 
+    std::cout << "\tTesting decimal places\n";
     for (auto value: { 0u, 1u, 2u, 3u })
     {
         {
@@ -221,14 +148,17 @@ void testCsvSettings()
             settings.decimalPlaces = value;
             db.setCsvSettings(settings);
             CHECK_TRUE(db.getCsvSettings().decimalPlaces == value);
-            saveDB(db);
+            closeDB(db);
         }
         {
             DB db;
             loadDB(db);
             CHECK_TRUE(db.getCsvSettings().decimalPlaces == value);
+            closeDB(db);
         }
     }
+
+    std::cout << "\tTesting separators\n";
     for (auto value: {"/", ",", " ", "|", ""})
     {
         {
@@ -238,12 +168,13 @@ void testCsvSettings()
             settings.separator = value;
             db.setCsvSettings(settings);
             CHECK_TRUE(db.getCsvSettings().separator == value);
-            saveDB(db);
+            closeDB(db);
         }
         {
             DB db;
             loadDB(db);
             CHECK_TRUE(db.getCsvSettings().separator == value);
+            closeDB(db);
         }
     }
 }
@@ -251,8 +182,6 @@ void testCsvSettings()
 
 int main(int, const char*[])
 {
-    std::cout << "Hello World\n";
-
     testGeneralSettings();
     testCsvSettings();
 

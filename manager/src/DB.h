@@ -32,6 +32,8 @@ public:
 
 	static Result<void> create(sqlite3& db);
     Result<void> load(sqlite3& db);
+    void close();
+    sqlite3* getSqliteDB();
 
 	////////////////////////////////////////////////////////////////////////////
 
@@ -673,6 +675,7 @@ private:
     void checkForDisconnectedBaseStations();
     void checkForBlackoutSensors();
     size_t _getFilteredMeasurements(Filter const& filter, std::vector<Measurement>* result) const;
+    Result<void> _addSensorTimeConfig(SensorTimeConfigDescriptor const& descriptor);
 
     //static inline MeasurementId computeMeasurementId(MeasurementDescriptor const& md);
     //static inline SensorId getSensorIdFromMeasurementId(MeasurementId id);

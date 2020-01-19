@@ -24,8 +24,7 @@ public:
 
 	static Result<void> create(sqlite3& db);
     bool load(sqlite3& db);
-
-    void setStdOutput(bool value);
+    void close();
 
     enum class Type : uint8_t
     {
@@ -34,6 +33,8 @@ public:
         WARNING,
         CRITICAL
     };
+
+	void setStdOutput(Type minType);
 
     void logVerbose(QString const& message);
     void logVerbose(std::string const& message);
@@ -77,7 +78,7 @@ signals:
 private:
     void addToDB(std::string const& message, Type type);
 
-    bool m_stdOutput = true;
+    Type m_stdOutputMinType = Type::VERBOSE;
 
 	mutable std::recursive_mutex m_mutex;
     sqlite3* m_sqlite = nullptr;
