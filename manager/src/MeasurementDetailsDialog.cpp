@@ -101,7 +101,7 @@ void MeasurementDetailsDialog::setMeasurement(DB::Measurement const& measurement
     {
 		m_ui.temperatureRW->setVisible(false);
 		m_ui.humidityRW->setVisible(false);
-		m_ui.temperatureRO->setText(QString(u8"%1°C").arg(m_measurement.descriptor.temperature, 0, 'f', 1));
+		m_ui.temperatureRO->setText(QString("%1°C").arg(m_measurement.descriptor.temperature, 0, 'f', 1));
 		m_ui.humidityRO->setText(QString("%1 %RH").arg(m_measurement.descriptor.humidity, 0, 'f', 1));
     }
 }

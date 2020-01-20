@@ -294,7 +294,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                 }
                 if (sensor.lastCommsTimePoint.time_since_epoch().count() != 0)
                 {
-                    auto p = utils::computeRelativeTimePointString(sensor.lastCommsTimePoint + m_db.getLastSensorTimeConfig().computedCommsPeriod);
+                    auto p = utils::computeRelativeTimePointString(sensor.lastCommsTimePoint + m_db.computeActualCommsPeriod(m_db.getLastSensorTimeConfig().descriptor));
                     if (p.second < k_imminentMaxSecond)
                     {
                         return QVariant(QColor(255, 255, 150));
@@ -394,7 +394,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
             {
                 if (sensor.lastCommsTimePoint.time_since_epoch().count() != 0)
                 {
-                    auto p = utils::computeRelativeTimePointString(sensor.lastCommsTimePoint + m_db.getLastSensorTimeConfig().computedCommsPeriod);
+                    auto p = utils::computeRelativeTimePointString(sensor.lastCommsTimePoint + m_db.computeActualCommsPeriod(m_db.getLastSensorTimeConfig().descriptor));
                     std::string str = p.first;
                     str = (p.second > 0) ? "In " + str : str + " ago";
                     if (p.second < k_imminentMaxSecond && p.second > k_imminentMinSecond)

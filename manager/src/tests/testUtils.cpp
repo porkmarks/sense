@@ -2,6 +2,7 @@
 #include "Logger.h"
 #include "sqlite3.h"
 #include <iostream>
+#include <QFileInfo>
 
 Logger s_logger;
 
@@ -17,6 +18,7 @@ void createDB(DB& db)
 {
 	std::string filename = "test.db";
 	remove(filename.c_str());
+	CHECK_FALSE(QFileInfo::exists(filename.c_str()));
 	sqlite3* sqlite;
 	CHECK_EQUALS(sqlite3_open_v2(filename.c_str(), &sqlite, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr), SQLITE_OK);
 	s_logger.setStdOutput(Logger::Type::WARNING);

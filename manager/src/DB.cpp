@@ -722,12 +722,6 @@ Result<void> DB::load(sqlite3& db)
             _addSensorTimeConfig(SensorTimeConfigDescriptor()).ignore();
 			needsSave = true;
         }
-        else
-        {
-            SensorTimeConfig& config = m_data.sensorTimeConfigs.back();
-            config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
-			data.sensorTimeConfigsChanged = true;
-        }
 
         s_logger.logVerbose(QString("Done loading DB. Time: %3s").arg(std::chrono::duration<float>(m_clock->now() - start).count()));
     }
@@ -2128,7 +2122,6 @@ Result<void> DB::_addSensorTimeConfig(SensorTimeConfigDescriptor const& descript
 	{
 		m_data.sensorTimeConfigs.erase(m_data.sensorTimeConfigs.begin());
 	}
-	m_data.sensorTimeConfigs.back().computedCommsPeriod = computeActualCommsPeriod(m_data.sensorTimeConfigs.back().descriptor); //make sure the computed commd config is up-to-date
 	m_data.sensorTimeConfigsChanged = true;
 
 	emit sensorTimeConfigAdded();
@@ -2160,16 +2153,6 @@ Result<void> DB::setSensorTimeConfigs(std::vector<SensorTimeConfig> const& confi
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
 	m_data.sensorTimeConfigs = configs;
-	for (SensorTimeConfig& config : m_data.sensorTimeConfigs)
-    {
-        config.computedCommsPeriod = config.descriptor.commsPeriod;
-    }
-    if (!m_data.sensorTimeConfigs.empty())
-    {
-		SensorTimeConfig& config = m_data.sensorTimeConfigs.back();
-        config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
-    }
-
 	m_data.sensorTimeConfigsChanged = true;
 	emit sensorTimeConfigChanged();
 
@@ -2255,13 +2238,7 @@ Result<void> DB::addSensor(SensorDescriptor const& descriptor)
     }
 
     //refresh computed comms period as new sensors are added
-    if (!m_data.sensorTimeConfigs.empty())
-    {
-		SensorTimeConfig& config = m_data.sensorTimeConfigs.back();
-        config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
-		m_data.sensorTimeConfigsChanged = true;
-        emit sensorTimeConfigChanged();
-    }
+    emit sensorTimeConfigChanged();
 
 	save(true);
 
@@ -2333,13 +2310,7 @@ Result<DB::SensorId> DB::bindSensor(uint32_t serialNumber, uint8_t sensorType, u
     s_logger.logInfo(QString("Sensor '%1' bound to address %2").arg(sensor.descriptor.name.c_str()).arg(sensor.address));
 
     //refresh computed comms period as new sensors are added
-    if (!m_data.sensorTimeConfigs.empty())
-    {
-		SensorTimeConfig& config = m_data.sensorTimeConfigs.back();
-        config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
-		m_data.sensorTimeConfigsChanged = true;
-        emit sensorTimeConfigChanged();
-    }
+    emit sensorTimeConfigChanged();
 
 	save(true);
 
@@ -2621,13 +2592,7 @@ void DB::removeSensor(size_t index)
     emit sensorRemoved(sensorId);
 
     //refresh computed comms period as new sensors are removed
-	if (!m_data.sensorTimeConfigs.empty())
-    {
-		SensorTimeConfig& config = m_data.sensorTimeConfigs.back();
-        config.computedCommsPeriod = computeActualCommsPeriod(config.descriptor);
-		m_data.sensorTimeConfigsChanged = true;
-        emit sensorTimeConfigChanged();
-    }
+    emit sensorTimeConfigChanged();
 
 	save(true);
 }

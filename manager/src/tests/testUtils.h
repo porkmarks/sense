@@ -63,3 +63,14 @@ do {\
 void closeDB(DB& db);
 void createDB(DB& db);
 void loadDB(DB& db);
+
+class ManualClock : public IClock
+{
+public:
+	time_point now() override { return m_timePoint;	}
+    void advance(duration d) { m_timePoint += d; }
+    void set(time_point tp) { m_timePoint = tp; }
+
+private:
+    time_point m_timePoint = time_point(duration::zero());
+};

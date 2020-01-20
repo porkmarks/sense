@@ -12,6 +12,9 @@
 #include <thread>
 #include <atomic>
 #include <condition_variable>
+#ifdef _MSC_VER
+#include <compare>
+#endif
 #include "Result.h"
 #include "Radio.h"
 
@@ -248,15 +251,21 @@ public:
     {
         IClock::duration measurementPeriod = std::chrono::minutes(5);
         IClock::duration commsPeriod = std::chrono::minutes(10);
+#ifdef _MSC_VER
+		bool operator<=>(SensorTimeConfigDescriptor const& other) const = default;
+#endif
     };
 
     struct SensorTimeConfig
     {
         SensorTimeConfigDescriptor descriptor;
-        IClock::duration computedCommsPeriod = std::chrono::minutes(10);
+        //IClock::duration computedCommsPeriod = std::chrono::minutes(10); //not saved
         //when did this config become active?
         IClock::time_point baselineMeasurementTimePoint = IClock::time_point(IClock::duration::zero());
         uint32_t baselineMeasurementIndex = 0;
+#ifdef _MSC_VER
+        bool operator<=>(SensorTimeConfig const& other) const = default;
+#endif
     };
 
     Result<void> addSensorTimeConfig(SensorTimeConfigDescriptor const& descriptor);
@@ -267,6 +276,8 @@ public:
     SensorTimeConfig getLastSensorTimeConfig() const;
     IClock::duration computeActualCommsPeriod(SensorTimeConfigDescriptor const& descriptor) const;
 	SensorTimeConfig findSensorTimeConfigForMeasurementIndex(uint32_t index) const;
+
+    //////////////////////////////////////////////////////////////////////////
 
     struct SensorErrors
     {

@@ -420,12 +420,12 @@ bool exportCsvTo(std::ostream& stream, DB::GeneralSettings const& settings, DB::
 			stream << std::fixed << std::setprecision(csvSettings.decimalPlaces) << m.descriptor.temperature;
 			if (csvSettings.unitsFormat == DB::CsvSettings::UnitsFormat::Embedded)
 			{
-				stream << (unicode ? u8"°C" : u8"\xB0""C");
+				stream << (const char*)(unicode ? u8"°C" : u8"\xB0""C");
 			}
 			stream << csvSettings.separator;
 			if (csvSettings.unitsFormat == DB::CsvSettings::UnitsFormat::SeparateColumn)
 			{
-				stream << (unicode ? u8"°C" : u8"\xB0""C");
+				stream << (const char*)(unicode ? u8"°C" : u8"\xB0""C");
 				stream << csvSettings.separator;
 			}
 		}
