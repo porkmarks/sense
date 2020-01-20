@@ -30,17 +30,15 @@ bool adminCheck(DB& db, QWidget* parent)
     int result = dialog.exec();
     if (result == QDialog::Accepted)
     {
-		int32_t _userIndex = db.findUserIndexByName(ui.username->text().toUtf8().data());
-        if (_userIndex < 0)
+        std::optional<DB::User> user = db.findUserByName(ui.username->text().toUtf8().data());
+        if (!user.has_value())
         {
             s_logger.logCritical(QString("Invalid login credentials (user '%1' not found)").arg(ui.username->text()).toUtf8().data());
             QMessageBox::critical(&dialog, "Error", QString("Invalid username '%1'.").arg(ui.username->text()));
             return false;
         }
 
-        size_t userIndex = static_cast<size_t>(_userIndex);
-		DB::User user = db.getUser(userIndex);
-		if (user.descriptor.type != DB::UserDescriptor::Type::Admin)
+        if (user->descriptor.type != DB::UserDescriptor::Type::Admin)
         {
             s_logger.logCritical(QString("Invalid login credentials (user '%1' not admin)").arg(ui.username->text()).toUtf8().data());
             QMessageBox::critical(&dialog, "Error", QString("Invalid user '%1': not admin.").arg(ui.username->text()));
@@ -53,7 +51,7 @@ bool adminCheck(DB& db, QWidget* parent)
         crypt.setCompressionMode(Crypt::CompressionAlways);
         crypt.setKey(ui.password->text());
         std::string passwordHash = crypt.encryptToString(QString(k_passwordHashReferenceText.c_str())).toUtf8().data();
-        if (user.descriptor.passwordHash != passwordHash)
+        if (user->descriptor.passwordHash != passwordHash)
         {
             s_logger.logCritical(QString("Invalid login credentials (wrong password)").toUtf8().data());
             QMessageBox::critical(&dialog, "Error", "Invalid username/password.");

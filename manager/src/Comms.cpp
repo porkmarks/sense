@@ -362,8 +362,8 @@ void Comms::sensorAdded(InitializedBaseStation& cbs, DB::SensorId id)
 
 void Comms::sensorRemoved(InitializedBaseStation& cbs, DB::SensorId id)
 {
-    int32_t unboundIndex = cbs.db.findUnboundSensorIndex();
-    if (unboundIndex == cbs.db.findSensorIndexById(id) || unboundIndex < 0)
+    std::optional<DB::Sensor> unboundSensor = cbs.db.findUnboundSensor();
+    if (!unboundSensor.has_value() || unboundSensor->id == id)
     {
         changeToRadioState(cbs, data::Radio_State::NORMAL);
     }
@@ -509,14 +509,12 @@ static void fillConfig(data::sensor::v1::Config_Response& config, DB::SensorSett
 
 void Comms::processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::v1::Measurement_Batch_Request const& measurementBatch)
 {
-    int32_t sensorIndex = cbs.db.findSensorIndexByAddress(request.address);
-    if (sensorIndex < 0)
+    std::optional<DB::Sensor> sensor = cbs.db.findSensorByAddress(request.address);
+    if (!sensor.has_value())
     {
         std::cerr << "Invalid sensor address: " << request.address << std::endl;
         return;
     }
-
-    DB::Sensor sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
 
     std::vector<DB::MeasurementDescriptor> measurements;
     uint32_t count = std::min<uint32_t>(measurementBatch.count, data::sensor::v1::Measurement_Batch_Request::MAX_COUNT);
@@ -527,15 +525,15 @@ void Comms::processSensorReq_MeasurementBatch(InitializedBaseStation& cbs, Senso
         data::sensor::v1::Measurement const& m = measurementBatch.measurements[i];
         DB::MeasurementDescriptor d;
         d.index = measurementBatch.start_index + i;
-        d.sensorId = sensor.id;
-        d.signalStrength.b2s = sensor.lastSignalStrengthB2S;
+        d.sensorId = sensor->id;
+        d.signalStrength.b2s = sensor->lastSignalStrengthB2S;
         d.signalStrength.s2b = request.signalS2B;
         d.vcc = data::sensor::v1::unpack_qvcc(measurementBatch.qvcc);
         m.unpack(d.humidity, d.temperature);
         measurements.push_back(d);
     }
 
-    cbs.db.addSingleSensorMeasurements(sensor.id, std::move(measurements));
+    cbs.db.addSingleSensorMeasurements(sensor->id, std::move(measurements));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -582,26 +580,24 @@ DB::SensorInputDetails Comms::createSensorInputDetails(DB::Sensor const& sensor,
 
 void Comms::processSensorReq_ConfigRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::v1::Config_Request const& configRequest)
 {
-    int32_t sensorIndex = cbs.db.findSensorIndexByAddress(request.address);
-    if (sensorIndex < 0)
+    std::optional<DB::Sensor> sensor = cbs.db.findSensorByAddress(request.address);
+    if (!sensor.has_value())
     {
         std::cerr << "Invalid sensor address: " << request.address << std::endl;
         sendEmptySensorResponse(cbs, request);
         return;
     }
 
-    DB::Sensor sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
-
-    DB::SensorInputDetails details = createSensorInputDetails(sensor, configRequest);
+    DB::SensorInputDetails details = createSensorInputDetails(*sensor, configRequest);
     cbs.db.setSensorInputDetails(details);
 
 	DB::SensorSettings sensorSettings = cbs.db.getSensorSettings();
-    DB::SensorOutputDetails outputDetails = cbs.db.computeSensorOutputDetails(sensor.id);
+    DB::SensorOutputDetails outputDetails = cbs.db.computeSensorOutputDetails(sensor->id);
     DB::Sensor::Calibration reportedCalibration{ static_cast<float>(configRequest.calibration.temperature_bias) / 100.f,
                 static_cast<float>(configRequest.calibration.humidity_bias) / 100.f};
 
     data::sensor::v1::Config_Response response;
-	fillConfig(response, sensorSettings, sensor, outputDetails, reportedCalibration);
+    fillConfig(response, sensorSettings, *sensor, outputDetails, reportedCalibration);
 
     sendSensorResponse(cbs, request, data::sensor::v1::Type::CONFIG_RESPONSE, request.address, response);
 
@@ -612,24 +608,22 @@ void Comms::processSensorReq_ConfigRequest(InitializedBaseStation& cbs, SensorRe
 
 void Comms::processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, SensorRequest const& request, data::sensor::v1::First_Config_Request const& firstConfigRequest)
 {
-    int32_t sensorIndex = cbs.db.findSensorIndexByAddress(request.address);
-    if (sensorIndex < 0)
+    std::optional<DB::Sensor> sensor = cbs.db.findSensorByAddress(request.address);
+    if (!sensor.has_value())
     {
         std::cerr << "Invalid sensor address: " << request.address << std::endl;
         sendEmptySensorResponse(cbs, request);
         return;
     }
 
-    DB::Sensor sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
-
     data::sensor::v1::First_Config_Response response;
 
     {
-        DB::SensorOutputDetails outputDetails = cbs.db.computeSensorOutputDetails(sensor.id);
+        DB::SensorOutputDetails outputDetails = cbs.db.computeSensorOutputDetails(sensor->id);
         response.first_measurement_index = outputDetails.nextRealTimeMeasurementIndex; //since this sensor just booted, it cannot have measurements older than now
     }
 
-    DB::SensorInputDetails details = createSensorInputDetails(sensor, firstConfigRequest);
+    DB::SensorInputDetails details = createSensorInputDetails(*sensor, firstConfigRequest);
 	details.hasDeviceInfo = true;
     details.deviceInfo.sensorType = firstConfigRequest.descriptor.sensor_type;
     details.deviceInfo.hardwareVersion = firstConfigRequest.descriptor.hardware_version;
@@ -644,8 +638,8 @@ void Comms::processSensorReq_FirstConfigRequest(InitializedBaseStation& cbs, Sen
 
     {
 		DB::SensorSettings sensorSettings = cbs.db.getSensorSettings();
-        DB::SensorOutputDetails outputDetails = cbs.db.computeSensorOutputDetails(sensor.id);
-		fillConfig(response, sensorSettings, sensor, outputDetails, sensor.calibration);
+        DB::SensorOutputDetails outputDetails = cbs.db.computeSensorOutputDetails(sensor->id);
+        fillConfig(response, sensorSettings, *sensor, outputDetails, sensor->calibration);
     }
 
     sendSensorResponse(cbs, request, data::sensor::v1::Type::FIRST_CONFIG_RESPONSE, request.address, response);
@@ -674,18 +668,16 @@ void Comms::processSensorReq_PairRequest(InitializedBaseStation& cbs, SensorRequ
     }
 
     DB::SensorId id = result.payload();
-    int32_t sensorIndex = cbs.db.findSensorIndexById(id);
-    if (sensorIndex < 0)
+    std::optional<DB::Sensor> sensor = cbs.db.findSensorById(id);
+    if (!sensor.has_value())
     {
         assert(false);
         sendEmptySensorResponse(cbs, request);
         return;
     }
 
-    DB::Sensor sensor = cbs.db.getSensor(static_cast<size_t>(sensorIndex));
-
     data::sensor::v1::Pair_Response response;
-    response.address = sensor.address;
+    response.address = sensor->address;
     sendSensorResponse(cbs, request, data::sensor::v1::Type::PAIR_RESPONSE, request.address, response);
 
     //switch back to normal state

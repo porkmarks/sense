@@ -38,43 +38,38 @@ Emailer::~Emailer()
 
 void Emailer::reportTriggered(DB::ReportId reportId, IClock::time_point from, IClock::time_point to)
 {
-	int32_t reportIndex = m_db.findReportIndexById(reportId);
-	if (reportIndex < 0)
+    std::optional<DB::Report> report = m_db.findReportById(reportId);
+    if (!report.has_value())
 	{
 		assert(false);
 		return;
 	}
 
-	DB::Report report = m_db.getReport(static_cast<size_t>(reportIndex));
-
-    s_logger.logInfo(QString("Report '%1' triggered").arg(report.descriptor.name.c_str()));
-    sendReportEmail(report, from, to);
+    s_logger.logInfo(QString("Report '%1' triggered").arg(report->descriptor.name.c_str()));
+    sendReportEmail(*report, from, to);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void Emailer::alarmSensorTriggersChanged(DB::AlarmId alarmId, DB::SensorId sensorId, std::optional<DB::Measurement> measurement, uint32_t oldTriggers, DB::AlarmTriggers triggers)
 {
-    int32_t alarmIndex = m_db.findAlarmIndexById(alarmId);
-    int32_t sensorIndex = m_db.findSensorIndexById(sensorId);
-    if (alarmIndex < 0 || sensorIndex < 0)
+    std::optional<DB::Alarm> alarm = m_db.findAlarmById(alarmId);
+    std::optional<DB::Sensor> sensor = m_db.findSensorById(sensorId);
+    if (!alarm.has_value() || !sensor.has_value())
     {
         assert(false);
         return;
     }
 
-    DB::Alarm alarm = m_db.getAlarm(static_cast<size_t>(alarmIndex));
-    DB::Sensor sensor = m_db.getSensor(static_cast<size_t>(sensorIndex));
-
-    if (alarm.descriptor.sendEmailAction)
+    if (alarm->descriptor.sendEmailAction)
     {
         if (triggers.removed != 0)
         {
-            sendAlarmEmail(alarm, sensor, measurement, oldTriggers, triggers.current, triggers.removed, Action::Recovery);
+            sendAlarmEmail(*alarm, *sensor, measurement, oldTriggers, triggers.current, triggers.removed, Action::Recovery);
         }
         if (triggers.added != 0)
         {
-            sendAlarmEmail(alarm, sensor, measurement, oldTriggers, triggers.current, triggers.added, Action::Trigger);
+            sendAlarmEmail(*alarm, *sensor, measurement, oldTriggers, triggers.current, triggers.added, Action::Trigger);
         }
     }
 }
@@ -84,17 +79,16 @@ void Emailer::alarmSensorTriggersChanged(DB::AlarmId alarmId, DB::SensorId senso
 
 void Emailer::alarmStillTriggered(DB::AlarmId alarmId)
 {
-	int32_t alarmIndex = m_db.findAlarmIndexById(alarmId);
-	if (alarmIndex < 0)
+    std::optional<DB::Alarm> alarm = m_db.findAlarmById(alarmId);
+    if (!alarm.has_value())
 	{
 		assert(false);
 		return;
 	}
 
-	DB::Alarm alarm = m_db.getAlarm(static_cast<size_t>(alarmIndex));
-	if (alarm.descriptor.sendEmailAction)
+    if (alarm->descriptor.sendEmailAction)
 	{
-		sendAlarmRetriggerEmail(alarm);
+        sendAlarmRetriggerEmail(*alarm);
 	}
 }
 
@@ -297,11 +291,10 @@ void Emailer::sendAlarmRetriggerEmail(DB::Alarm const& alarm)
 	for (auto p : alarm.triggersPerSensor)
 	{
         DB::SensorId sensorId = p.first;
-        int32_t sensorIndex = m_db.findSensorIndexById(sensorId);
-        if (sensorIndex >= 0)
+        std::optional<DB::Sensor> sensor = m_db.findSensorById(sensorId);
+        if (sensor.has_value())
 		{
-            DB::Sensor sensor = m_db.getSensor((size_t)sensorIndex);
-			email.body += "\n<p>Sensor '<strong>" + sensor.descriptor.name + "</strong>': " + toString(p.second) + "</p>";
+            email.body += "\n<p>Sensor '<strong>" + sensor->descriptor.name + "</strong>': " + toString(p.second) + "</p>";
 		}
 	}
 	
@@ -318,10 +311,10 @@ std::optional<utils::CsvData> Emailer::getCsvData(std::vector<DB::Measurement> c
 {
 	utils::CsvData data;
     data.measurement = measurements[index];
-	int32_t sensorIndex = m_db.findSensorIndexById(data.measurement.descriptor.sensorId);
-	if (sensorIndex >= 0)
+    std::optional<DB::Sensor> sensor = m_db.findSensorById(data.measurement.descriptor.sensorId);
+    if (sensor.has_value())
 	{
-		data.sensor = m_db.getSensor((size_t)sensorIndex);
+        data.sensor = *sensor;
 	}
 	return data;
 }
@@ -581,7 +574,7 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
         std::vector<MimeAttachment*> attachments;
         for (Email::Attachment const& a: email.attachments)
 		{
-			MimeAttachment* attachment = new MimeAttachment(QByteArray(a.contents.c_str(), (int)a.contents.size()), a.filename.c_str());
+            MimeAttachment* attachment = new MimeAttachment(QByteArray(a.contents.c_str(), int(a.contents.size())), a.filename.c_str());
             attachments.push_back(attachment);
             message.addPart(attachment);
 		}

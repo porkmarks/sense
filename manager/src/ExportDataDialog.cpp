@@ -56,12 +56,12 @@ std::optional<utils::CsvData> ExportDataDialog::getCsvData(size_t index) const
 {
     utils::CsvData data;
     data.measurement = m_model.getMeasurement(index);
-    int32_t sensorIndex = m_db.findSensorIndexById(data.measurement.descriptor.sensorId);
-    if (sensorIndex >= 0)
+    std::optional<DB::Sensor> sensor = m_db.findSensorById(data.measurement.descriptor.sensorId);
+    if (sensor.has_value())
     {
-        data.sensor = m_db.getSensor((size_t)sensorIndex);
+        data.sensor = *sensor;
     }
-    return data;
+    return std::move(data);
 }
 
 //////////////////////////////////////////////////////////////////////////

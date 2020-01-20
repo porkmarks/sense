@@ -157,8 +157,8 @@ bool ConfigureReportDialog::getDescriptor(DB::ReportDescriptor& descriptor)
         return false;
     }
 
-    int32_t reportIndex = m_db.findReportIndexByName(descriptor.name);
-    if (reportIndex >= 0 && m_db.getReport(static_cast<size_t>(reportIndex)).id != m_report.id)
+    std::optional<DB::Report> report = m_db.findReportByName(descriptor.name);
+    if (report.has_value() && report->id != m_report.id)
     {
         QMessageBox::critical(this, "Error", QString("Report '%1' already exists.").arg(descriptor.name.c_str()));
         return false;

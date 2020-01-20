@@ -159,8 +159,8 @@ void ConfigureUserDialog::accept()
         descriptor.passwordHash = crypt.encryptToString(QString(k_passwordHashReferenceText.c_str())).toUtf8().data();
     }
 
-	int32_t userIndex = m_db.findUserIndexByName(descriptor.name);
-    if (userIndex >= 0 && m_db.getUser(static_cast<size_t>(userIndex)).id != m_user.id)
+    std::optional<DB::User> user = m_db.findUserByName(descriptor.name);
+    if (user.has_value() && user->id != m_user.id)
     {
         QMessageBox::critical(this, "Error", QString("User '%1' already exists.").arg(descriptor.name.c_str()));
         return;

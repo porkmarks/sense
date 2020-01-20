@@ -194,10 +194,14 @@ public:
 	int32_t findUserIndexByName(std::string const& name) const;
 	int32_t findUserIndexById(UserId id) const;
 	int32_t findUserIndexByPasswordHash(std::string const& passwordHash) const;
-	bool addUser(UserDescriptor const& descriptor);
+    std::optional<User> findUserByName(std::string const& name) const;
+    std::optional<User> findUserById(UserId id) const;
+    std::optional<User> findUserByPasswordHash(std::string const& passwordHash) const;
+    bool addUser(UserDescriptor const& descriptor);
 	Result<void> setUser(UserId id, UserDescriptor const& descriptor);
 	void removeUser(size_t index);
-	bool needsAdmin() const;
+    void removeUserById(UserId id);
+    bool needsAdmin() const;
 	void setLoggedInUserId(UserId id);
 	UserId getLoggedInUserId() const;
 	std::optional<User> getLoggedInUser() const;
@@ -227,9 +231,13 @@ public:
     int32_t findBaseStationIndexByName(std::string const& name) const;
     int32_t findBaseStationIndexById(BaseStationId id) const;
     int32_t findBaseStationIndexByMac(BaseStationDescriptor::Mac const& mac) const;
+    std::optional<BaseStation> findBaseStationByName(std::string const& name) const;
+    std::optional<BaseStation> findBaseStationById(BaseStationId id) const;
+    std::optional<BaseStation> findBaseStationByMac(BaseStationDescriptor::Mac const& mac) const;
     bool addBaseStation(BaseStationDescriptor const& descriptor);
     bool setBaseStation(BaseStationId id, BaseStationDescriptor const& descriptor);
     void removeBaseStation(size_t index);
+    void removeBaseStationById(BaseStationId id);
     void setBaseStationConnected(BaseStationId id, bool connected);
 
     ////////////////////////////////////////////////////////////////////////////
@@ -479,11 +487,17 @@ public:
     SensorOutputDetails computeSensorOutputDetails(SensorId id) const;
 
     void removeSensor(size_t index);
+    void removeSensorById(SensorId id);
     int32_t findSensorIndexByName(std::string const& name) const;
     int32_t findSensorIndexById(SensorId id) const;
     int32_t findSensorIndexByAddress(SensorAddress address) const;
     int32_t findSensorIndexBySerialNumber(SensorSerialNumber serialNumber) const;
     int32_t findUnboundSensorIndex() const;
+    std::optional<Sensor> findSensorByName(std::string const& name) const;
+    std::optional<Sensor> findSensorById(SensorId id) const;
+    std::optional<Sensor> findSensorByAddress(SensorAddress address) const;
+    std::optional<Sensor> findSensorBySerialNumber(SensorSerialNumber serialNumber) const;
+    std::optional<Sensor> findUnboundSensor() const;
 
     ////////////////////////////////////////////////////////////////////////////
 
@@ -535,9 +549,12 @@ public:
     Alarm getAlarm(size_t index) const;
     int32_t findAlarmIndexByName(std::string const& name) const;
     int32_t findAlarmIndexById(AlarmId id) const;
+    std::optional<Alarm> findAlarmByName(std::string const& name) const;
+    std::optional<Alarm> findAlarmById(AlarmId id) const;
     Result<void> addAlarm(AlarmDescriptor const& descriptor);
     Result<void> setAlarm(AlarmId id, AlarmDescriptor const& descriptor);
     void removeAlarm(size_t index);
+    void removeAlarmById(AlarmId id);
 
     ////////////////////////////////////////////////////////////////////////////
 
@@ -608,9 +625,12 @@ public:
     Report getReport(size_t index) const;
     int32_t findReportIndexByName(std::string const& name) const;
     int32_t findReportIndexById(ReportId id) const;
+    std::optional<Report> findReportByName(std::string const& name) const;
+    std::optional<Report> findReportById(ReportId id) const;
     Result<void> addReport(ReportDescriptor const& descriptor);
     Result<void> setReport(ReportId id, ReportDescriptor const& descriptor);
     void removeReport(size_t index);
+    void removeReportById(ReportId id);
 
     ////////////////////////////////////////////////////////////////////////////
 

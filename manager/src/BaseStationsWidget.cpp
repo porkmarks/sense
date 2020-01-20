@@ -172,8 +172,7 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
 
     DB::BaseStationDescriptor descriptor = m_baseStationDescriptors[indexRow];
 
-    int32_t _bsIndex = m_db->findBaseStationIndexByMac(descriptor.mac);
-    if (_bsIndex >= 0)
+    if (m_db->findBaseStationIndexByMac(descriptor.mac) >= 0)
     {
         return;
     }
@@ -187,7 +186,7 @@ void BaseStationsWidget::activateBaseStation(QModelIndex const& index)
     descriptor.name = qname.toUtf8().data();
     if (m_db->addBaseStation(descriptor))
     {
-        _bsIndex = m_db->findBaseStationIndexByMac(descriptor.mac);
+        int32_t _bsIndex = m_db->findBaseStationIndexByMac(descriptor.mac);
         if (_bsIndex >= 0)
         {
             size_t bsIndex = static_cast<size_t>(_bsIndex);

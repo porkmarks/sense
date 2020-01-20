@@ -187,23 +187,21 @@ void UsersWidget::removeUsers()
 
     QModelIndex mi = m_model->index(selected.at(0).row(), static_cast<int>(UsersModel::Column::Id));
 	DB::UserId id = m_model->data(mi).toUInt();
-	int32_t _index = m_db->findUserIndexById(id);
-    if (_index < 0)
+
+    std::optional<DB::User> user = m_db->findUserById(id);
+    if (!user.has_value())
     {
         QMessageBox::critical(this, "Error", "Invalid user selected.");
         return;
     }
 
-    size_t index = static_cast<size_t>(_index);
-	DB::User user = m_db->getUser(index);
-
-    int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete user '%1'").arg(user.descriptor.name.c_str()));
+    int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete user '%1'").arg(user->descriptor.name.c_str()));
     if (response != QMessageBox::Yes)
     {
         return;
     }
 
-    m_db->removeUser(index);
+    m_db->removeUserById(id);
 }
 
 //////////////////////////////////////////////////////////////////////////

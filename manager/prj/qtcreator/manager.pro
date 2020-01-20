@@ -14,14 +14,14 @@ TEMPLATE = app
 #INSTALLS = target
 
 CONFIG += console
-CONFIG += c++14
+CONFIG += c++2a
 CONFIG -= console
 
 INCLUDEPATH += ../../src
 INCLUDEPATH += ../../src/Smtp
 INCLUDEPATH += ../../src/qftp
+INCLUDEPATH += ../../src/sqlite
 INCLUDEPATH += ../../../common/src
-INCLUDEPATH += ../../../common/src/rapidjson/include
 INCLUDEPATH += ../../../sensor/firmware
 
 
@@ -50,6 +50,7 @@ win32-msvc* {
     QMAKE_LFLAGS_RELEASE += /MAP
     QMAKE_CFLAGS_RELEASE += /Zi
     QMAKE_LFLAGS_RELEASE += /debug /opt:ref
+    LIBS += User32.lib
 }
 
 OBJECTS_DIR = ./.obj/$${DEST_FOLDER}
@@ -61,33 +62,78 @@ DESTDIR = ../../bin
 RESOURCES += \
     ../../res/res.qrc
 
+FORMS += \
+    ../../src/AboutDialog.ui \
+    ../../src/AlarmsWidget.ui \
+    ../../src/BaseStationsDialog.ui \
+    ../../src/BaseStationsWidget.ui \
+    ../../src/ConfigureAlarmDialog.ui \
+    ../../src/ConfigureReportDialog.ui \
+    ../../src/ConfigureUserDialog.ui \
+    ../../src/CsvSettingsWidget.ui \
+    ../../src/DateTimeFilterWidget.ui \
+    ../../src/ExportDataDialog.ui \
+    ../../src/ExportLogsDialog.ui \
+    ../../src/ExportPicDialog.ui \
+    ../../src/LoginDialog.ui \
+    ../../src/LogsWidget.ui \
+    ../../src/Manager.ui \
+    ../../src/MeasurementDetailsDialog.ui \
+    ../../src/MeasurementsWidget.ui \
+    ../../src/PlotWidget.ui \
+    ../../src/ReportsDialog.ui \
+    ../../src/ReportsWidget.ui \
+    ../../src/SensorDetailsDialog.ui \
+    ../../src/SensorsFilterDialog.ui \
+    ../../src/SensorsFilterWidget.ui \
+    ../../src/SensorsWidget.ui \
+    ../../src/SettingsDialog.ui \
+    ../../src/SettingsWidget.ui \
+    ../../src/UsersDialog.ui \
+    ../../src/UsersWidget.ui
+
 HEADERS += \
-    ../../src/Manager.h \
-    ../../src/stdafx.h \
-    ../../src/Comms.h \
-    ../../src/BaseStationsWidget.h \
-    ../../src/MeasurementsWidget.h \
-    ../../src/AlarmsWidget.h \
-    ../../../common/src/Channel.h \
-    ../../../common/src/QTcpSocketAdapter.h \
-    ../../src/SensorsWidget.h \
-    ../../src/SensorsModel.h \
-    ../../src/AlarmsModel.h \
-    ../../src/MeasurementsModel.h \
-    ../../src/DB.h \
-    ../../src/MeasurementsDelegate.h \
-    ../../src/SensorsDelegate.h \
-    ../../src/ConfigureAlarmDialog.h \
-    ../../src/PlotWidget.h \
     ../../../common/src/Butterworth.h \
+    ../../../common/src/Channel.h \
+    ../../../common/src/Crypt.h \
+    ../../../common/src/QTcpSocketAdapter.h \
+    ../../../common/src/Queue.h \
+    ../../../common/src/Result.h \
+    ../../src/AlarmsModel.h \
+    ../../src/AlarmsWidget.h \
+    ../../src/BaseStationsWidget.h \
+    ../../src/Comms.h \
+    ../../src/ConfigureAlarmDialog.h \
+    ../../src/ConfigureReportDialog.h \
+    ../../src/ConfigureUserDialog.h \
+    ../../src/CsvSettingsWidget.h \
+    ../../src/DB.h \
+    ../../src/DateTimeFilterWidget.h \
+    ../../src/Emailer.h \
     ../../src/ExportDataDialog.h \
+    ../../src/ExportLogsDialog.h \
     ../../src/ExportPicDialog.h \
+    ../../src/HtmlItemDelegate.h \
+    ../../src/Logger.h \
+    ../../src/LogsModel.h \
+    ../../src/LogsWidget.h \
+    ../../src/Manager.h \
+    ../../src/MeasurementDetailsDialog.h \
+    ../../src/MeasurementsDelegate.h \
+    ../../src/MeasurementsModel.h \
+    ../../src/MeasurementsWidget.h \
+    ../../src/PermissionsCheck.h \
+    ../../src/PlotToolTip.h \
+    ../../src/PlotWidget.h \
     ../../src/ReportsModel.h \
     ../../src/ReportsWidget.h \
-    ../../src/ConfigureReportDialog.h \
-    ../../src/Utils.h \
-    ../../../common/src/Crypt.h \
-    ../../src/Emailer.h \
+    ../../src/SensorDetailsDialog.h \
+    ../../src/SensorsDelegate.h \
+    ../../src/SensorsFilterWidget.h \
+    ../../src/SensorsModel.h \
+    ../../src/SensorsWidget.h \
+    ../../src/SettingsWidget.h \
+    ../../src/Smtp/SmtpMime \
     ../../src/Smtp/emailaddress.h \
     ../../src/Smtp/mimeattachment.h \
     ../../src/Smtp/mimecontentformatter.h \
@@ -101,52 +147,53 @@ HEADERS += \
     ../../src/Smtp/quotedprintable.h \
     ../../src/Smtp/smtpclient.h \
     ../../src/Smtp/smtpexports.h \
-    ../../src/SettingsWidget.h \
-    ../../src/ConfigureUserDialog.h \
+    ../../src/StackWalker.h \
+    ../../src/TreeView.h \
     ../../src/UsersModel.h \
     ../../src/UsersWidget.h \
-    ../../src/Settings.h \
-    ../../src/LogsWidget.h \
-    ../../src/LogsModel.h \
-    ../../src/Logger.h \
-    ../../src/ExportLogsDialog.h \
+    ../../src/Utils.h \
+    ../../src/qcustomplot.h \
     ../../src/qftp/qftp.h \
     ../../src/qftp/qurlinfo.h \
-    ../../src/DateTimeFilterWidget.h \
-    ../../src/StackWalker.h \
-    ../../src/SensorsFilterWidget.h \
-    ../../../sensor/firmware/CRC.h \
-    ../../../sensor/firmware/Data_Defs.h \
-    ../../src/qcustomplot.h \
-    ../../src/PlotToolTip.h \
-    ../../../common/src/Result.h \
-    ../../src/SensorDetailsDialog.h \
-    ../../src/AdminCheck.h
+    ../../src/sqlite/sqlite3.h \
+    ../../src/sqlite/sqlite3ext.h
 
 SOURCES += \
-    ../../src/Manager.cpp \
-    ../../src/main.cpp \
-    ../../src/Comms.cpp \
-    ../../src/BaseStationsWidget.cpp \
-    ../../src/MeasurementsWidget.cpp \
-    ../../src/AlarmsWidget.cpp \
-    ../../src/DB.cpp \
-    ../../src/SensorsWidget.cpp \
-    ../../src/SensorsModel.cpp \
+    ../../../common/src/Crypt.cpp \
     ../../src/AlarmsModel.cpp \
-    ../../src/MeasurementsModel.cpp \
-    ../../src/MeasurementsDelegate.cpp \
-    ../../src/SensorsDelegate.cpp \
+    ../../src/AlarmsWidget.cpp \
+    ../../src/BaseStationsWidget.cpp \
+    ../../src/Comms.cpp \
     ../../src/ConfigureAlarmDialog.cpp \
-    ../../src/PlotWidget.cpp \
+    ../../src/ConfigureReportDialog.cpp \
+    ../../src/ConfigureUserDialog.cpp \
+    ../../src/CsvSettingsWidget.cpp \
+    ../../src/DB.cpp \
+    ../../src/DateTimeFilterWidget.cpp \
+    ../../src/Emailer.cpp \
     ../../src/ExportDataDialog.cpp \
+    ../../src/ExportLogsDialog.cpp \
     ../../src/ExportPicDialog.cpp \
+    ../../src/HtmlItemDelegate.cpp \
+    ../../src/Logger.cpp \
+    ../../src/LogsModel.cpp \
+    ../../src/LogsWidget.cpp \
+    ../../src/Manager.cpp \
+    ../../src/MeasurementDetailsDialog.cpp \
+    ../../src/MeasurementsDelegate.cpp \
+    ../../src/MeasurementsModel.cpp \
+    ../../src/MeasurementsWidget.cpp \
+    ../../src/PermissionsCheck.cpp \
+    ../../src/PlotToolTip.cpp \
+    ../../src/PlotWidget.cpp \
     ../../src/ReportsModel.cpp \
     ../../src/ReportsWidget.cpp \
-    ../../src/ConfigureReportDialog.cpp \
-    ../../src/Utils.cpp \
-    ../../../common/src/Crypt.cpp \
-    ../../src/Emailer.cpp \
+    ../../src/SensorDetailsDialog.cpp \
+    ../../src/SensorsDelegate.cpp \
+    ../../src/SensorsFilterWidget.cpp \
+    ../../src/SensorsModel.cpp \
+    ../../src/SensorsWidget.cpp \
+    ../../src/SettingsWidget.cpp \
     ../../src/Smtp/emailaddress.cpp \
     ../../src/Smtp/mimeattachment.cpp \
     ../../src/Smtp/mimecontentformatter.cpp \
@@ -159,50 +206,14 @@ SOURCES += \
     ../../src/Smtp/mimetext.cpp \
     ../../src/Smtp/quotedprintable.cpp \
     ../../src/Smtp/smtpclient.cpp \
-    ../../src/SettingsWidget.cpp \
-    ../../src/ConfigureUserDialog.cpp \
+    ../../src/StackWalker.cpp \
     ../../src/UsersModel.cpp \
     ../../src/UsersWidget.cpp \
-    ../../src/Settings.cpp \
-    ../../src/LogsWidget.cpp \
-    ../../src/LogsModel.cpp \
-    ../../src/Logger.cpp \
-    ../../src/ExportLogsDialog.cpp \
+    ../../src/Utils.cpp \
+    ../../src/main.cpp \
+    ../../src/qcustomplot.cpp \
     ../../src/qftp/qftp.cpp \
     ../../src/qftp/qurlinfo.cpp \
-    ../../src/DateTimeFilterWidget.cpp \
-    ../../src/StackWalker.cpp \
-    ../../src/SensorsFilterWidget.cpp \
-    ../../../sensor/firmware/CRC.cpp \
-    ../../src/qcustomplot.cpp \
-    ../../src/PlotToolTip.cpp \
-    ../../src/SensorDetailsDialog.cpp \
-    ../../src/AdminCheck.cpp
+    ../../src/sqlite/sqlite3.c
 
-FORMS += \
-    ../../src/Manager.ui \
-    ../../src/BaseStationsWidget.ui \
-    ../../src/MeasurementsWidget.ui \
-    ../../src/SensorsWidget.ui \
-    ../../src/SensorsFilterDialog.ui \
-    ../../src/AlarmsWidget.ui \
-    ../../src/ConfigureAlarmDialog.ui \
-    ../../src/PlotWidget.ui \
-    ../../src/ExportDataDialog.ui \
-    ../../src/ExportPicDialog.ui \
-    ../../src/ReportsWidget.ui \
-    ../../src/ConfigureReportDialog.ui \
-    ../../src/SettingsWidget.ui \
-    ../../src/ConfigureUserDialog.ui \
-    ../../src/UsersWidget.ui \
-    ../../src/LoginDialog.ui \
-    ../../src/LogsWidget.ui \
-    ../../src/ExportLogsDialog.ui \
-    ../../src/DateTimeFilterWidget.ui \
-    ../../src/SensorsFilterWidget.ui \
-    ../../src/SensorDetailsDialog.ui \
-    ../../src/SensorDetailsDialog.ui \
-    ../../src/AboutDialog.ui
-
-DISTFILES += \
 

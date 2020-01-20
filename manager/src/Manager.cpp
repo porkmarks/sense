@@ -183,10 +183,10 @@ void Manager::checkIfAdminExists()
             {
                 s_logger.logInfo(QString("Admin user '%1' created, logging in").arg(user.descriptor.name.c_str()).toUtf8().data());
 
-                int32_t userIndex = m_db.findUserIndexByName(user.descriptor.name);
-                if (userIndex >= 0)
+                std::optional<DB::User> user = m_db.findUserByName(user->descriptor.name);
+                if (user.has_value())
                 {
-                    m_db.setLoggedInUserId(m_db.getUser(static_cast<size_t>(userIndex)).id);
+                    m_db.setLoggedInUserId(user->id);
                 }
                 else
                 {
@@ -231,17 +231,14 @@ void Manager::login()
         int result = dialog.exec();
         if (result == QDialog::Accepted)
         {
-            int32_t _userIndex = m_db.findUserIndexByName(ui.username->text().toUtf8().data());
-            if (_userIndex < 0)
+            std::optional<DB::User> user = m_db.findUserByName(ui.username->text().toUtf8().data());
+            if (!user.has_value())
             {
                 attempts++;
                 s_logger.logCritical(QString("Invalid login credentials (user not found), attempt %1").arg(attempts).toUtf8().data());
                 QMessageBox::critical(this, "Error", QString("Invalid username '%1'.").arg(ui.username->text()));
                 continue;
             }
-
-            size_t userIndex = static_cast<size_t>(_userIndex);
-			DB::User user = m_db.getUser(userIndex);
 
 #ifdef CHECK_PASSWORD
             Crypt crypt;
@@ -250,7 +247,7 @@ void Manager::login()
             crypt.setCompressionMode(Crypt::CompressionAlways);
             crypt.setKey(ui.password->text());
             std::string passwordHash = crypt.encryptToString(QString(k_passwordHashReferenceText.c_str())).toUtf8().data();
-            if (user.descriptor.passwordHash != passwordHash)
+            if (user->descriptor.passwordHash != passwordHash)
             {
                 attempts++;
                 s_logger.logCritical(QString("Invalid login credentials (wrong password), attempt %1").arg(attempts).toUtf8().data());
@@ -259,7 +256,7 @@ void Manager::login()
             }
 #endif
 
-            m_db.setLoggedInUserId(user.id);
+            m_db.setLoggedInUserId(user->id);
             break;
         }
         else
@@ -297,7 +294,7 @@ void Manager::showSettingsDialog()
 	QDialog dialog(this);
 	Ui::SettingsDialog ui;
 	ui.setupUi(&dialog);
-	ui.settingsWidget->init(m_comms, m_db);
+    ui.settingsWidget->init(m_db);
 
 	QSettings settings;
     if (settings.contains("settingsDialogGeometry"))
@@ -384,16 +381,14 @@ void Manager::exitAction()
 
 void Manager::userLoggedIn(DB::UserId id)
 {
-	int32_t _index = m_db.findUserIndexById(id);
-    if (_index < 0)
+    std::optional<DB::User> user = m_db.findUserById(id);
+    if (!user.has_value())
     {
         setWindowTitle("Manager (Not Logged In");
     }
     else
     {
-        size_t index = static_cast<size_t>(_index);
-		DB::User user = m_db.getUser(index);
-        setWindowTitle(QString("Manager (%1)").arg(user.descriptor.name.c_str()));
+        setWindowTitle(QString("Manager (%1)").arg(user->descriptor.name.c_str()));
     }
 }
 
@@ -403,12 +398,10 @@ void Manager::baseStationDiscovered(Comms::BaseStationDescriptor const& commsBS)
 {
 	auto id = std::this_thread::get_id();
 
-	int32_t _bsIndex = m_db.findBaseStationIndexByMac(commsBS.mac);
-	if (_bsIndex >= 0)
+    std::optional<DB::BaseStation> bs = m_db.findBaseStationByMac(commsBS.mac);
+    if (bs.has_value())
 	{
-		size_t bsIndex = static_cast<size_t>(_bsIndex);
-		DB::BaseStation bs = m_db.getBaseStation(static_cast<size_t>(bsIndex));
-		m_comms.connectToBaseStation(m_db, bs.descriptor.mac);
+        m_comms.connectToBaseStation(m_db, bs->descriptor.mac);
 	}
 }
 

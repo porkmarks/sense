@@ -90,8 +90,7 @@ int32_t SensorsModel::getSensorIndex(QModelIndex index) const
 
 void SensorsModel::sensorAdded(DB::SensorId id)
 {
-    int32_t sensorIndex = m_db.findSensorIndexById(id);
-    if (sensorIndex < 0)
+    if (m_db.findSensorIndexById(id) < 0)
     {
         assert(false);
         return;
@@ -99,7 +98,7 @@ void SensorsModel::sensorAdded(DB::SensorId id)
 
     //DB::Sensor sensor = m_db.getSensor(sensorIndex);
 
-    emit beginInsertRows(QModelIndex(), (int)m_sensors.size(), (int)m_sensors.size());
+    emit beginInsertRows(QModelIndex(), int(m_sensors.size()), int(m_sensors.size()));
     SensorData sd;
     sd.sensorId = id;
     m_sensors.push_back(sd);
@@ -261,14 +260,12 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
     }
 
     SensorData const& sensorData = m_sensors[indexRow];
-    int32_t _dbSensorIndex = m_db.findSensorIndexById(sensorData.sensorId);
-    assert(_dbSensorIndex >= 0);
-    if (_dbSensorIndex < 0)
+    std::optional<DB::Sensor> sensor = m_db.findSensorById(sensorData.sensorId);
+    if (!sensor.has_value())
     {
+        Q_ASSERT(false);
         return QVariant();
     }
-    size_t dbSensorIndex = static_cast<size_t>(_dbSensorIndex);
-    DB::Sensor sensor = m_db.getSensor(dbSensorIndex);
 
     Column column = static_cast<Column>(index.column());
     if (role == Qt::CheckStateRole && m_showCheckboxes)
@@ -282,19 +279,19 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
     {
         if (column == Column::NextComms)
         {
-            if (sensor.state == DB::Sensor::State::Sleeping)
+            if (sensor->state == DB::Sensor::State::Sleeping)
             {
                 return QVariant(QColor(150, 150, 150));
             }
             else
             {
-                if (sensor.blackout)
+                if (sensor->blackout)
                 {
 					return QVariant(QColor(255, 150, 150));
                 }
-                if (sensor.lastCommsTimePoint.time_since_epoch().count() != 0)
+                if (sensor->lastCommsTimePoint.time_since_epoch().count() != 0)
                 {
-                    auto p = utils::computeRelativeTimePointString(sensor.lastCommsTimePoint + m_db.computeActualCommsPeriod(m_db.getLastSensorTimeConfig().descriptor));
+                    auto p = utils::computeRelativeTimePointString(sensor->lastCommsTimePoint + m_db.computeActualCommsPeriod(m_db.getLastSensorTimeConfig().descriptor));
                     if (p.second < k_imminentMaxSecond)
                     {
                         return QVariant(QColor(255, 255, 150));
@@ -304,7 +301,7 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Stored)
         {
-            if (sensor.estimatedStoredMeasurementCount > k_alertStoredMeasurementCount)
+            if (sensor->estimatedStoredMeasurementCount > k_alertStoredMeasurementCount)
             {
                 return QVariant(QColor(255, 150, 150));
             }
@@ -314,44 +311,44 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
     {
         if (column == Column::Name)
         {
-            if (sensor.state == DB::Sensor::State::Active)
+            if (sensor->state == DB::Sensor::State::Active)
             {
                 return QIcon(":/icons/ui/sensor.png");
             }
-            if (sensor.state == DB::Sensor::State::Sleeping)
+            if (sensor->state == DB::Sensor::State::Sleeping)
             {
                 return QIcon(":/icons/ui/sleeping.png");
             }
-            if (sensor.state == DB::Sensor::State::Unbound)
+            if (sensor->state == DB::Sensor::State::Unbound)
             {
                 return QIcon(":/icons/ui/unbound.png");
             }
         }
         else if (column == Column::NextComms)
         {
-            if (sensor.lastCommsTimePoint.time_since_epoch().count() == 0)
+            if (sensor->lastCommsTimePoint.time_since_epoch().count() == 0)
             {
                 return QIcon(":/icons/ui/question.png");
             } 
         }
         else if (column == Column::Stored)
         {
-//            if (sensor.storedMeasurementCount < 0)
+//            if (sensor->storedMeasurementCount < 0)
 //            {
 //                return QIcon(":/icons/ui/question.png");
 //            }
         }
         else
         {
-            if (sensor.isRTMeasurementValid)
+            if (sensor->isRTMeasurementValid)
             {
                 if (column == Column::Battery)
                 {
-                    return utils::getBatteryIcon(m_db.getSensorSettings(), sensor.rtMeasurementVcc);
+                    return utils::getBatteryIcon(m_db.getSensorSettings(), sensor->rtMeasurementVcc);
                 }
                 else if (column == Column::Signal)
                 {
-                    return utils::getSignalIcon(m_db.getSensorSettings(), std::min(sensor.averageSignalStrength.s2b, sensor.averageSignalStrength.b2s));
+                    return utils::getSignalIcon(m_db.getSensorSettings(), std::min(sensor->averageSignalStrength.s2b, sensor->averageSignalStrength.b2s));
                 }
                 else if (column == Column::Temperature)
                 {
@@ -378,23 +375,23 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
     {
         if (column == Column::Name)
         {
-            return sensor.descriptor.name.c_str();
+            return sensor->descriptor.name.c_str();
         }
         else if (column == Column::SerialNumber)
         {
-            return QString("%1").arg(sensor.serialNumber, 8, 16, QChar('0'));
+            return QString("%1").arg(sensor->serialNumber, 8, 16, QChar('0'));
         }
         else if (column == Column::NextComms)
         {
-            if (sensor.state == DB::Sensor::State::Sleeping)
+            if (sensor->state == DB::Sensor::State::Sleeping)
             {
                 return "Sleeping...";
             }
             else
             {
-                if (sensor.lastCommsTimePoint.time_since_epoch().count() != 0)
+                if (sensor->lastCommsTimePoint.time_since_epoch().count() != 0)
                 {
-                    auto p = utils::computeRelativeTimePointString(sensor.lastCommsTimePoint + m_db.computeActualCommsPeriod(m_db.getLastSensorTimeConfig().descriptor));
+                    auto p = utils::computeRelativeTimePointString(sensor->lastCommsTimePoint + m_db.computeActualCommsPeriod(m_db.getLastSensorTimeConfig().descriptor));
                     std::string str = p.first;
                     str = (p.second > 0) ? "In " + str : str + " ago";
                     if (p.second < k_imminentMaxSecond && p.second > k_imminentMinSecond)
@@ -407,32 +404,32 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Stored)
         {
-            return sensor.estimatedStoredMeasurementCount < k_minStoredMeasurementCount ? 0 : sensor.estimatedStoredMeasurementCount;
+            return sensor->estimatedStoredMeasurementCount < k_minStoredMeasurementCount ? 0 : sensor->estimatedStoredMeasurementCount;
         }
         else if (column == Column::Alarms)
         {
-            Result<DB::Measurement> res = m_db.getLastMeasurementForSensor(sensor.id);
+            Result<DB::Measurement> res = m_db.getLastMeasurementForSensor(sensor->id);
             return (res == success) ? res.payload().alarmTriggers.current : -1;
         }
         else
         {
-            if (sensor.isRTMeasurementValid)
+            if (sensor->isRTMeasurementValid)
             {
                 if (column == Column::Temperature)
                 {
-                    return QString("%1°C").arg(sensor.rtMeasurementTemperature, 0, 'f', 1);
+                    return QString("%1°C").arg(sensor->rtMeasurementTemperature, 0, 'f', 1);
                 }
                 else if (column == Column::Humidity)
                 {
-                    return QString("%1 %RH").arg(sensor.rtMeasurementHumidity, 0, 'f', 1);
+                    return QString("%1 %RH").arg(sensor->rtMeasurementHumidity, 0, 'f', 1);
                 }
                 else if (column == Column::Battery)
                 {
-                    return QString("%1%").arg(static_cast<int>(utils::getBatteryLevel(sensor.rtMeasurementVcc) * 100.f));
+                    return QString("%1%").arg(static_cast<int>(utils::getBatteryLevel(sensor->rtMeasurementVcc) * 100.f));
                 }
                 else if (column == Column::Signal)
                 {
-                    int average = static_cast<int>(utils::getSignalLevel(std::min(sensor.averageSignalStrength.s2b, sensor.averageSignalStrength.b2s)) * 100.f);
+                    int average = static_cast<int>(utils::getSignalLevel(std::min(sensor->averageSignalStrength.s2b, sensor->averageSignalStrength.b2s)) * 100.f);
                     return QString("%1%").arg(average);
                 }
             }

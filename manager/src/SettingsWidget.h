@@ -17,7 +17,7 @@ public:
     explicit SettingsWidget(QWidget *parent = 0);
     ~SettingsWidget();
 
-	void init(Comms& comms, DB& db);
+    void init(DB& db);
     void shutdown();
     void save();
 

@@ -226,8 +226,8 @@ void ConfigureAlarmDialog::accept()
 //        return;
 //    }
 
-    int32_t alarmIndex = m_db.findAlarmIndexByName(descriptor.name);
-    if (alarmIndex >= 0 && m_db.getAlarm(static_cast<size_t>(alarmIndex)).id != m_alarm.id)
+    std::optional<DB::Alarm> alarm = m_db.findAlarmByName(descriptor.name);
+    if (alarm.has_value() && alarm->id != m_alarm.id)
     {
         QMessageBox::critical(this, "Error", QString("Alarm '%1' already exists.").arg(descriptor.name.c_str()));
         return;

@@ -12,7 +12,7 @@
 #include <sstream>
 
 #define NOMINMAX
-#include <windows.h>
+#include <Windows.h>
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -35,7 +35,7 @@ SettingsWidget::~SettingsWidget()
 
 //////////////////////////////////////////////////////////////////////////
 
-void SettingsWidget::init(Comms& comms, DB& db)
+void SettingsWidget::init(DB& db)
 {
     for (const QMetaObject::Connection& connection: m_uiConnections)
     {

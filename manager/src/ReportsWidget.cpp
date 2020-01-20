@@ -170,23 +170,20 @@ void ReportsWidget::removeReports()
 
     QModelIndex mi = m_model->index(selected.at(0).row(), static_cast<int>(ReportsModel::Column::Id));
     DB::ReportId id = m_model->data(mi).toUInt();
-    int32_t _index = m_db->findReportIndexById(id);
-    if (_index < 0)
+    std::optional<DB::Report> report = m_db->findReportById(id);
+    if (!report.has_value())
     {
         QMessageBox::critical(this, "Error", "Invalid report selected.");
         return;
     }
 
-    size_t index = static_cast<size_t>(_index);
-    DB::Report report = m_db->getReport(index);
-
-    int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete report '%1'").arg(report.descriptor.name.c_str()));
+    int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete report '%1'").arg(report->descriptor.name.c_str()));
     if (response != QMessageBox::Yes)
     {
         return;
     }
 
-    m_db->removeReport(index);
+    m_db->removeReportById(id);
 }
 
 //////////////////////////////////////////////////////////////////////////

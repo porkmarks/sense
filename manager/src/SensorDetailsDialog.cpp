@@ -192,8 +192,8 @@ void SensorDetailsDialog::accept()
         return;
     }
 
-    int32_t sensorIndex = m_db.findSensorIndexByName(descriptor.name);
-    if (sensorIndex >= 0 && m_db.getSensor(static_cast<size_t>(sensorIndex)).id != m_sensor.id)
+    std::optional<DB::Sensor> sensor = m_db.findSensorByName(descriptor.name);
+    if (sensor.has_value() && sensor->id != m_sensor.id)
     {
         QMessageBox::critical(this, "Error", QString("Sensor '%1' already exists.").arg(descriptor.name.c_str()));
         return;

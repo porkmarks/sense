@@ -175,14 +175,14 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Sensor)
         {
-            int32_t sensorIndex = m_db.findSensorIndexById(measurement.descriptor.sensorId);
-            if (sensorIndex < 0)
+            std::optional<DB::Sensor> sensor = m_db.findSensorById(measurement.descriptor.sensorId);
+            if (sensor.has_value())
             {
-                return "N/A";
+                return sensor->descriptor.name.c_str();
             }
             else
             {
-                return m_db.getSensor(static_cast<size_t>(sensorIndex)).descriptor.name.c_str();
+                return "N/A";
             }
         }
         else if (column == Column::Index)
