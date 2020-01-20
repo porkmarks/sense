@@ -65,18 +65,18 @@ DB::~DB()
 
 Result<void> DB::create(sqlite3& db)
 {
-	sqlite3_exec(&db, "BEGIN TRANSACTION;", NULL, NULL, NULL);
-	utils::epilogue epi([&db] { sqlite3_exec(&db, "END TRANSACTION;", NULL, NULL, NULL); });
+    sqlite3_exec(&db, "BEGIN TRANSACTION;", nullptr, nullptr, nullptr);
+    utils::epilogue epi([&db] { sqlite3_exec(&db, "END TRANSACTION;", nullptr, nullptr, nullptr); });
 
 	{
 		const char* sql = "CREATE TABLE GeneralSettings (id INTEGER PRIMARY KEY, dateTimeFormat INTEGER);";
-		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
+        if (sqlite3_exec(&db, sql, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
 		}
 		const char* sqlInsert = "INSERT INTO GeneralSettings VALUES(0, 0);";
-		if (sqlite3_exec(&db, sqlInsert, NULL, NULL, nullptr))
+        if (sqlite3_exec(&db, sqlInsert, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
@@ -87,13 +87,13 @@ Result<void> DB::create(sqlite3& db)
 			"exportId BOOLEAN, exportIndex BOOLEAN, exportSensorName BOOLEAN, exportSensorSN BOOLEAN, exportTimePoint BOOLEAN, exportReceivedTimePoint BOOLEAN, "
 			"exportTemperature BOOLEAN, exportHumidity BOOLEAN, exportBattery BOOLEAN, exportSignal BOOLEAN, "
             "decimalPlaces INTEGER, separator STRING);";
-		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
+        if (sqlite3_exec(&db, sql, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
 		}
         const char* sqlInsert = "INSERT INTO CsvSettings VALUES(0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ',');";
-		if (sqlite3_exec(&db, sqlInsert, NULL, NULL, nullptr))
+        if (sqlite3_exec(&db, sqlInsert, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
@@ -101,13 +101,13 @@ Result<void> DB::create(sqlite3& db)
 	}
 	{
 		const char* sql = "CREATE TABLE EmailSettings (id INTEGER PRIMARY KEY, host STRING, port INTEGER, connection INTEGER, username STRING, password STRING, sender STRING, recipients STRING);";
-		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
+        if (sqlite3_exec(&db, sql, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
 		}
 		const char* sqlInsert = "INSERT INTO EmailSettings VALUES(0, '', 465, 0, '', '', '', '');";
-		if (sqlite3_exec(&db, sqlInsert, NULL, NULL, nullptr))
+        if (sqlite3_exec(&db, sqlInsert, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
@@ -115,13 +115,13 @@ Result<void> DB::create(sqlite3& db)
 	}
 	{
 		const char* sql = "CREATE TABLE FtpSettings (id INTEGER PRIMARY KEY, host STRING, port INTEGER, username STRING, password STRING, folder STRING, uploadBackups BOOLEAN, uploadPeriod INTEGER);";
-		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
+        if (sqlite3_exec(&db, sql, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
 		}
 		const char* sqlInsert = "INSERT INTO FtpSettings VALUES(0, '', 21, '', '', '', 0, 14400);";
-		if (sqlite3_exec(&db, sqlInsert, NULL, NULL, nullptr))
+        if (sqlite3_exec(&db, sqlInsert, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
@@ -129,7 +129,7 @@ Result<void> DB::create(sqlite3& db)
 	}
 	{
 		const char* sql = "CREATE TABLE Users (id INTEGER PRIMARY KEY, name STRING, passwordHash STRING, permissions INTEGER, type INTEGER, lastLogin DATETIME);";
-		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
+        if (sqlite3_exec(&db, sql, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
@@ -137,7 +137,7 @@ Result<void> DB::create(sqlite3& db)
 	}
 	{
 		const char* sql = "CREATE TABLE BaseStations (id INTEGER PRIMARY KEY, name STRING, mac STRING);";
-		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
+        if (sqlite3_exec(&db, sql, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
@@ -145,7 +145,7 @@ Result<void> DB::create(sqlite3& db)
 	}
 	{
 		const char* sql = "CREATE TABLE SensorTimeConfigs (baselineMeasurementTimePoint DATETIME, baselineMeasurementIndex INTEGER, measurementPeriod INTEGER, commsPeriod INTEGER);";
-		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
+        if (sqlite3_exec(&db, sql, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
@@ -153,13 +153,13 @@ Result<void> DB::create(sqlite3& db)
 	}
 	{
 		const char* sql = "CREATE TABLE SensorSettings (id INTEGER PRIMARY KEY, radioPower INTEGER, retries INTEGER, alertBatteryLevel REAL, alertSignalStrengthLevel REAL);";
-		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
+        if (sqlite3_exec(&db, sql, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
 		}
 		const char* sqlInsert = "INSERT INTO SensorSettings VALUES(0, 0, 2, 0.1, 0.1);";
-		if (sqlite3_exec(&db, sqlInsert, NULL, NULL, nullptr))
+        if (sqlite3_exec(&db, sqlInsert, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
@@ -172,7 +172,7 @@ Result<void> DB::create(sqlite3& db)
 			"lastCommsTimePoint DATETIME, lastConfirmedMeasurementIndex INTEGER, lastAlarmProcessesMeasurementIndex INTEGER, "
             "firstStoredMeasurementIndex INTEGER, storedMeasurementCount INTEGER, estimatedStoredMeasurementCount INTEGER, lastSignalStrengthB2S INTEGER, averageSignalStrengthB2S INTEGER, averageSignalStrengthS2B INTEGER, "
             "isRTMeasurementValid BOOLEAN, rtMeasurementTemperature REAL, rtMeasurementHumidity REAL, rtMeasurementVcc REAL);";
-		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
+        if (sqlite3_exec(&db, sql, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
@@ -182,7 +182,7 @@ Result<void> DB::create(sqlite3& db)
 		const char* sql = "CREATE TABLE Alarms (id INTEGER PRIMARY KEY, name STRING, filterSensors BOOLEAN, sensors STRING, lowTemperatureWatch BOOLEAN, lowTemperatureSoft REAL, lowTemperatureHard REAL, highTemperatureWatch BOOLEAN, highTemperatureSoft REAL, highTemperatureHard REAL, "
             "lowHumidityWatch BOOLEAN, lowHumiditySoft REAL, lowHumidityHard REAL, highHumidityWatch BOOLEAN, highHumiditySoft REAL, highHumidityHard REAL, "
             "lowVccWatch BOOLEAN, lowSignalWatch BOOLEAN, sensorBlackoutWatch BOOLEAN, baseStationDisconnectedWatch BOOLEAN, sendEmailAction BOOLEAN, resendPeriod INTEGER, triggersPerSensor STRING, triggersPerBaseStation STRING, lastTriggeredTimePoint DATETIME);";
-		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
+        if (sqlite3_exec(&db, sql, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
@@ -190,7 +190,7 @@ Result<void> DB::create(sqlite3& db)
 	}
 	{
 		const char* sql = "CREATE TABLE Reports (id INTEGER PRIMARY KEY, name STRING, period INTEGER, customPeriod INTEGER, filterSensors BOOLEAN, sensors STRING, lastTriggeredTimePoint DATETIME);";
-		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
+        if (sqlite3_exec(&db, sql, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
@@ -199,7 +199,7 @@ Result<void> DB::create(sqlite3& db)
     {
 		const char* sql = "CREATE TABLE Measurements (id INTEGER PRIMARY KEY AUTOINCREMENT, timePoint DATETIME, receivedTimePoint DATETIME, idx INTEGER, sensorId INTEGER, temperature REAL, humidity REAL, vcc REAL, signalStrengthS2B INTEGER, signalStrengthB2S INTEGER, "
                                                      "sensorErrors INTEGER, alarmTriggersCurrent INTEGER, alarmTriggersAdded INTEGER, alarmTriggersRemoved INTEGER, UNIQUE(idx, sensorId));";
-		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
+        if (sqlite3_exec(&db, sql, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
@@ -207,7 +207,7 @@ Result<void> DB::create(sqlite3& db)
 	}
 	{
 		const char* sql = "CREATE INDEX idx_sensorId ON Measurements (idx, sensorId);";
-		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
+        if (sqlite3_exec(&db, sql, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
@@ -215,7 +215,7 @@ Result<void> DB::create(sqlite3& db)
 	}
 	{
 		const char* sql = "CREATE INDEX measurementsIdx ON Measurements(idx);";
-		if (sqlite3_exec(&db, sql, NULL, NULL, nullptr))
+        if (sqlite3_exec(&db, sql, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
@@ -236,7 +236,7 @@ Result<void> DB::load(sqlite3& db)
     {
 		sqlite3_stmt* stmt;
         if (sqlite3_prepare_v2(&db, "REPLACE INTO BaseStations (id, name, mac) "
-                                    "VALUES (?1, ?2, ?3);", -1, &stmt, NULL) != SQLITE_OK)
+                                    "VALUES (?1, ?2, ?3);", -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -245,7 +245,7 @@ Result<void> DB::load(sqlite3& db)
 	{
 		sqlite3_stmt* stmt;
         if (sqlite3_prepare_v2(&db, "INSERT INTO SensorTimeConfigs (baselineMeasurementTimePoint, baselineMeasurementIndex, measurementPeriod, commsPeriod) "
-						            "VALUES (?1, ?2, ?3, ?4);", -1, &stmt, NULL) != SQLITE_OK)
+                                    "VALUES (?1, ?2, ?3, ?4);", -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -254,7 +254,7 @@ Result<void> DB::load(sqlite3& db)
 	{
 		sqlite3_stmt* stmt;
 		if (sqlite3_prepare_v2(&db, "REPLACE INTO SensorSettings (id, radioPower, retries, alertBatteryLevel, alertSignalStrengthLevel) "
-							   "VALUES (0, ?1, ?2, ?3, ?4);", -1, &stmt, NULL) != SQLITE_OK)
+                               "VALUES (0, ?1, ?2, ?3, ?4);", -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -268,7 +268,7 @@ Result<void> DB::load(sqlite3& db)
 											   "lastCommsTimePoint, lastConfirmedMeasurementIndex, lastAlarmProcessesMeasurementIndex, "
 						                       "firstStoredMeasurementIndex, storedMeasurementCount, estimatedStoredMeasurementCount, lastSignalStrengthB2S, averageSignalStrengthB2S, averageSignalStrengthS2B, "
 						                       "isRTMeasurementValid, rtMeasurementTemperature, rtMeasurementHumidity, rtMeasurementVcc) "
-						            "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36, ?37);", -1, &stmt, NULL) != SQLITE_OK)
+                                    "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36, ?37);", -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -280,7 +280,7 @@ Result<void> DB::load(sqlite3& db)
 						                       "lowHumidityWatch, lowHumiditySoft, lowHumidityHard, highHumidityWatch, highHumiditySoft, highHumidityHard, "
 						                       "lowVccWatch, lowSignalWatch, sensorBlackoutWatch, baseStationDisconnectedWatch, sendEmailAction, resendPeriod, triggersPerSensor, triggersPerBaseStation, "
 											   "lastTriggeredTimePoint) "
-							        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25);", -1, &stmt, NULL) != SQLITE_OK)
+                                    "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25);", -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -289,7 +289,7 @@ Result<void> DB::load(sqlite3& db)
 	{
 		sqlite3_stmt* stmt;
 		if (sqlite3_prepare_v2(&db, "REPLACE INTO Reports (id, name, period, customPeriod, filterSensors, sensors, lastTriggeredTimePoint) "
-							        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7);", -1, &stmt, NULL) != SQLITE_OK)
+                                    "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7);", -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -298,7 +298,7 @@ Result<void> DB::load(sqlite3& db)
     {
 		sqlite3_stmt* stmt;
         if (sqlite3_prepare_v2(&db, "INSERT OR IGNORE INTO Measurements (timePoint, receivedTimePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggersCurrent, alarmTriggersAdded, alarmTriggersRemoved) "
-							        "VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13);", -1, &stmt, NULL) != SQLITE_OK)
+                                    "VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13);", -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -309,7 +309,7 @@ Result<void> DB::load(sqlite3& db)
 	{
 		const char* sql = "SELECT dateTimeFormat FROM GeneralSettings;";
 		sqlite3_stmt* stmt;
-		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
+        if (sqlite3_prepare_v2(&db, sql, -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			return Error(QString("Cannot load general settings: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -319,7 +319,7 @@ Result<void> DB::load(sqlite3& db)
 		{
 			return Error(QString("Cannot load general settings row: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
-		data.generalSettings.dateTimeFormat = (DateTimeFormat)sqlite3_column_int64(stmt, 0);
+        data.generalSettings.dateTimeFormat = DateTimeFormat(sqlite3_column_int64(stmt, 0));
 	}
 	{
 		//id INTEGER PRIMARY KEY, dateTimeFormatOverride INTEGER, unitsFormat INTEGER, "
@@ -330,7 +330,7 @@ Result<void> DB::load(sqlite3& db)
 			"exportTemperature, exportHumidity, exportBattery, exportSignal, "
             "decimalPlaces, separator FROM CsvSettings;";
 		sqlite3_stmt* stmt;
-		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
+        if (sqlite3_prepare_v2(&db, sql, -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			return Error(QString("Cannot load csv settings: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -340,12 +340,12 @@ Result<void> DB::load(sqlite3& db)
 		{
 			return Error(QString("Cannot load csv settings row: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
-		int v = sqlite3_column_int64(stmt, 0);
+        int v = int(sqlite3_column_int64(stmt, 0));
 		if (v >= 0)
 		{
-			data.csvSettings.dateTimeFormatOverride = (DateTimeFormat)v;
+            data.csvSettings.dateTimeFormatOverride = DateTimeFormat(v);
 		}
-		data.csvSettings.unitsFormat = (CsvSettings::UnitsFormat)sqlite3_column_int(stmt, 1);
+        data.csvSettings.unitsFormat = CsvSettings::UnitsFormat(sqlite3_column_int(stmt, 1));
 		data.csvSettings.exportId = sqlite3_column_int(stmt, 2) ? true : false;
 		data.csvSettings.exportIndex = sqlite3_column_int(stmt, 3) ? true : false;
 		data.csvSettings.exportSensorName = sqlite3_column_int(stmt, 4) ? true : false;
@@ -356,14 +356,14 @@ Result<void> DB::load(sqlite3& db)
 		data.csvSettings.exportHumidity = sqlite3_column_int(stmt, 9) ? true : false;
 		data.csvSettings.exportBattery = sqlite3_column_int(stmt, 10) ? true : false;
 		data.csvSettings.exportSignal = sqlite3_column_int(stmt, 11) ? true : false;
-		data.csvSettings.decimalPlaces = (uint32_t)sqlite3_column_int(stmt, 12);
+        data.csvSettings.decimalPlaces = uint32_t(sqlite3_column_int(stmt, 12));
         data.csvSettings.separator = (const char*)sqlite3_column_text(stmt, 13);
     }
 	{
 		//id INTEGER PRIMARY KEY, host STRING, port INTEGER, connection INTEGER, username STRING, password STRING, sender STRING, recipients STRING
 		const char* sql = "SELECT host, port, connection, username, password, sender, recipients FROM EmailSettings;";
 		sqlite3_stmt* stmt;
-		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
+        if (sqlite3_prepare_v2(&db, sql, -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			return Error(QString("Cannot load email settings: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -374,7 +374,7 @@ Result<void> DB::load(sqlite3& db)
 			return Error(QString("Cannot load email settings row: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
 		data.emailSettings.host = (char const*)sqlite3_column_text(stmt, 0);
-		data.emailSettings.port = sqlite3_column_int(stmt, 1);
+        data.emailSettings.port = uint16_t(sqlite3_column_int(stmt, 1));
 		data.emailSettings.connection = (EmailSettings::Connection)sqlite3_column_int(stmt, 2);
 		data.emailSettings.username = (char const*)sqlite3_column_text(stmt, 3);
 		data.emailSettings.password = (char const*)sqlite3_column_text(stmt, 4);
@@ -391,7 +391,7 @@ Result<void> DB::load(sqlite3& db)
 		//FtpSettings (id INTEGER PRIMARY KEY, host STRING, port INTEGER, username STRING, password STRING, folder STRING, uploadBackups BOOLEAN, uploadPeriod INTEGER);";
 		const char* sql = "SELECT host, port, username, password, folder, uploadBackups, uploadPeriod FROM FtpSettings;";
 		sqlite3_stmt* stmt;
-		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
+        if (sqlite3_prepare_v2(&db, sql, -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			return Error(QString("Cannot load ftp settings: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -403,7 +403,7 @@ Result<void> DB::load(sqlite3& db)
 		}
 
 		data.ftpSettings.host = (char const*)sqlite3_column_text(stmt, 0);
-		data.ftpSettings.port = sqlite3_column_int(stmt, 1);
+        data.ftpSettings.port = uint16_t(sqlite3_column_int(stmt, 1));
 		data.ftpSettings.username = (char const*)sqlite3_column_text(stmt, 2);
 		data.ftpSettings.password = (char const*)sqlite3_column_text(stmt, 3);
 		data.ftpSettings.folder = (char const*)sqlite3_column_text(stmt, 4);
@@ -414,7 +414,7 @@ Result<void> DB::load(sqlite3& db)
 		//Users (id INTEGER PRIMARY KEY, name STRING, passwordHash STRING, permissions INTEGER, type INTEGER, lastLogin DATETIME);";
 		const char* sql = "SELECT id, name, passwordHash, permissions, type, lastLogin FROM Users;";
 		sqlite3_stmt* stmt;
-		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
+        if (sqlite3_prepare_v2(&db, sql, -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			return Error(QString("Cannot load user settings: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -423,10 +423,10 @@ Result<void> DB::load(sqlite3& db)
 		while (sqlite3_step(stmt) == SQLITE_ROW)
 		{
 			User user;
-			user.id = sqlite3_column_int(stmt, 0);
+            user.id = UserId(sqlite3_column_int64(stmt, 0));
 			user.descriptor.name = (char const*)sqlite3_column_text(stmt, 1);
 			user.descriptor.passwordHash = (char const*)sqlite3_column_text(stmt, 2);
-			user.descriptor.permissions = sqlite3_column_int(stmt, 3);
+            user.descriptor.permissions = uint32_t(sqlite3_column_int64(stmt, 3));
 			user.descriptor.type = (UserDescriptor::Type)sqlite3_column_int(stmt, 4);
 			user.lastLogin = IClock::from_time_t(sqlite3_column_int64(stmt, 5));
 			data.users.push_back(std::move(user));
@@ -437,7 +437,7 @@ Result<void> DB::load(sqlite3& db)
 		const char* sql = "SELECT id, name, mac "
                           "FROM BaseStations;";
 		sqlite3_stmt* stmt;
-		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
+        if (sqlite3_prepare_v2(&db, sql, -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -446,7 +446,7 @@ Result<void> DB::load(sqlite3& db)
         while (sqlite3_step(stmt) == SQLITE_ROW)
         {
             BaseStation bs;
-            bs.id = sqlite3_column_int64(stmt, 0);
+            bs.id = BaseStationId(sqlite3_column_int64(stmt, 0));
 		    bs.descriptor.name = (char const*)sqlite3_column_text(stmt, 1);
 		    std::string macStr = (char const*)sqlite3_column_text(stmt, 2);
 			int m0, m1, m2, m3, m4, m5;
@@ -463,7 +463,7 @@ Result<void> DB::load(sqlite3& db)
 		const char* sql = "SELECT baselineMeasurementTimePoint, baselineMeasurementIndex, measurementPeriod, commsPeriod "
                           "FROM SensorTimeConfigs;";
 		sqlite3_stmt* stmt;
-		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
+        if (sqlite3_prepare_v2(&db, sql, -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			return Error(QString("Cannot load sensors configs: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -473,7 +473,7 @@ Result<void> DB::load(sqlite3& db)
 		{
             SensorTimeConfig sc;
 			sc.baselineMeasurementTimePoint = IClock::from_time_t(sqlite3_column_int64(stmt, 0));
-			sc.baselineMeasurementIndex = sqlite3_column_int64(stmt, 1);
+            sc.baselineMeasurementIndex = uint32_t(sqlite3_column_int64(stmt, 1));
 			sc.descriptor.measurementPeriod = std::chrono::seconds(sqlite3_column_int64(stmt, 2));
 			sc.descriptor.commsPeriod = std::chrono::seconds(sqlite3_column_int64(stmt, 3));
 			data.sensorTimeConfigs.push_back(std::move(sc));
@@ -484,7 +484,7 @@ Result<void> DB::load(sqlite3& db)
 		const char* sql = "SELECT radioPower, retries, alertBatteryLevel, alertSignalStrengthLevel "
 			              "FROM SensorSettings;";
 		sqlite3_stmt* stmt;
-		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
+        if (sqlite3_prepare_v2(&db, sql, -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			return Error(QString("Cannot load sensors configs: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -512,7 +512,7 @@ Result<void> DB::load(sqlite3& db)
 			 			        "isRTMeasurementValid, rtMeasurementTemperature, rtMeasurementHumidity, rtMeasurementVcc "
                           "FROM Sensors;";
 		sqlite3_stmt* stmt;
-		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
+        if (sqlite3_prepare_v2(&db, sql, -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			return Error(QString("Cannot load sensors: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -522,9 +522,9 @@ Result<void> DB::load(sqlite3& db)
 		{
 			Sensor s;
 			int index = 0;
-			s.id = sqlite3_column_int64(stmt, index++);
+            s.id = SensorId(sqlite3_column_int64(stmt, index++));
 			s.descriptor.name = (char const*)sqlite3_column_text(stmt, index++);
-			s.address = sqlite3_column_int64(stmt, index++);
+            s.address = SensorAddress(sqlite3_column_int64(stmt, index++));
 			s.deviceInfo.sensorType = (uint8_t)sqlite3_column_int64(stmt, index++);
 			s.deviceInfo.hardwareVersion = (uint8_t)sqlite3_column_int64(stmt, index++);
 			s.deviceInfo.softwareVersion = (uint8_t)sqlite3_column_int64(stmt, index++);
@@ -571,7 +571,7 @@ Result<void> DB::load(sqlite3& db)
 				                    "lastTriggeredTimePoint "
                           "FROM Alarms;";
 		sqlite3_stmt* stmt;
-		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
+        if (sqlite3_prepare_v2(&db, sql, -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			return Error(QString("Cannot load alarms: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -581,7 +581,7 @@ Result<void> DB::load(sqlite3& db)
 		{
 			Alarm a;
 			int index = 0;
-            a.id = sqlite3_column_int64(stmt, index++);
+            a.id = AlarmId(sqlite3_column_int64(stmt, index++));
 			a.descriptor.name = (char const*)sqlite3_column_text(stmt, index++);
             a.descriptor.filterSensors = sqlite3_column_int64(stmt, index++) ? true : false;
 			{
@@ -589,7 +589,7 @@ Result<void> DB::load(sqlite3& db)
 				QStringList l = sensors.split(QChar(';'), QString::SkipEmptyParts);
 				for (QString str : l)
 				{
-					a.descriptor.sensors.insert(atoll(str.trimmed().toUtf8().data()));
+                    a.descriptor.sensors.insert(SensorId(atoll(str.trimmed().toUtf8().data())));
 				}
 			}
             a.descriptor.lowTemperatureWatch = sqlite3_column_int64(stmt, index++) ? true : false;
@@ -655,7 +655,7 @@ Result<void> DB::load(sqlite3& db)
 		const char* sql = "SELECT id, name, period, customPeriod, filterSensors, sensors, lastTriggeredTimePoint "
                           "FROM Reports;";
 		sqlite3_stmt* stmt;
-		if (sqlite3_prepare_v2(&db, sql, -1, &stmt, 0) != SQLITE_OK)
+        if (sqlite3_prepare_v2(&db, sql, -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			return Error(QString("Cannot load reports: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -664,7 +664,7 @@ Result<void> DB::load(sqlite3& db)
 		while (sqlite3_step(stmt) == SQLITE_ROW)
 		{
 			Report r;
-			r.id = sqlite3_column_int64(stmt, 0);
+            r.id = ReportId(sqlite3_column_int64(stmt, 0));
 			r.descriptor.name = (char const*)sqlite3_column_text(stmt, 1);
 			r.descriptor.period = (ReportDescriptor::Period)sqlite3_column_int64(stmt, 2);
 			r.descriptor.customPeriod = std::chrono::seconds(sqlite3_column_int64(stmt, 3));
@@ -673,7 +673,7 @@ Result<void> DB::load(sqlite3& db)
 			QStringList l = sensors.split(QChar(';'), QString::SkipEmptyParts);
 			for (QString str : l)
 			{
-				r.descriptor.sensors.insert(atoll(str.trimmed().toUtf8().data()));
+                r.descriptor.sensors.insert(SensorId(atoll(str.trimmed().toUtf8().data())));
 			}
 			r.lastTriggeredTimePoint = IClock::from_time_t(sqlite3_column_int64(stmt, 6));
 			data.reports.push_back(std::move(r));
@@ -765,13 +765,13 @@ void DB::save(Data& data, bool newTransaction) const
 
 	if (newTransaction)
 	{
-		sqlite3_exec(m_sqlite, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+        sqlite3_exec(m_sqlite, "BEGIN TRANSACTION;", nullptr, nullptr, nullptr);
 	}
 	utils::epilogue epi([this, newTransaction]
 	{
 		if (newTransaction)
 		{
-			sqlite3_exec(m_sqlite, "END TRANSACTION;", NULL, NULL, NULL);
+            sqlite3_exec(m_sqlite, "END TRANSACTION;", nullptr, nullptr, nullptr);
 		}
 	});
 
@@ -779,7 +779,7 @@ void DB::save(Data& data, bool newTransaction) const
 	{
 		data.generalSettingsChanged = false;
 		sqlite3_stmt* stmt;
-		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO GeneralSettings (id, dateTimeFormat) VALUES (0, ?1);", -1, &stmt, NULL);
+        sqlite3_prepare_v2(m_sqlite, "REPLACE INTO GeneralSettings (id, dateTimeFormat) VALUES (0, ?1);", -1, &stmt, nullptr);
 		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
 
 		sqlite3_bind_int64(stmt, 1, (int)data.generalSettings.dateTimeFormat);
@@ -797,7 +797,7 @@ void DB::save(Data& data, bool newTransaction) const
 		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO CsvSettings (id, dateTimeFormatOverride, unitsFormat, "
 						   "exportId, exportIndex, exportSensorName, exportSensorSN, exportTimePoint, exportReceivedTimePoint, "
 						   "exportTemperature, exportHumidity, exportBattery, exportSignal, "
-						   "decimalPlaces, separator) VALUES (0, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14);", -1, &stmt, NULL);
+                           "decimalPlaces, separator) VALUES (0, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14);", -1, &stmt, nullptr);
 		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
 
 		sqlite3_bind_int64(stmt, 1, data.csvSettings.dateTimeFormatOverride.has_value() ? (int)data.csvSettings.dateTimeFormatOverride.value() : -1);
@@ -825,7 +825,7 @@ void DB::save(Data& data, bool newTransaction) const
 	{
 		data.emailSettingsChanged = false;
 		sqlite3_stmt* stmt;
-		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO EmailSettings (id, host, port, connection, username, password, sender, recipients) VALUES (0, ?1, ?2, ?3, ?4, ?5, ?6, ?7);", -1, &stmt, NULL);
+        sqlite3_prepare_v2(m_sqlite, "REPLACE INTO EmailSettings (id, host, port, connection, username, password, sender, recipients) VALUES (0, ?1, ?2, ?3, ?4, ?5, ?6, ?7);", -1, &stmt, nullptr);
 		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
 
 		sqlite3_bind_text(stmt, 1, data.emailSettings.host.c_str(), -1, SQLITE_STATIC);
@@ -847,7 +847,7 @@ void DB::save(Data& data, bool newTransaction) const
 	{
 		data.ftpSettingsChanged = false;
 		sqlite3_stmt* stmt;
-		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO FtpSettings (id, host, port, username, password, folder, uploadBackups, uploadPeriod) VALUES (0, ?1, ?2, ?3, ?4, ?5, ?6, ?7);", -1, &stmt, NULL);
+        sqlite3_prepare_v2(m_sqlite, "REPLACE INTO FtpSettings (id, host, port, username, password, folder, uploadBackups, uploadPeriod) VALUES (0, ?1, ?2, ?3, ?4, ?5, ?6, ?7);", -1, &stmt, nullptr);
 		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
 
 		sqlite3_bind_text(stmt, 1, data.ftpSettings.host.c_str(), -1, SQLITE_STATIC);
@@ -869,14 +869,14 @@ void DB::save(Data& data, bool newTransaction) const
 		if (data.usersAddedOrRemoved)
 		{
 			const char* sql = "DELETE FROM Users;";
-			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
+            if (sqlite3_exec(m_sqlite, sql, nullptr, nullptr, nullptr))
 			{
 				s_logger.logCritical(QString("Failed to clear users: %1").arg(sqlite3_errmsg(m_sqlite)));
 				return;
 			}
 		}
 		sqlite3_stmt* stmt;
-		sqlite3_prepare_v2(m_sqlite, "REPLACE INTO Users (id, name, passwordHash, permissions, type, lastLogin) VALUES(?1, ?2, ?3, ?4, ?5, ?6);", -1, &stmt, NULL);
+        sqlite3_prepare_v2(m_sqlite, "REPLACE INTO Users (id, name, passwordHash, permissions, type, lastLogin) VALUES(?1, ?2, ?3, ?4, ?5, ?6);", -1, &stmt, nullptr);
 		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
 
 		for (User const& user : data.users)
@@ -902,7 +902,7 @@ void DB::save(Data& data, bool newTransaction) const
 		if (data.baseStationsAddedOrRemoved)
 		{
 			const char* sql = "DELETE FROM BaseStations;";
-			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
+            if (sqlite3_exec(m_sqlite, sql, nullptr, nullptr, nullptr))
 			{
 				s_logger.logCritical(QString("Failed to clear base stations: %1").arg(sqlite3_errmsg(m_sqlite)));
 				return;
@@ -928,7 +928,7 @@ void DB::save(Data& data, bool newTransaction) const
 	{
 		{
 			const char* sql = "DELETE FROM SensorTimeConfigs;";
-			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
+            if (sqlite3_exec(m_sqlite, sql, nullptr, nullptr, nullptr))
 			{
 				s_logger.logCritical(QString("Failed to clear sensor configs: %1").arg(sqlite3_errmsg(m_sqlite)));
 				return;
@@ -974,7 +974,7 @@ void DB::save(Data& data, bool newTransaction) const
 		if (data.sensorsAddedOrRemoved)
 		{
 			const char* sql = "DELETE FROM Sensors;";
-			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
+            if (sqlite3_exec(m_sqlite, sql, nullptr, nullptr, nullptr))
 			{
 				s_logger.logCritical(QString("Failed to clear sensors: %1").arg(sqlite3_errmsg(m_sqlite)));
 				return;
@@ -1044,7 +1044,7 @@ void DB::save(Data& data, bool newTransaction) const
 		if (data.alarmsAddedOrRemoved)
 		{
 			const char* sql = "DELETE FROM Alarms;";
-			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
+            if (sqlite3_exec(m_sqlite, sql, nullptr, nullptr, nullptr))
 			{
 				s_logger.logCritical(QString("Failed to clear alarms: %1").arg(sqlite3_errmsg(m_sqlite)));
 				return;
@@ -1114,7 +1114,7 @@ void DB::save(Data& data, bool newTransaction) const
 		if (data.reportsAddedOrRemoved)
 		{
 			const char* sql = "DELETE FROM Reports;";
-			if (sqlite3_exec(m_sqlite, sql, NULL, NULL, nullptr))
+            if (sqlite3_exec(m_sqlite, sql, nullptr, nullptr, nullptr))
 			{
 				s_logger.logCritical(QString("Failed to clear reports: %1").arg(sqlite3_errmsg(m_sqlite)));
 				return;
@@ -1166,7 +1166,7 @@ void DB::close()
 		save(true);
 	}
 
-	m_saveBaseStationsStmt = nullptr;
+    m_saveBaseStationsStmt = nullptr;
 	m_saveSensorTimeConfigsStmt = nullptr;
 	m_saveSensorSettingsStmt = nullptr;
 	m_saveSensorsStmt = nullptr;
@@ -1295,7 +1295,6 @@ void DB::checkMeasurementTriggers()
 
 	if (m_data.sensors.empty() || m_data.alarms.empty())
 	{
-		Q_ASSERT(false);
 		return;
 	}
 
@@ -1314,7 +1313,7 @@ void DB::checkMeasurementTriggers()
 								"FROM Measurements "
 								"WHERE idx > %1 AND idx <= %2 AND sensorId = %3;").arg(sensor.lastAlarmProcessesMeasurementIndex).arg(sensor.lastConfirmedMeasurementIndex).arg(sensor.id);
 		sqlite3_stmt* stmt;
-		if (sqlite3_prepare_v2(m_sqlite, sql.toUtf8().data(), -1, &stmt, 0) != SQLITE_OK)
+        if (sqlite3_prepare_v2(m_sqlite, sql.toUtf8().data(), -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			const char* msg = sqlite3_errmsg(m_sqlite);
 			Q_ASSERT(false);
@@ -1334,8 +1333,8 @@ void DB::checkMeasurementTriggers()
 
 	if (!measurements.empty() || dataChanged)
 	{
-		sqlite3_exec(m_sqlite, "BEGIN TRANSACTION;", NULL, NULL, NULL);
-		utils::epilogue epi([this] { sqlite3_exec(m_sqlite, "END TRANSACTION;", NULL, NULL, NULL); });
+        sqlite3_exec(m_sqlite, "BEGIN TRANSACTION;", nullptr, nullptr, nullptr);
+        utils::epilogue epi([this] { sqlite3_exec(m_sqlite, "END TRANSACTION;", nullptr, nullptr, nullptr); });
 
 		for (Measurement const& m : measurements)
 		{
@@ -2594,7 +2593,7 @@ void DB::removeSensor(size_t index)
     {
 		QString sql = QString("DELETE FROM Measurements "
                               "WHERE sensorId = %1;").arg(sensorId);
-		if (sqlite3_exec(m_sqlite, sql.toUtf8().data(), NULL, NULL, nullptr))
+        if (sqlite3_exec(m_sqlite, sql.toUtf8().data(), nullptr, nullptr, nullptr))
 		{
 			s_logger.logCritical(QString("Failed to remove measurements for sensor %1: %2").arg(sensorId).arg(sqlite3_errmsg(m_sqlite)));
 			return;
@@ -3265,21 +3264,21 @@ bool DB::isReportTriggered(Report const& report) const
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::addMeasurement(MeasurementDescriptor const& md)
+bool DB::addMeasurement(MeasurementDescriptor const& descriptor)
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    return addSingleSensorMeasurements(md.sensorId, { md });
+    return addSingleSensorMeasurements(descriptor.sensorId, { descriptor });
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool DB::addMeasurements(std::vector<MeasurementDescriptor> mds)
+bool DB::addMeasurements(std::vector<MeasurementDescriptor> descriptors)
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
     std::map<SensorId, std::vector<MeasurementDescriptor>> mdPerSensor;
-    for (MeasurementDescriptor const& md: mds)
+    for (MeasurementDescriptor const& md: descriptors)
     {
         mdPerSensor[md.sensorId].push_back(md);
     }
@@ -3326,8 +3325,8 @@ bool DB::addSingleSensorMeasurements(SensorId sensorId, std::vector<MeasurementD
 
 		if (!mds.empty())
 		{
-			sqlite3_exec(m_sqlite, "BEGIN TRANSACTION;", NULL, NULL, NULL);
-			utils::epilogue epi1([this] { sqlite3_exec(m_sqlite, "END TRANSACTION;", NULL, NULL, NULL); });
+            sqlite3_exec(m_sqlite, "BEGIN TRANSACTION;", nullptr, nullptr, nullptr);
+            utils::epilogue epi1([this] { sqlite3_exec(m_sqlite, "END TRANSACTION;", nullptr, nullptr, nullptr); });
 
 			sqlite3_stmt* stmt = m_addMeasurementsStmt.get();
 			for (MeasurementDescriptor const& md : mds)
@@ -3458,7 +3457,7 @@ size_t DB::getAllMeasurementCount() const
 
 	const char* sql = "SELECT COUNT(*) FROM Measurements;";
 	sqlite3_stmt* stmt;
-	if (sqlite3_prepare_v2(m_sqlite, sql, -1, &stmt, 0) != SQLITE_OK)
+    if (sqlite3_prepare_v2(m_sqlite, sql, -1, &stmt, nullptr) != SQLITE_OK)
 	{
 		const char* msg = sqlite3_errmsg(m_sqlite);
 		Q_ASSERT(false);
@@ -3473,7 +3472,7 @@ size_t DB::getAllMeasurementCount() const
         return 0;
     }
 
-    return sqlite3_column_int64(stmt, 0);
+    return size_t(sqlite3_column_int64(stmt, 0));
 }
 
 //////////////////////////////////////////////////////////////////////////

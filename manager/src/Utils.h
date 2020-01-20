@@ -66,7 +66,7 @@ class epilogue final
 {
 public:
 	inline epilogue(std::function<void()> func)
-		: m_operation(func)
+        : m_operation(std::move(func))
 	{}
 	inline epilogue(epilogue&& other)
 		: m_operation(std::move(other.m_operation))

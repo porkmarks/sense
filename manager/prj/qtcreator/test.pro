@@ -17,7 +17,9 @@ INCLUDEPATH += ../../src/Smtp
 INCLUDEPATH += ../../../common/src
 INCLUDEPATH += ../../../sensor/firmware
 
-LIBS += -ldl
+linux {
+    LIBS += -ldl
+}
 
 # You can also make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.

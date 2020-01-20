@@ -1,4 +1,4 @@
-#include "stdio.h"
+#include "cstdio"
 #include "Logger.h"
 #include <iostream>
 #include "DB.h"
@@ -100,16 +100,16 @@ void testCsvSettings()
         CHECK_TRUE(db.getCsvSettings().name == value);      \
         closeDB(db);                                        \
     }
-    CHECK_BOOL(exportId);
-    CHECK_BOOL(exportIndex);
-    CHECK_BOOL(exportSensorName);
-    CHECK_BOOL(exportSensorSN);
-    CHECK_BOOL(exportTimePoint);
-    CHECK_BOOL(exportReceivedTimePoint);
-    CHECK_BOOL(exportTemperature);
-    CHECK_BOOL(exportHumidity);
-    CHECK_BOOL(exportBattery);
-    CHECK_BOOL(exportSignal);
+    CHECK_BOOL(exportId)
+    CHECK_BOOL(exportIndex)
+    CHECK_BOOL(exportSensorName)
+    CHECK_BOOL(exportSensorSN)
+    CHECK_BOOL(exportTimePoint)
+    CHECK_BOOL(exportReceivedTimePoint)
+    CHECK_BOOL(exportTemperature)
+    CHECK_BOOL(exportHumidity)
+    CHECK_BOOL(exportBattery)
+    CHECK_BOOL(exportSignal)
 #undef CHECK_BOOL
 
 
@@ -150,24 +150,24 @@ void testSensorSettings()
 	std::cout << "Testing Sensor Settings\n";
 
 	std::cout << "\tTesting radio power\n";
-    for (auto value : std::map<int, bool>{ {-10, false}, {-3, true}, {0, true}, {5, true}, {10, true}, {17, true}, {20, true}, {22, false} })
+    for (auto value : std::map<int8_t, bool>{ {-10, false}, {-3, true}, {0, true}, {5, true}, {10, true}, {17, true}, {20, true}, {22, false} })
 	{
-		std::cout << "\t\t" << value.first << "dBm: Should " << (value.second ? "succeed" : "fail") << "\n";
+        std::cout << "\t\t" << int32_t(value.first) << "dBm: Should " << (value.second ? "succeed" : "fail") << "\n";
 		DB db;
 		createDB(db);
 		DB::SensorSettings settings;
-        settings.radioPower = (int8_t)value.first;
+        settings.radioPower = value.first;
 		CHECK_RESULT(db.setSensorSettings(settings), value.second);
-		CHECK_EQUALS(db.getSensorSettings().radioPower == (int8_t)value.first, value.second);
+        CHECK_EQUALS(db.getSensorSettings().radioPower == value.first, value.second);
 		closeDB(db);
 		loadDB(db);
-		CHECK_EQUALS(db.getSensorSettings().radioPower == (int8_t)value.first, value.second);
+        CHECK_EQUALS(db.getSensorSettings().radioPower == value.first, value.second);
 		closeDB(db);
 	}
 	std::cout << "\tTesting retries\n";
-	for (auto value : std::map<uint32_t, bool>{ {0u, false}, {1u, true}, {2u, true}, {10u, true}, {11u, false}})
+    for (auto value : std::map<uint8_t, bool>{ {0u, false}, {1u, true}, {2u, true}, {10u, true}, {11u, false}})
 	{
-        std::cout << "\t\t" << value.first << ": Should " << (value.second ? "succeed" : "fail") << "\n";
+        std::cout << "\t\t" << int32_t(value.first) << ": Should " << (value.second ? "succeed" : "fail") << "\n";
 		DB db;
 		createDB(db);
 		DB::SensorSettings settings;
