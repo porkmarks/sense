@@ -3771,6 +3771,22 @@ static std::string getQueryWherePart(DB::Filter const& filter)
 			sql += ")";
 		}
 	}
+	sql += " ORDER BY ";
+	switch (filter.sortBy)
+	{
+	case DB::Filter::SortBy::Id: sql += "id"; break;
+	case DB::Filter::SortBy::SensorId: sql += "sensorId"; break;
+	case DB::Filter::SortBy::Index: sql += "idx"; break;
+	case DB::Filter::SortBy::Timestamp: sql += "timePoint"; break;
+	case DB::Filter::SortBy::ReceivedTimestamp: sql += "receivedTimePoint"; break;
+	case DB::Filter::SortBy::Temperature: sql += "temperature"; break;
+	case DB::Filter::SortBy::Humidity: sql += "humidity"; break;
+	case DB::Filter::SortBy::Battery: sql += "vcc"; break;
+	case DB::Filter::SortBy::Signal: sql += "MIN(signalStrengthS2B, signalStrengthB2S)"; break;
+	case DB::Filter::SortBy::Alarms: sql += "alarmTriggersCurrent"; break;
+	default: sql += "idx"; break;
+	}
+	sql += filter.sortOrder == DB::Filter::SortOrder::Ascending ? " ASC" : " DESC";
     return sql;
 }
 

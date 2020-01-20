@@ -41,11 +41,6 @@ public:
         Alarms
     };
 
-    enum UserRole
-    {
-        SortingRole = Qt::UserRole + 5,
-    };
-
 public slots:
     void refresh();
 
@@ -67,6 +62,7 @@ private:
     bool removeColumns(int position, int columns, QModelIndex const& parent = QModelIndex()) override;
     bool insertRows(int position, int rows, QModelIndex const& parent = QModelIndex()) override;
     bool removeRows(int position, int rows, QModelIndex const& parent = QModelIndex()) override;
+    void sort(int column, Qt::SortOrder order = Qt::AscendingOrder) override;
 
 	void startAutoRefresh(IClock::duration timer);
 
@@ -77,6 +73,8 @@ private slots:
 private:
     DB& m_db;
     DB::Filter m_filter;
+    Column m_sortColumn = Column::Timestamp;
+    DB::Filter::SortOrder m_sortOrder = DB::Filter::SortOrder::Descending;
     std::vector<DB::Measurement> m_measurements;
     QTimer* m_refreshTimer = nullptr;
 };

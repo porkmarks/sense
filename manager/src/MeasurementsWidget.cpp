@@ -51,15 +51,13 @@ void MeasurementsWidget::init(DB& db)
 	m_db = &db;
 
 	m_model.reset(new MeasurementsModel(*m_db));
-    m_sortingModel.setSourceModel(m_model.get());
-    m_sortingModel.setSortRole(MeasurementsModel::SortingRole);
 
     connect(m_model.get(), &MeasurementsModel::rowsAboutToBeInserted, this, &MeasurementsWidget::refreshCounter);
     connect(m_model.get(), &MeasurementsModel::modelReset, this, &MeasurementsWidget::refreshCounter);
 
-    m_delegate.reset(new MeasurementsDelegate(m_sortingModel));
+    m_delegate.reset(new MeasurementsDelegate(*m_model));
 
-    m_ui.list->setModel(&m_sortingModel);
+    m_ui.list->setModel(m_model.get());
     m_ui.list->setItemDelegate(m_delegate.get());
 
     m_ui.list->setUniformRowHeights(true);
@@ -132,7 +130,6 @@ void MeasurementsWidget::shutdown()
     setEnabled(false);
     m_ui.list->setModel(nullptr);
     m_ui.list->setItemDelegate(nullptr);
-    m_sortingModel.setSourceModel(nullptr);
     m_model.reset();
     m_delegate.reset();
     m_db = nullptr;
@@ -485,8 +482,7 @@ void MeasurementsWidget::selectSensors()
 
 void MeasurementsWidget::configureMeasurement(QModelIndex const& index)
 {
-	QModelIndex mi = m_sortingModel.mapToSource(index);
-	Result<DB::Measurement> result = m_model->getMeasurement(mi);
+	Result<DB::Measurement> result = m_model->getMeasurement(index);
 	if (result != success)
 	{
 		QMessageBox::critical(this, "Error", "Invalid measurement selected.");

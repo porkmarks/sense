@@ -667,6 +667,28 @@ public:
 
 //        bool useSensorErrorsFilter = false;
 //        bool sensorErrorsFilter = true;
+
+		enum class SortBy
+		{
+			Id,
+			SensorId,
+			Index,
+			Timestamp,
+			ReceivedTimestamp,
+			Temperature,
+			Humidity,
+			Battery,
+			Signal,
+			Alarms
+		};
+        SortBy sortBy = SortBy::Timestamp;
+
+        enum class SortOrder
+        {
+            Ascending,
+            Descending
+        };
+        SortOrder sortOrder = SortOrder::Ascending;
     };
 
     size_t getAllMeasurementCount() const;

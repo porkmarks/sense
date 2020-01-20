@@ -108,40 +108,40 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
     //code to skip over disabled columns
     Column column = static_cast<Column>(index.column());
 
-    if (role == UserRole::SortingRole)
-    {
-        if (column == Column::Timestamp)
-        {
-            return static_cast<qlonglong>(IClock::to_time_t(measurement.timePoint));
-        }
-		else if (column == Column::ReceivedTimestamp)
-		{
-			return static_cast<qlonglong>(IClock::to_time_t(measurement.receivedTimePoint));
-		}
-        else if (column == Column::Temperature)
-        {
-            return measurement.descriptor.temperature;
-        }
-        else if (column == Column::Humidity)
-        {
-            return measurement.descriptor.humidity;
-        }
-        else if (column == Column::Battery)
-        {
-            return utils::getBatteryLevel(measurement.descriptor.vcc);
-        }
-        else if (column == Column::Signal)
-        {
-			return utils::getSignalLevel(std::min(measurement.descriptor.signalStrength.s2b, measurement.descriptor.signalStrength.b2s));
-        }
-        else if (column == Column::Alarms)
-        {
-            return static_cast<uint32_t>(std::bitset<32>(measurement.alarmTriggers.current).count());
-        }
-
-        return data(index, Qt::DisplayRole);
-    }
-    else if (role == Qt::DecorationRole)
+//     if (role == UserRole::SortingRole)
+//     {
+//         if (column == Column::Timestamp)
+//         {
+//             return static_cast<qlonglong>(IClock::to_time_t(measurement.timePoint));
+//         }
+// 		else if (column == Column::ReceivedTimestamp)
+// 		{
+// 			return static_cast<qlonglong>(IClock::to_time_t(measurement.receivedTimePoint));
+// 		}
+//         else if (column == Column::Temperature)
+//         {
+//             return measurement.descriptor.temperature;
+//         }
+//         else if (column == Column::Humidity)
+//         {
+//             return measurement.descriptor.humidity;
+//         }
+//         else if (column == Column::Battery)
+//         {
+//             return utils::getBatteryLevel(measurement.descriptor.vcc);
+//         }
+//         else if (column == Column::Signal)
+//         {
+// 			return utils::getSignalLevel(std::min(measurement.descriptor.signalStrength.s2b, measurement.descriptor.signalStrength.b2s));
+//         }
+//         else if (column == Column::Alarms)
+//         {
+//             return static_cast<uint32_t>(std::bitset<32>(measurement.alarmTriggers.current).count());
+//         }
+// 
+//         return data(index, Qt::DisplayRole);
+//     }
+    if (role == Qt::DecorationRole)
     {
         if (column == Column::Id)
         {
@@ -238,6 +238,22 @@ void MeasurementsModel::setFilter(DB::Filter const& filter)
 {
     beginResetModel();
     m_filter = filter;
+	switch (m_sortColumn)
+	{
+	case Column::Id: m_filter.sortBy = DB::Filter::SortBy::Id; break;
+	case Column::Sensor: m_filter.sortBy = DB::Filter::SortBy::SensorId; break;
+	case Column::Index: m_filter.sortBy = DB::Filter::SortBy::Index; break;
+	case Column::Timestamp: m_filter.sortBy = DB::Filter::SortBy::Timestamp; break;
+	case Column::ReceivedTimestamp: m_filter.sortBy = DB::Filter::SortBy::ReceivedTimestamp; break;
+	case Column::Temperature: m_filter.sortBy = DB::Filter::SortBy::Temperature; break;
+	case Column::Humidity: m_filter.sortBy = DB::Filter::SortBy::Humidity; break;
+	case Column::Battery: m_filter.sortBy = DB::Filter::SortBy::Battery; break;
+	case Column::Signal: m_filter.sortBy = DB::Filter::SortBy::Signal; break;
+	case Column::Alarms: m_filter.sortBy = DB::Filter::SortBy::Alarms; break;
+	default:
+		break;
+	}
+    m_filter.sortOrder = m_sortOrder;
     //auto start = IClock::now();
     m_measurements = m_db.getFilteredMeasurements(m_filter);
     //std::cout << "XXX: " << std::chrono::duration_cast<std::chrono::microseconds>(IClock::now() - start).count() << "\n";
@@ -268,14 +284,14 @@ void MeasurementsModel::refresh()
 
 void MeasurementsModel::startSlowAutoRefresh()
 {
-	startAutoRefresh(std::chrono::milliseconds(5000));
+	startAutoRefresh(std::chrono::milliseconds(10000));
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 void MeasurementsModel::startFastAutoRefresh()
 {
-    startAutoRefresh(std::chrono::milliseconds(1000));
+    startAutoRefresh(std::chrono::milliseconds(3000));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -357,5 +373,20 @@ bool MeasurementsModel::insertRows(int /*position*/, int /*rows*/, QModelIndex c
 bool MeasurementsModel::removeRows(int /*position*/, int /*rows*/, QModelIndex const& /*parent*/)
 {
     return false;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsModel::sort(int column, Qt::SortOrder order)
+{
+	Column sortColumn = static_cast<Column>(column);
+	DB::Filter::SortOrder sortOrder = order == Qt::AscendingOrder ? DB::Filter::SortOrder::Ascending : DB::Filter::SortOrder::Descending;
+
+    if (m_sortColumn != sortColumn || m_sortOrder != sortOrder)
+    {
+        m_sortColumn = sortColumn;
+        m_sortOrder = sortOrder;
+        setFilter(getFilter());
+    }
 }
 
