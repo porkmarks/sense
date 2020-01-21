@@ -13,6 +13,8 @@
 
 static std::array<const char*, 10> s_headerNames = {"Id", "Sensor", "Index", "Timestamp", "Received Timestamp", "Temperature", "Humidity", "Battery", "Signal", "Alarms"};
 
+constexpr size_t k_chunkSize = 50000;
+
 //////////////////////////////////////////////////////////////////////////
 
 MeasurementsModel::MeasurementsModel(DB& db)
@@ -20,16 +22,27 @@ MeasurementsModel::MeasurementsModel(DB& db)
 {
     m_refreshTimer = new QTimer(this);
     m_refreshTimer->setSingleShot(true);
-
-    connect(&db, &DB::measurementsAdded, this, &MeasurementsModel::startSlowAutoRefresh);
-    connect(&db, &DB::measurementsChanged, this, &MeasurementsModel::startFastAutoRefresh);
-    connect(m_refreshTimer, &QTimer::timeout, this, &MeasurementsModel::refresh);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 MeasurementsModel::~MeasurementsModel()
 {
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsModel::setActive(bool active)
+{
+	for (const QMetaObject::Connection& connection : m_connections)
+	{
+		QObject::disconnect(connection);
+	}
+    m_connections.clear();
+
+	m_connections.push_back(connect(&m_db, &DB::measurementsAdded, this, &MeasurementsModel::startSlowAutoRefresh));
+	m_connections.push_back(connect(&m_db, &DB::measurementsChanged, this, &MeasurementsModel::startFastAutoRefresh));
+	m_connections.push_back(connect(m_refreshTimer, &QTimer::timeout, this, &MeasurementsModel::refresh));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -255,7 +268,9 @@ void MeasurementsModel::setFilter(DB::Filter const& filter)
 	}
     m_filter.sortOrder = m_sortOrder;
     //auto start = IClock::now();
-    m_measurements = m_db.getFilteredMeasurements(m_filter);
+    m_measurementsStartIndex = 0;
+    m_measurementsTotalCount = m_db.getFilteredMeasurementCount(m_filter);
+    m_measurements = m_db.getFilteredMeasurements(m_filter, m_measurementsStartIndex, k_chunkSize);
     //std::cout << "XXX: " << std::chrono::duration_cast<std::chrono::microseconds>(IClock::now() - start).count() << "\n";
     endResetModel();
 
@@ -274,7 +289,9 @@ DB::Filter const& MeasurementsModel::getFilter() const
 void MeasurementsModel::refresh()
 {
     beginResetModel();
-    m_measurements = m_db.getFilteredMeasurements(m_filter);
+    m_measurementsStartIndex = 0;
+    m_measurementsTotalCount = m_db.getFilteredMeasurementCount(m_filter);
+    m_measurements = m_db.getFilteredMeasurements(m_filter, m_measurementsStartIndex, k_chunkSize);
     endResetModel();
 
     Q_EMIT layoutChanged();
@@ -305,13 +322,17 @@ void MeasurementsModel::startAutoRefresh(IClock::duration timer)
 
 size_t MeasurementsModel::getMeasurementCount() const
 {
-    return m_measurements.size();
+    return m_measurementsTotalCount;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-DB::Measurement const& MeasurementsModel::getMeasurement(size_t index) const
+DB::Measurement const& MeasurementsModel::getMeasurement(size_t index)
 {
+    while (index >= m_measurements.size())
+    {
+        fetchMore(QModelIndex());
+    }
     return m_measurements[index];
 }
 
@@ -389,4 +410,26 @@ void MeasurementsModel::sort(int column, Qt::SortOrder order)
         setFilter(getFilter());
     }
 }
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsModel::fetchMore(const QModelIndex& parent)
+{
+	beginInsertRows(QModelIndex(), int(m_measurementsStartIndex), int(m_measurementsStartIndex) + k_chunkSize);
+
+    m_measurementsStartIndex = m_measurements.size();
+    std::vector<DB::Measurement> measurements = m_db.getFilteredMeasurements(m_filter, m_measurementsStartIndex, k_chunkSize);
+    m_measurements.resize(m_measurementsStartIndex + measurements.size());
+    std::move(measurements.begin(), measurements.end(), m_measurements.begin() + m_measurementsStartIndex);
+
+	endInsertRows();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool MeasurementsModel::canFetchMore(const QModelIndex& parent) const
+{
+    return m_measurements.size() < m_measurementsTotalCount;
+}
+
 

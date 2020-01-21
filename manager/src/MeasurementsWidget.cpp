@@ -266,6 +266,21 @@ void MeasurementsWidget::saveSettings()
 
 //////////////////////////////////////////////////////////////////////////
 
+void MeasurementsWidget::setActive(bool active)
+{
+    if (active)
+    {
+        loadSettings();
+    }
+    else
+    {
+        saveSettings();
+    }
+    m_model->setActive(active);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 DB::Filter MeasurementsWidget::createFilter() const
 {
     DB::Filter filter;

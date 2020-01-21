@@ -19,11 +19,13 @@ public:
 	MeasurementsModel(DB& db);
     ~MeasurementsModel();
 
+    void setActive(bool active);
+
     void setFilter(DB::Filter const& filter);
     DB::Filter const& getFilter() const;
 
     size_t getMeasurementCount() const;
-    DB::Measurement const& getMeasurement(size_t index) const;
+    DB::Measurement const& getMeasurement(size_t index);
 
     Result<DB::Measurement> getMeasurement(QModelIndex index) const;
 
@@ -63,6 +65,8 @@ private:
     bool insertRows(int position, int rows, QModelIndex const& parent = QModelIndex()) override;
     bool removeRows(int position, int rows, QModelIndex const& parent = QModelIndex()) override;
     void sort(int column, Qt::SortOrder order = Qt::AscendingOrder) override;
+	void fetchMore(const QModelIndex& parent) override;
+	bool canFetchMore(const QModelIndex& parent) const override;
 
 	void startAutoRefresh(IClock::duration timer);
 
@@ -71,10 +75,13 @@ private slots:
 	void startFastAutoRefresh();
 
 private:
+	std::vector<QMetaObject::Connection> m_connections;
     DB& m_db;
     DB::Filter m_filter;
     Column m_sortColumn = Column::Timestamp;
     DB::Filter::SortOrder m_sortOrder = DB::Filter::SortOrder::Descending;
+    size_t m_measurementsStartIndex = 0;
+    size_t m_measurementsTotalCount = 0;
     std::vector<DB::Measurement> m_measurements;
     QTimer* m_refreshTimer = nullptr;
 };

@@ -498,7 +498,7 @@ const char* getDominatingTriggerName(uint32_t trigger)
 float getBatteryLevel(float vcc)
 {
     float level = std::max(std::min(vcc, k_maxBatteryLevel) - k_minBatteryLevel, 0.f) / (k_maxBatteryLevel - k_minBatteryLevel);
-    level = std::pow(level, 5.f); //to revert the battery curve
+    level = std::pow(level, 4.f); //to revert the battery curve
     return level;
 }
 

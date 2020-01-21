@@ -21,6 +21,8 @@ public:
     void loadSettings();
     void saveSettings();
 
+    void setActive(bool active);
+
 private slots:
     void scheduleSlowRefresh();
     void scheduleFastRefresh();

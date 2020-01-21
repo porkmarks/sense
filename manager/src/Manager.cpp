@@ -416,19 +416,19 @@ void Manager::tabChanged()
 
 	if (m_currentTabIndex == 1) //measurements out
 	{
-		m_ui.measurementsWidget->saveSettings();
+		m_ui.measurementsWidget->setActive(false);
 	}
 	if (m_currentTabIndex == 2) //plots out
 	{
-		m_ui.plotWidget->saveSettings();
+		m_ui.plotWidget->setActive(false);
 	}
     if (m_ui.tabWidget->currentIndex() == 1) //measurements in
     {
-		m_ui.measurementsWidget->loadSettings();
+		m_ui.measurementsWidget->setActive(true);
     }
     if (m_ui.tabWidget->currentIndex() == 2) //plots in
     {
-		m_ui.plotWidget->loadSettings();
+		m_ui.plotWidget->setActive(true);
     }
 
     if (m_ui.tabWidget->currentWidget() == m_ui.logsWidget)

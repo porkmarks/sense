@@ -693,7 +693,7 @@ public:
 
     size_t getAllMeasurementCount() const;
 
-    std::vector<Measurement> getFilteredMeasurements(Filter const& filter) const;
+    std::vector<Measurement> getFilteredMeasurements(Filter const& filter, size_t start = 0, size_t count = 0) const;
     size_t getFilteredMeasurementCount(Filter const& filter) const;
 
     Result<Measurement> getLastMeasurementForSensor(SensorId sensorId) const;
@@ -709,42 +709,42 @@ signals:
 	void emailSettingsChanged();
 	void ftpSettingsChanged();
 
-    void userAdded(DB::UserId id);
-    void userRemoved(DB::UserId id);
-    void userChanged(DB::UserId id);
-    void userLoggedIn(DB::UserId id);
+    void userAdded(UserId id);
+    void userRemoved(UserId id);
+    void userChanged(UserId id);
+    void userLoggedIn(UserId id);
 
-    void baseStationAdded(DB::BaseStationId id);
-    void baseStationRemoved(DB::BaseStationId id);
-    void baseStationChanged(DB::BaseStationId id);
+    void baseStationAdded(BaseStationId id);
+    void baseStationRemoved(BaseStationId id);
+    void baseStationChanged(BaseStationId id);
 
     void sensorTimeConfigAdded();
     void sensorTimeConfigChanged();
 
     void sensorSettingsChanged();
 
-    void sensorAdded(DB::SensorId id);
-    void sensorBound(DB::SensorId id);
-    void sensorRemoved(DB::SensorId id);
-    void sensorChanged(DB::SensorId id);
-    void sensorDataChanged(DB::SensorId id);
+    void sensorAdded(SensorId id);
+    void sensorBound(SensorId id);
+    void sensorRemoved(SensorId id);
+    void sensorChanged(SensorId id);
+    void sensorDataChanged(SensorId id);
 
-    void alarmAdded(DB::AlarmId id);
-    void alarmRemoved(DB::AlarmId id);
-    void alarmChanged(DB::AlarmId id);
+    void alarmAdded(AlarmId id);
+    void alarmRemoved(AlarmId id);
+    void alarmChanged(AlarmId id);
 
-    void reportAdded(DB::ReportId id);
-    void reportRemoved(DB::ReportId id);
-    void reportChanged(DB::ReportId id);
-    void reportTriggered(DB::ReportId id, IClock::time_point from, IClock::time_point to);
+    void reportAdded(ReportId id);
+    void reportRemoved(ReportId id);
+    void reportChanged(ReportId id);
+    void reportTriggered(ReportId id, IClock::time_point from, IClock::time_point to);
 
-    void measurementsAdded(DB::SensorId id);
-    void measurementsRemoved(DB::SensorId id);
+    void measurementsAdded(SensorId id);
+    void measurementsRemoved(SensorId id);
     void measurementsChanged();
 
-   void alarmSensorTriggersChanged(DB::AlarmId alarmId, DB::SensorId sensorId, std::optional<DB::Measurement> measurement, uint32_t oldTriggers, DB::AlarmTriggers triggers);
-   void alarmBaseStationTriggersChanged(DB::AlarmId alarmId, DB::BaseStationId baseStationId, uint32_t oldTriggers, DB::AlarmTriggers triggers);
-   void alarmStillTriggered(DB::AlarmId alarmId);
+   void alarmSensorTriggersChanged(AlarmId alarmId, SensorId sensorId, std::optional<Measurement> measurement, uint32_t oldTriggers, AlarmTriggers triggers);
+   void alarmBaseStationTriggersChanged(AlarmId alarmId, BaseStationId baseStationId, uint32_t oldTriggers, AlarmTriggers triggers);
+   void alarmStillTriggered(AlarmId alarmId);
 
 private:
     Result<void> checkAlarmDescriptor(AlarmDescriptor const& descriptor) const;
@@ -754,7 +754,6 @@ private:
     void checkForDisconnectedBaseStations();
     void checkForBlackoutSensors();
     void checkMeasurementTriggers();
-    size_t _getFilteredMeasurements(Filter const& filter, std::vector<Measurement>* result) const;
     Result<void> _addSensorTimeConfig(SensorTimeConfigDescriptor const& descriptor);
 
     //static inline MeasurementId computeMeasurementId(MeasurementDescriptor const& md);

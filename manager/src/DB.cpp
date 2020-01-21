@@ -49,6 +49,7 @@ DB::DB(std::shared_ptr<IClock> clock)
 	qRegisterMetaType<AlarmId>("AlarmId");
 	qRegisterMetaType<ReportId>("ReportId");
 	qRegisterMetaType<Measurement>("Measurement");
+	qRegisterMetaType<std::optional<Measurement>>("std::optional<Measurement>");
 	qRegisterMetaType<AlarmTriggers>("AlarmTriggers");
 
 	m_emailer.reset(new Emailer(*this));
@@ -205,21 +206,20 @@ Result<void> DB::create(sqlite3& db)
 			return error;
 		}
 	}
+    if (sqlite3_exec(&db, "CREATE INDEX idx_sensorId ON Measurements (idx, sensorId);", nullptr, nullptr, nullptr))
 	{
-		const char* sql = "CREATE INDEX idx_sensorId ON Measurements (idx, sensorId);";
-        if (sqlite3_exec(&db, sql, nullptr, nullptr, nullptr))
-		{
-			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
-			return error;
-		}
+		Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+		return error;
 	}
+    if (sqlite3_exec(&db, "CREATE INDEX measurementsIdx ON Measurements(idx);", nullptr, nullptr, nullptr))
 	{
-		const char* sql = "CREATE INDEX measurementsIdx ON Measurements(idx);";
-        if (sqlite3_exec(&db, sql, nullptr, nullptr, nullptr))
-		{
-			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
-			return error;
-		}
+		Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+		return error;
+	}
+	if (sqlite3_exec(&db, "CREATE INDEX measurementsTimePoint ON Measurements(timePoint);", nullptr, nullptr, nullptr))
+	{
+		Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+		return error;
 	}
 
 	return success;
@@ -1303,7 +1303,7 @@ void DB::checkMeasurementTriggers()
 			continue;
 		}
 
-		QString sql = QString("SELECT id, timePoint, receivedTimePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggersCurrent, alarmTriggersAdded, alarmTriggersRemoved "
+		QString sql = QString("SELECT * "
 								"FROM Measurements "
 								"WHERE idx > %1 AND idx <= %2 AND sensorId = %3;").arg(sensor.lastAlarmProcessesMeasurementIndex).arg(sensor.lastConfirmedMeasurementIndex).arg(sensor.id);
 		sqlite3_stmt* stmt;
@@ -3676,48 +3676,29 @@ size_t DB::getAllMeasurementCount() const
 
 //////////////////////////////////////////////////////////////////////////
 
-std::vector<DB::Measurement> DB::getFilteredMeasurements(Filter const& filter) const
-{
-    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
-
-    std::vector<DB::Measurement> result;
-    result.reserve(8192);
-    _getFilteredMeasurements(filter, &result);
-    return result;
-}
-
 //////////////////////////////////////////////////////////////////////////
 
-size_t DB::getFilteredMeasurementCount(Filter const& filter) const
+static std::string getQueryWherePart(DB::Filter const& filter, bool order)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+	std::string sql;
 
-    return _getFilteredMeasurements(filter, nullptr);
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-static std::string getQueryWherePart(DB::Filter const& filter)
-{
-    std::string sql;
-
-    std::vector<std::string> conditions;
+	std::vector<std::string> conditions;
 
 	if (filter.useTimePointFilter)
 	{
-        std::string str = " timePoint >= ";
-        str += std::to_string(IClock::to_time_t(filter.timePointFilter.min));
-        str += " AND timePoint <= ";
-        str += std::to_string(IClock::to_time_t(filter.timePointFilter.max));
-        conditions.push_back(str);
+		std::string str = " timePoint >= ";
+		str += std::to_string(IClock::to_time_t(filter.timePointFilter.min));
+		str += " AND timePoint <= ";
+		str += std::to_string(IClock::to_time_t(filter.timePointFilter.max));
+		conditions.push_back(str);
 	}
 	if (filter.useSensorFilter)
 	{
-        std::string str;
-        for (DB::SensorId sensorId : filter.sensorIds)
+		std::string str;
+		for (DB::SensorId sensorId : filter.sensorIds)
 		{
 			if (!str.empty()) str += " OR";
-            str += " sensorId = " + std::to_string(sensorId);
+			str += " sensorId = " + std::to_string(sensorId);
 		}
 		conditions.push_back(str);
 	}
@@ -3758,77 +3739,113 @@ static std::string getQueryWherePart(DB::Filter const& filter)
 	{
 		sql += " WHERE";
 
-        bool first = true;
-        for (std::string const& str: conditions)
+		bool first = true;
+		for (std::string const& str : conditions)
 		{
-            if (!first)
-            {
+			if (!first)
+			{
 				sql += " AND ";
-            }
-            first = false;
+			}
+			first = false;
 			sql += " (";
 			sql += str;
 			sql += ")";
 		}
 	}
-	sql += " ORDER BY ";
-	switch (filter.sortBy)
+	if (order)
 	{
-	case DB::Filter::SortBy::Id: sql += "id"; break;
-	case DB::Filter::SortBy::SensorId: sql += "sensorId"; break;
-	case DB::Filter::SortBy::Index: sql += "idx"; break;
-	case DB::Filter::SortBy::Timestamp: sql += "timePoint"; break;
-	case DB::Filter::SortBy::ReceivedTimestamp: sql += "receivedTimePoint"; break;
-	case DB::Filter::SortBy::Temperature: sql += "temperature"; break;
-	case DB::Filter::SortBy::Humidity: sql += "humidity"; break;
-	case DB::Filter::SortBy::Battery: sql += "vcc"; break;
-	case DB::Filter::SortBy::Signal: sql += "MIN(signalStrengthS2B, signalStrengthB2S)"; break;
-	case DB::Filter::SortBy::Alarms: sql += "alarmTriggersCurrent"; break;
-	default: sql += "idx"; break;
+		sql += " ORDER BY ";
+		switch (filter.sortBy)
+		{
+		case DB::Filter::SortBy::Id: sql += "id"; break;
+		case DB::Filter::SortBy::SensorId: sql += "sensorId"; break;
+		case DB::Filter::SortBy::Index: sql += "idx"; break;
+		case DB::Filter::SortBy::Timestamp: sql += "timePoint"; break;
+		case DB::Filter::SortBy::ReceivedTimestamp: sql += "receivedTimePoint"; break;
+		case DB::Filter::SortBy::Temperature: sql += "temperature"; break;
+		case DB::Filter::SortBy::Humidity: sql += "humidity"; break;
+		case DB::Filter::SortBy::Battery: sql += "vcc"; break;
+		case DB::Filter::SortBy::Signal: sql += "MIN(signalStrengthS2B, signalStrengthB2S)"; break;
+		case DB::Filter::SortBy::Alarms: sql += "alarmTriggersCurrent"; break;
+		default: sql += "idx"; break;
+		}
+		sql += filter.sortOrder == DB::Filter::SortOrder::Ascending ? " ASC" : " DESC";
 	}
-	sql += filter.sortOrder == DB::Filter::SortOrder::Ascending ? " ASC" : " DESC";
-    return sql;
+	return sql;
 }
 
-size_t DB::_getFilteredMeasurements(Filter const& filter, std::vector<DB::Measurement>* out) const
+std::vector<DB::Measurement> DB::getFilteredMeasurements(Filter const& filter, size_t start, size_t count) const
 {
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+
+    std::vector<DB::Measurement> result;
+    result.reserve(100000);
+
+	IClock::time_point startTp = m_clock->now();
+	utils::epilogue epi([startTp, start, count, this]
+	{
+		std::cout << (QString("Computed filtered measurements %1:%2: %3ms\n").arg(start).arg(count).arg(std::chrono::duration_cast<std::chrono::milliseconds>(DB::m_clock->now() - startTp).count())).toStdString();
+	});
+
+	std::string sql = "SELECT * FROM Measurements " + getQueryWherePart(filter, true);
+	if (start != 0 || count != 0)
+	{
+		sql += " LIMIT " + std::to_string(count == 0 ? 1000000000ULL : count);
+		if (start != 0)
+		{
+			sql += " OFFSET " + std::to_string(start);
+		}
+	}
+	sql += ";";
+
+	sqlite3_stmt* stmt;
+	if (sqlite3_prepare_v2(m_sqlite, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK)
+	{
+		const char* msg = sqlite3_errmsg(m_sqlite);
+		Q_ASSERT(false);
+		return {};
+	}
+	utils::epilogue epi2([stmt] { sqlite3_finalize(stmt); });
+
+	while (sqlite3_step(stmt) == SQLITE_ROW)
+	{
+		result.emplace_back(unpackMeasurement(stmt));
+	}
+
+    return result;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+size_t DB::getFilteredMeasurementCount(Filter const& filter) const
+{
+    std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+
 	IClock::time_point start = m_clock->now();
-
-    size_t count = 0;
-
-	if (out)
+	utils::epilogue epi([start, this] 
 	{
-		out->reserve(100000);
+		std::cout << (QString("Computed filtered measurement counts: %3ms\n").arg(std::chrono::duration_cast<std::chrono::milliseconds>(DB::m_clock->now() - start).count())).toStdString();
+	});
+
+	std::string sql = "SELECT COUNT(*) FROM Measurements " + getQueryWherePart(filter, false) + ";";
+
+	sqlite3_stmt* stmt;
+	if (sqlite3_prepare_v2(m_sqlite, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK)
+	{
+		const char* msg = sqlite3_errmsg(m_sqlite);
+		Q_ASSERT(false);
+		return {};
+	}
+	utils::epilogue epi1([stmt] { sqlite3_finalize(stmt); });
+
+	if (sqlite3_step(stmt) != SQLITE_ROW)
+	{
+		const char* msg = sqlite3_errmsg(m_sqlite);
+		Q_ASSERT(false);
+		return 0;
 	}
 
-	{
-		std::string sql = "SELECT id, timePoint, receivedTimePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggersCurrent, alarmTriggersAdded, alarmTriggersRemoved "
-                          "FROM Measurements " + getQueryWherePart(filter);
-		sql += ";";
-
-		sqlite3_stmt* stmt;
-        if (sqlite3_prepare_v2(m_sqlite, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK)
-		{
-            const char* msg = sqlite3_errmsg(m_sqlite);
-			Q_ASSERT(false);
-			return {};
-		}
-		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
-
-		while (sqlite3_step(stmt) == SQLITE_ROW)
-		{
-			if (out)
-			{
-				out->emplace_back(unpackMeasurement(stmt));
-			}
-			count++;
-		}
-	}
-
-	std::cout << (QString("Computed filtered measurements: %3ms\n")
-				  .arg(std::chrono::duration_cast<std::chrono::milliseconds>(DB::m_clock->now() - start).count())).toStdString();
-
-    return count;
+	return size_t(sqlite3_column_int64(stmt, 0));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -3837,7 +3854,7 @@ Result<DB::Measurement> DB::getLastMeasurementForSensor(SensorId sensorId) const
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    QString sql = QString("SELECT id, timePoint, receivedTimePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggersCurrent, alarmTriggersAdded, alarmTriggersRemoved "
+    QString sql = QString("SELECT * "
                           "FROM Measurements "
                           "WHERE sensorId = %1 "
                           "ORDER BY idx DESC LIMIT 1;").arg(sensorId);
@@ -3864,7 +3881,7 @@ Result<DB::Measurement> DB::findMeasurementById(MeasurementId id) const
 {
 	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-	QString sql = QString("SELECT id, timePoint, receivedTimePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggersCurrent, alarmTriggersAdded, alarmTriggersRemoved "
+	QString sql = QString("SELECT * "
                           "FROM Measurements "
                           "WHERE id = %1;").arg(id);
 	sqlite3_stmt* stmt;
@@ -3950,7 +3967,7 @@ DB::SignalStrength DB::computeAverageSignalStrength(SensorId sensorId, Data cons
 {
 	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-	QString sql = QString("SELECT id, timePoint, receivedTimePoint, idx, sensorId, temperature, humidity, vcc, signalStrengthS2B, signalStrengthB2S, sensorErrors, alarmTriggersCurrent, alarmTriggersAdded, alarmTriggersRemoved "
+	QString sql = QString("SELECT * "
                           "FROM Measurements "
                           "WHERE sensorId = %1 AND signalStrengthS2B != 0 AND signalStrengthB2S != 0 "
                           "ORDER BY idx DESC LIMIT 10;").arg(sensorId);
