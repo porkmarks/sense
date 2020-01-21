@@ -260,7 +260,7 @@ public:
         IClock::duration measurementPeriod = std::chrono::minutes(5);
         IClock::duration commsPeriod = std::chrono::minutes(10);
 #ifdef _MSC_VER
-		bool operator<=>(SensorTimeConfigDescriptor const& other) const = default;
+        auto operator<=>(SensorTimeConfigDescriptor const& other) const = default;
 #endif
     };
 
@@ -272,7 +272,7 @@ public:
         IClock::time_point baselineMeasurementTimePoint = IClock::time_point(IClock::duration::zero());
         uint32_t baselineMeasurementIndex = 0;
 #ifdef _MSC_VER
-        bool operator<=>(SensorTimeConfig const& other) const = default;
+        auto operator<=>(SensorTimeConfig const& other) const = default;
 #endif
     };
 
@@ -303,6 +303,9 @@ public:
 
     struct SignalStrength
     {
+#ifdef _MSC_VER
+        auto operator<=>(SignalStrength const& other) const = default;
+#endif
         int16_t s2b = 0;
         int16_t b2s = 0;
     };
@@ -345,6 +348,10 @@ public:
 
     struct SensorStats
     {
+#ifdef _MSC_VER
+        auto operator<=>(SensorStats const& other) const = default;
+#endif
+
         uint32_t commsBlackouts = 0; //skipped comms cycles
         uint32_t commsFailures = 0; //generic comms failures reported by the sensor
         //various reboot reasons
@@ -364,18 +371,31 @@ public:
     struct SensorDescriptor
     {
         std::string name;
+#ifdef _MSC_VER
+        auto operator<=>(SensorDescriptor const& other) const = default;
+#endif
     };
 
     struct Sensor
     {
+#ifdef _MSC_VER
+        auto operator<=>(Sensor const& other) const = default;
+#endif
+
         struct Calibration
         {
+#ifdef _MSC_VER
+            auto operator<=>(Calibration const& other) const = default;
+#endif
             float temperatureBias = 0.f;
             float humidityBias = 0.f;
         };
 
         struct DeviceInfo
         {
+#ifdef _MSC_VER
+            auto operator<=>(DeviceInfo const& other) const = default;
+#endif
 			uint8_t sensorType = 0;
 			uint8_t hardwareVersion = 0;
 			uint8_t softwareVersion = 0;
@@ -434,7 +454,7 @@ public:
 
     size_t getSensorCount() const;
     Sensor getSensor(size_t index) const;
-    Result<void> addSensor(SensorDescriptor const& descriptor);
+    Result<DB::SensorId> addSensor(SensorDescriptor const& descriptor);
     Result<void> setSensor(SensorId id, SensorDescriptor const& descriptor);
     Result<void> setSensorCalibration(SensorId id, Sensor::Calibration const& calibration);
     Result<void> setSensorSleep(SensorId id, bool sleep);

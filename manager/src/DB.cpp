@@ -559,8 +559,9 @@ Result<void> DB::load(sqlite3& db)
 			s.rtMeasurementTemperature = (float)sqlite3_column_double(stmt, index++);
 			s.rtMeasurementHumidity = (float)sqlite3_column_double(stmt, index++);
 			s.rtMeasurementVcc = (float)sqlite3_column_double(stmt, index++);
-			Q_ASSERT(index == 37);
-			data.sensors.push_back(std::move(s));
+            Q_ASSERT(index == 37);
+            s.addedTimePoint = m_clock->now();
+            data.sensors.push_back(std::move(s));
 		}
 	}
 
@@ -2301,7 +2302,7 @@ DB::SensorTimeConfig DB::findSensorTimeConfigForMeasurementIndex(uint32_t index)
 
 //////////////////////////////////////////////////////////////////////////
 
-Result<void> DB::addSensor(SensorDescriptor const& descriptor)
+Result<DB::SensorId> DB::addSensor(SensorDescriptor const& descriptor)
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
@@ -2315,11 +2316,13 @@ Result<void> DB::addSensor(SensorDescriptor const& descriptor)
         return Error("There is already an unbound sensor");
     }
 
+    SensorId id;
     {
         Sensor sensor;
 		sensor.addedTimePoint = m_clock->now();
         sensor.descriptor.name = descriptor.name;
-        sensor.id = ++m_data.lastSensorId;
+        id = ++m_data.lastSensorId;
+        sensor.id = id;
         sensor.state = Sensor::State::Unbound;
 
         m_data.sensors.push_back(sensor);
@@ -2334,7 +2337,7 @@ Result<void> DB::addSensor(SensorDescriptor const& descriptor)
 
 	save(true);
 
-    return success;
+    return id;
 }
 
 //////////////////////////////////////////////////////////////////////////
