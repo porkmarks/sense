@@ -26,6 +26,8 @@ public:
     void loadSettings();
     void saveSettings();
 
+    void setActive(bool active);
+
     QSize getPlotSize() const;
     void saveToPng(const QString& fileName, bool showLegend, bool showAnnotations);
 
@@ -46,6 +48,7 @@ private slots:
     void plotContextMenu(QPoint const& position);
     void refresh();
     void scheduleSlowRefresh();
+    void scheduleMediumRefresh();
     void scheduleFastRefresh();
     void selectSensors();
 	void sensorAdded(DB::SensorId id);
@@ -130,6 +133,7 @@ private:
     std::vector<QMetaObject::Connection> m_uiConnections;
 
     int32_t m_draggedAnnotationIndex = -1;
+    bool m_isApplyingFilter = false;
     //bool m_isDragging = false;
 };
 

@@ -21,6 +21,8 @@ public:
     void loadSettings();
     void saveSettings();
 
+    void setActive(bool active);
+
 private slots:
     void scheduleSlowRefresh();
     void scheduleFastRefresh();
@@ -49,7 +51,6 @@ private:
 
     DB* m_db = nullptr;
     std::unique_ptr<MeasurementsModel> m_model;
-    QSortFilterProxyModel m_sortingModel;
     std::unique_ptr<MeasurementsDelegate> m_delegate;
     std::set<DB::SensorId> m_selectedSensorIds;
 

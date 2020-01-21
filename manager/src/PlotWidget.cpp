@@ -54,43 +54,12 @@ PlotWidget::PlotWidget(QWidget* parent)
 
 void PlotWidget::init(DB& db)
 {
-    for (const QMetaObject::Connection& connection: m_uiConnections)
-    {
-        QObject::disconnect(connection);
-    }
-    m_uiConnections.clear();
-
     setEnabled(true);
     m_db = &db;
 
-    m_uiConnections.push_back(connect(&db, &DB::userLoggedIn, this, &PlotWidget::setPermissions));
-
-    m_uiConnections.push_back(connect(m_ui.clearAnnotations, &QPushButton::released, this, &PlotWidget::clearAnnotations));
-    m_uiConnections.push_back(connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.selectSensors, &QPushButton::released, this, &PlotWidget::selectSensors, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.exportData, &QPushButton::released, this, &PlotWidget::exportData));
-
-    m_uiConnections.push_back(connect(m_ui.fitVertically, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.fitHorizontally, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.minTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.maxTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.minHumidity, &QDoubleSpinBox::editingFinished, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.maxHumidity, &QDoubleSpinBox::editingFinished, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
-
-    m_uiConnections.push_back(connect(m_ui.useSmoothing, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
-
-    m_uiConnections.push_back(connect(m_ui.showTemperature, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.showHumidity, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.showBattery, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_ui.showSignal, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
-
-    m_uiConnections.push_back(connect(m_db, &DB::measurementsAdded, this, &PlotWidget::scheduleSlowRefresh, Qt::QueuedConnection));
-    m_uiConnections.push_back(connect(m_db, &DB::measurementsChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
-	m_uiConnections.push_back(connect(m_db, &DB::sensorAdded, this, &PlotWidget::sensorAdded, Qt::QueuedConnection));
-	m_uiConnections.push_back(connect(m_db, &DB::sensorRemoved, this, &PlotWidget::sensorRemoved, Qt::QueuedConnection));
+    connect(m_db, &DB::userLoggedIn, this, &PlotWidget::setPermissions);
 
     loadSettings();
-    refresh();
 
     setPermissions();
 }
@@ -140,19 +109,6 @@ void PlotWidget::setPermissions()
 void PlotWidget::loadSettings()
 {
     m_ui.dateTimeFilter->loadSettings();
-
-    bool showTemperature = m_ui.showTemperature->isChecked();
-    bool showHumidity = m_ui.showHumidity->isChecked();
-    bool showBattery = m_ui.showBattery->isChecked();
-    bool showSignal = m_ui.showSignal->isChecked();
-    bool fitVertically = m_ui.fitVertically->isChecked();
-    bool fitHorizontally = m_ui.fitHorizontally->isChecked();
-    bool useSmoothing = m_ui.useSmoothing->isChecked();
-    double minHumidity = m_ui.minHumidity->value();
-    double maxHumidity = m_ui.maxHumidity->value();
-    double minTemperature = m_ui.minTemperature->value();
-    double maxTemperature = m_ui.maxTemperature->value();
-    std::set<DB::SensorId> selectedSensorIds = m_selectedSensorIds;
 
     m_ui.showTemperature->blockSignals(true);
     m_ui.showHumidity->blockSignals(true);
@@ -219,22 +175,6 @@ void PlotWidget::loadSettings()
             m_selectedSensorIds.insert(sensor.id);
         }
     }
-
-    if (showTemperature != m_ui.showTemperature->isChecked() ||
-        showHumidity != m_ui.showHumidity->isChecked() ||
-        showBattery != m_ui.showBattery->isChecked() ||
-        showSignal != m_ui.showSignal->isChecked() ||
-        fitVertically != m_ui.fitVertically->isChecked() ||
-		fitHorizontally != m_ui.fitHorizontally->isChecked() ||
-        useSmoothing != m_ui.useSmoothing->isChecked() ||
-        minHumidity != m_ui.minHumidity->value() ||
-        maxHumidity != m_ui.maxHumidity->value() ||
-        minTemperature != m_ui.minTemperature->value() ||
-        maxTemperature != m_ui.maxTemperature->value() ||
-        selectedSensorIds != m_selectedSensorIds)
-    {
-        refresh();
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -263,6 +203,52 @@ void PlotWidget::saveSettings()
         ssid.append(id);
     }
     settings.setValue("filter/selectedSensors", ssid);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::setActive(bool active)
+{
+	for (const QMetaObject::Connection& connection : m_uiConnections)
+	{
+		QObject::disconnect(connection);
+	}
+	m_uiConnections.clear();
+
+	if (active)
+	{
+		m_uiConnections.push_back(connect(m_ui.clearAnnotations, &QPushButton::released, this, &PlotWidget::clearAnnotations));
+		m_uiConnections.push_back(connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+		m_uiConnections.push_back(connect(m_ui.selectSensors, &QPushButton::released, this, &PlotWidget::selectSensors, Qt::QueuedConnection));
+		m_uiConnections.push_back(connect(m_ui.exportData, &QPushButton::released, this, &PlotWidget::exportData));
+
+		m_uiConnections.push_back(connect(m_ui.fitVertically, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+		m_uiConnections.push_back(connect(m_ui.fitHorizontally, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+		m_uiConnections.push_back(connect(m_ui.minTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+		m_uiConnections.push_back(connect(m_ui.maxTemperature, &QDoubleSpinBox::editingFinished, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+		m_uiConnections.push_back(connect(m_ui.minHumidity, &QDoubleSpinBox::editingFinished, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+		m_uiConnections.push_back(connect(m_ui.maxHumidity, &QDoubleSpinBox::editingFinished, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+
+		m_uiConnections.push_back(connect(m_ui.useSmoothing, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+
+		m_uiConnections.push_back(connect(m_ui.showTemperature, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+		m_uiConnections.push_back(connect(m_ui.showHumidity, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+		m_uiConnections.push_back(connect(m_ui.showBattery, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+		m_uiConnections.push_back(connect(m_ui.showSignal, &QCheckBox::stateChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+
+        m_uiConnections.push_back(connect(m_db, &DB::measurementsAdded, this, &PlotWidget::scheduleSlowRefresh, Qt::QueuedConnection));
+        m_uiConnections.push_back(connect(m_db, &DB::measurementsChanged, this, &PlotWidget::scheduleMediumRefresh, Qt::QueuedConnection));
+        m_uiConnections.push_back(connect(m_db, &DB::sensorAdded, this, &PlotWidget::sensorAdded, Qt::QueuedConnection));
+        m_uiConnections.push_back(connect(m_db, &DB::sensorRemoved, this, &PlotWidget::sensorRemoved, Qt::QueuedConnection));
+		
+        loadSettings();
+
+        refresh();
+	}
+	else
+	{
+		saveSettings();
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -306,6 +292,13 @@ void PlotWidget::sensorRemoved(DB::SensorId id)
 void PlotWidget::scheduleFastRefresh()
 {
     scheduleRefresh(std::chrono::milliseconds(100));
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void PlotWidget::scheduleMediumRefresh()
+{
+	scheduleRefresh(std::chrono::seconds(5));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -537,10 +530,13 @@ void PlotWidget::createPlotWidgets()
 
 void PlotWidget::applyFilter(DB::Filter const& filter)
 {
-    if (!m_db)
+    if (!m_db || m_isApplyingFilter)
     {
         return;
     }
+    m_isApplyingFilter = true;
+    utils::epilogue epi([this] { m_isApplyingFilter = false; });
+
     m_filter = filter;
 
     createPlotWidgets();
@@ -566,12 +562,10 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
 		plotMinMax[plotIndex].second = std::numeric_limits<double>::lowest();
     }
 
-    std::vector<DB::Measurement> measurements = m_db->getFilteredMeasurements(m_filter);
+    size_t totalCount = m_db->getFilteredMeasurementCount(m_filter);
 
-    m_ui.resultCount->setText(QString("%1 out of %2 results.").arg(measurements.size()).arg(m_db->getAllMeasurementCount()));
-    m_ui.exportData->setEnabled(!measurements.empty());
-
-    std::sort(measurements.begin(), measurements.end(), [](DB::Measurement const& a, DB::Measurement const& b) { return a.timePoint < b.timePoint; });
+    m_ui.resultCount->setText(QString("%1 out of %2 results.").arg(totalCount).arg(m_db->getAllMeasurementCount()));
+    m_ui.exportData->setEnabled(totalCount > 0);
 
     for (size_t i = 0; i < m_db->getSensorCount(); i++)
     {
@@ -591,54 +585,72 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         }
     }
 
-    for (DB::Measurement const& m : measurements)
-    {
-        time_t time = IClock::to_time_t(m.timePoint);
-        minTS = std::min(minTS, static_cast<uint64_t>(time));
-        maxTS = std::max(maxTS, static_cast<uint64_t>(time));
+    size_t chunkSize = 50000;
 
-        auto it = m_graphs.find(m.descriptor.sensorId);
-        if (it == m_graphs.end())
+    QProgressDialog progressDialog(QProgressDialog("Plotting...", "Abort", 0, (int)(totalCount / chunkSize), this));
+	progressDialog.setWindowModality(Qt::WindowModal);
+	progressDialog.setMinimumDuration(200);
+
+    for (size_t measurementsIndex = 0; measurementsIndex < totalCount; measurementsIndex += chunkSize)
+	{
+        std::vector<DB::Measurement> measurements = m_db->getFilteredMeasurements(filter, measurementsIndex, chunkSize);
+		std::sort(measurements.begin(), measurements.end(), [](DB::Measurement const& a, DB::Measurement const& b) { return a.timePoint < b.timePoint; });
+
+        progressDialog.setValue(int(measurementsIndex / chunkSize));
+        if (progressDialog.wasCanceled())
         {
-            continue;
+            break;
         }
-        GraphData& graphData = it->second;
 
-        bool gap = graphData.lastIndex >= 0 && graphData.lastIndex + 1 != m.descriptor.index;
-        graphData.lastIndex = m.descriptor.index;
+		for (DB::Measurement const& m : measurements)
+		{
+			time_t time = IClock::to_time_t(m.timePoint);
+			minTS = std::min(minTS, static_cast<uint64_t>(time));
+			maxTS = std::max(maxTS, static_cast<uint64_t>(time));
 
-        for (size_t plotIndex = 0; plotIndex < graphData.plots.size(); plotIndex++)
-        {
-            Plot& plot = graphData.plots[plotIndex];
-            uint32_t alarmTriggerMask = 0;
-            double value = 0;
-            switch ((PlotType)plotIndex)
-            {
-            case PlotType::Temperature: value = m.descriptor.temperature; alarmTriggerMask = DB::AlarmTrigger::MeasurementTemperatureMask; break;
-            case PlotType::Humidity: value = m.descriptor.humidity; alarmTriggerMask = DB::AlarmTrigger::MeasurementHumidityMask; break;
-            case PlotType::Battery: value = utils::getBatteryLevel(m.descriptor.vcc) * 100.0; alarmTriggerMask = DB::AlarmTrigger::MeasurementLowVcc; break;
-            case PlotType::Signal: value = utils::getSignalLevel(std::min(m.descriptor.signalStrength.b2s, m.descriptor.signalStrength.s2b)) * 100.0; alarmTriggerMask = DB::AlarmTrigger::MeasurementLowSignal; break;
-            }
-            if (m_ui.useSmoothing->isChecked())
-            {
-                if (!plot.oldValue.has_value() || gap)
-                {
-                    plot.oldValue = value;
-                }
-                value = *plot.oldValue * 0.8 + value * 0.2;
-                plot.oldValue = value;
-            }
-            plot.keys.push_back(time);
-            plot.values.push_back(gap ? qQNaN() : value);
-            if ((m.alarmTriggers.added & alarmTriggerMask) || (m.alarmTriggers.removed & alarmTriggerMask))
-            {
-                plot.alarmIndicators.push_back({ double(time), value, m.alarmTriggers & alarmTriggerMask });
-            }
-            auto& minMax = plotMinMax[plotIndex];
-            minMax.first = std::min(minMax.first, value);
-            minMax.second = std::max(minMax.second, value);
-        }
-    }
+			auto it = m_graphs.find(m.descriptor.sensorId);
+			if (it == m_graphs.end())
+			{
+				continue;
+			}
+			GraphData& graphData = it->second;
+
+			bool gap = graphData.lastIndex >= 0 && graphData.lastIndex + 1 != m.descriptor.index;
+			graphData.lastIndex = m.descriptor.index;
+
+			for (size_t plotIndex = 0; plotIndex < graphData.plots.size(); plotIndex++)
+			{
+				Plot& plot = graphData.plots[plotIndex];
+				uint32_t alarmTriggerMask = 0;
+				double value = 0;
+				switch ((PlotType)plotIndex)
+				{
+				case PlotType::Temperature: value = m.descriptor.temperature; alarmTriggerMask = DB::AlarmTrigger::MeasurementTemperatureMask; break;
+				case PlotType::Humidity: value = m.descriptor.humidity; alarmTriggerMask = DB::AlarmTrigger::MeasurementHumidityMask; break;
+				case PlotType::Battery: value = utils::getBatteryLevel(m.descriptor.vcc) * 100.0; alarmTriggerMask = DB::AlarmTrigger::MeasurementLowVcc; break;
+				case PlotType::Signal: value = utils::getSignalLevel(std::min(m.descriptor.signalStrength.b2s, m.descriptor.signalStrength.s2b)) * 100.0; alarmTriggerMask = DB::AlarmTrigger::MeasurementLowSignal; break;
+				}
+				if (m_ui.useSmoothing->isChecked())
+				{
+					if (!plot.oldValue.has_value() || gap)
+					{
+						plot.oldValue = value;
+					}
+					value = *plot.oldValue * 0.8 + value * 0.2;
+					plot.oldValue = value;
+				}
+				plot.keys.push_back(time);
+				plot.values.push_back(gap ? qQNaN() : value);
+				if ((m.alarmTriggers.added & alarmTriggerMask) || (m.alarmTriggers.removed & alarmTriggerMask))
+				{
+					plot.alarmIndicators.push_back({ double(time), value, m.alarmTriggers & alarmTriggerMask });
+				}
+				auto& minMax = plotMinMax[plotIndex];
+				minMax.first = std::min(minMax.first, value);
+				minMax.second = std::max(minMax.second, value);
+			}
+		}
+	}
 
 	if (m_ui.fitHorizontally->isChecked())
     {
