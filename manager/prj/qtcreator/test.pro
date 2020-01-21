@@ -44,7 +44,12 @@ SOURCES += \
     ../../src/Smtp/mimeattachment.cpp \
     ../../src/Smtp/emailaddress.cpp \
     ../../src/Logger.cpp \
+    ../../src/tests/testCsvSettings.cpp \
+    ../../src/tests/testGeneralSettings.cpp \
     ../../src/tests/testMain.cpp \
+    ../../src/tests/testSensorBasicOperations.cpp \
+    ../../src/tests/testSensorSettings.cpp \
+    ../../src/tests/testSensorTimeConfigs.cpp \
     ../../src/tests/testUtils.cpp
 
 # Default rules for deployment.
