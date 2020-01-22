@@ -144,13 +144,27 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
 
 	setupStatsUI();
 
-    connect(m_ui.clearStats, &QPushButton::clicked, [this]()
-    {
-        Result<void> result = m_db.clearSensorStats(m_sensor.id);
-        Q_ASSERT(result == success);
-        m_sensor.stats = DB::SensorStats();
-        setupStatsUI();
-    });
+#define RESET_STAT(rb, s, v) \
+	connect(m_ui.rb, &QPushButton::clicked, [this]() \
+	{ \
+		m_sensor.stats.s = v; \
+		Result<void> result = m_db.setSensorStats(m_sensor.id, m_sensor.stats); \
+		Q_ASSERT(result == success); \
+		setupStatsUI(); \
+	});
+
+    RESET_STAT(resetCommsBlackouts, commsBlackouts, 0);
+    RESET_STAT(resetCommsFailures, commsFailures, 0);
+	RESET_STAT(resetUnknownReboots, unknownReboots, 0);
+    RESET_STAT(resetBrownoutReboots, brownoutReboots, 0);
+    RESET_STAT(resetWatchdogReboots, watchdogReboots, 0);
+    RESET_STAT(resetManualReboots, resetReboots, 0);
+    RESET_STAT(resetPowerOnReboots, powerOnReboots, 0);
+	RESET_STAT(resetCommsRetries, commsRetries, 0);
+    RESET_STAT(resetAsleep, asleep, IClock::duration::zero());
+    RESET_STAT(resetAwake, awake, IClock::duration::zero());
+    RESET_STAT(resetCommsRounds, commsRounds, 0);
+    RESET_STAT(resetMeasurementRounds, measurementRounds, 0);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -162,7 +176,7 @@ void SensorDetailsDialog::setupStatsUI()
 	m_ui.unknownReboots->setText(QString("%1").arg(m_sensor.stats.unknownReboots));
 	m_ui.brownoutReboots->setText(QString("%1").arg(m_sensor.stats.brownoutReboots));
 	m_ui.watchdogReboots->setText(QString("%1").arg(m_sensor.stats.watchdogReboots));
-	m_ui.resets->setText(QString("%1").arg(m_sensor.stats.resetReboots));
+	m_ui.manualReboots->setText(QString("%1").arg(m_sensor.stats.resetReboots));
 	m_ui.powerOnReboots->setText(QString("%1").arg(m_sensor.stats.powerOnReboots));
 	m_ui.commsRetries->setText(QString("%1").arg(m_sensor.stats.commsRetries));
 	m_ui.asleep->setText(QString("%1").arg(utils::computeDurationString(m_sensor.stats.asleep).first.c_str()));

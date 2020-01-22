@@ -199,38 +199,38 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, s
 			QString lowTemperatureStr;
 			if (alarm.descriptor.lowTemperatureWatch)
 			{
-				lowTemperatureStr = QString(R"X(<strong><span style="color: #011fff;">%1</span>&nbsp;|&nbsp;<span style="color: #004a96;">%2</span>&nbsp;|&nbsp;)X").arg(alarm.descriptor.lowTemperatureHard, 0, 'f', 1).arg(alarm.descriptor.lowTemperatureSoft, 0, 'f', 1);
+				lowTemperatureStr = QString(R"X(<span style="color: #011fff;">%1</span>&nbsp;|&nbsp;<span style="color: #004a96;">%2</span>&nbsp;|&nbsp;)X").arg(alarm.descriptor.lowTemperatureHard, 0, 'f', 1).arg(alarm.descriptor.lowTemperatureSoft, 0, 'f', 1);
 			}
 			QString highTemperatureStr;
 			if (alarm.descriptor.highTemperatureWatch)
 			{
 				highTemperatureStr = QString(R"X(&nbsp;|&nbsp;<span style="color: #f37736;">%1</span>&nbsp;|&nbsp;<span style="color: #ff2015;">%2</span>)X").arg(alarm.descriptor.highTemperatureSoft, 0, 'f', 1).arg(alarm.descriptor.highTemperatureHard, 0, 'f', 1);
 			}
-			email.body += QString(R"X(<p><strong>Temperature Thresholds</strong><strong>&nbsp;(&deg;C):&nbsp;</strong>%1<span style="color: #339966;">OK</span>%2</p>)X").arg(lowTemperatureStr).arg(highTemperatureStr).toUtf8().data();
+			email.body += QString(R"X(<p><strong>Temperature Thresholds&nbsp;(&deg;C):&nbsp;%1<span style="color: #339966;">OK</span>%2</strong></p>)X").arg(lowTemperatureStr).arg(highTemperatureStr).toUtf8().data();
 		}
 		if (alarm.descriptor.lowHumidityWatch || alarm.descriptor.highHumidityWatch)
 		{
 			QString lowHumidityStr;
 			if (alarm.descriptor.lowHumidityWatch)
 			{
-				lowHumidityStr = QString(R"X(<strong><span style="color: #011fff;">%1</span>&nbsp;|&nbsp;<span style="color: #004a96;">%2</span>&nbsp;|&nbsp;)X").arg(alarm.descriptor.lowHumidityHard, 0, 'f', 1).arg(alarm.descriptor.lowHumiditySoft, 0, 'f', 1);
+				lowHumidityStr = QString(R"X(<span style="color: #011fff;">%1</span>&nbsp;|&nbsp;<span style="color: #004a96;">%2</span>&nbsp;|&nbsp;)X").arg(alarm.descriptor.lowHumidityHard, 0, 'f', 1).arg(alarm.descriptor.lowHumiditySoft, 0, 'f', 1);
 			}
 			QString highHumidityStr;
 			if (alarm.descriptor.highHumidityWatch)
 			{
 				highHumidityStr = QString(R"X(&nbsp;|&nbsp;<span style="color: #f37736;">%1</span>&nbsp;|&nbsp;<span style="color: #ff2015;">%2</span>)X").arg(alarm.descriptor.highHumiditySoft, 0, 'f', 1).arg(alarm.descriptor.highHumidityHard, 0, 'f', 1);
 			}
-			email.body += QString(R"X(<p><strong>Humidity Thresholds</strong><strong>&nbsp;(%RH):&nbsp;</strong>%1<span style="color: #339966;">OK</span>%2</p>)X").arg(lowHumidityStr).arg(highHumidityStr).toUtf8().data();
+			email.body += QString(R"X(<p><strong>Humidity Thresholds&nbsp;(%RH):&nbsp;%1<span style="color: #339966;">OK</span>%2</strong></p>)X").arg(lowHumidityStr).arg(highHumidityStr).toUtf8().data();
 		}
 		if (alarm.descriptor.lowVccWatch)
 		{
-			email.body += QString(R"X(<p><strong>Battery Threshold</strong><strong>&nbsp;(%):&nbsp;</strong><strong><span style="color: #ff2015;">%1</span>&nbsp;|&nbsp;<span style="color: #339966;">OK</span></strong></p>)X")
+			email.body += QString(R"X(<p><strong>Battery Threshold&nbsp;(%):&nbsp;<span style="color: #ff2015;">%1</span>&nbsp;|&nbsp;<span style="color: #339966;">OK</span></strong></p>)X")
 				.arg(static_cast<int>(m_db.getSensorSettings().alertBatteryLevel * 100.f))
 				.toUtf8().data();
 		}
 		if (alarm.descriptor.lowSignalWatch)
 		{
-			email.body += QString(R"X(<p><strong>Signal Strength Threshold</strong><strong>&nbsp;(%):&nbsp;</strong><strong><span style="color: #ff2015;">%1</span>&nbsp;|&nbsp;<span style="color: #339966;">OK</span></strong></p>)X")
+			email.body += QString(R"X(<p><strong>Signal Strength Threshold&nbsp;(%):&nbsp;<span style="color: #ff2015;">%1</span>&nbsp;|&nbsp;<span style="color: #339966;">OK</span></strong></p>)X")
 				.arg(static_cast<int>(m_db.getSensorSettings().alertSignalStrengthLevel * 100.f))
 				.toUtf8().data();
 		}

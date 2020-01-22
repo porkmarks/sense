@@ -62,34 +62,6 @@ void MeasurementsWidget::init(DB& db)
 
     m_ui.list->setUniformRowHeights(true);
 
-//    DB::SensorDescriptor sd;
-//    sd.name = "test1";
-//    m_db->addSensor(sd);
-
-//    IClock::time_point start = IClock::now();
-//    for (size_t index = 0; index < 500; index++)
-//    {
-//        DB::Measurement m;
-//        m.sensorId = m_db->getSensor(m_db->findSensorIndexByName(sd.name)).id;
-//        m.index = index;
-//        m.timePoint = IClock::now() - std::chrono::seconds(index * 1000);
-//        m.vcc = std::min((index / 1000.f) + 2.f, 3.3f);
-//        m.temperature = std::min((index / 1000.f) * 55.f, 100.f);
-//        m.humidity = std::min((index / 1000.f) * 100.f, 100.f);
-//        m_db->addMeasurement(m);
-//    }
-//    std::cout << "Time to add: " << (std::chrono::duration<float>(IClock::now() - start).count()) << "\n";
-
-//    DB::Filter filter;
-//    start = IClock::now();
-//    for (size_t i = 0; i < 1; i++)
-//    {
-//        std::vector<DB::Measurement> result = m_db->getFilteredMeasurements(filter);
-//    }
-//    std::cout << "Time to filter: " << (std::chrono::duration<float>(IClock::now() - start).count()) << "\n";
-//
-//    refresh();
-
     m_uiConnections.push_back(connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.selectSensors, &QPushButton::released, this, &MeasurementsWidget::selectSensors, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.exportData, &QPushButton::released, this, &MeasurementsWidget::exportData));
@@ -113,8 +85,6 @@ void MeasurementsWidget::init(DB& db)
     m_uiConnections.push_back(connect(m_ui.showBattery, &QCheckBox::stateChanged, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.showSignal, &QCheckBox::stateChanged, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
 
-//    m_uiConnections.push_back(connect(m_db, &DB::measurementsAdded, this, &MeasurementsWidget::scheduleSlowRefresh, Qt::QueuedConnection));
-//    m_uiConnections.push_back(connect(m_db, &DB::measurementsChanged, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_db, &DB::sensorAdded, this, &MeasurementsWidget::sensorAdded, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_db, &DB::sensorRemoved, this, &MeasurementsWidget::sensorRemoved, Qt::QueuedConnection));
 
@@ -140,18 +110,6 @@ void MeasurementsWidget::shutdown()
 void MeasurementsWidget::loadSettings()
 {
     m_ui.dateTimeFilter->loadSettings();
-
-    bool showTemperature = m_ui.showTemperature->isChecked();
-    bool showHumidity = m_ui.showHumidity->isChecked();
-    bool showBattery = m_ui.showBattery->isChecked();
-    bool showSignal = m_ui.showSignal->isChecked();
-    bool useTemperature = m_ui.useTemperature->isChecked();
-    bool useHumidity = m_ui.useHumidity->isChecked();
-    double minHumidity = m_ui.minHumidity->value();
-    double maxHumidity = m_ui.maxHumidity->value();
-    double minTemperature = m_ui.minTemperature->value();
-    double maxTemperature = m_ui.maxTemperature->value();
-    std::set<DB::SensorId> selectedSensorIds = m_selectedSensorIds;
 
     m_ui.showTemperature->blockSignals(true);
     m_ui.showHumidity->blockSignals(true);
@@ -220,21 +178,6 @@ void MeasurementsWidget::loadSettings()
     m_ui.maxTemperature->setEnabled(m_ui.useTemperature->isChecked());
     m_ui.minHumidity->setEnabled(m_ui.useHumidity->isChecked());
     m_ui.maxHumidity->setEnabled(m_ui.useHumidity->isChecked());
-
-    if (showTemperature != m_ui.showTemperature->isChecked() ||
-            showHumidity != m_ui.showHumidity->isChecked() ||
-            showBattery != m_ui.showBattery->isChecked() ||
-            showSignal != m_ui.showSignal->isChecked() ||
-            useTemperature != m_ui.useTemperature->isChecked() ||
-            useHumidity != m_ui.useHumidity->isChecked() ||
-            minHumidity != m_ui.minHumidity->value() ||
-            maxHumidity != m_ui.maxHumidity->value() ||
-            minTemperature != m_ui.minTemperature->value() ||
-            maxTemperature != m_ui.maxTemperature->value() ||
-            selectedSensorIds != m_selectedSensorIds)
-    {
-        refresh();
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -271,6 +214,7 @@ void MeasurementsWidget::setActive(bool active)
     if (active)
     {
         loadSettings();
+        refresh();
     }
     else
     {

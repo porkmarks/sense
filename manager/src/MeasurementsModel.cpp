@@ -13,7 +13,7 @@
 
 static std::array<const char*, 10> s_headerNames = {"Id", "Sensor", "Index", "Timestamp", "Received Timestamp", "Temperature", "Humidity", "Battery", "Signal", "Alarms"};
 
-constexpr size_t k_chunkSize = 50000;
+constexpr size_t k_chunkSize = 10000;
 
 //////////////////////////////////////////////////////////////////////////
 

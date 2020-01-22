@@ -1320,7 +1320,7 @@ void DB::checkMeasurementTriggers()
 		{
 			Measurement m = unpackMeasurement(stmt);
 			m.alarmTriggers = computeSensorAlarmTriggers(sensor, m);
-			measurements.push_back(m);
+			measurements.emplace_back(m);
 		}
 		sensor.lastAlarmProcessesMeasurementIndex = sensor.lastConfirmedMeasurementIndex;
 		dataChanged = true;
@@ -2492,7 +2492,7 @@ Result<void> DB::setSensorSleep(SensorId id, bool sleep)
 
 //////////////////////////////////////////////////////////////////////////
 
-Result<void> DB::clearSensorStats(SensorId id)
+Result<void> DB::setSensorStats(SensorId id, SensorStats const& stats)
 {
 	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
@@ -2503,7 +2503,7 @@ Result<void> DB::clearSensorStats(SensorId id)
 	}
 	size_t index = static_cast<size_t>(_index);
 	Sensor& sensor = m_data.sensors[index];
-    sensor.stats = SensorStats();
+	sensor.stats = stats;
 	m_data.sensorsChanged = true;
 
 	emit sensorChanged(sensor.id);
@@ -3679,8 +3679,6 @@ size_t DB::getAllMeasurementCount() const
 
 //////////////////////////////////////////////////////////////////////////
 
-//////////////////////////////////////////////////////////////////////////
-
 static std::string getQueryWherePart(DB::Filter const& filter, bool order)
 {
 	std::string sql;
@@ -3777,9 +3775,15 @@ static std::string getQueryWherePart(DB::Filter const& filter, bool order)
 	return sql;
 }
 
-std::vector<DB::Measurement> DB::getFilteredMeasurements(Filter const& filter, size_t start, size_t count) const
+std::vector<DB::Measurement> DB::getFilteredMeasurements(Filter filter, size_t start, size_t count) const
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+
+	//using all the sensors? disable the filter to speed up the query
+	if (filter.useSensorFilter && filter.sensorIds.size() == m_data.sensors.size())
+	{
+		filter.useSensorFilter = false;
+	}
 
     std::vector<DB::Measurement> result;
     result.reserve(100000);
@@ -3934,13 +3938,6 @@ Result<void> DB::setMeasurement(MeasurementId id, MeasurementDescriptor const& m
     emit measurementsChanged();
     return success;
 }
-
-//////////////////////////////////////////////////////////////////////////
-
-// inline DB::MeasurementId DB::computeMeasurementId(MeasurementDescriptor const& md)
-// {
-//     return (MeasurementId(md.sensorId) << 32) | MeasurementId(md.index);
-// }
 
 //////////////////////////////////////////////////////////////////////////
 

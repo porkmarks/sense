@@ -459,7 +459,7 @@ public:
     Result<void> setSensorCalibration(SensorId id, Sensor::Calibration const& calibration);
     Result<void> setSensorSleep(SensorId id, bool sleep);
     Result<SensorId> bindSensor(uint32_t serialNumber, uint8_t sensorType, uint8_t hardwareVersion, uint8_t softwareRevision, Sensor::Calibration const& calibration);
-    Result<void> clearSensorStats(SensorId id);
+    Result<void> setSensorStats(SensorId id, SensorStats const& stats);
 
     struct SensorInputDetails
     {
@@ -713,7 +713,7 @@ public:
 
     size_t getAllMeasurementCount() const;
 
-    std::vector<Measurement> getFilteredMeasurements(Filter const& filter, size_t start = 0, size_t count = 0) const;
+    std::vector<Measurement> getFilteredMeasurements(Filter filter, size_t start = 0, size_t count = 0) const;
     size_t getFilteredMeasurementCount(Filter const& filter) const;
 
     Result<Measurement> getLastMeasurementForSensor(SensorId sensorId) const;
