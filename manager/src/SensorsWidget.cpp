@@ -128,7 +128,7 @@ void SensorsWidget::bindSensor()
             continue;
         }
 
-        Result<void> result = m_db->addSensor(descriptor);
+        Result<DB::SensorId> result = m_db->addSensor(descriptor);
         if (result != success)
         {
             QMessageBox::critical(this, "Error", QString("Cannot add sensor '%1': %2").arg(text).arg(result.error().what().c_str()));
