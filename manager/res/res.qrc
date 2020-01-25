@@ -49,7 +49,9 @@
 <file>icons/ui/remove.png</file>
 <file>icons/ui/search.png</file>
 <file>icons/ui/sensor.png</file>
+<file>icons/ui/sensor-blackout.png</file>
 <file>icons/ui/setup.png</file>
 <file>icons/ui/station.png</file>
+<file>icons/ui/station-disconnected.png</file>
 </qresource>
 </RCC>

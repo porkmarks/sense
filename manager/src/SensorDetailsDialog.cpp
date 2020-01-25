@@ -84,18 +84,18 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
     {
 		{
 			float vcc = sensor.rtMeasurementVcc;
-			m_ui.battery->setText(QString("%1% (%2V)").arg(static_cast<int>(utils::getBatteryLevel(vcc) * 100.f)).arg(vcc, 0, 'f', 2));
+			m_ui.battery->setText(QString("%1% (%2V)").arg(utils::getBatteryLevel(vcc) * 100.f, 0, 'f', 2).arg(vcc, 0, 'f', 2));
 			m_ui.batteryIcon->setPixmap(utils::getBatteryIcon(m_db.getSensorSettings(), vcc).pixmap(24, 24));
 		}
 
 		{
-			int signal = static_cast<int>(utils::getSignalLevel(m_sensor.averageSignalStrength.b2s) * 100.f);
-			m_ui.signalStrengthB2S->setText(QString("%1% (%2 dBm)").arg(signal).arg(m_sensor.averageSignalStrength.b2s));
+			float signal = utils::getSignalLevel(m_sensor.averageSignalStrength.b2s) * 100.f;
+			m_ui.signalStrengthB2S->setText(QString("%1% (%2 dBm)").arg(signal, 0, 'f', 2).arg(m_sensor.averageSignalStrength.b2s));
 			m_ui.signalStrengthIconB2S->setPixmap(utils::getSignalIcon(m_db.getSensorSettings(), signal).pixmap(24, 24));
 		}
 		{
-			int signal = static_cast<int>(utils::getSignalLevel(m_sensor.averageSignalStrength.s2b) * 100.f);
-			m_ui.signalStrengthS2B->setText(QString("%1% (%2 dBm)").arg(signal).arg(m_sensor.averageSignalStrength.s2b));
+			float signal = utils::getSignalLevel(m_sensor.averageSignalStrength.s2b) * 100.f;
+			m_ui.signalStrengthS2B->setText(QString("%1% (%2 dBm)").arg(signal, 0, 'f', 2).arg(m_sensor.averageSignalStrength.s2b));
 			m_ui.signalStrengthIconS2B->setPixmap(utils::getSignalIcon(m_db.getSensorSettings(), signal).pixmap(24, 24));
 		}
     }

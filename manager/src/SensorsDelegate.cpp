@@ -8,6 +8,7 @@
 #include <QApplication>
 
 #include <cassert>
+#include <bitset>
 
 constexpr QSize k_iconMargin(4, 2);
 
@@ -89,6 +90,18 @@ void SensorsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
                 painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
                 pos.setX(pos.x() + iconSize + k_iconMargin.width());
             }
+			if (alarmTriggers & DB::AlarmTrigger::SensorBlackout)
+			{
+				static QIcon icon(":/icons/ui/sensor-blackout.png");
+				painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
+				pos.setX(pos.x() + iconSize + k_iconMargin.width());
+			}
+			if (alarmTriggers & DB::AlarmTrigger::BaseStationDisconnected)
+			{
+				static QIcon icon(":/icons/ui/station-disconnected.png");
+				painter->drawPixmap(pos, icon.pixmap(option.rect.size() - k_iconMargin * 2));
+				pos.setX(pos.x() + iconSize + k_iconMargin.width());
+			}
         }
 
         painter->restore();
@@ -121,30 +134,7 @@ QSize SensorsDelegate::sizeHint(const QStyleOptionViewItem& option, const QModel
         }
         else
         {
-            if (alarmTriggers & DB::AlarmTrigger::MeasurementHighTemperatureMask)
-            {
-                width += iconSize + k_iconMargin.width();
-            }
-			if (alarmTriggers & DB::AlarmTrigger::MeasurementLowTemperatureMask)
-			{
-				width += iconSize + k_iconMargin.width();
-			}
-            if (alarmTriggers & DB::AlarmTrigger::MeasurementHighHumidityMask)
-            {
-                width += iconSize + k_iconMargin.width();
-            }
-			if (alarmTriggers & DB::AlarmTrigger::MeasurementLowHumidityMask)
-			{
-				width += iconSize + k_iconMargin.width();
-			}
-            if (alarmTriggers & DB::AlarmTrigger::MeasurementLowVcc)
-            {
-                width += iconSize + k_iconMargin.width();
-            }
-            if (alarmTriggers & DB::AlarmTrigger::MeasurementLowSignal)
-            {
-                width += iconSize + k_iconMargin.width();
-            }
+            width += std::bitset<64>(alarmTriggers).count();
         }
 
         return QSize(width, iconSize);

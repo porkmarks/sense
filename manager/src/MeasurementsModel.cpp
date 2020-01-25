@@ -121,39 +121,6 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
     //code to skip over disabled columns
     Column column = static_cast<Column>(index.column());
 
-//     if (role == UserRole::SortingRole)
-//     {
-//         if (column == Column::Timestamp)
-//         {
-//             return static_cast<qlonglong>(IClock::to_time_t(measurement.timePoint));
-//         }
-// 		else if (column == Column::ReceivedTimestamp)
-// 		{
-// 			return static_cast<qlonglong>(IClock::to_time_t(measurement.receivedTimePoint));
-// 		}
-//         else if (column == Column::Temperature)
-//         {
-//             return measurement.descriptor.temperature;
-//         }
-//         else if (column == Column::Humidity)
-//         {
-//             return measurement.descriptor.humidity;
-//         }
-//         else if (column == Column::Battery)
-//         {
-//             return utils::getBatteryLevel(measurement.descriptor.vcc);
-//         }
-//         else if (column == Column::Signal)
-//         {
-// 			return utils::getSignalLevel(std::min(measurement.descriptor.signalStrength.s2b, measurement.descriptor.signalStrength.b2s));
-//         }
-//         else if (column == Column::Alarms)
-//         {
-//             return static_cast<uint32_t>(std::bitset<32>(measurement.alarmTriggers.current).count());
-//         }
-// 
-//         return data(index, Qt::DisplayRole);
-//     }
     if (role == Qt::DecorationRole)
     {
         if (column == Column::Id)

@@ -137,7 +137,7 @@ Result<void> DB::create(sqlite3& db)
 		}
 	}
 	{
-		const char* sql = "CREATE TABLE BaseStations (id INTEGER PRIMARY KEY, name STRING, mac STRING);";
+		const char* sql = "CREATE TABLE BaseStations (id INTEGER PRIMARY KEY, name STRING, mac STRING, lastCommsTimePoint DATETIME);";
         if (sqlite3_exec(&db, sql, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
@@ -235,8 +235,8 @@ Result<void> DB::load(sqlite3& db)
 
     {
 		sqlite3_stmt* stmt;
-        if (sqlite3_prepare_v2(&db, "REPLACE INTO BaseStations (id, name, mac) "
-                                    "VALUES (?1, ?2, ?3);", -1, &stmt, nullptr) != SQLITE_OK)
+        if (sqlite3_prepare_v2(&db, "REPLACE INTO BaseStations (id, name, mac, lastCommsTimePoint) "
+                                    "VALUES (?1, ?2, ?3, ?4);", -1, &stmt, nullptr) != SQLITE_OK)
 		{
 			return Error(QString("Cannot prepare query: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
@@ -434,7 +434,7 @@ Result<void> DB::load(sqlite3& db)
 	}
 	{
 		//const char* sql = "CREATE TABLE BaseStations (id INTEGER PRIMARY KEY, name STRING, mac STRING);";
-		const char* sql = "SELECT id, name, mac "
+		const char* sql = "SELECT id, name, mac, lastCommsTimePoint "
                           "FROM BaseStations;";
 		sqlite3_stmt* stmt;
         if (sqlite3_prepare_v2(&db, sql, -1, &stmt, nullptr) != SQLITE_OK)
@@ -448,13 +448,14 @@ Result<void> DB::load(sqlite3& db)
             BaseStation bs;
             bs.id = BaseStationId(sqlite3_column_int64(stmt, 0));
 		    bs.descriptor.name = (char const*)sqlite3_column_text(stmt, 1);
-		    std::string macStr = (char const*)sqlite3_column_text(stmt, 2);
+			std::string macStr = (char const*)sqlite3_column_text(stmt, 2);
 			int m0, m1, m2, m3, m4, m5;
             if (sscanf(macStr.c_str(), "%X:%X:%X:%X:%X:%X", &m0, &m1, &m2, &m3, &m4, &m5) != 6)
             {
                 return Error(QString("Bad base station mac: %1").arg(macStr.c_str()).toUtf8().data());
             }
             bs.descriptor.mac = { static_cast<uint8_t>(m0 & 0xFF), static_cast<uint8_t>(m1 & 0xFF), static_cast<uint8_t>(m2 & 0xFF), static_cast<uint8_t>(m3 & 0xFF), static_cast<uint8_t>(m4 & 0xFF), static_cast<uint8_t>(m5 & 0xFF) };
+			bs.lastCommsTimePoint = IClock::from_time_t(sqlite3_column_int64(stmt, 3));
             data.baseStations.push_back(std::move(bs));
         }
 	}
@@ -909,6 +910,7 @@ void DB::save(Data& data, bool newTransaction) const
 			sqlite3_bind_int64(stmt, 1, bs.id);
 			sqlite3_bind_text(stmt, 2, bs.descriptor.name.c_str(), -1, SQLITE_STATIC);
 			sqlite3_bind_text(stmt, 3, utils::getMacStr(bs.descriptor.mac).c_str(), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_int64(stmt, 4, IClock::to_time_t(bs.lastCommsTimePoint));
 			if (sqlite3_step(stmt) != SQLITE_DONE)
 			{
 				s_logger.logCritical(QString("Failed to save base station: %1").arg(sqlite3_errmsg(m_sqlite)));
@@ -1993,6 +1995,7 @@ void DB::setBaseStationConnected(BaseStationId id, bool connected)
 
 	bs.isConnected = connected;
 	bs.lastConnectedTimePoint = m_clock->now();
+	bs.lastCommsTimePoint = m_clock->now();
 	if (connected)
 	{
 		computeBaseStationAlarmTriggers(bs);
@@ -3123,14 +3126,22 @@ DB::AlarmTriggers DB::_computeSensorAlarmTriggers(Alarm& alarm, Sensor& sensor, 
 				currentTriggers |= AlarmTrigger::MeasurementLowHumidityHard;
 			}
 
-			if (ad.lowVccWatch && utils::getBatteryLevel(m.descriptor.vcc) <= m_data.sensorSettings.alertBatteryLevel)
+			if (ad.lowVccWatch)
 			{
-				currentTriggers |= AlarmTrigger::MeasurementLowVcc;
+				float histeresis = ((oldTriggers & AlarmTrigger::MeasurementLowVcc) ? 0.4f : -0.4f) / 100.f; //+- 0.4% histeresis
+				if (utils::getBatteryLevel(m.descriptor.vcc) <= m_data.sensorSettings.alertBatteryLevel + histeresis)
+				{
+					currentTriggers |= AlarmTrigger::MeasurementLowVcc;
+				}
 			}
 
-			if (ad.lowSignalWatch && utils::getSignalLevel(std::min(m.descriptor.signalStrength.b2s, m.descriptor.signalStrength.s2b)) <= m_data.sensorSettings.alertSignalStrengthLevel)
+			if (ad.lowSignalWatch)
 			{
-				currentTriggers |= AlarmTrigger::MeasurementLowSignal;
+				float histeresis = ((oldTriggers & AlarmTrigger::MeasurementLowSignal) ? 0.4f : -0.4f) / 100.f; //+- 0.4% histeresis
+				if (utils::getSignalLevel(std::min(m.descriptor.signalStrength.b2s, m.descriptor.signalStrength.s2b)) <= m_data.sensorSettings.alertSignalStrengthLevel + histeresis)
+				{
+					currentTriggers |= AlarmTrigger::MeasurementLowSignal;
+				}
 			}
 		}
 		else

@@ -224,6 +224,7 @@ public:
         BaseStationId id = 0;
         bool isConnected = false;
         IClock::time_point lastConnectedTimePoint = IClock::time_point(IClock::duration::zero());
+        IClock::time_point lastCommsTimePoint = IClock::time_point(IClock::duration::zero());
     };
 
     size_t getBaseStationCount() const;

@@ -136,6 +136,8 @@ Manager::Manager(QWidget *parent)
 
 	connect(&m_db, &DB::userLoggedIn, this, &Manager::userLoggedIn);
     connect(&m_comms, &Comms::baseStationDiscovered, this, &Manager::baseStationDiscovered);
+	connect(&m_comms, &Comms::baseStationConnected, this, &Manager::baseStationConnected);
+	connect(&m_comms, &Comms::baseStationDisconnected, this, &Manager::baseStationDisconnected);
 
     checkIfAdminExists();
 
@@ -403,6 +405,32 @@ void Manager::baseStationDiscovered(Comms::BaseStationDescriptor const& commsBS)
 	{
         m_comms.connectToBaseStation(m_db, bs->descriptor.mac);
 	}
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Manager::baseStationConnected(Comms::BaseStationDescriptor const& commsBS)
+{
+	auto id = std::this_thread::get_id();
+
+	std::optional<DB::BaseStation> bs = m_db.findBaseStationByMac(commsBS.mac);
+	if (bs.has_value())
+	{
+        m_db.setBaseStationConnected(bs->id, true);
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Manager::baseStationDisconnected(Comms::BaseStationDescriptor const& commsBS)
+{
+	auto id = std::this_thread::get_id();
+
+	std::optional<DB::BaseStation> bs = m_db.findBaseStationByMac(commsBS.mac);
+    if (bs.has_value())
+    {
+        m_db.setBaseStationConnected(bs->id, false);
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////

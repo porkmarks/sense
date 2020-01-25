@@ -17,6 +17,8 @@ public:
 
 private slots:
     void baseStationDiscovered(Comms::BaseStationDescriptor const& commsBS);
+	void baseStationConnected(Comms::BaseStationDescriptor const& commsBS);
+	void baseStationDisconnected(Comms::BaseStationDescriptor const& commsBS);
     void showSettingsDialog();
     void showBaseStationsDialog();
     void showUsersDialog();

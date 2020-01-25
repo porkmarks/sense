@@ -30,12 +30,12 @@ BaseStationsWidget::BaseStationsWidget(QWidget *parent)
         if (!m_sectionSaveScheduled)
         {
             m_sectionSaveScheduled = true;
-            QTimer::singleShot(500, [this]()
+//            QTimer::singleShot(500, [this]()
             {
                 m_sectionSaveScheduled = false;
                 QSettings settings;
                 settings.setValue("baseStations/list/state", m_ui.list->header()->saveState());
-            });
+            }//);
         }
     });
 

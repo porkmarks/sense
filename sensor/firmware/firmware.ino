@@ -5,6 +5,7 @@
 #include <avr/pgmspace.h>
 #include <avr/wdt.h>
 #include <avr/power.h>
+#include <avr/boot.h>
 #include <compat/deprecated.h>
 
 #include "SPI.h"
@@ -144,29 +145,35 @@ static uint16_t stack_size(void)
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-void init_gpio()
+#define set_pin_as_input(pin)\
+{\
+  pinModeFast(pin, INPUT); \
+  digitalWriteFast(pin, HIGH);\
+}
+
+static void init_gpio()
 {
     //set ping to input pull high to make sure they don't float in sleep mode
 
     //PB
-    pinModeFast(8, INPUT); digitalWriteFast(8, HIGH);  //PB0
-    pinModeFast(9, INPUT); digitalWriteFast(9, HIGH);  //PB1
-    pinModeFast(10, INPUT); digitalWriteFast(10, HIGH);  //PB2
-    pinModeFast(11, INPUT); digitalWriteFast(11, HIGH);  //PB3
-    pinModeFast(12, INPUT); digitalWriteFast(12, HIGH);  //PB4
-    pinModeFast(13, INPUT); digitalWriteFast(13, HIGH);  //PB5
+    set_pin_as_input(8);  //PB0
+    set_pin_as_input(9);  //PB1
+    set_pin_as_input(10); //PB2
+    set_pin_as_input(11); //PB3
+    set_pin_as_input(12); //PB4
+    set_pin_as_input(13); //PB5
 
     //PC
-    pinModeFast(14, INPUT); digitalWriteFast(14, HIGH);  //PC0
-    pinModeFast(15, INPUT); digitalWriteFast(15, HIGH);  //PC1
-    pinModeFast(17, INPUT); digitalWriteFast(17, HIGH);  //PC3
+    set_pin_as_input(14); //PC0
+    set_pin_as_input(15); //PC1
+    set_pin_as_input(17); //PC3
 
     //PD
-    pinModeFast(7, INPUT); digitalWriteFast(7, HIGH);  //PD7
+    set_pin_as_input(7);  //PD7
 
     //PE
-    pinModeFast(25, INPUT); digitalWriteFast(25, HIGH);  //PE2 / ADC6
-    pinModeFast(26, INPUT); digitalWriteFast(26, HIGH);  //PE3 / ADC7
+    set_pin_as_input(25); //PE2 / ADC6
+    set_pin_as_input(26); //PE3 / ADC7
 }
 
 void setup()
@@ -273,32 +280,33 @@ void setup()
     ////////////////////////////////////////////
 
     LOG(PSTR("***"));
-    s_stats.reboot_flags = 0;
+    uint8_t reboot_flags = 0;
     if (mcusr_value & bit(PORF))
     {
-        s_stats.reboot_flags |= static_cast<uint8_t>(data::sensor::v1::Reboot_Flag::REBOOT_POWER_ON);
+        reboot_flags |= static_cast<uint8_t>(data::sensor::v1::Reboot_Flag::REBOOT_POWER_ON);
         LOG(PSTR("POR "));
     }
     if (mcusr_value & bit(EXTRF))
     {
-        s_stats.reboot_flags |= static_cast<uint8_t>(data::sensor::v1::Reboot_Flag::REBOOT_RESET);
+        reboot_flags |= static_cast<uint8_t>(data::sensor::v1::Reboot_Flag::REBOOT_RESET);
         LOG(PSTR("ER "));
     }
     if (mcusr_value & bit(BORF))
     {
-        s_stats.reboot_flags |= static_cast<uint8_t>(data::sensor::v1::Reboot_Flag::REBOOT_BROWNOUT);
+        reboot_flags |= static_cast<uint8_t>(data::sensor::v1::Reboot_Flag::REBOOT_BROWNOUT);
         LOG(PSTR("BOR "));
     }
     if (mcusr_value & bit(WDRF))
     {
-        s_stats.reboot_flags |= static_cast<uint8_t>(data::sensor::v1::Reboot_Flag::REBOOT_WATCHDOG);
+        reboot_flags |= static_cast<uint8_t>(data::sensor::v1::Reboot_Flag::REBOOT_WATCHDOG);
         LOG(PSTR("WR "));
     }
-    if (s_stats.reboot_flags == 0)
+    if (reboot_flags == 0)
     {
-        s_stats.reboot_flags |= static_cast<uint8_t>(data::sensor::v1::Reboot_Flag::REBOOT_UNKNOWN);
+        reboot_flags |= static_cast<uint8_t>(data::sensor::v1::Reboot_Flag::REBOOT_UNKNOWN);
     }
     LOG(PSTR("***\n"));
+    s_stats.reboot_flags = reboot_flags;
 
     LOG(PSTR("Stk:%d->%d\n"), initial_stack_size(), stack_size());
 
@@ -364,6 +372,15 @@ void setup()
     uint32_t rnd_seed = 0;
     while (true)
     {
+#if defined(__AVR_ATmega328PB__)
+        for (size_t i = 0; i < 10; i++)
+        {
+            uint8_t id = boot_signature_byte_get(0x0E + i);
+            hash_combine(rnd_seed, id);
+        }
+        srandom(rnd_seed);
+        break;
+#else
         float t;
         float h;
         for (uint8_t i = 0; i < 20; i++)
@@ -382,6 +399,7 @@ void setup()
             //LOG(PSTR("Seed: %lu\n"), rnd_seed);
             break;
         }
+#endif
 
         LOG(PSTR("Seed F\n"));
         blink_led(Blink_Led::Red, 3, chrono::millis(200));
@@ -624,13 +642,12 @@ static bool request_config()
 
     if (send_successful)
     {
-        s_stats = data::sensor::v1::Stats();
-      
         uint8_t size = sizeof(data::sensor::v1::Config_Response);
         uint8_t raw_buffer[packet_raw_size(size)];
         uint8_t* buffer = s_radio.receive_packet(raw_buffer, size, chrono::millis(1000));
         if (size == sizeof(data::sensor::v1::Config_Response) && check_rx_packet(buffer, data::sensor::v1::Type::CONFIG_RESPONSE))
     	  {
+            s_stats = data::sensor::v1::Stats();
           	s_last_input_dBm = s_radio.get_last_input_dBm();
   	        const data::sensor::v1::Config_Response* ptr = reinterpret_cast<const data::sensor::v1::Config_Response*>(s_radio.get_rx_packet_payload(buffer));
           	apply_config(*ptr);
@@ -1201,26 +1218,17 @@ int main()
     
     while (true)
     {
-        if (s_state == State::PAIR)
+        switch (s_state)
         {
-            pair_state();
+            case State::PAIR: pair_state(); break;
+            case State::FIRST_CONFIG: first_config_state(); break;
+            case State::MEASUREMENT_LOOP: measurement_loop_state(); break;
+            case State::SLEEPING_LOOP: sleep_loop_state(); break;
+            default:
+            {
+                blink_led(Blink_Led::Red, 2, chrono::millis(50));
+                sleep(true);
+            }      
         }
-        else if (s_state == State::FIRST_CONFIG)
-        {
-            first_config_state();
-        }
-        else if (s_state == State::MEASUREMENT_LOOP)
-        {
-            measurement_loop_state();
-        }
-        else if (s_state == State::SLEEPING_LOOP)
-        {
-            sleep_loop_state();
-        }
-        else
-        {
-            blink_led(Blink_Led::Red, 2, chrono::millis(50));
-            sleep(true);
-        }      
     }
 }

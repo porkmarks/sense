@@ -75,17 +75,17 @@ void MeasurementDetailsDialog::setMeasurement(DB::Measurement const& measurement
 
 	{
 		float vcc = m_measurement.descriptor.vcc;
-		m_ui.battery->setText(QString("%1% (%2V)").arg(static_cast<int>(utils::getBatteryLevel(vcc) * 100.f)).arg(vcc, 0, 'f', 2));
+		m_ui.battery->setText(QString("%1% (%2V)").arg(utils::getBatteryLevel(vcc) * 100.f, 0, 'f', 2).arg(vcc, 0, 'f', 2));
 		m_ui.batteryIcon->setPixmap(utils::getBatteryIcon(m_db.getSensorSettings(), vcc).pixmap(24, 24));
 
 		{
-			int signal = static_cast<int>(utils::getSignalLevel(m_measurement.descriptor.signalStrength.b2s) * 100.f);
-			m_ui.signalStrengthB2S->setText(QString("%1% (%2 dBm)").arg(signal).arg(m_measurement.descriptor.signalStrength.b2s));
+			float signal = utils::getSignalLevel(m_measurement.descriptor.signalStrength.b2s) * 100.f;
+			m_ui.signalStrengthB2S->setText(QString("%1% (%2 dBm)").arg(signal, 0, 'f', 2).arg(m_measurement.descriptor.signalStrength.b2s));
 			m_ui.signalStrengthIconB2S->setPixmap(utils::getSignalIcon(m_db.getSensorSettings(), signal).pixmap(24, 24));
 		}
 		{
-			int signal = static_cast<int>(utils::getSignalLevel(m_measurement.descriptor.signalStrength.s2b) * 100.f);
-			m_ui.signalStrengthS2B->setText(QString("%1% (%2 dBm)").arg(signal).arg(m_measurement.descriptor.signalStrength.s2b));
+			float signal = utils::getSignalLevel(m_measurement.descriptor.signalStrength.s2b) * 100.f;
+			m_ui.signalStrengthS2B->setText(QString("%1% (%2 dBm)").arg(signal, 0, 'f', 2).arg(m_measurement.descriptor.signalStrength.s2b));
 			m_ui.signalStrengthIconS2B->setPixmap(utils::getSignalIcon(m_db.getSensorSettings(), signal).pixmap(24, 24));
 		}
 	}
@@ -101,8 +101,8 @@ void MeasurementDetailsDialog::setMeasurement(DB::Measurement const& measurement
     {
 		m_ui.temperatureRW->setVisible(false);
 		m_ui.humidityRW->setVisible(false);
-		m_ui.temperatureRO->setText(QString("%1°C").arg(m_measurement.descriptor.temperature, 0, 'f', 1));
-		m_ui.humidityRO->setText(QString("%1 %RH").arg(m_measurement.descriptor.humidity, 0, 'f', 1));
+		m_ui.temperatureRO->setText(QString("%1°C").arg(m_measurement.descriptor.temperature, 0, 'f', 2));
+		m_ui.humidityRO->setText(QString("%1 %RH").arg(m_measurement.descriptor.humidity, 0, 'f', 2));
     }
 }
 

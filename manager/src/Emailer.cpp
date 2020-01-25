@@ -18,6 +18,7 @@ Emailer::Emailer(DB& db)
     m_emailThread = std::thread(std::bind(&Emailer::emailThreadProc, this));
 
     connect(&m_db, &DB::alarmSensorTriggersChanged, this, &Emailer::alarmSensorTriggersChanged, Qt::QueuedConnection);
+    connect(&m_db, &DB::alarmBaseStationTriggersChanged, this, &Emailer::alarmBaseStationTriggersChanged, Qt::QueuedConnection);
 	connect(&m_db, &DB::alarmStillTriggered, this, &Emailer::alarmStillTriggered, Qt::QueuedConnection);
 	connect(&m_db, &DB::reportTriggered, this, &Emailer::reportTriggered, Qt::QueuedConnection);
 }
@@ -51,32 +52,6 @@ void Emailer::reportTriggered(DB::ReportId reportId, IClock::time_point from, IC
 
 //////////////////////////////////////////////////////////////////////////
 
-void Emailer::alarmSensorTriggersChanged(DB::AlarmId alarmId, DB::SensorId sensorId, std::optional<DB::Measurement> measurement, uint32_t oldTriggers, DB::AlarmTriggers triggers)
-{
-    std::optional<DB::Alarm> alarm = m_db.findAlarmById(alarmId);
-    std::optional<DB::Sensor> sensor = m_db.findSensorById(sensorId);
-    if (!alarm.has_value() || !sensor.has_value())
-    {
-        assert(false);
-        return;
-    }
-
-    if (alarm->descriptor.sendEmailAction)
-    {
-        if (triggers.removed != 0)
-        {
-            sendAlarmEmail(*alarm, *sensor, measurement, oldTriggers, triggers.current, triggers.removed, Action::Recovery);
-        }
-        if (triggers.added != 0)
-        {
-            sendAlarmEmail(*alarm, *sensor, measurement, oldTriggers, triggers.current, triggers.added, Action::Trigger);
-        }
-    }
-}
-
-
-//////////////////////////////////////////////////////////////////////////
-
 void Emailer::alarmStillTriggered(DB::AlarmId alarmId)
 {
     std::optional<DB::Alarm> alarm = m_db.findAlarmById(alarmId);
@@ -94,32 +69,53 @@ void Emailer::alarmStillTriggered(DB::AlarmId alarmId)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, std::optional<DB::Measurement> measurement, uint32_t oldTriggers, uint32_t newTriggers, uint32_t triggers, Action action)
+void Emailer::alarmSensorTriggersChanged(DB::AlarmId alarmId, DB::SensorId sensorId, std::optional<DB::Measurement> measurement, uint32_t oldTriggers, DB::AlarmTriggers triggers)
+{
+	std::optional<DB::Alarm> alarm = m_db.findAlarmById(alarmId);
+	std::optional<DB::Sensor> sensor = m_db.findSensorById(sensorId);
+	if (!alarm.has_value() || !sensor.has_value())
+	{
+		assert(false);
+		return;
+	}
+
+	if (alarm->descriptor.sendEmailAction)
+	{
+		if (triggers.removed != 0)
+		{
+			sendSensorAlarmEmail(*alarm, *sensor, measurement, oldTriggers, triggers.current, triggers.removed, Action::Recovery);
+		}
+		if (triggers.added != 0)
+		{
+			sendSensorAlarmEmail(*alarm, *sensor, measurement, oldTriggers, triggers.current, triggers.added, Action::Trigger);
+		}
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Emailer::sendSensorAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, std::optional<DB::Measurement> measurement, uint32_t oldTriggers, uint32_t newTriggers, uint32_t triggers, Action action)
 {
     Email email;
 
-    ///////////////////////////////
-    // SUBJECT
-    if (action == Action::Trigger)
-    {
-        email.subject = "SENSE - Sensor '" + sensor.descriptor.name + "' THRESHOLD ALERT for '" + alarm.descriptor.name + "'";
-    }
-    else
-    {
-        email.subject = "SENSE - Sensor '" + sensor.descriptor.name + "' THRESHOLD RECOVERY for '" + alarm.descriptor.name + "'";
-    }
-
-    ///////////////////////////////
-    // BODY
-
     if (measurement.has_value())
 	{
+		if (action == Action::Trigger)
+		{
+			email.subject = "SENSE - Sensor '" + sensor.descriptor.name + "' THRESHOLD ALERT for '" + alarm.descriptor.name + "'";
+		}
+		else
+		{
+			email.subject = "SENSE - Sensor '" + sensor.descriptor.name + "' THRESHOLD RECOVERY for '" + alarm.descriptor.name + "'";
+		}
+
 		const char* alertTemplateStr = R"X(<table style="border-style: solid; border-width: 2px; border-color: #%1;"><tbody><tr><td><strong>%2%3%4</strong></td></tr></tbody></table>)X";
 
 		QString temperatureStr;
 		QString humidityStr;
 		QString batteryStr;
 		QString signalStrengthStr;
+        QString commsStr;
 
         DB::Measurement const& m = *measurement;
 		if (newTriggers & DB::AlarmTrigger::MeasurementTemperatureMask)
@@ -170,6 +166,16 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, s
 		else
 			signalStrengthStr = QString(R"X(%1%)X").arg(signalStrengthPercentage);
 
+        if (newTriggers & DB::AlarmTrigger::SensorBlackout)
+            commsStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0'))
+                                                .arg("Blackout: ")
+                                                .arg(utils::toString<IClock>(sensor.lastCommsTimePoint, m_db.getGeneralSettings().dateTimeFormat))
+                                                .arg((" (" + utils::computeRelativeTimePointString(sensor.lastCommsTimePoint).first + " ago)").c_str());
+		else if (oldTriggers & DB::AlarmTrigger::SensorBlackout)
+            commsStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Recovered from blackout").arg("").arg("");
+        else
+            commsStr = QString(R"X(Normal)X");
+
 		email.body += QString(R"X(
 <table>
 <tbody>
@@ -181,6 +187,7 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, s
 <tr><td><strong>Humidity:</strong></td>         <td>%6</td></tr>
 <tr><td><strong>Battery:</strong></td>          <td>%7</td></tr>
 <tr><td><strong>Signal Strength:</strong></td>  <td>%8</td></tr>
+<tr><td><strong>Comms:</strong></td>            <td>%9</td></tr>
 </tbody>
 </table>
     )X").arg(sensor.descriptor.name.c_str())
@@ -191,6 +198,7 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, s
 			.arg(humidityStr)
 			.arg(batteryStr)
 			.arg(signalStrengthStr)
+            .arg(commsStr)
 			.toUtf8().data();
 
 
@@ -241,19 +249,141 @@ void Emailer::sendAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sensor, s
 <p><strong>Date/Time Format: %1</strong></p>
 <p>&nbsp;</p>)X").arg(dateTimeFormatStr.toUpper()).toUtf8().data();
     }
+	else
+	{
+	    if (action == Action::Trigger)
+	    {
+		    email.subject = "SENSE - Sensor '" + sensor.descriptor.name + "' TRIGGER for '" + alarm.descriptor.name + "'";
+	    }
+	    else
+	    {
+		    email.subject = "SENSE - Sensor '" + sensor.descriptor.name + "' RECOVERY for '" + alarm.descriptor.name + "'";
+	    }
+
+		const char* alertTemplateStr = R"X(<table style="border-style: solid; border-width: 2px; border-color: #%1;"><tbody><tr><td><strong>%2%3%4</strong></td></tr></tbody></table>)X";
+
+		QString commsStr;
+
+        if (newTriggers & DB::AlarmTrigger::SensorBlackout)
+            commsStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0'))
+                                                .arg("Blackout: ")
+                                                .arg(utils::toString<IClock>(sensor.lastCommsTimePoint, m_db.getGeneralSettings().dateTimeFormat))
+                                                .arg((" (" + utils::computeRelativeTimePointString(sensor.lastCommsTimePoint).first + " ago)").c_str());
+		else if (oldTriggers & DB::AlarmTrigger::SensorBlackout)
+			commsStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Recovered from blackout").arg("").arg("");
+		else
+			commsStr = QString(R"X(Normal)X");
+
+		email.body += QString(R"X(
+<table>
+<tbody>
+<tr><td><strong>Sensor:</strong></td>           <td>%1</td></tr>
+<tr><td><strong>S/N:</strong></td>              <td>%2</td></tr>
+<tr><td><strong>Comms:</strong></td>            <td>%3</td></tr>
+</tbody>
+</table>
+    )X").arg(sensor.descriptor.name.c_str())
+			.arg(sensor.serialNumber, 8, 16, QChar('0'))
+			.arg(commsStr)
+			.toUtf8().data();
+
+		QString dateTimeFormatStr = utils::getQDateTimeFormatString(m_db.getGeneralSettings().dateTimeFormat);
+		email.body += QString(R"X(
+<p>&nbsp;</p>
+<p><strong>Date/Time Format: %1</strong></p>
+<p>&nbsp;</p>)X").arg(dateTimeFormatStr.toUpper()).toUtf8().data();
+	}
 
 	email.settings = m_db.getEmailSettings();
 
-	s_logger.logInfo(QString("Sending alarm email"));
+	s_logger.logInfo(QString("Sending sensor alarm email"));
 
     sendEmail(email);
 }
 
 //////////////////////////////////////////////////////////////////////////
 
+void Emailer::alarmBaseStationTriggersChanged(DB::AlarmId alarmId, DB::BaseStationId baseStationId, uint32_t oldTriggers, DB::AlarmTriggers triggers)
+{
+	std::optional<DB::Alarm> alarm = m_db.findAlarmById(alarmId);
+	std::optional<DB::BaseStation> bs = m_db.findBaseStationById(baseStationId);
+	if (!alarm.has_value() || !bs.has_value())
+	{
+		assert(false);
+		return;
+	}
+
+	if (alarm->descriptor.sendEmailAction)
+	{
+		if (triggers.removed != 0)
+		{
+			sendBaseStationAlarmEmail(*alarm, *bs, oldTriggers, triggers.current, triggers.removed, Action::Recovery);
+		}
+		if (triggers.added != 0)
+		{
+			sendBaseStationAlarmEmail(*alarm, *bs, oldTriggers, triggers.current, triggers.added, Action::Trigger);
+		}
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Emailer::sendBaseStationAlarmEmail(DB::Alarm const& alarm, DB::BaseStation const& bs, uint32_t oldTriggers, uint32_t newTriggers, uint32_t triggers, Action action)
+{
+	Email email;
+
+	if (action == Action::Trigger)
+	{
+		email.subject = "SENSE - Base Station '" + bs.descriptor.name + "' TRIGGER for '" + alarm.descriptor.name + "'";
+	}
+	else
+	{
+		email.subject = "SENSE - Base Station '" + bs.descriptor.name + "' RECOVERY for '" + alarm.descriptor.name + "'";
+	}
+
+	const char* alertTemplateStr = R"X(<table style="border-style: solid; border-width: 2px; border-color: #%1;"><tbody><tr><td><strong>%2%3%4</strong></td></tr></tbody></table>)X";
+
+	QString commsStr;
+
+    if (newTriggers & DB::AlarmTrigger::BaseStationDisconnected)
+        commsStr = QString(alertTemplateStr).arg(utils::k_highThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0'))
+                                            .arg("Disconnected: ")
+                                            .arg(utils::toString<IClock>(bs.lastCommsTimePoint, m_db.getGeneralSettings().dateTimeFormat))
+                                            .arg((" (" + utils::computeRelativeTimePointString(bs.lastCommsTimePoint).first + " ago)").c_str());
+	else if (oldTriggers & DB::AlarmTrigger::BaseStationDisconnected)
+		commsStr = QString(alertTemplateStr).arg(utils::k_inRangeColor & 0xFFFFFF, 6, 16, QChar('0')).arg("Reconnected").arg("").arg("");
+	else
+		commsStr = QString(R"X(Normal)X");
+
+	email.body += QString(R"X(
+<table>
+<tbody>
+<tr><td><strong>Base Station:</strong></td>     <td>%1</td></tr>
+<tr><td><strong>Comms:</strong></td>            <td>%2</td></tr>
+</tbody>
+</table>
+)X").arg(bs.descriptor.name.c_str())
+		.arg(commsStr)
+		.toUtf8().data();
+
+	QString dateTimeFormatStr = utils::getQDateTimeFormatString(m_db.getGeneralSettings().dateTimeFormat);
+	email.body += QString(R"X(
+<p>&nbsp;</p>
+<p><strong>Date/Time Format: %1</strong></p>
+<p>&nbsp;</p>)X").arg(dateTimeFormatStr.toUpper()).toUtf8().data();
+
+	email.settings = m_db.getEmailSettings();
+
+	s_logger.logInfo(QString("Sending base station alarm email"));
+
+	sendEmail(email);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void Emailer::sendAlarmRetriggerEmail(DB::Alarm const& alarm)
 {
-	auto toString = [](uint32_t triggers)
+	auto sensorTriggersToString = [](uint32_t triggers)
 	{
 		std::string str;
 		str += (triggers & DB::AlarmTrigger::MeasurementLowTemperatureSoft) ? "Low Temperature, " : "";
@@ -266,6 +396,18 @@ void Emailer::sendAlarmRetriggerEmail(DB::Alarm const& alarm)
 		str += (triggers & DB::AlarmTrigger::MeasurementHighHumidityHard) ? "High Humidity, " : "";
 		str += (triggers & DB::AlarmTrigger::MeasurementLowVcc) ? "Low Battery, " : "";
 		str += (triggers & DB::AlarmTrigger::MeasurementLowSignal) ? "Low Signal, " : "";
+        str += (triggers & DB::AlarmTrigger::SensorBlackout) ? "Blackout, " : "";
+		if (!str.empty())
+		{
+			str.pop_back(); //' '
+			str.pop_back(); //','
+		}
+		return str;
+	};
+	auto baseStationTriggersToString = [](uint32_t triggers)
+	{
+		std::string str;
+		str += (triggers & DB::AlarmTrigger::BaseStationDisconnected) ? "Disconnected, " : "";
 		if (!str.empty())
 		{
 			str.pop_back(); //' '
@@ -274,30 +416,31 @@ void Emailer::sendAlarmRetriggerEmail(DB::Alarm const& alarm)
 		return str;
 	};
 
-    uint32_t triggers = 0;
-    for (auto p: alarm.triggersPerSensor)
-    { 
-        triggers |= p.second;
-    }
-
 	Email email;
 
 	///////////////////////////////
 	// SUBJECT
-	email.subject = "ALARM '" + alarm.descriptor.name + "' still triggered: " + toString(triggers);
+	email.subject = "ALARM '" + alarm.descriptor.name + "' still triggered";
 
 	///////////////////////////////
 	// BODY
 	for (auto p : alarm.triggersPerSensor)
 	{
-        DB::SensorId sensorId = p.first;
-        std::optional<DB::Sensor> sensor = m_db.findSensorById(sensorId);
+        std::optional<DB::Sensor> sensor = m_db.findSensorById(p.first);
         if (sensor.has_value())
 		{
-            email.body += "\n<p>Sensor '<strong>" + sensor->descriptor.name + "</strong>': " + toString(p.second) + "</p>";
+            email.body += "\n<p>Sensor '<strong>" + sensor->descriptor.name + "</strong>': " + sensorTriggersToString(p.second) + "</p>";
 		}
 	}
-	
+	for (auto p : alarm.triggersPerBaseStation)
+	{
+		std::optional<DB::BaseStation> bs = m_db.findBaseStationById(p.first);
+		if (bs.has_value())
+		{
+			email.body += "\n<p>Base Station '<strong>" + bs->descriptor.name + "</strong>': " + baseStationTriggersToString(p.second) + "</p>";
+		}
+	}
+
 	email.settings = m_db.getEmailSettings();
 
 	s_logger.logInfo(QString("Sending alarm retrigger email"));
