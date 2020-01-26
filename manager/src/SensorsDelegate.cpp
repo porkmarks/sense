@@ -165,7 +165,7 @@ void SensorsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
 		}
 		else
 		{
-			painter->fillRect(option.rect, (index.row() & 0) ? option.palette.base() : option.palette.alternateBase());
+			painter->fillRect(option.rect, (index.row() & 1) ? option.palette.alternateBase() : option.palette.base());
 		}
 
 		int32_t sensorIndex = m_sensorsModel.getSensorIndex(m_sortingModel.mapToSource(index));
@@ -198,7 +198,7 @@ void SensorsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
 		}
 		else
 		{
-			painter->fillRect(option.rect, (index.row() & 0) ? option.palette.base() : option.palette.alternateBase());
+			painter->fillRect(option.rect, (index.row() & 1) ? option.palette.alternateBase() : option.palette.base());
 		}
 
         int32_t sensorIndex = m_sensorsModel.getSensorIndex(m_sortingModel.mapToSource(index));
