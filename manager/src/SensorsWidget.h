@@ -22,7 +22,8 @@ signals:
 
 private slots:
     void bindSensor();
-    void unbindSensor();
+    void removeSensor();
+    void rebindSensor();
     void configureSensor(QModelIndex const& index);
 	void setPermissions();
 

@@ -139,6 +139,9 @@ Manager::Manager(QWidget *parent)
 	connect(&m_comms, &Comms::baseStationConnected, this, &Manager::baseStationConnected);
 	connect(&m_comms, &Comms::baseStationDisconnected, this, &Manager::baseStationDisconnected);
 
+
+    connect(&s_logger, &Logger::logLinesAdded, this, &Manager::logLinesAdded);
+
     checkIfAdminExists();
 
     login();
@@ -264,7 +267,7 @@ void Manager::login()
         else
         {
             s_logger.logCritical("User failed to log in. Exiting");
-            QMessageBox::critical(this, "Error", "You need to be logged in to user this program.\nThe program will now close.");
+            QMessageBox::critical(this, "Error", "You need to be logged in to use this program.\nThe program will now close.");
             exit(1);
         }
     }
@@ -377,6 +380,51 @@ void Manager::showReportsDialog()
 void Manager::exitAction()
 {
     exit(0);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void Manager::logLinesAdded(std::vector<Logger::LogLine> const& logLines)
+{
+    static QIcon eicon(":/icons/ui/error.png");
+
+    DB::GeneralSettings generalSettings = m_db.getGeneralSettings();
+    if (!generalSettings.showCriticalLogsPopup)
+    {
+        return;
+    }
+
+    bool show = false;
+    for (size_t index = logLines.size(); index > 0; index--)
+    {
+        Logger::LogLine const& line = logLines[index - 1];
+        if (line.type != Logger::Type::CRITICAL)
+        {
+            continue;
+        }
+        if (!m_criticalLogsDialog)
+        {
+            m_criticalLogsDialog = new QDialog(this);
+            m_criticalLogsDialogUI.setupUi(m_criticalLogsDialog);
+            connect(m_criticalLogsDialogUI.buttonBox->button(QDialogButtonBox::StandardButton::Reset), &QPushButton::released, [this]
+            {
+                m_criticalLogsDialogUI.list->clear();
+            });
+        }
+
+        QTreeWidgetItem* item = new QTreeWidgetItem();
+        item->setData(0, Qt::DecorationRole, eicon);
+        item->setData(0, Qt::DisplayRole, utils::toString<Logger::Clock>(line.timePoint, generalSettings.dateTimeFormat));
+        item->setData(1, Qt::DisplayRole, line.message.c_str());
+        m_criticalLogsDialogUI.list->insertTopLevelItem(0, item);
+        show = true;
+    }
+
+	if (show)
+	{
+		m_criticalLogsDialog->show();
+        m_criticalLogsDialog->raise();
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////

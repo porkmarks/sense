@@ -148,8 +148,6 @@ void SensorDetailsDialog::setSensor(DB::Sensor const& sensor)
 	connect(m_ui.rb, &QPushButton::clicked, [this]() \
 	{ \
 		m_sensor.stats.s = v; \
-		Result<void> result = m_db.setSensorStats(m_sensor.id, m_sensor.stats); \
-		Q_ASSERT(result == success); \
 		setupStatsUI(); \
 	});
 

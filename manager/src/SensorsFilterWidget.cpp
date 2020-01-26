@@ -19,7 +19,7 @@ void SensorsFilterWidget::init(DB& db)
     m_sortingModel.reset(new QSortFilterProxyModel(this));
     m_sortingModel->setSourceModel(m_model.get());
 
-    m_delegate.reset(new SensorsDelegate(*m_sortingModel));
+    m_delegate.reset(new SensorsDelegate(*m_sortingModel, *m_model));
 
     size_t sensorCount = m_db->getSensorCount();
 

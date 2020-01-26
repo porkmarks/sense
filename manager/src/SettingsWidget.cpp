@@ -49,7 +49,6 @@ void SettingsWidget::init(DB& db)
 	m_uiConnections.push_back(connect(&db, &DB::userLoggedIn, this, &SettingsWidget::setPermissions));
 
     m_ui.showDebugConsole->setChecked(IsWindowVisible(GetConsoleWindow()) == SW_SHOW);
-    m_ui.showDebugConsole->setVisible(db.isLoggedInAsAdmin());
     m_uiConnections.push_back(connect(m_ui.showDebugConsole, &QCheckBox::stateChanged, this, [](int state) 
     {
         ShowWindow(GetConsoleWindow(), state ? SW_SHOW : SW_HIDE);
@@ -72,6 +71,8 @@ void SettingsWidget::init(DB& db)
     m_uiConnections.push_back(connect(m_ui.emailTest, &QPushButton::released, this, &SettingsWidget::sendTestEmail));
 
     m_uiConnections.push_back(connect(m_ui.ftpTest, &QPushButton::released, this, &SettingsWidget::testFtpSettings));
+
+    m_uiConnections.push_back(connect(m_ui.clearMeasurements, &QPushButton::released, this, &SettingsWidget::clearMeasurements));
 
     setGeneralSettings(m_db->getGeneralSettings());
     m_ui.csvTab->init(*m_db);
@@ -114,6 +115,7 @@ void SettingsWidget::save()
 
 void SettingsWidget::setPermissions()
 {
+    m_ui.showDebugConsole->setVisible(m_db->isLoggedInAsAdmin());
 	m_ui.generalTab->setEnabled(m_db->isLoggedInAsAdmin());
 	m_ui.csvTab->setEnabled(m_db->isLoggedInAsAdmin());
 	m_ui.emailTab->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeEmailSettings));
@@ -125,6 +127,20 @@ void SettingsWidget::setPermissions()
 	m_ui.signalStrengthAlertThreshold->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
 	m_ui.sensorsCommsPeriod->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
 	m_ui.sensorsMeasurementPeriod->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
+	m_ui.clearMeasurementsSection->setVisible(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeMeasurements));
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::clearMeasurements()
+{
+	int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to clear all measurements for all the sensors?\nThis will keep all the other settings.\n"));
+	if (response != QMessageBox::Yes)
+	{
+		return;
+	}
+
+    m_db->clearAllMeasurements();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -132,6 +148,7 @@ void SettingsWidget::setPermissions()
 void SettingsWidget::setGeneralSettings(DB::GeneralSettings const& settings)
 {
     m_ui.dateTimeFormat->setCurrentIndex((int)settings.dateTimeFormat);
+    m_ui.showCriticalLogsPopup->setChecked(settings.showCriticalLogsPopup);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -140,6 +157,7 @@ DB::GeneralSettings SettingsWidget::getGeneralSettings() const
 {
     DB::GeneralSettings settings = m_db->getGeneralSettings();
 	settings.dateTimeFormat = (DB::DateTimeFormat)m_ui.dateTimeFormat->currentIndex();
+    settings.showCriticalLogsPopup = m_ui.showCriticalLogsPopup->isChecked();
     return settings;
 }
 

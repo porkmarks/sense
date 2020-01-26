@@ -201,6 +201,13 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
             return measurement.alarmTriggers.current;
         }
     }
+	else if (role == Qt::ToolTipRole)
+	{
+		if (column == Column::Alarms)
+		{
+            return utils::sensorTriggersToString(measurement.alarmTriggers.current & DB::AlarmTrigger::MeasurementMask, true).c_str();
+		}
+    }
 
     return QVariant();
 }

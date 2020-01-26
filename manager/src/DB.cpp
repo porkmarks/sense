@@ -70,13 +70,13 @@ Result<void> DB::create(sqlite3& db)
     utils::epilogue epi([&db] { sqlite3_exec(&db, "END TRANSACTION;", nullptr, nullptr, nullptr); });
 
 	{
-		const char* sql = "CREATE TABLE GeneralSettings (id INTEGER PRIMARY KEY, dateTimeFormat INTEGER);";
+		const char* sql = "CREATE TABLE GeneralSettings (id INTEGER PRIMARY KEY, dateTimeFormat INTEGER, showCriticalLogsPopup BOOLEAN);";
         if (sqlite3_exec(&db, sql, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 			return error;
 		}
-		const char* sqlInsert = "INSERT INTO GeneralSettings VALUES(0, 0);";
+		const char* sqlInsert = "INSERT INTO GeneralSettings VALUES(0, 0, 1);";
         if (sqlite3_exec(&db, sqlInsert, nullptr, nullptr, nullptr))
 		{
 			Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
@@ -307,7 +307,7 @@ Result<void> DB::load(sqlite3& db)
 
 
 	{
-		const char* sql = "SELECT dateTimeFormat FROM GeneralSettings;";
+		const char* sql = "SELECT dateTimeFormat, showCriticalLogsPopup FROM GeneralSettings;";
 		sqlite3_stmt* stmt;
         if (sqlite3_prepare_v2(&db, sql, -1, &stmt, nullptr) != SQLITE_OK)
 		{
@@ -320,6 +320,7 @@ Result<void> DB::load(sqlite3& db)
 			return Error(QString("Cannot load general settings row: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		}
         data.generalSettings.dateTimeFormat = DateTimeFormat(sqlite3_column_int64(stmt, 0));
+		data.generalSettings.showCriticalLogsPopup = sqlite3_column_int(stmt, 1) ? true : false;
 	}
 	{
 		//id INTEGER PRIMARY KEY, dateTimeFormatOverride INTEGER, unitsFormat INTEGER, "
@@ -714,7 +715,14 @@ Result<void> DB::load(sqlite3& db)
 			int32_t index = findUnboundSensorIndex();
 			if (index >= 0)
 			{
-				removeSensor((size_t)index);
+				if (m_data.sensors[size_t(index)].serialNumber == 0)
+				{
+					removeSensor((size_t)index);
+				}
+				else
+				{
+					m_data.sensors[size_t(index)].state = Sensor::State::Active;
+				}
 			}
 		}
 
@@ -775,10 +783,11 @@ void DB::save(Data& data, bool newTransaction) const
 	{
 		data.generalSettingsChanged = false;
 		sqlite3_stmt* stmt;
-        sqlite3_prepare_v2(m_sqlite, "REPLACE INTO GeneralSettings (id, dateTimeFormat) VALUES (0, ?1);", -1, &stmt, nullptr);
+        sqlite3_prepare_v2(m_sqlite, "REPLACE INTO GeneralSettings (id, dateTimeFormat, showCriticalLogsPopup) VALUES (0, ?1, ?2);", -1, &stmt, nullptr);
         utils::epilogue epi2([stmt] { sqlite3_finalize(stmt); });
 
 		sqlite3_bind_int64(stmt, 1, (int)data.generalSettings.dateTimeFormat);
+		sqlite3_bind_int(stmt, 2, data.generalSettings.showCriticalLogsPopup ? 1 : 0);
 		if (sqlite3_step(stmt) != SQLITE_DONE)
 		{
 			s_logger.logCritical(QString("Failed to save general settings: %1").arg(sqlite3_errmsg(m_sqlite)));
@@ -2520,6 +2529,67 @@ Result<void> DB::setSensorStats(SensorId id, SensorStats const& stats)
 
 //////////////////////////////////////////////////////////////////////////
 
+Result<void> DB::rebindSensor(SensorId id)
+{
+	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+
+	if (findUnboundSensorIndex() >= 0)
+	{
+		return Error("Binding already in process");
+	}
+
+	int32_t _index = findSensorIndexById(id);
+	if (_index < 0)
+	{
+		return Error("Invalid sensor id");
+	}
+	size_t index = static_cast<size_t>(_index);
+	Sensor& sensor = m_data.sensors[index];
+	sensor.state = Sensor::State::Unbound;
+	m_data.sensorsChanged = true;
+
+	emit sensorChanged(sensor.id);
+
+	s_logger.logInfo(QString("Sensor '%1' marked for rebinding").arg(sensor.descriptor.name.c_str()));
+
+	save(true);
+
+	return success;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void DB::cancelSensorBinding()
+{
+	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+
+	int32_t _index = findUnboundSensorIndex();
+	if (_index < 0)
+	{
+		return;
+	}
+	size_t index = static_cast<size_t>(_index);
+	Sensor& sensor = m_data.sensors[index];
+
+	if (sensor.serialNumber == 0) //never bound? remove
+	{
+		removeSensorById(sensor.id);
+		return;
+	}
+
+	//revert to active
+	sensor.state = Sensor::State::Active;
+	m_data.sensorsChanged = true;
+
+	emit sensorChanged(sensor.id);
+
+	s_logger.logInfo(QString("Sensor '%1' canceled rebinding").arg(sensor.descriptor.name.c_str()));
+
+	save(true);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 bool DB::setSensorInputDetails(SensorInputDetails const& details)
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
@@ -2652,6 +2722,7 @@ bool DB::setSensorsInputDetails(std::vector<SensorInputDetails> const& details)
 //////////////////////////////////////////////////////////////////////////
 
 void DB::removeSensor(size_t index)
+
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
@@ -3475,6 +3546,34 @@ bool DB::isReportTriggered(Report const& report) const
     }
 
     return false;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void DB::clearAllMeasurements()
+{
+	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+
+
+	QString sql = QString("DELETE FROM Measurements;");
+	if (sqlite3_exec(m_sqlite, sql.toUtf8().data(), nullptr, nullptr, nullptr))
+	{
+		s_logger.logCritical(QString("Failed to clear all measurements: %2").arg(sqlite3_errmsg(m_sqlite)));
+		return;
+	}
+	for (Sensor const& sensor: m_data.sensors)
+	{
+		emit measurementsRemoved(sensor.id);
+	}
+	for (Alarm& alarm : m_data.alarms)
+	{
+		alarm.triggersPerSensor.clear();
+	}
+	m_data.alarmsChanged = true;
+
+	s_logger.logInfo(QString("Cleared all measurements"));
+
+	save(true);
 }
 
 //////////////////////////////////////////////////////////////////////////

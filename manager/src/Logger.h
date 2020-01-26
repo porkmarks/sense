@@ -73,7 +73,7 @@ public:
     std::vector<LogLine> getFilteredLogLines(Filter const& filter) const;
 
 signals:
-    void logLinesAdded();
+    void logLinesAdded(std::vector<LogLine> const& logLines);
 
 private:
     void addToDB(std::string const& message, Type type);
@@ -83,5 +83,6 @@ private:
 	mutable std::recursive_mutex m_mutex;
     sqlite3* m_sqlite = nullptr;
 	std::shared_ptr<sqlite3_stmt> m_insertStmt;
+    std::vector<LogLine> m_logLinesForSignaling;
 };
 

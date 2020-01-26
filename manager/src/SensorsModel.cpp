@@ -51,6 +51,13 @@ SensorsModel::~SensorsModel()
 
 //////////////////////////////////////////////////////////////////////////
 
+DB& SensorsModel::getDB()
+{
+    return m_db;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void SensorsModel::refreshDetails()
 {
     for (size_t i = 0; i < m_db.getSensorCount(); i++)
@@ -263,7 +270,6 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
     std::optional<DB::Sensor> sensor = m_db.findSensorById(sensorData.sensorId);
     if (!sensor.has_value())
     {
-        Q_ASSERT(false);
         return QVariant();
     }
 
@@ -433,6 +439,14 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                     return QString("%1%").arg(average);
                 }
             }
+        }
+    }
+    else if (role == Qt::ToolTipRole)
+    {
+        if (column == Column::Alarms)
+        {
+			Result<DB::Measurement> res = m_db.getLastMeasurementForSensor(sensor->id);
+			return (res == success) ? QVariant(utils::sensorTriggersToString(res.payload().alarmTriggers.current, true).c_str()) : QVariant();
         }
     }
 

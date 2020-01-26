@@ -15,6 +15,8 @@ public:
     SensorsModel(DB& db);
     ~SensorsModel();
 
+    DB& getDB();
+
     void setShowCheckboxes(bool show);
     void setSensorChecked(DB::SensorId id, bool checked);
     bool isSensorChecked(DB::SensorId id) const;

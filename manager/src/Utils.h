@@ -29,6 +29,9 @@ std::pair<std::string, int32_t> computeRelativeTimePointString(IClock::time_poin
 uint32_t getSensorStorageCapacity(DB::Sensor const& sensor);
 IClock::duration computeBatteryLife(float capacity, IClock::duration measurementPeriod, IClock::duration commsPeriod, float power, uint8_t retries, uint8_t hardwareVersion);
 
+std::string sensorTriggersToString(uint32_t triggers, bool collapseSoftAndHard);
+std::string baseStationTriggersToString(uint32_t triggers);
+
 struct CsvData
 {
 	DB::Measurement measurement;

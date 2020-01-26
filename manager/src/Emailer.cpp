@@ -383,39 +383,6 @@ void Emailer::sendBaseStationAlarmEmail(DB::Alarm const& alarm, DB::BaseStation 
 
 void Emailer::sendAlarmRetriggerEmail(DB::Alarm const& alarm)
 {
-	auto sensorTriggersToString = [](uint32_t triggers)
-	{
-		std::string str;
-		str += (triggers & DB::AlarmTrigger::MeasurementLowTemperatureSoft) ? "Low Temperature, " : "";
-		str += (triggers & DB::AlarmTrigger::MeasurementLowTemperatureHard) ? "Low Temperature, " : "";
-		str += (triggers & DB::AlarmTrigger::MeasurementHighTemperatureSoft) ? "High Temperature, " : "";
-		str += (triggers & DB::AlarmTrigger::MeasurementHighTemperatureHard) ? "High Temperature, " : "";
-		str += (triggers & DB::AlarmTrigger::MeasurementLowHumiditySoft) ? "Low Humidity, " : "";
-		str += (triggers & DB::AlarmTrigger::MeasurementLowHumidityHard) ? "Low Humidity, " : "";
-		str += (triggers & DB::AlarmTrigger::MeasurementHighHumiditySoft) ? "High Humidity, " : "";
-		str += (triggers & DB::AlarmTrigger::MeasurementHighHumidityHard) ? "High Humidity, " : "";
-		str += (triggers & DB::AlarmTrigger::MeasurementLowVcc) ? "Low Battery, " : "";
-		str += (triggers & DB::AlarmTrigger::MeasurementLowSignal) ? "Low Signal, " : "";
-        str += (triggers & DB::AlarmTrigger::SensorBlackout) ? "Blackout, " : "";
-		if (!str.empty())
-		{
-			str.pop_back(); //' '
-			str.pop_back(); //','
-		}
-		return str;
-	};
-	auto baseStationTriggersToString = [](uint32_t triggers)
-	{
-		std::string str;
-		str += (triggers & DB::AlarmTrigger::BaseStationDisconnected) ? "Disconnected, " : "";
-		if (!str.empty())
-		{
-			str.pop_back(); //' '
-			str.pop_back(); //','
-		}
-		return str;
-	};
-
 	Email email;
 
 	///////////////////////////////
@@ -429,7 +396,7 @@ void Emailer::sendAlarmRetriggerEmail(DB::Alarm const& alarm)
         std::optional<DB::Sensor> sensor = m_db.findSensorById(p.first);
         if (sensor.has_value())
 		{
-            email.body += "\n<p>Sensor '<strong>" + sensor->descriptor.name + "</strong>': " + sensorTriggersToString(p.second) + "</p>";
+            email.body += "\n<p>Sensor '<strong>" + sensor->descriptor.name + "</strong>': " + utils::sensorTriggersToString(p.second, true) + "</p>";
 		}
 	}
 	for (auto p : alarm.triggersPerBaseStation)
@@ -437,7 +404,7 @@ void Emailer::sendAlarmRetriggerEmail(DB::Alarm const& alarm)
 		std::optional<DB::BaseStation> bs = m_db.findBaseStationById(p.first);
 		if (bs.has_value())
 		{
-			email.body += "\n<p>Base Station '<strong>" + bs->descriptor.name + "</strong>': " + baseStationTriggersToString(p.second) + "</p>";
+			email.body += "\n<p>Base Station '<strong>" + bs->descriptor.name + "</strong>': " + utils::baseStationTriggersToString(p.second) + "</p>";
 		}
 	}
 

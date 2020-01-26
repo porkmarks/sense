@@ -182,12 +182,12 @@ QString getQDateTimeFormatString(DB::DateTimeFormat format, bool millis)
 {
     switch (format)
 	{
-    case DB::DateTimeFormat::DD_MM_YYYY_Dash: return QString("dd-MM-yyyy HH:mm%1").arg(millis ? ".zzz" : "");
-    case DB::DateTimeFormat::YYYY_MM_DD_Slash: return QString("yyyy/MM/dd HH:mm%1").arg(millis ? ".zzz" : "");
-    case DB::DateTimeFormat::YYYY_MM_DD_Dash: return QString("yyyy-MM-dd HH:mm%1").arg(millis ? ".zzz" : "");
-    case DB::DateTimeFormat::MM_DD_YYYY_Slash: return QString("MM/dd/yyyy HH:mm%1").arg(millis ? ".zzz" : "");
+    case DB::DateTimeFormat::DD_MM_YYYY_Dash: return QString("dd-MM-yyyy HH:mm:ss%1").arg(millis ? ".zzz" : "");
+    case DB::DateTimeFormat::YYYY_MM_DD_Slash: return QString("yyyy/MM/dd HH:mm:ss%1").arg(millis ? ".zzz" : "");
+    case DB::DateTimeFormat::YYYY_MM_DD_Dash: return QString("yyyy-MM-dd HH:mm:ss%1").arg(millis ? ".zzz" : "");
+    case DB::DateTimeFormat::MM_DD_YYYY_Slash: return QString("MM/dd/yyyy HH:mm:ss%1").arg(millis ? ".zzz" : "");
 	}
-	return QString("dd-MM-yyyy HH:mm").arg(millis ? ".zzz" : "");
+	return QString("dd-MM-yyyy HH:mm:ss").arg(millis ? ".zzz" : "");
 }
 
 std::string getMacStr(DB::BaseStationDescriptor::Mac const& mac)
@@ -294,6 +294,56 @@ IClock::duration computeBatteryLife(float capacity, IClock::duration measurement
 	float hours = capacity / usagePerHour;
 	return std::chrono::hours(static_cast<int32_t>(hours));
 }
+
+//////////////////////////////////////////////////////////////////////////
+
+std::string sensorTriggersToString(uint32_t triggers, bool collapseSoftAndHard)
+{
+	std::string str;
+	str += (triggers & DB::AlarmTrigger::MeasurementLowTemperatureHard) ? "Very Low Temperature, " : "";
+	if (!collapseSoftAndHard && (triggers & DB::AlarmTrigger::MeasurementLowTemperatureHard))
+	{
+		str += (triggers & DB::AlarmTrigger::MeasurementLowTemperatureSoft) ? "Low Temperature, " : "";
+	}
+	str += (triggers & DB::AlarmTrigger::MeasurementHighTemperatureHard) ? "Very High Temperature, " : "";
+	if (!collapseSoftAndHard && (triggers & DB::AlarmTrigger::MeasurementHighTemperatureHard))
+	{
+		str += (triggers & DB::AlarmTrigger::MeasurementHighTemperatureSoft) ? "High Temperature, " : "";
+	}
+	str += (triggers & DB::AlarmTrigger::MeasurementLowHumidityHard) ? "Very Low Humidity, " : "";
+	if (!collapseSoftAndHard && (triggers & DB::AlarmTrigger::MeasurementLowHumidityHard))
+	{
+		str += (triggers & DB::AlarmTrigger::MeasurementLowHumiditySoft) ? "Low Humidity, " : "";
+	}
+	str += (triggers & DB::AlarmTrigger::MeasurementHighHumidityHard) ? "Very High Humidity, " : "";
+	if (!collapseSoftAndHard && (triggers & DB::AlarmTrigger::MeasurementHighHumidityHard))
+	{
+		str += (triggers & DB::AlarmTrigger::MeasurementHighHumiditySoft) ? "High Humidity, " : "";
+	}
+	str += (triggers & DB::AlarmTrigger::MeasurementLowVcc) ? "Low Battery, " : "";
+	str += (triggers & DB::AlarmTrigger::MeasurementLowSignal) ? "Low Signal, " : "";
+	str += (triggers & DB::AlarmTrigger::SensorBlackout) ? "Blackout, " : "";
+	if (!str.empty())
+	{
+		str.pop_back(); //' '
+		str.pop_back(); //','
+	}
+	return str;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+std::string baseStationTriggersToString(uint32_t triggers)
+{
+	std::string str;
+	str += (triggers & DB::AlarmTrigger::BaseStationDisconnected) ? "Disconnected, " : "";
+	if (!str.empty())
+	{
+		str.pop_back(); //' '
+		str.pop_back(); //','
+	}
+	return str;
+};
 
 //////////////////////////////////////////////////////////////////////////
 

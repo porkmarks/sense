@@ -192,8 +192,9 @@ void Comms::_connectToBaseStation(DB* db, Mac mac)
     cbs->isConnecting = true;
     cbs->socketAdapter.getSocket().connectToHost(it->address, 4444);
 
-    cbs->connections.push_back(QObject::connect(db, &DB::sensorAdded, [this, cbs](DB::SensorId id) { sensorAdded(*cbs, id); }));
-    cbs->connections.push_back(QObject::connect(db, &DB::sensorRemoved, [this, cbs](DB::SensorId id) { sensorRemoved(*cbs, id); }));
+    cbs->connections.push_back(QObject::connect(db, &DB::sensorAdded, [this, cbs](DB::SensorId id) { checkForUnboundSensors(*cbs, id); }));
+    cbs->connections.push_back(QObject::connect(db, &DB::sensorChanged, [this, cbs](DB::SensorId id) { checkForUnboundSensors(*cbs, id); }));
+    cbs->connections.push_back(QObject::connect(db, &DB::sensorRemoved, [this, cbs](DB::SensorId id) { checkForUnboundSensors(*cbs, id); }));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -260,7 +261,7 @@ void Comms::disconnectedFromBaseStation(InitializedBaseStation* cbs)
 
         if (wasConnected)
         {
-            s_logger.logWarning(QString("Disconnected from BS %1").arg(utils::getMacStr(cbs->descriptor.mac).c_str()));
+            s_logger.logCritical(QString("Disconnected from BS %1").arg(utils::getMacStr(cbs->descriptor.mac).c_str()));
             emit baseStationDisconnected(cbs->descriptor);
         }
     }
@@ -353,17 +354,14 @@ void Comms::processPong(InitializedBaseStation& cbs)
 
 //////////////////////////////////////////////////////////////////////////
 
-void Comms::sensorAdded(InitializedBaseStation& cbs, DB::SensorId id)
+void Comms::checkForUnboundSensors(InitializedBaseStation& cbs, DB::SensorId id)
 {
-    changeToRadioState(cbs, data::Radio_State::PAIRING);
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void Comms::sensorRemoved(InitializedBaseStation& cbs, DB::SensorId id)
-{
-    std::optional<DB::Sensor> unboundSensor = cbs.db.findUnboundSensor();
-    if (!unboundSensor.has_value() || unboundSensor->id == id)
+	std::optional<DB::Sensor> unboundSensor = cbs.db.findUnboundSensor();
+	if (unboundSensor.has_value() && unboundSensor->id == id)
+	{
+		changeToRadioState(cbs, data::Radio_State::PAIRING);
+	}
+    else
     {
         changeToRadioState(cbs, data::Radio_State::NORMAL);
     }
@@ -422,15 +420,7 @@ void Comms::processRevertedRadioStateToNormal(InitializedBaseStation& cbs)
 {
 	Clock::time_point startTp = Clock::now();
 
-    int32_t index = cbs.db.findUnboundSensorIndex();
-    if (index < 0)
-    {
-        s_logger.logWarning(QString("Unexpected state reversal (no unbound sensor)"));
-    }
-    else
-    {
-        cbs.db.removeSensor((size_t)index);
-    }
+    cbs.db.cancelSensorBinding();
 
 	std::cout << "Duration: " << std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - startTp).count() / 1000.f << std::endl;
 }

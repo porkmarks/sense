@@ -6,6 +6,7 @@
 #include "Comms.h"
 #include "DB.h"
 #include "Logger.h"
+#include "ui_CriticalLogsDialog.h"
 
 struct sqlite3;
 
@@ -19,6 +20,7 @@ private slots:
     void baseStationDiscovered(Comms::BaseStationDescriptor const& commsBS);
 	void baseStationConnected(Comms::BaseStationDescriptor const& commsBS);
 	void baseStationDisconnected(Comms::BaseStationDescriptor const& commsBS);
+    void logLinesAdded(std::vector<Logger::LogLine> const& logLines);
     void showSettingsDialog();
     void showBaseStationsDialog();
     void showUsersDialog();
@@ -46,6 +48,8 @@ private:
 
     Comms m_comms;
 	DB m_db;
+    QDialog* m_criticalLogsDialog = nullptr;
+    Ui::CriticalLogsDialog m_criticalLogsDialogUI;
 
     Ui::Manager m_ui;
     int m_currentTabIndex = 0;

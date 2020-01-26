@@ -1,6 +1,7 @@
 #include "SensorsWidget.h"
 #include "SensorDetailsDialog.h"
 #include "PermissionsCheck.h"
+#include "ui_BindDialog.h"
 
 #include <QSettings>
 #include <QMessageBox>
@@ -18,7 +19,8 @@ SensorsWidget::SensorsWidget(QWidget *parent)
     setEnabled(false);
 
     connect(m_ui.add, &QPushButton::released, this, &SensorsWidget::bindSensor);
-    connect(m_ui.remove, &QPushButton::released, this, &SensorsWidget::unbindSensor);
+    connect(m_ui.remove, &QPushButton::released, this, &SensorsWidget::removeSensor);
+    connect(m_ui.rebind, &QPushButton::released, this, &SensorsWidget::rebindSensor);
     connect(m_ui.list, &QTreeView::activated, this, &SensorsWidget::configureSensor);
 }
 
@@ -44,7 +46,7 @@ void SensorsWidget::init(DB& db)
     m_db = &db;
     m_model.reset(new SensorsModel(*m_db));
     m_sortingModel.setSourceModel(m_model.get());
-    m_delegate.reset(new SensorsDelegate(m_sortingModel));
+    m_delegate.reset(new SensorsDelegate(m_sortingModel, *m_model));
 
     m_ui.list->setModel(&m_sortingModel);
     m_ui.list->setItemDelegate(m_delegate.get());
@@ -135,13 +137,35 @@ void SensorsWidget::bindSensor()
             continue;
         }
 
+		QDialog dialog(this);
+		Ui_BindDialog ui;
+		ui.setupUi(&dialog);
+		ui.spinner->setRoundness(70.0);
+		ui.spinner->setMinimumTrailOpacity(15.0);
+		ui.spinner->setTrailFadePercentage(70.0);
+		ui.spinner->setNumberOfLines(12);
+		ui.spinner->setLineLength(10);
+		ui.spinner->setLineWidth(5);
+		ui.spinner->setInnerRadius(10);
+		ui.spinner->setRevolutionsPerSecond(1);
+		ui.spinner->setColor(QColor(81, 4, 71));
+		ui.spinner->start();
+		dialog.show();
+
+		connect(&dialog, &QDialog::rejected, [this]() { m_db->cancelSensorBinding(); });
+
+		while (m_db->findUnboundSensorIndex() >= 0)
+		{
+			QApplication::instance()->processEvents();
+		}
+
         break;
     }
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-void SensorsWidget::unbindSensor()
+void SensorsWidget::removeSensor()
 {
     QModelIndexList selected = m_ui.list->selectionModel()->selectedIndexes();
     if (selected.isEmpty())
@@ -174,6 +198,70 @@ void SensorsWidget::unbindSensor()
     }
 
     m_db->removeSensor(index);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SensorsWidget::rebindSensor()
+{
+	QModelIndexList selected = m_ui.list->selectionModel()->selectedIndexes();
+	if (selected.isEmpty())
+	{
+		QMessageBox::critical(this, "Error", "Please select the sensor you want to rebind.");
+		return;
+	}
+
+	if (!hasPermissionOrCanLoginAsAdmin(*m_db, DB::UserDescriptor::PermissionChangeSensors, this))
+	{
+		QMessageBox::critical(this, "Error", "You don't have permission to rebind sensors.");
+		return;
+	}
+
+	QModelIndex mi = m_sortingModel.mapToSource(m_sortingModel.index(selected.at(0).row(), 0));
+	int32_t _index = m_model->getSensorIndex(mi);
+	if (_index < 0)
+	{
+		QMessageBox::critical(this, "Error", "Invalid sensor selected.");
+		return;
+	}
+
+	size_t index = static_cast<size_t>(_index);
+	DB::Sensor sensor = m_db->getSensor(index);
+
+	int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to rebind sensor '%1'?\nThis will allow you to replace the sensor\nwhile keeping all the measurements.\n").arg(sensor.descriptor.name.c_str()));
+	if (response != QMessageBox::Yes)
+	{
+		return;
+	}
+
+	Result<void> result = m_db->rebindSensor(sensor.id);
+    if (result != success)
+    {
+		QMessageBox::critical(this, "Error", QString("Failed to initiate sensor rebinding: {}").arg(result.error().what().c_str()));
+        return;
+    }
+
+    QDialog dialog(this);
+    Ui_BindDialog ui;
+    ui.setupUi(&dialog);
+	ui.spinner->setRoundness(70.0);
+	ui.spinner->setMinimumTrailOpacity(15.0);
+	ui.spinner->setTrailFadePercentage(70.0);
+	ui.spinner->setNumberOfLines(12);
+	ui.spinner->setLineLength(10);
+	ui.spinner->setLineWidth(5);
+	ui.spinner->setInnerRadius(10);
+	ui.spinner->setRevolutionsPerSecond(1);
+	ui.spinner->setColor(QColor(81, 4, 71));
+    ui.spinner->start();
+    dialog.show();
+
+    connect(&dialog, &QDialog::rejected, [this]() { m_db->cancelSensorBinding(); });
+
+    while (m_db->findUnboundSensorIndex() >= 0)
+    {
+        QApplication::instance()->processEvents();
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -224,6 +312,12 @@ void SensorsWidget::configureSensor(QModelIndex const& index)
                 QMessageBox::critical(this, "Error", QString("Sensor '%1' sleep failed: %2").arg(sensor.descriptor.name.c_str()).arg(result.error().what().c_str()));
                 continue;
             }
+			result = m_db->setSensorStats(sensor.id, sensor.stats);
+			if (result != success)
+			{
+				QMessageBox::critical(this, "Error", QString("Sensor '%1' stats failed: %2").arg(sensor.descriptor.name.c_str()).arg(result.error().what().c_str()));
+				continue;
+			}
         }
         break;
     } while (true);

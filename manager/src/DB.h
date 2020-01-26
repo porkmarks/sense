@@ -71,6 +71,7 @@ public:
 	struct GeneralSettings
 	{
 		DateTimeFormat dateTimeFormat = DateTimeFormat::DD_MM_YYYY_Dash;
+        bool showCriticalLogsPopup = true;
 	};
 
 	bool setGeneralSettings(GeneralSettings const& settings);
@@ -461,6 +462,8 @@ public:
     Result<void> setSensorSleep(SensorId id, bool sleep);
     Result<SensorId> bindSensor(uint32_t serialNumber, uint8_t sensorType, uint8_t hardwareVersion, uint8_t softwareRevision, Sensor::Calibration const& calibration);
     Result<void> setSensorStats(SensorId id, SensorStats const& stats);
+    Result<void> rebindSensor(SensorId id);
+    void cancelSensorBinding();
 
     struct SensorInputDetails
     {
@@ -507,7 +510,7 @@ public:
 
     SensorOutputDetails computeSensorOutputDetails(SensorId id) const;
 
-    void removeSensor(size_t index);
+	void removeSensor(size_t index);
     void removeSensorById(SensorId id);
     int32_t findSensorIndexByName(std::string const& name) const;
     int32_t findSensorIndexById(SensorId id) const;
@@ -655,6 +658,7 @@ public:
 
     ////////////////////////////////////////////////////////////////////////////
 
+    void clearAllMeasurements();
     bool addMeasurement(MeasurementDescriptor const& descriptor);
     bool addMeasurements(std::vector<MeasurementDescriptor> descriptors);
 	bool addSingleSensorMeasurements(SensorId sensorId, std::vector<MeasurementDescriptor> descriptors);

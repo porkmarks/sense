@@ -41,6 +41,7 @@ extern std::string s_dataFolder;
 
 Logger::Logger()
 {
+	qRegisterMetaType<std::vector<LogLine>>("std::vector<LogLine>");
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -119,7 +120,9 @@ void Logger::logVerbose(std::string const& message)
         std::cout.flush();
     }
 
-    emit logLinesAdded();
+	m_logLinesForSignaling.clear();
+	m_logLinesForSignaling.push_back(LogLine{ IClock::rtNow(), 0, Type::VERBOSE, message });
+    emit logLinesAdded(m_logLinesForSignaling);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -177,7 +180,9 @@ void Logger::logWarning(std::string const& message)
         std::cout.flush();
     }
 
-    emit logLinesAdded();
+	m_logLinesForSignaling.clear();
+	m_logLinesForSignaling.push_back(LogLine{ IClock::rtNow(), 0, Type::WARNING, message });
+    emit logLinesAdded(m_logLinesForSignaling);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -207,7 +212,9 @@ void Logger::logCritical(std::string const& message)
         std::cout.flush();
     }
 
-    emit logLinesAdded();
+    m_logLinesForSignaling.clear();
+    m_logLinesForSignaling.push_back(LogLine{ IClock::rtNow(), 0, Type::CRITICAL, message });
+    emit logLinesAdded(m_logLinesForSignaling);
 }
 
 //////////////////////////////////////////////////////////////////////////
