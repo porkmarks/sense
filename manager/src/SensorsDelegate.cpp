@@ -33,8 +33,10 @@ void SensorsDelegate::refreshMiniPlot(QImage& image, DB& db, DB::Sensor const& s
 {
 	image = QImage(k_miniPlotSize, QImage::Format_RGBA8888);
 	QPainter p2;
-	p2.setRenderHints(QPainter::Antialiasing);
 	p2.begin(&image);
+	p2.setRenderHints(QPainter::Antialiasing);
+
+	image.fill(QColor(200, 200, 200, 100));
 
 	DB::Filter filter;
 	filter.useSensorFilter = true;
@@ -157,6 +159,15 @@ void SensorsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
     }
 	else if (column == SensorsModel::Column::Temperature)
 	{
+		if (option.state & QStyle::State_Selected)
+		{
+			painter->fillRect(option.rect, option.palette.highlight());
+		}
+		else
+		{
+			painter->fillRect(option.rect, (index.row() & 0) ? option.palette.base() : option.palette.alternateBase());
+		}
+
 		int32_t sensorIndex = m_sensorsModel.getSensorIndex(m_sortingModel.mapToSource(index));
 		if (sensorIndex >= 0)
 		{
@@ -181,6 +192,15 @@ void SensorsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
 	}
 	else if (column == SensorsModel::Column::Humidity)
 	{
+		if (option.state & QStyle::State_Selected)
+		{
+			painter->fillRect(option.rect, option.palette.highlight());
+		}
+		else
+		{
+			painter->fillRect(option.rect, (index.row() & 0) ? option.palette.base() : option.palette.alternateBase());
+		}
+
         int32_t sensorIndex = m_sensorsModel.getSensorIndex(m_sortingModel.mapToSource(index));
         if (sensorIndex >= 0)
 		{

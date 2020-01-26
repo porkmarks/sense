@@ -1001,7 +1001,7 @@ static void first_config_state()
     while (s_state == State::FIRST_CONFIG)
     {
         uint8_t tries = 0;
-        while (tries++ < 10)
+        while (tries++ < 10 && !done)
         {
             if (is_pressed(Button::BUTTON1))
             {

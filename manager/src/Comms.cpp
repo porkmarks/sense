@@ -234,11 +234,11 @@ void Comms::connectedToBaseStation(InitializedBaseStation* cbs)
 
         if (cbs->db.findUnboundSensorIndex() >= 0)
         {
-            changeToRadioState(*cbs, data::Radio_State::PAIRING);
+            cbs->stateChange = data::Radio_State::PAIRING;
         }
         else
         {
-            changeToRadioState(*cbs, data::Radio_State::NORMAL);
+            cbs->stateChange = data::Radio_State::NORMAL;
         }
     }
 }
@@ -356,14 +356,16 @@ void Comms::processPong(InitializedBaseStation& cbs)
 
 void Comms::checkForUnboundSensors(InitializedBaseStation& cbs, DB::SensorId id)
 {
+    std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
 	std::optional<DB::Sensor> unboundSensor = cbs.db.findUnboundSensor();
 	if (unboundSensor.has_value() && unboundSensor->id == id)
 	{
-		changeToRadioState(cbs, data::Radio_State::PAIRING);
+        cbs.stateChange = data::Radio_State::PAIRING;
 	}
     else
     {
-        changeToRadioState(cbs, data::Radio_State::NORMAL);
+        cbs.stateChange = data::Radio_State::NORMAL;
     }
 }
 
@@ -721,11 +723,17 @@ void Comms::process()
 		{
 			sendPing(*cbs);
 		}
-		if (IClock::rtNow() - cbs->lastTalkTP > std::chrono::seconds(10))
+		if (IClock::rtNow() - cbs->lastTalkTP > std::chrono::seconds(30))
 		{
 			disconnectedFromBaseStation(cbs);
 			continue;
 		}
+
+        if (cbs->stateChange.has_value())
+        {
+            changeToRadioState(*cbs, *(cbs->stateChange));
+            cbs->stateChange = std::nullopt;
+        }
 
 		while (cbs->channel.get_next_message(message))
 		{

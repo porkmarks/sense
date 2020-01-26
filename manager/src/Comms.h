@@ -73,6 +73,7 @@ private:
         BaseStationDescriptor descriptor;
         QTcpSocketAdapter socketAdapter;
         Channel channel;
+        std::optional<data::Radio_State> stateChange;
         bool isConnecting = false;
         bool isConnected = false;
 

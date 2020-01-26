@@ -626,7 +626,7 @@ void Server::process()
         m_leds.set_color(LEDs::Color::Green);
     }
 
-    if (Clock::now() - m_last_talk_tp > std::chrono::seconds(10))
+    if (Clock::now() - m_last_talk_tp > std::chrono::seconds(30))
     {
         LOGI << "Timed out. Disconnecting & listening..." << std::endl;
         start_accept();
@@ -638,7 +638,7 @@ void Server::process()
         Sensor_Response response;
         while (m_radio_requests.pop_front(request, false))
         {
-            Result result = send_sensor_message(request, response);
+            Result result = send_sensor_message(request, response);     
             if (result == Result::Ok)
             {
                 if (request.needs_response)
