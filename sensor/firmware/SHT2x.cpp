@@ -1,39 +1,62 @@
-/*
-  SHT2x - A Humidity Library for Arduino.
-
-  Supported Sensor modules:
-    SHT21-Breakout Module - http://www.moderndevice.com/products/sht21-humidity-sensor
-    SHT2x-Breakout Module - http://www.misenso.com/products/001
-
-  Created by Christopher Ladden at Modern Device on December 2009.
-  Modified by Paul Badger March 2010
-
-  Modified by www.misenso.com on October 2011:
-    - code optimisation
-    - compatibility with Arduino 1.0
-
-  This library is free software; you can redistribute it and/or
-  modify it under the terms of the GNU Lesser General Public
-  License as published by the Free Software Foundation; either
-  version 2.1 of the License, or (at your option) any later version.
-
-  This library is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-  Lesser General Public License for more details.
-
-  You should have received a copy of the GNU Lesser General Public
-  License along with this library; if not, write to the Free Software
-  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-*/
-
 #include <inttypes.h>
+#include <stdio.h>
+#include <avr/pgmspace.h>
+
 #include "SHT2x.h"
 #include "i2c.h"
+#include "Chrono.h"
+
+#define Address 0x40
+
+#define HTU21D_USER_REGISTER_WRITE   0xE6      //write user register
+#define HTU21D_USER_REGISTER_READ    0xE7      //read  user register
+
+#define HTU21D_TEMP_COEFFICIENT      -0.15f     
 
 /******************************************************************************
  * Global Functions
  ******************************************************************************/
+
+SHT2x::SHT2x()
+{
+}
+
+void SHT2x::setResolution(Resolution resolution)
+{
+  if (i2c_start((Address << 1) | I2C_WRITE) && 
+      i2c_write(HTU21D_USER_REGISTER_READ) && 
+      i2c_rep_start((Address << 1) | I2C_READ))
+  {
+      uint8_t userRegisterData  = i2c_read(true); //reads current user register state
+      i2c_stop();                 //end
+
+      //printf_P(PSTR("\nusr %d\n"), (int)userRegisterData);
+      
+      userRegisterData &= 0x7E;                             //clears current resolution bits with 0
+      userRegisterData |= resolution;                 //adds new resolution bits to user register byte
+    
+      if (i2c_start((Address << 1) | I2C_WRITE) && 
+          i2c_write(HTU21D_USER_REGISTER_WRITE))
+      {
+          i2c_write(userRegisterData);
+      }
+      i2c_stop();                 //end
+  }
+  else
+  {
+      i2c_stop();                 //end
+  }
+}
+
+bool SHT2x::getMeasurements(float& temperature, float& humidity)
+{
+    if (!getTemperature(temperature) || !getHumidity(humidity))
+    {
+        return false;
+    }
+    humidity = humidity + (25.0f - temperature) * HTU21D_TEMP_COEFFICIENT;    
+    return true;
+}
 
 /**********************************************************
  * GetHumidity
@@ -41,14 +64,14 @@
  *
  * @return float - The relative humidity in %RH
  **********************************************************/
-bool SHT2x::GetHumidity(float& value)
+bool SHT2x::getHumidity(float& value)
 {
     uint16_t raw = 0;
-    if (!readSensor(eRHumidityHoldCmd, raw))
+    if (!readSensor(RHumidityHoldCmd, raw))
     {
         return false;
     }
-    value = (-6.0 + 125.0 / 65536.0 * (float)(raw));
+    value = (-6.0 + 125.0 * (float)(raw) / 65536.0);
     return true;
 }
 
@@ -58,14 +81,14 @@ bool SHT2x::GetHumidity(float& value)
  *
  * @return float - The temperature in Deg C
  **********************************************************/
-bool SHT2x::GetTemperature(float& value)
+bool SHT2x::getTemperature(float& value)
 {
     uint16_t raw = 0;
-    if (!readSensor(eTempHoldCmd, raw))
+    if (!readSensor(TempHoldCmd, raw))
     {
         return false;
     }
-    value = (-46.85 + 175.72 / 65536.0 * (float)(raw));
+    value = (-46.85 + 175.72 * (float)(raw) / 65536.0);
     return true;
 }
 
@@ -73,11 +96,11 @@ bool SHT2x::GetTemperature(float& value)
 /******************************************************************************
  * Private Functions
  ******************************************************************************/
-constexpr uint16_t POLYNOMIAL = 0x131;  // P(x)=x^8+x^5+x^4+1 = 100110001
+#define POLYNOMIAL 0x13100ULL   // P(x)=x^8+x^5+x^4+1 = 100110001
 
 bool SHT2x::readSensor(uint8_t command, uint16_t& result)
 {
-    if (!i2c_start((eSHT2xAddress << 1) | I2C_WRITE))	//begin
+    if (!i2c_start((Address << 1) | I2C_WRITE))	//begin
     {
         return false;
     }
@@ -86,34 +109,29 @@ bool SHT2x::readSensor(uint8_t command, uint16_t& result)
         i2c_stop();                 //end
         return false;
     }
-    if (!i2c_rep_start((eSHT2xAddress << 1) | I2C_READ))  //begin
+    if (!i2c_rep_start((Address << 1) | I2C_READ))  //begin
     {
         i2c_stop();                 //end
         return false;
     }
 
+    chrono::delay(chrono::millis(30));
+
     //Store the result
-    uint8_t data[2];
-    data[0] = i2c_read(false);
-    data[1] = i2c_read(false);
-    result = data[0] << 8;
-    result += data[1];
-    result &= ~0x0003;   // clear two low bits (status bits)
+    uint16_t raw = i2c_read(false) << 8;
+    raw |= i2c_read(false);
     uint8_t checksum = i2c_read(true);
 
     i2c_stop();                 //end
 
+    result = raw & (~0x3); // clear two low bits (status bits)
+    
     //calculates 8-Bit checksum with given polynomial
-    uint8_t crc = 0;
-    for (uint8_t i = 0; i < 2; ++i)
-    { 
-        crc ^= (data[i]);
-        for (uint8_t bit = 8; bit > 0; --bit)
-        { 
-            crc = (crc & 0x80) ? (crc << 1) ^ POLYNOMIAL : (crc << 1);
-        }
+    for (uint8_t bit = 0; bit < 16; bit++)
+    {
+        if  (raw & 0x8000) raw = (raw << 1) ^ POLYNOMIAL;
+        else raw <<= 1;
     }
+    uint8_t crc = raw >> 8;
     return crc == checksum;
 }
-
-

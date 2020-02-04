@@ -1,4 +1,3 @@
-//#include <Arduino.h>
 //#include <HardwareSerial.h>
 #include <avr/interrupt.h>
 #include <avr/io.h>
@@ -321,7 +320,7 @@ void setup()
         float h;
         //try to read something
         //sometimes the sht21 gets stuck and we just have to read smth for it to release the lines
-        s_sht.GetHumidity(h); 
+        s_sht.getHumidity(h); 
         chrono::delay(chrono::millis(100));
         //reinit
         if (i2c_init())
@@ -330,6 +329,7 @@ void setup()
         }
         sleep(true);
     }
+    s_sht.setResolution(SHT2x::RH12_TEMP14);
     chrono::delay(chrono::millis(50));
 
     init_battery();
@@ -339,8 +339,7 @@ void setup()
     {
         float t;
         float h;
-        s_sht.GetHumidity(h);
-        s_sht.GetTemperature(t);
+        s_sht.getMeasurements(t, h);
         float vcc = read_battery(s_stable_settings.vref);
         s_last_batery_vcc_during_comms = vcc;
         LOG(PSTR("VCC:%ldmV\n"), (int32_t)(vcc*1000.f));
@@ -385,8 +384,7 @@ void setup()
         float h;
         for (uint8_t i = 0; i < 20; i++)
         {
-            s_sht.GetHumidity(h);
-            s_sht.GetTemperature(t);
+            s_sht.getMeasurements(t, h);
             float vcc = read_battery(s_stable_settings.vref);
             hash_combine(rnd_seed, *(uint32_t*)&vcc);
             hash_combine(rnd_seed, *(uint32_t*)&t);
@@ -614,7 +612,7 @@ static void fill_config_request(data::sensor::v1::Config_Request& request)
         Battery_Monitor bm(s_stable_settings.vref, k_sensor_min_battery_vcc);
         float temperature = 0;
         float humidity = 0;
-        if (s_sht.GetTemperature(temperature) && s_sht.GetHumidity(humidity))
+        if (s_sht.getMeasurements(temperature, humidity))
         {
             temperature += static_cast<float>(s_stable_settings.calibration.temperature_bias) * 0.01f;
             humidity += static_cast<float>(s_stable_settings.calibration.humidity_bias) * 0.01f;
@@ -679,7 +677,7 @@ static void pair_state()
     {
         //wait actively for a while for the user to press the button
         uint8_t tries = 0;
-        while (tries++ < 10)
+        while (tries++ < 30)
         {
             if (is_pressed(Button::BUTTON1))
             {
@@ -761,11 +759,6 @@ static void pair_state()
 
             chrono::calibrate();
             LOG(PSTR("done\n"));
-
-            //fade_in_leds(YELLOW_LED, chrono::millis(1000));
-
-            //we probably woken up because the user pressed the button - wait for him to release it
-            wait_for_release(Button::BUTTON1);
 
             battery_guard_auto(s_stable_settings.vref, k_radio_min_battery_vcc);
         }
@@ -912,7 +905,7 @@ static void do_measurement()
     {
         LOG(PSTR("Meas%d..."), tries);
         Battery_Monitor bm(s_stable_settings.vref, k_sensor_min_battery_vcc);
-        if (s_sht.GetTemperature(data.temperature) && s_sht.GetHumidity(data.humidity))
+        if (s_sht.getMeasurements(data.temperature, data.humidity))
         {
             data.temperature += static_cast<float>(s_stable_settings.calibration.temperature_bias) * 0.01f;
             data.humidity += static_cast<float>(s_stable_settings.calibration.humidity_bias) * 0.01f;
