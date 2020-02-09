@@ -22,7 +22,7 @@
 #   define CHECK_PASSWORD
 #endif
 
-static const std::string s_version = "1.0.17";
+static const std::string s_version = "1.0.18";
 
 Logger s_logger;
 extern std::string s_dataFolder;

@@ -318,6 +318,7 @@ void Comms::sendEmptySensorResponse(InitializedBaseStation& cbs, SensorRequest c
 
 void Comms::sendPing(Comms::InitializedBaseStation& cbs)
 {
+    printf("\nSending ping: %s", utils::toString<IClock>(IClock::rtNow(), DB::DateTimeFormat::DD_MM_YYYY_Dash).toUtf8().data());
     std::array<uint8_t, 1024> buffer;
     size_t offset = 0;
     pack(buffer, ++cbs.lastPingId, offset);
@@ -348,6 +349,7 @@ void Comms::sendSensorResponse(InitializedBaseStation& cbs, SensorRequest const&
 
 void Comms::processPong(InitializedBaseStation& cbs)
 {
+    printf("\nReceived pong: %s", utils::toString<IClock>(IClock::rtNow(), DB::DateTimeFormat::DD_MM_YYYY_Dash).toUtf8().data());
     cbs.lastTalkTP = IClock::rtNow(); //this represents communication so reset the pong
     //std::cout << "PONG" << std::endl;
 }
@@ -737,6 +739,7 @@ void Comms::process()
 
 		while (cbs->channel.get_next_message(message))
 		{
+            printf("\nReceived comms: %s", utils::toString<IClock>(IClock::rtNow(), DB::DateTimeFormat::DD_MM_YYYY_Dash).toUtf8().data());
 			cbs->lastTalkTP = IClock::rtNow(); //this represents communication so reset the pong
 			switch (message)
 			{

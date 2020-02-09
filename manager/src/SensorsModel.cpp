@@ -414,8 +414,14 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         }
         else if (column == Column::Alarms)
         {
+            uint32_t triggers = 0;
             Result<DB::Measurement> res = m_db.getLastMeasurementForSensor(sensor->id);
-            return (res == success) ? res.payload().alarmTriggers.current : -1;
+            triggers |= (res == success) ? res.payload().alarmTriggers.current : 0;
+            if (sensor->blackout)
+            {
+                triggers |= DB::AlarmTrigger::SensorBlackout;
+            }
+            return triggers;
         }
         else
         {
@@ -445,8 +451,14 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
     {
         if (column == Column::Alarms)
         {
+			uint32_t triggers = 0;
 			Result<DB::Measurement> res = m_db.getLastMeasurementForSensor(sensor->id);
-			return (res == success) ? QVariant(utils::sensorTriggersToString(res.payload().alarmTriggers.current, true).c_str()) : QVariant();
+			triggers |= (res == success) ? res.payload().alarmTriggers.current : 0;
+			if (sensor->blackout)
+			{
+				triggers |= DB::AlarmTrigger::SensorBlackout;
+			}
+			return QVariant(utils::sensorTriggersToString(triggers, true).c_str());
         }
     }
 

@@ -29,14 +29,15 @@ SensorsDelegate::~SensorsDelegate()
 
 //////////////////////////////////////////////////////////////////////////
 
-void SensorsDelegate::refreshMiniPlot(QImage& image, DB& db, DB::Sensor const& sensor, bool temperature) const
+void SensorsDelegate::refreshMiniPlot(QPixmap& image, DB& db, DB::Sensor const& sensor, bool temperature) const
 {
-	image = QImage(k_miniPlotSize, QImage::Format_RGBA8888);
+	image = QPixmap(k_miniPlotSize);
+	image.fill(QColor(200, 200, 200, 100));
+
 	QPainter p2;
 	p2.begin(&image);
 	p2.setRenderHints(QPainter::Antialiasing);
 
-	image.fill(QColor(200, 200, 200, 100));
 
 	DB::Filter filter;
 	filter.useSensorFilter = true;
@@ -185,7 +186,8 @@ void SensorsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
 			painter->setClipRect(option.rect);
 			QSize size = sizeHint(option, index);
 			QPoint pos = option.rect.topLeft() + QPoint(size.width(), (option.rect.height() - k_miniPlotSize.height()) / 2) - QPoint(k_miniPlotSize.width(), 0);
-            painter->drawImage(pos, miniPlot.temperatureImage);
+            //painter->drawImage(pos, miniPlot.temperatureImage);
+			painter->drawPixmap(pos, miniPlot.temperatureImage);
 			painter->restore();
 		}
 		QStyledItemDelegate::paint(painter, option, index);
@@ -218,7 +220,8 @@ void SensorsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
 			painter->setClipRect(option.rect);
 			QSize size = sizeHint(option, index);
 			QPoint pos = option.rect.topLeft() + QPoint(size.width(), (option.rect.height() - k_miniPlotSize.height()) / 2) - QPoint(k_miniPlotSize.width(), 0);
-			painter->drawImage(pos, miniPlot.humidityImage);
+			//painter->drawImage(pos, miniPlot.humidityImage);
+			painter->drawPixmap(pos, miniPlot.humidityImage);
 			painter->restore();
 		}
 		QStyledItemDelegate::paint(painter, option, index);

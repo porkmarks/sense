@@ -3022,8 +3022,26 @@ Result<void> DB::setAlarm(AlarmId id, AlarmDescriptor const& descriptor)
 		return result;
 	}
 
-    size_t index = static_cast<size_t>(_index);
-    m_data.alarms[index].descriptor = descriptor;
+	size_t index = static_cast<size_t>(_index);
+	Alarm& alarm = m_data.alarms[index];
+
+	if (descriptor.filterSensors)
+	{
+		//erase sensor triggers that are not watched
+		for (auto it = alarm.triggersPerSensor.begin(); it != alarm.triggersPerSensor.end();)
+		{
+			if (descriptor.sensors.find(it->first) == descriptor.sensors.end())
+			{
+				it = alarm.triggersPerSensor.erase(it);
+			}
+			else
+			{
+				++it;
+			}
+		}
+	}
+
+    alarm.descriptor = descriptor;
 	m_data.alarmsChanged = true;
     emit alarmChanged(id);
 
@@ -3220,11 +3238,11 @@ DB::AlarmTriggers DB::_computeSensorAlarmTriggers(Alarm& alarm, Sensor& sensor, 
 			//keep measurement triggers
 			currentTriggers = oldTriggers & AlarmTrigger::MeasurementMask;
 		}
-	}
 
-	if (ad.sensorBlackoutWatch && sensor.blackout)
-	{
-		currentTriggers |= AlarmTrigger::SensorBlackout;
+		if (ad.sensorBlackoutWatch && sensor.blackout)
+		{
+			currentTriggers |= AlarmTrigger::SensorBlackout;
+		}
 	}
 
     if (currentTriggers != oldTriggers)

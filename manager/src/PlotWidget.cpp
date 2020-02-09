@@ -1050,6 +1050,7 @@ void PlotWidget::createAnnotation(DB::SensorId sensorId, QPointF point, double k
 	const Plot* plot = findAnnotationPlot(m_annotation);
     if (!plot)
     {
+        m_annotation.toolTip = nullptr;
         return;
     }
 

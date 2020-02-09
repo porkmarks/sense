@@ -16,7 +16,7 @@ public:
     ~SensorsDelegate();
 
 private:
-    void refreshMiniPlot(QImage& image, DB& db, DB::Sensor const& sensor, bool temperature) const;
+    void refreshMiniPlot(QPixmap& image, DB& db, DB::Sensor const& sensor, bool temperature) const;
     void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
     QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override;
 
@@ -25,10 +25,10 @@ private:
 
     struct MiniPlot
     {
-		QImage temperatureImage;
+        QPixmap temperatureImage;
         IClock::time_point temperatureLastRefreshedTimePoint = IClock::time_point(IClock::duration::zero());
 
-        QImage humidityImage;
+        QPixmap humidityImage;
         IClock::time_point humidityLastRefreshedTimePoint = IClock::time_point(IClock::duration::zero());
     };
 
