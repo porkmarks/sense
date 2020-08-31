@@ -27,7 +27,10 @@ Emailer::Emailer(DB& db)
 
 Emailer::~Emailer()
 {
-    m_threadsExit = true;
+	{
+		std::unique_lock<std::mutex> lg(m_emailMutex);
+		m_threadsExit = true;
+	}
     m_emailCV.notify_all();
     if (m_emailThread.joinable())
     {
@@ -618,6 +621,34 @@ void Emailer::sendReportEmail(DB::Report const& report, IClock::time_point from,
 
 //////////////////////////////////////////////////////////////////////////
 
+void Emailer::sendShutdownEmail()
+{
+	Email email;
+	email.subject = "SENSE - Manager Closed";
+
+	const char* templateStr = R"X(<table style="border-style: solid; border-width: 2px; border-color: #%1;"><tbody><tr><td><strong>%2%3%4</strong></td></tr></tbody></table>)X";
+
+	QString str = QString(templateStr).arg(utils::k_highThresholdHardColor & 0xFFFFFF, 6, 16, QChar('0'))
+		.arg("Manager closed on ")
+        .arg(utils::toString<IClock>(IClock::rtNow(), m_db.getGeneralSettings().dateTimeFormat))
+        .arg(", all measurements will be stored on the sensors until started again");
+
+	email.body += str.toUtf8().data();
+	QString dateTimeFormatStr = utils::getQDateTimeFormatString(m_db.getGeneralSettings().dateTimeFormat);
+	email.body += QString(R"X(
+<p>&nbsp;</p>
+<p><strong>Date/Time Format: %1</strong></p>
+<p>&nbsp;</p>)X").arg(dateTimeFormatStr.toUpper()).toUtf8().data();
+
+	email.settings = m_db.getEmailSettings();
+
+	s_logger.logInfo(QString("Sending shutdown alarm email"));
+
+	sendEmail(email);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void Emailer::sendEmail(Email const& email)
 {
     {
@@ -625,6 +656,14 @@ void Emailer::sendEmail(Email const& email)
         m_emails.push_back(email);
     }
     m_emailCV.notify_all();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool Emailer::hasPendingEmails() const
+{
+	std::unique_lock<std::mutex> lg(m_emailMutex);
+	return !m_emails.empty();
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -58,6 +58,9 @@ public:
     void close();
     sqlite3* getSqliteDB();
 
+    const Emailer& getEmailer() const;
+    Emailer& getEmailer();
+
 	////////////////////////////////////////////////////////////////////////////
 
 	enum class DateTimeFormat

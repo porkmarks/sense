@@ -61,8 +61,9 @@ void SensorsDelegate::refreshMiniPlot(QPixmap& image, DB& db, DB::Sensor const& 
 		minValue = center - range / 2.f;
 		maxValue = center + range / 2.f;
 
-		int x = 0;
-		p2.setPen(QPen(Qt::blue));
+		Q_ASSERT(measurements.size() <= (k_miniPlotSize.width()));
+		size_t x = size_t(k_miniPlotSize.width()) - measurements.size(); //right align
+		p2.setPen(QPen(temperature ? QColor(211, 47, 47) : QColor(39, 97, 123)));
 		std::vector<QPointF> points;
 		points.reserve(measurements.size());
 		for (DB::Measurement const& m : measurements)
@@ -160,14 +161,9 @@ void SensorsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
     }
 	else if (column == SensorsModel::Column::Temperature)
 	{
-		if (option.state & QStyle::State_Selected)
-		{
-			painter->fillRect(option.rect, option.palette.highlight());
-		}
-		else
-		{
-			painter->fillRect(option.rect, (index.row() & 1) ? option.palette.alternateBase() : option.palette.base());
-		}
+		painter->save();
+		QStyledItemDelegate::paint(painter, option, index);
+		painter->restore();
 
 		int32_t sensorIndex = m_sensorsModel.getSensorIndex(m_sortingModel.mapToSource(index));
 		if (sensorIndex >= 0)
@@ -190,18 +186,13 @@ void SensorsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
 			painter->drawPixmap(pos, miniPlot.temperatureImage);
 			painter->restore();
 		}
-		QStyledItemDelegate::paint(painter, option, index);
+		return;
 	}
 	else if (column == SensorsModel::Column::Humidity)
 	{
-		if (option.state & QStyle::State_Selected)
-		{
-			painter->fillRect(option.rect, option.palette.highlight());
-		}
-		else
-		{
-			painter->fillRect(option.rect, (index.row() & 1) ? option.palette.alternateBase() : option.palette.base());
-		}
+		painter->save();
+		QStyledItemDelegate::paint(painter, option, index);
+		painter->restore();
 
         int32_t sensorIndex = m_sensorsModel.getSensorIndex(m_sortingModel.mapToSource(index));
         if (sensorIndex >= 0)
@@ -224,7 +215,7 @@ void SensorsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
 			painter->drawPixmap(pos, miniPlot.humidityImage);
 			painter->restore();
 		}
-		QStyledItemDelegate::paint(painter, option, index);
+		return;
 	}
 
     return QStyledItemDelegate::paint(painter, option, index);

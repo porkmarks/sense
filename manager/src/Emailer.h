@@ -23,7 +23,10 @@ public:
 
     using EmailSettings = DB::EmailSettings;
 
+    bool hasPendingEmails() const;
+
     void sendReportEmail(DB::Report const& report, IClock::time_point from, IClock::time_point to);
+    void sendShutdownEmail();
 
 private slots:
     void alarmSensorTriggersChanged(DB::AlarmId alarmId, DB::SensorId sensorId, std::optional<DB::Measurement> measurement, uint32_t oldTriggers, DB::AlarmTriggers triggers);
@@ -68,6 +71,6 @@ private:
     static void sendEmails(std::vector<Email> const& emails);
     std::thread m_emailThread;
     std::condition_variable m_emailCV;
-    std::mutex m_emailMutex;
+    mutable std::mutex m_emailMutex;
     std::vector<Email> m_emails;
 };

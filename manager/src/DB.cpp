@@ -1160,28 +1160,31 @@ void DB::save(Data& data, bool newTransaction) const
 
 void DB::close()
 {
-	std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
-	if (!m_sqlite)
 	{
-		return;
+		std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+		if (!m_sqlite)
+		{
+			return;
+		}
+
+		addAsyncMeasurements();
+		if (m_saveScheduled)
+		{
+			save(true);
+		}
+
+		m_saveBaseStationsStmt = nullptr;
+		m_saveSensorTimeConfigsStmt = nullptr;
+		m_saveSensorSettingsStmt = nullptr;
+		m_saveSensorsStmt = nullptr;
+		m_saveAlarmsStmt = nullptr;
+		m_saveReportsStmt = nullptr;
+		m_addMeasurementsStmt = nullptr;
+		m_sqlite = nullptr;
+
+		m_data = Data();
 	}
-
-	addAsyncMeasurements();
-	if (m_saveScheduled)
-	{
-		save(true);
-	}
-
-    m_saveBaseStationsStmt = nullptr;
-	m_saveSensorTimeConfigsStmt = nullptr;
-	m_saveSensorSettingsStmt = nullptr;
-	m_saveSensorsStmt = nullptr;
-	m_saveAlarmsStmt = nullptr;
-	m_saveReportsStmt = nullptr;
-	m_addMeasurementsStmt = nullptr;
-	m_sqlite = nullptr;
-
-	m_data = Data();
+	m_emailer.reset(new Emailer(*this));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1189,6 +1192,20 @@ void DB::close()
 sqlite3* DB::getSqliteDB()
 {
 	return m_sqlite;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+const Emailer& DB::getEmailer() const
+{
+	return *m_emailer;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+Emailer& DB::getEmailer()
+{
+	return *m_emailer;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -3181,36 +3198,36 @@ DB::AlarmTriggers DB::_computeSensorAlarmTriggers(Alarm& alarm, Sensor& sensor, 
 		if (measurement.has_value())
 		{
 			Measurement const& m = *measurement;
-			if (ad.highTemperatureWatch && m.descriptor.temperature > ad.highTemperatureSoft)
+			if (ad.highTemperatureWatch && m.descriptor.temperature >= ad.highTemperatureSoft)
 			{
 				currentTriggers |= AlarmTrigger::MeasurementHighTemperatureSoft;
 			}
-			if (ad.highTemperatureWatch && m.descriptor.temperature > ad.highTemperatureHard)
+			if (ad.highTemperatureWatch && m.descriptor.temperature >= ad.highTemperatureHard)
 			{
 				currentTriggers |= AlarmTrigger::MeasurementHighTemperatureHard;
 			}
-			if (ad.lowTemperatureWatch && m.descriptor.temperature < ad.lowTemperatureSoft)
+			if (ad.lowTemperatureWatch && m.descriptor.temperature <= ad.lowTemperatureSoft)
 			{
 				currentTriggers |= AlarmTrigger::MeasurementLowTemperatureSoft;
 			}
-			if (ad.lowTemperatureWatch && m.descriptor.temperature < ad.lowTemperatureHard)
+			if (ad.lowTemperatureWatch && m.descriptor.temperature <= ad.lowTemperatureHard)
 			{
 				currentTriggers |= AlarmTrigger::MeasurementLowTemperatureHard;
 			}
 
-			if (ad.highHumidityWatch && m.descriptor.humidity > ad.highHumiditySoft)
+			if (ad.highHumidityWatch && m.descriptor.humidity >= ad.highHumiditySoft)
 			{
 				currentTriggers |= AlarmTrigger::MeasurementHighHumiditySoft;
 			}
-			if (ad.highHumidityWatch && m.descriptor.humidity > ad.highHumidityHard)
+			if (ad.highHumidityWatch && m.descriptor.humidity >= ad.highHumidityHard)
 			{
 				currentTriggers |= AlarmTrigger::MeasurementHighHumidityHard;
 			}
-			if (ad.lowHumidityWatch && m.descriptor.humidity < ad.lowHumiditySoft)
+			if (ad.lowHumidityWatch && m.descriptor.humidity <= ad.lowHumiditySoft)
 			{
 				currentTriggers |= AlarmTrigger::MeasurementLowHumiditySoft;
 			}
-			if (ad.lowHumidityWatch && m.descriptor.humidity < ad.lowHumidityHard)
+			if (ad.lowHumidityWatch && m.descriptor.humidity <= ad.lowHumidityHard)
 			{
 				currentTriggers |= AlarmTrigger::MeasurementLowHumidityHard;
 			}

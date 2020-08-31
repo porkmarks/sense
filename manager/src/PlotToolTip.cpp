@@ -161,20 +161,6 @@ void PlotToolTip::setAnchor(QCPGraph* graph, const QPointF point, double key, do
 
 void PlotToolTip::updateGeometry(QCPGraph* graph)
 {
-    if (!graph)
-    {
-        return;
-    }
-	if (!graph->keyAxis()->range().contains(m_key))
-	{
-		m_isOpen = false;
-		emit closeMe();
-		return;
-	}
-
-    double x, y;
-    graph->coordsToPixels(m_key, m_value, x, y);
-
     if (!m_textLabel)
     {
         m_textLabel = new QCPItemText(m_plot);
@@ -198,6 +184,21 @@ void PlotToolTip::updateGeometry(QCPGraph* graph)
         m_arrow->setClipToAxisRect(false);
     }
     m_arrow->setVisible(m_isVisible);
+
+	if (!graph)
+	{
+		return;
+	}
+	if (!graph->keyAxis()->range().contains(m_key))
+	{
+		m_isOpen = false;
+		emit closeMe();
+		return;
+	}
+
+	double x, y;
+	graph->coordsToPixels(m_key, m_value, x, y);
+
     //m_arrow->end->setAxes(graph->keyAxis(), graph->valueAxis());
     //m_arrow->end->setCoords(m_key, m_value); // point to (4, 1.6) in x-y-plot coordinates
     m_arrow->end->setPixelPosition(QPointF(x, y));

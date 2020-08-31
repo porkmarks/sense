@@ -17,12 +17,13 @@
 #define SQLITE_HAS_CODEC
 #include "sqlite3.h"
 #include "Utils.h"
+#include "WaitingSpinnerWidget.h"
 
 #ifdef NDEBUG
 #   define CHECK_PASSWORD
 #endif
 
-static const std::string s_version = "1.0.18";
+static const std::string s_version = "1.0.19";
 
 Logger s_logger;
 extern std::string s_dataFolder;
@@ -524,11 +525,48 @@ void Manager::tabChanged()
 
 void Manager::closeEvent(QCloseEvent* event)
 {
-    QSettings settings;
-    settings.setValue("geometry", saveGeometry());
-    settings.setValue("windowState", saveState());
+    m_db.getEmailer().sendShutdownEmail();
 
-    QMainWindow::closeEvent(event);
+    QDialog dialog(this);
+    dialog.setModal(true);
+    dialog.setLayout(new QVBoxLayout(&dialog));
+
+    WaitingSpinnerWidget* spinner = new WaitingSpinnerWidget(&dialog);
+    dialog.layout()->addWidget(spinner);
+	spinner->setRoundness(70.0);
+	spinner->setMinimumTrailOpacity(15.0);
+	spinner->setTrailFadePercentage(70.0);
+	spinner->setNumberOfLines(12);
+	spinner->setLineLength(10);
+	spinner->setLineWidth(5);
+	spinner->setInnerRadius(10);
+	spinner->setRevolutionsPerSecond(1);
+	spinner->setColor(QColor(81, 4, 71));
+    spinner->start();
+    
+    dialog.layout()->addWidget(new QLabel("Shutting down all systems...", &dialog));
+    dialog.show();
+
+    auto start = IClock::rtNow();
+
+    while ((m_db.getEmailer().hasPendingEmails() || IClock::rtNow() - start < std::chrono::seconds(1)) && dialog.isVisible())
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		QApplication::instance()->processEvents();
+    }
+
+    if (!dialog.isVisible()) //canceled by the user?
+    {
+        event->ignore();
+    }
+    else
+	{
+		QSettings settings;
+		settings.setValue("geometry", saveGeometry());
+		settings.setValue("windowState", saveState());
+
+		QMainWindow::closeEvent(event);
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
