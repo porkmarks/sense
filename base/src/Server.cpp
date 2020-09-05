@@ -535,6 +535,7 @@ bool Server::wait_for_message(data::Server_Message expected_message, Clock::dura
         if (m_channel.get_next_message(message))
         {
             m_last_talk_tp = Clock::now();
+            printf("\nReceived comms: %f", std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::system_clock::now().time_since_epoch()).count());
             if (message == expected_message)
             {
                 return true;
@@ -551,6 +552,8 @@ bool Server::wait_for_message(data::Server_Message expected_message, Clock::dura
 void Server::process_ping()
 {
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
+    printf("\nReceived ping: %f", std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::system_clock::now().time_since_epoch()).count());
 
     std::array<uint8_t, 1024> buffer;
     size_t offset = 0;
@@ -660,6 +663,7 @@ void Server::process()
         while (m_channel.get_next_message(message))
         {
             m_last_talk_tp = Clock::now();
+            printf("\nReceived comms: %f", std::chrono::duration_cast<std::chrono::duration<float>>(std::chrono::system_clock::now().time_since_epoch()).count());
             process_message(message);
         }
     }

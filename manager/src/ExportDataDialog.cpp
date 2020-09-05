@@ -58,9 +58,8 @@ std::optional<utils::CsvData> ExportDataDialog::getCsvData(size_t index) const
     data.measurement = m_model.getMeasurement(index);
     std::optional<DB::Sensor> sensor = m_db.findSensorById(data.measurement.descriptor.sensorId);
     if (sensor.has_value())
-    {
         data.sensor = *sensor;
-    }
+
     return std::move(data);
 }
 
@@ -72,9 +71,7 @@ std::optional<utils::CsvData> ExportDataDialog::getCsvDataWithProgress(size_t in
 	{
 		progressDialog->setValue((int)index / 64);
 		if (progressDialog->wasCanceled())
-		{
 			return std::nullopt;
-		}
 	}
 	return getCsvData(index);
 }
@@ -127,9 +124,7 @@ void ExportDataDialog::accept()
     QString fileName = QFileDialog::getSaveFileName(this, "Select export file", 
                                                     (s_programFolder + "/user_reports/" + defaultFilename).c_str(), extension);
     if (fileName.isEmpty())
-    {
         return;
-    }
 
 	std::unique_ptr<QProgressDialog> progressDialog;
 	progressDialog.reset(new QProgressDialog("Exporting data...", "Abort", 0, (int)m_model.getMeasurementCount() / 64, this));
@@ -152,11 +147,8 @@ void ExportDataDialog::accept()
 
         file.close();
 
-        if (!finished)
-        {
-            //canceled
+        if (!finished) //canceled?
             std::remove(fileName.toUtf8().data());
-        }
     }
 
     QString msg = finished ? QString("Data was exported to file '%1'").arg(fileName) :

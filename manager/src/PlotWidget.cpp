@@ -1116,6 +1116,11 @@ void PlotWidget::legendSelectionChanged(QCPLegend* l, QCPAbstractLegendItem* ai,
         if (plottable)
         {
             plottable->setVisible(!plottable->visible());
+            for (QCPItemTracer* item : m_indicatorItems)
+            {
+                if (item->graph() == plottable)
+                    item->setVisible(plottable->visible());
+            }
 
             QFont font = legendItem->font();
             font.setItalic(!plottable->visible());

@@ -132,9 +132,8 @@ DB::CsvSettings CsvSettingsWidget::getCsvSettings() const
 	DB::CsvSettings settings = m_db->getCsvSettings();
 
     if (m_ui.csvDateTimeFormatOverride->isChecked())
-	{
         settings.dateTimeFormatOverride = (DB::DateTimeFormat)m_ui.csvDateTimeFormat->currentIndex();
-	}
+	
 	settings.exportId = m_ui.csvExportId->isChecked();
 	settings.exportIndex = m_ui.csvExportIndex->isChecked();
 	settings.exportSensorName = m_ui.csvExportSensorName->isChecked();
@@ -148,13 +147,9 @@ DB::CsvSettings CsvSettingsWidget::getCsvSettings() const
 	settings.unitsFormat = (DB::CsvSettings::UnitsFormat)m_ui.csvUnitFormat->currentIndex();
     settings.decimalPlaces = m_ui.csvDecimalPlaces->value();
     if (m_ui.csvTabSeparator->isChecked())
-    {
         settings.separator = "\t";
-    }
     else
-    {
 		settings.separator = m_ui.csvSeparator->text().toUtf8().data();
-	}
 
 	return settings;
 }

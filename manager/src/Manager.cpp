@@ -191,9 +191,7 @@ void Manager::checkIfAdminExists()
 
                 std::optional<DB::User> user = m_db.findUserByName(user->descriptor.name);
                 if (user.has_value())
-                {
                     m_db.setLoggedInUserId(user->id);
-                }
                 else
                 {
                     s_logger.logCritical("Internal consistency error: user not found after adding\nThe program will now close.");
@@ -208,9 +206,7 @@ void Manager::checkIfAdminExists()
             }
         }
         else
-        {
-            s_logger.logWarning("User cancelled admin creation dialog");
-        }
+            s_logger.logWarning("User canceled admin creation dialog");
 
         if (m_db.needsAdmin())
         {
@@ -304,14 +300,10 @@ void Manager::showSettingsDialog()
 
 	QSettings settings;
     if (settings.contains("settingsDialogGeometry"))
-	{
 		dialog.restoreGeometry(settings.value("settingsDialogGeometry").toByteArray());
-	}
 
     if (dialog.exec() == QDialog::Accepted)
-    {
         ui.settingsWidget->save();
-    }
 
 	settings.setValue("settingsDialogGeometry", dialog.saveGeometry());
 }
@@ -327,9 +319,7 @@ void Manager::showBaseStationsDialog()
 
 	QSettings settings;
 	if (settings.contains("baseStationsDialogGeometry"))
-	{
 		dialog.restoreGeometry(settings.value("baseStationsDialogGeometry").toByteArray());
-	}
 
     dialog.exec();
 
@@ -347,9 +337,7 @@ void Manager::showUsersDialog()
 
 	QSettings settings;
 	if (settings.contains("usersDialogGeometry"))
-	{
 		dialog.restoreGeometry(settings.value("usersDialogGeometry").toByteArray());
-	}
 
 	dialog.exec();
 
@@ -367,9 +355,7 @@ void Manager::showReportsDialog()
 
 	QSettings settings;
 	if (settings.contains("reportsDialogGeometry"))
-	{
 		dialog.restoreGeometry(settings.value("reportsDialogGeometry").toByteArray());
-	}
 
 	dialog.exec();
 	
@@ -391,9 +377,7 @@ void Manager::logLinesAdded(std::vector<Logger::LogLine> const& logLines)
 
     DB::GeneralSettings generalSettings = m_db.getGeneralSettings();
     if (!generalSettings.showCriticalLogsPopup)
-    {
         return;
-    }
 
     bool show = false;
     for (size_t index = logLines.size(); index > 0; index--)
@@ -434,13 +418,9 @@ void Manager::userLoggedIn(DB::UserId id)
 {
     std::optional<DB::User> user = m_db.findUserById(id);
     if (!user.has_value())
-    {
         setWindowTitle("Manager (Not Logged In");
-    }
     else
-    {
         setWindowTitle(QString("Manager (%1)").arg(user->descriptor.name.c_str()));
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -451,9 +431,7 @@ void Manager::baseStationDiscovered(Comms::BaseStationDescriptor const& commsBS)
 
     std::optional<DB::BaseStation> bs = m_db.findBaseStationByMac(commsBS.mac);
     if (bs.has_value())
-	{
         m_comms.connectToBaseStation(m_db, bs->descriptor.mac);
-	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -464,9 +442,7 @@ void Manager::baseStationConnected(Comms::BaseStationDescriptor const& commsBS)
 
 	std::optional<DB::BaseStation> bs = m_db.findBaseStationByMac(commsBS.mac);
 	if (bs.has_value())
-	{
         m_db.setBaseStationConnected(bs->id, true);
-	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -477,9 +453,7 @@ void Manager::baseStationDisconnected(Comms::BaseStationDescriptor const& commsB
 
 	std::optional<DB::BaseStation> bs = m_db.findBaseStationByMac(commsBS.mac);
     if (bs.has_value())
-    {
         m_db.setBaseStationConnected(bs->id, false);
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -487,26 +461,19 @@ void Manager::baseStationDisconnected(Comms::BaseStationDescriptor const& commsB
 void Manager::tabChanged()
 {
     if (m_currentTabIndex == m_ui.tabWidget->currentIndex())
-    {
         return;
-    }
 
 	if (m_currentTabIndex == 1) //measurements out
-	{
 		m_ui.measurementsWidget->setActive(false);
-	}
-	if (m_currentTabIndex == 2) //plots out
-	{
+	
+    if (m_currentTabIndex == 2) //plots out
 		m_ui.plotWidget->setActive(false);
-	}
+    
     if (m_ui.tabWidget->currentIndex() == 1) //measurements in
-    {
 		m_ui.measurementsWidget->setActive(true);
-    }
+    
     if (m_ui.tabWidget->currentIndex() == 2) //plots in
-    {
 		m_ui.plotWidget->setActive(true);
-    }
 
     if (m_ui.tabWidget->currentWidget() == m_ui.logsWidget)
     {
@@ -514,9 +481,7 @@ void Manager::tabChanged()
         m_ui.logsWidget->refresh();
     }
     else
-    {
         m_ui.logsWidget->setAutoRefresh(false);
-    }
 
     m_currentTabIndex = m_ui.tabWidget->currentIndex();
 }
@@ -556,9 +521,7 @@ void Manager::closeEvent(QCloseEvent* event)
     }
 
     if (!dialog.isVisible()) //canceled by the user?
-    {
         event->ignore();
-    }
     else
 	{
 		QSettings settings;

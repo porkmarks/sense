@@ -1,5 +1,7 @@
 #include "cstdio"
 
+void testBitstream();
+void testStorage();
 void testGeneralSettings();
 void testCsvSettings();
 void testSensorSettings();
@@ -8,6 +10,8 @@ void testSensorBasicOperations();
 
 int main(int, const char*[])
 {
+	testBitstream();
+	testStorage();
     testGeneralSettings();
     testCsvSettings();
     testSensorSettings();

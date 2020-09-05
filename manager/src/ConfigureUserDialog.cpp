@@ -54,9 +54,8 @@ void ConfigureUserDialog::setUser(DB::User const& user)
     m_ui.name->setText(descriptor.name.c_str());
 
     if (m_ui.administrator->isEnabled())
-	{
 		m_ui.administrator->setChecked(descriptor.type == DB::UserDescriptor::Type::Admin);
-	}
+    
     if (descriptor.type != DB::UserDescriptor::Type::Admin)
     {
         m_ui.addRemoveSensors->setChecked(descriptor.permissions & DB::UserDescriptor::PermissionAddRemoveSensors);

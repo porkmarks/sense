@@ -36,13 +36,9 @@ void LogsModel::setAutoRefresh(bool enabled)
     {
         m_autoRefreshEnabled = enabled;
         if (enabled)
-        {
             m_autoRefreshConnection = connect(&m_logger, &Logger::logLinesAdded, this, &LogsModel::startAutoRefreshLogLines);
-        }
         else
-        {
             QObject::disconnect(m_autoRefreshConnection);
-        }
     }
 }
 
@@ -51,13 +47,11 @@ void LogsModel::setAutoRefresh(bool enabled)
 QModelIndex LogsModel::index(int row, int column, QModelIndex const& parent) const
 {
     if (row < 0 || column < 0)
-    {
         return QModelIndex();
-    }
+
     if (!hasIndex(row, column, parent))
-    {
         return QModelIndex();
-    }
+
     return createIndex(row, column, nullptr);
 }
 
@@ -73,13 +67,9 @@ QModelIndex LogsModel::parent(QModelIndex const& /*index*/) const
 int LogsModel::rowCount(QModelIndex const& index) const
 {
     if (!index.isValid())
-    {
         return static_cast<int>(m_logLines.size());
-    }
     else
-    {
         return 0;
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -96,9 +86,7 @@ QVariant LogsModel::headerData(int section, Qt::Orientation orientation, int rol
     if (orientation == Qt::Horizontal && role == Qt::DisplayRole)
     {
         if (static_cast<size_t>(section) < s_headerNames.size())
-        {
             return s_headerNames[section];
-        }
     }
     return QAbstractItemModel::headerData(section, orientation, role);
 }
@@ -108,15 +96,11 @@ QVariant LogsModel::headerData(int section, Qt::Orientation orientation, int rol
 QVariant LogsModel::data(QModelIndex const& index, int role) const
 {
     if (!index.isValid())
-    {
         return QVariant();
-    }
 
     size_t indexRow = static_cast<size_t>(index.row());
     if (indexRow >= m_logLines.size())
-    {
         return QVariant();
-    }
 
     Logger::LogLine const& line = m_logLines[indexRow];
 
@@ -125,17 +109,11 @@ QVariant LogsModel::data(QModelIndex const& index, int role) const
     if (role == Qt::UserRole + 5) // sorting
     {
         if (column == Column::Timestamp)
-        {
             return qulonglong(line.index);
-        }
         else if (column == Column::Type)
-        {
             return static_cast<int>(line.type);
-        }
         else if (column == Column::Message)
-        {
             return line.message.c_str();
-        }
 
         return data(index, Qt::DisplayRole);
     }
@@ -160,9 +138,7 @@ QVariant LogsModel::data(QModelIndex const& index, int role) const
     else if (role == Qt::DisplayRole)
     {
         if (column == Column::Timestamp)
-        {
             return utils::toString<Logger::Clock>(line.timePoint, m_db.getGeneralSettings().dateTimeFormat);
-        }
         else if (column == Column::Type)
         {
             switch (line.type)
@@ -175,9 +151,7 @@ QVariant LogsModel::data(QModelIndex const& index, int role) const
             }
         }
         else if (column == Column::Message)
-        {
             return line.message.c_str();
-        }
     }
 
     return QVariant();

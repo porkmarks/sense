@@ -32,9 +32,7 @@ void LogsWidget::init(DB& db)
 {
     m_db = &db;
     for (const QMetaObject::Connection& connection: m_uiConnections)
-    {
         QObject::disconnect(connection);
-    }
     m_uiConnections.clear();
 
     setEnabled(true);
@@ -133,9 +131,7 @@ void LogsWidget::exportData()
     ExportLogsDialog dialog(*m_model, this);
     int result = dialog.exec();
     if (result != QDialog::Accepted)
-    {
         return;
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////

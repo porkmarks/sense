@@ -32,10 +32,9 @@ Emailer::~Emailer()
 		m_threadsExit = true;
 	}
     m_emailCV.notify_all();
+ 
     if (m_emailThread.joinable())
-    {
         m_emailThread.join();
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -65,9 +64,7 @@ void Emailer::alarmStillTriggered(DB::AlarmId alarmId)
 	}
 
     if (alarm->descriptor.sendEmailAction)
-	{
         sendAlarmRetriggerEmail(*alarm);
-	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -85,13 +82,10 @@ void Emailer::alarmSensorTriggersChanged(DB::AlarmId alarmId, DB::SensorId senso
 	if (alarm->descriptor.sendEmailAction)
 	{
 		if (triggers.removed != 0)
-		{
 			sendSensorAlarmEmail(*alarm, *sensor, measurement, oldTriggers, triggers.current, triggers.removed, Action::Recovery);
-		}
-		if (triggers.added != 0)
-		{
+	
+        if (triggers.added != 0)
 			sendSensorAlarmEmail(*alarm, *sensor, measurement, oldTriggers, triggers.current, triggers.added, Action::Trigger);
-		}
 	}
 }
 
@@ -104,13 +98,9 @@ void Emailer::sendSensorAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sen
     if (measurement.has_value())
 	{
 		if (action == Action::Trigger)
-		{
 			email.subject = "SENSE - Sensor '" + sensor.descriptor.name + "' THRESHOLD ALERT for '" + alarm.descriptor.name + "'";
-		}
 		else
-		{
 			email.subject = "SENSE - Sensor '" + sensor.descriptor.name + "' THRESHOLD RECOVERY for '" + alarm.descriptor.name + "'";
-		}
 
 		const char* alertTemplateStr = R"X(<table style="border-style: solid; border-width: 2px; border-color: #%1;"><tbody><tr><td><strong>%2%3%4</strong></td></tr></tbody></table>)X";
 
@@ -209,29 +199,25 @@ void Emailer::sendSensorAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sen
 		{
 			QString lowTemperatureStr;
 			if (alarm.descriptor.lowTemperatureWatch)
-			{
 				lowTemperatureStr = QString(R"X(<span style="color: #011fff;">%1</span>&nbsp;|&nbsp;<span style="color: #004a96;">%2</span>&nbsp;|&nbsp;)X").arg(alarm.descriptor.lowTemperatureHard, 0, 'f', 1).arg(alarm.descriptor.lowTemperatureSoft, 0, 'f', 1);
-			}
-			QString highTemperatureStr;
+			
+            QString highTemperatureStr;
 			if (alarm.descriptor.highTemperatureWatch)
-			{
 				highTemperatureStr = QString(R"X(&nbsp;|&nbsp;<span style="color: #f37736;">%1</span>&nbsp;|&nbsp;<span style="color: #ff2015;">%2</span>)X").arg(alarm.descriptor.highTemperatureSoft, 0, 'f', 1).arg(alarm.descriptor.highTemperatureHard, 0, 'f', 1);
-			}
-			email.body += QString(R"X(<p><strong>Temperature Thresholds&nbsp;(&deg;C):&nbsp;%1<span style="color: #339966;">OK</span>%2</strong></p>)X").arg(lowTemperatureStr).arg(highTemperatureStr).toUtf8().data();
+			
+            email.body += QString(R"X(<p><strong>Temperature Thresholds&nbsp;(&deg;C):&nbsp;%1<span style="color: #339966;">OK</span>%2</strong></p>)X").arg(lowTemperatureStr).arg(highTemperatureStr).toUtf8().data();
 		}
 		if (alarm.descriptor.lowHumidityWatch || alarm.descriptor.highHumidityWatch)
 		{
 			QString lowHumidityStr;
 			if (alarm.descriptor.lowHumidityWatch)
-			{
 				lowHumidityStr = QString(R"X(<span style="color: #011fff;">%1</span>&nbsp;|&nbsp;<span style="color: #004a96;">%2</span>&nbsp;|&nbsp;)X").arg(alarm.descriptor.lowHumidityHard, 0, 'f', 1).arg(alarm.descriptor.lowHumiditySoft, 0, 'f', 1);
-			}
-			QString highHumidityStr;
+			
+            QString highHumidityStr;
 			if (alarm.descriptor.highHumidityWatch)
-			{
 				highHumidityStr = QString(R"X(&nbsp;|&nbsp;<span style="color: #f37736;">%1</span>&nbsp;|&nbsp;<span style="color: #ff2015;">%2</span>)X").arg(alarm.descriptor.highHumiditySoft, 0, 'f', 1).arg(alarm.descriptor.highHumidityHard, 0, 'f', 1);
-			}
-			email.body += QString(R"X(<p><strong>Humidity Thresholds&nbsp;(%RH):&nbsp;%1<span style="color: #339966;">OK</span>%2</strong></p>)X").arg(lowHumidityStr).arg(highHumidityStr).toUtf8().data();
+			
+            email.body += QString(R"X(<p><strong>Humidity Thresholds&nbsp;(%RH):&nbsp;%1<span style="color: #339966;">OK</span>%2</strong></p>)X").arg(lowHumidityStr).arg(highHumidityStr).toUtf8().data();
 		}
 		if (alarm.descriptor.lowVccWatch)
 		{
@@ -255,13 +241,9 @@ void Emailer::sendSensorAlarmEmail(DB::Alarm const& alarm, DB::Sensor const& sen
 	else
 	{
 	    if (action == Action::Trigger)
-	    {
 		    email.subject = "SENSE - Sensor '" + sensor.descriptor.name + "' TRIGGER for '" + alarm.descriptor.name + "'";
-	    }
 	    else
-	    {
 		    email.subject = "SENSE - Sensor '" + sensor.descriptor.name + "' RECOVERY for '" + alarm.descriptor.name + "'";
-	    }
 
 		const char* alertTemplateStr = R"X(<table style="border-style: solid; border-width: 2px; border-color: #%1;"><tbody><tr><td><strong>%2%3%4</strong></td></tr></tbody></table>)X";
 
@@ -319,13 +301,9 @@ void Emailer::alarmBaseStationTriggersChanged(DB::AlarmId alarmId, DB::BaseStati
 	if (alarm->descriptor.sendEmailAction)
 	{
 		if (triggers.removed != 0)
-		{
 			sendBaseStationAlarmEmail(*alarm, *bs, oldTriggers, triggers.current, triggers.removed, Action::Recovery);
-		}
 		if (triggers.added != 0)
-		{
 			sendBaseStationAlarmEmail(*alarm, *bs, oldTriggers, triggers.current, triggers.added, Action::Trigger);
-		}
 	}
 }
 
@@ -336,13 +314,9 @@ void Emailer::sendBaseStationAlarmEmail(DB::Alarm const& alarm, DB::BaseStation 
 	Email email;
 
 	if (action == Action::Trigger)
-	{
 		email.subject = "SENSE - Base Station '" + bs.descriptor.name + "' TRIGGER for '" + alarm.descriptor.name + "'";
-	}
 	else
-	{
 		email.subject = "SENSE - Base Station '" + bs.descriptor.name + "' RECOVERY for '" + alarm.descriptor.name + "'";
-	}
 
 	const char* alertTemplateStr = R"X(<table style="border-style: solid; border-width: 2px; border-color: #%1;"><tbody><tr><td><strong>%2%3%4</strong></td></tr></tbody></table>)X";
 
@@ -398,17 +372,13 @@ void Emailer::sendAlarmRetriggerEmail(DB::Alarm const& alarm)
 	{
         std::optional<DB::Sensor> sensor = m_db.findSensorById(p.first);
         if (sensor.has_value())
-		{
             email.body += "\n<p>Sensor '<strong>" + sensor->descriptor.name + "</strong>': " + utils::sensorTriggersToString(p.second, true) + "</p>";
-		}
 	}
 	for (auto p : alarm.triggersPerBaseStation)
 	{
 		std::optional<DB::BaseStation> bs = m_db.findBaseStationById(p.first);
 		if (bs.has_value())
-		{
 			email.body += "\n<p>Base Station '<strong>" + bs->descriptor.name + "</strong>': " + utils::baseStationTriggersToString(p.second) + "</p>";
-		}
 	}
 
 	email.settings = m_db.getEmailSettings();
@@ -426,10 +396,9 @@ std::optional<utils::CsvData> Emailer::getCsvData(std::vector<DB::Measurement> c
     data.measurement = measurements[index];
     std::optional<DB::Sensor> sensor = m_db.findSensorById(data.measurement.descriptor.sensorId);
     if (sensor.has_value())
-	{
         data.sensor = *sensor;
-	}
-	return data;
+
+    return data;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -550,14 +519,12 @@ void Emailer::sendReportEmail(DB::Report const& report, IClock::time_point from,
             std::string sensorName = "N/A";
             int32_t _sensorIndex = m_db.findSensorIndexById(m.descriptor.sensorId);
             if (_sensorIndex < 0)
-            {
                 continue;
-            }
+
             size_t sensorIndex = static_cast<size_t>(_sensorIndex);
             if (sensorIndex >= sensorDatas.size())
-            {
                 sensorDatas.resize(sensorIndex + 1);
-            }
+
             SensorData& sd = sensorDatas[sensorIndex];
             sd.hasData = true;
             sd.name = m_db.getSensor(sensorIndex).descriptor.name;
@@ -710,9 +677,8 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
 
         message.setSender(new EmailAddress(QString::fromUtf8(email.settings.sender.c_str())));
         for (std::string const& recipient: email.settings.recipients)
-        {
             message.addRecipient(new EmailAddress(QString::fromUtf8(recipient.c_str())));
-        }
+
         message.setSubject(QString::fromUtf8(email.subject.c_str()));
 
         MimeHtml body;
@@ -729,13 +695,10 @@ void Emailer::sendEmails(std::vector<Email> const& emails)
 		}
 
         if (smtp.connectToHost() && smtp.login() && smtp.sendMail(message))
-        {
             s_logger.logInfo(QString("Successfully sent email"));
-        }
         else
-        {
             s_logger.logCritical(QString("Failed to send email: %2").arg(errorMsg.c_str()));
-        }
+
         smtp.quit();
 
         for (MimeAttachment* attachment : attachments)
@@ -757,13 +720,10 @@ void Emailer::emailThreadProc()
             //wait for data
             std::unique_lock<std::mutex> lg(m_emailMutex);
             if (m_emails.empty())
-            {
                 m_emailCV.wait(lg, [this]{ return !m_emails.empty() || m_threadsExit; });
-            }
+
             if (m_threadsExit)
-            {
                 break;
-            }
 
             emails = m_emails;
             m_emails.clear();

@@ -71,10 +71,10 @@ public:
 	inline epilogue(std::function<void()> func)
         : m_operation(std::move(func))
 	{}
-	inline epilogue(epilogue&& other)
+	inline epilogue(epilogue&& other) noexcept
 		: m_operation(std::move(other.m_operation))
 	{}
-	inline epilogue& operator=(epilogue&& other)
+	inline epilogue& operator=(epilogue&& other) noexcept
 	{
 		m_operation = std::move(other.m_operation);
 	}

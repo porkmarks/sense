@@ -43,9 +43,8 @@ void DateTimeFilterWidget::refreshPreset()
 {
     //in case the date changed, reapply it
     if (m_ui.usePreset->isChecked())
-    {
         setPreset(m_ui.preset->currentIndex());
-    }
+    
     QTimer::singleShot(60 * 1000, this, &DateTimeFilterWidget::refreshPreset);
 }
 
@@ -54,9 +53,7 @@ void DateTimeFilterWidget::refreshPreset()
 void DateTimeFilterWidget::togglePreset(bool toggled)
 {
     if (toggled)
-    {
         setPreset(m_ui.preset->currentIndex());
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -98,9 +95,7 @@ void DateTimeFilterWidget::setPresetToday()
     m_ui.from->blockSignals(false);
 
     if (m_emitSignal && (fromDT != getFromDateTime() || toDT != getToDateTime()))
-    {
         emit filterChanged();
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -125,9 +120,7 @@ void DateTimeFilterWidget::setPresetYesterday()
     m_ui.from->blockSignals(false);
 
     if (m_emitSignal && (fromDT != getFromDateTime() || toDT != getToDateTime()))
-    {
         emit filterChanged();
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -148,9 +141,7 @@ void DateTimeFilterWidget::setPresetLastHour()
     m_ui.from->blockSignals(false);
 
     if (m_emitSignal && (fromDT != getFromDateTime() || toDT != getToDateTime()))
-    {
         emit filterChanged();
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -171,9 +162,7 @@ void DateTimeFilterWidget::setPresetLast24Hours()
     m_ui.from->blockSignals(false);
 
     if (m_emitSignal && (fromDT != getFromDateTime() || toDT != getToDateTime()))
-    {
         emit filterChanged();
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -199,9 +188,7 @@ void DateTimeFilterWidget::setPresetThisWeek()
     m_ui.to->blockSignals(false);
 
     if (m_emitSignal && (fromDT != getFromDateTime() || toDT != getToDateTime()))
-    {
         emit filterChanged();
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -227,9 +214,7 @@ void DateTimeFilterWidget::setPresetLastWeek()
     m_ui.to->blockSignals(false);
 
     if (m_emitSignal && (fromDT != getFromDateTime() || toDT != getToDateTime()))
-    {
         emit filterChanged();
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -253,9 +238,7 @@ void DateTimeFilterWidget::setPresetThisMonth()
     m_ui.to->blockSignals(false);
 
     if (m_emitSignal && (fromDT != getFromDateTime() || toDT != getToDateTime()))
-    {
         emit filterChanged();
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -279,9 +262,7 @@ void DateTimeFilterWidget::setPresetLastMonth()
     m_ui.to->blockSignals(false);
 
     if (m_emitSignal && (fromDT != getFromDateTime() || toDT != getToDateTime()))
-    {
         emit filterChanged();
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -305,9 +286,7 @@ void DateTimeFilterWidget::setPresetThisYear()
     m_ui.to->blockSignals(false);
 
     if (m_emitSignal && (fromDT != getFromDateTime() || toDT != getToDateTime()))
-    {
         emit filterChanged();
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -331,9 +310,7 @@ void DateTimeFilterWidget::setPresetLastYear()
     m_ui.to->blockSignals(false);
 
     if (m_emitSignal && (fromDT != getFromDateTime() || toDT != getToDateTime()))
-    {
         emit filterChanged();
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -354,9 +331,7 @@ void DateTimeFilterWidget::fromChanged()
     }
 
     if (m_emitSignal)
-    {
         emit filterChanged();
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -377,9 +352,7 @@ void DateTimeFilterWidget::toChanged()
     }
 
     if (m_emitSignal)
-    {
         emit filterChanged();
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -404,9 +377,7 @@ void DateTimeFilterWidget::loadSettings()
     m_emitSignal = true;
 
     if (from != getFromDateTime() || to != getToDateTime())
-    {
         emit filterChanged();
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////

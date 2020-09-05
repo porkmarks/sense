@@ -14,16 +14,14 @@ bool adminCheck(DB& db, QWidget* parent)
 {
 	std::optional<DB::User> user = db.getLoggedInUser();
 	if (user && user->descriptor.type == DB::UserDescriptor::Type::Admin)
-    {
         return true;
-    }
 
     s_logger.logInfo("Asking the user to log in");
 
     QDialog dialog(parent);
     Ui::LoginDialog ui;
     ui.setupUi(&dialog);
-    ui.info->setText("The operation you're trying to do needs a user with more permissions or an admin.\nNOTE: you will not be logged out after this. This test is for the current operation only.");
+    ui.info->setText("The operation you're trying to do needs an admin account.\nNOTE: you will not be logged out after this. This is for the current operation only.");
     dialog.setWindowTitle("Admin Credentials Needed");
     dialog.adjustSize();
 
@@ -60,7 +58,7 @@ bool adminCheck(DB& db, QWidget* parent)
 
         return true;
     }
-    s_logger.logCritical("User adming check cancelled");
+    s_logger.logCritical("Admin check canceled");
     return false;
 }
 
@@ -68,14 +66,11 @@ bool hasPermission(DB& db, DB::UserDescriptor::Permissions permission)
 {
     std::optional<DB::User> user = db.getLoggedInUser();
     if (!user)
-    {
         return false;
-    }
 
 	if (user->descriptor.type == DB::UserDescriptor::Type::Admin)
-	{
 		return true;
-	}
+
     return (user->descriptor.permissions & permission) != 0;
 }
 

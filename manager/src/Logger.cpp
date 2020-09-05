@@ -93,9 +93,8 @@ bool Logger::load(sqlite3& db)
 void Logger::close()
 {
     if (!m_sqlite)
-    {
         return;
-    }
+    
     m_insertStmt = nullptr;
     m_sqlite = nullptr;
 }

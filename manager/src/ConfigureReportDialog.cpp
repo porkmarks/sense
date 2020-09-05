@@ -71,29 +71,22 @@ void ConfigureReportDialog::setReport(DB::Report const& report)
     {
         size_t sensorCount = m_db.getSensorCount();
         for (size_t i = 0; i < sensorCount; i++)
-        {
             m_ui.sensorFilter->getSensorModel().setSensorChecked(m_db.getSensor(i).id, false);
-        }
 
         for (DB::SensorId id: descriptor.sensors)
-        {
             m_ui.sensorFilter->getSensorModel().setSensorChecked(id, true);
-        }
+
         if (descriptor.sensors.empty()) //if no sensors were selected, select all
         {
             for (size_t i = 0; i < sensorCount; i++)
-            {
                 m_ui.sensorFilter->getSensorModel().setSensorChecked(m_db.getSensor(i).id, true);
-            }
         }
     }
     else
     {
         size_t sensorCount = m_db.getSensorCount();
         for (size_t i = 0; i < sensorCount; i++)
-        {
             m_ui.sensorFilter->getSensorModel().setSensorChecked(m_db.getSensor(i).id, true);
-        }
     }
 
     if (descriptor.period == DB::ReportDescriptor::Period::Custom)
@@ -124,16 +117,12 @@ bool ConfigureReportDialog::getDescriptor(DB::ReportDescriptor& descriptor)
         {
             DB::Sensor sensor = m_db.getSensor(i);
             if (m_ui.sensorFilter->getSensorModel().isSensorChecked(sensor.id))
-            {
                 descriptor.sensors.insert(sensor.id);
-            }
         }
         if (descriptor.sensors.empty()) //if no sensors were selected, select all
         {
             for (size_t i = 0; i < sensorCount; i++)
-            {
                 descriptor.sensors.insert(m_db.getSensor(i).id);
-            }
         }
     }
 
@@ -142,9 +131,7 @@ bool ConfigureReportDialog::getDescriptor(DB::ReportDescriptor& descriptor)
         descriptor.period = DB::ReportDescriptor::Period::Custom;
         descriptor.customPeriod = std::chrono::hours(m_ui.customPeriod->value());
         if (std::chrono::duration_cast<std::chrono::hours>(descriptor.customPeriod).count() / 24 == 0)
-        {
             descriptor.customPeriod = std::chrono::hours(24);
-        }
     }
     else
     {
@@ -186,9 +173,7 @@ void ConfigureReportDialog::accept()
 {
     DB::ReportDescriptor descriptor;
     if (!getDescriptor(descriptor))
-    {
         return;
-    }
 
     m_report.descriptor = descriptor;
     QDialog::accept();

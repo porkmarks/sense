@@ -105,29 +105,22 @@ void ConfigureAlarmDialog::setAlarm(DB::Alarm const& alarm)
     {
         size_t sensorCount = m_db.getSensorCount();
         for (size_t i = 0; i < sensorCount; i++)
-        {
             m_ui.sensorFilter->getSensorModel().setSensorChecked(m_db.getSensor(i).id, false);
-        }
 
         for (DB::SensorId id: descriptor.sensors)
-        {
             m_ui.sensorFilter->getSensorModel().setSensorChecked(id, true);
-        }
+        
         if (descriptor.sensors.empty()) //if no sensors were selected, select all
         {
             for (size_t i = 0; i < sensorCount; i++)
-            {
                 m_ui.sensorFilter->getSensorModel().setSensorChecked(m_db.getSensor(i).id, true);
-            }
         }
     }
     else
     {
         size_t sensorCount = m_db.getSensorCount();
         for (size_t i = 0; i < sensorCount; i++)
-        {
             m_ui.sensorFilter->getSensorModel().setSensorChecked(m_db.getSensor(i).id, true);
-        }
     }
 
     m_ui.highTemperatureWatch->setChecked(descriptor.highTemperatureWatch);
@@ -179,16 +172,12 @@ void ConfigureAlarmDialog::accept()
         {
             DB::Sensor sensor = m_db.getSensor(i);
             if (m_ui.sensorFilter->getSensorModel().isSensorChecked(sensor.id))
-            {
                 descriptor.sensors.insert(sensor.id);
-            }
         }
         if (descriptor.sensors.empty()) //if no sensors were selected, select all
         {
             for (size_t i = 0; i < sensorCount; i++)
-            {
                 descriptor.sensors.insert(m_db.getSensor(i).id);
-            }
         }
     }
 

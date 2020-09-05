@@ -58,9 +58,7 @@ void ExportPicDialog::accept()
 
     QString fileName = QFileDialog::getSaveFileName(this, "Select export file", QString(), extension);
     if (fileName.isEmpty())
-    {
         return;
-    }
 
     m_plotWidget.saveToPng(fileName, m_ui.legend->isChecked(), m_ui.annotations->isChecked());
 

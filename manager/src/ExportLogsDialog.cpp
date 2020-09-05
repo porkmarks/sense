@@ -94,9 +94,7 @@ void ExportLogsDialog::accept()
 
     QString fileName = QFileDialog::getSaveFileName(this, "Select export file", QString(), extension);
     if (fileName.isEmpty())
-    {
         return;
-    }
 
     bool finished = false;
     {
@@ -112,15 +110,12 @@ void ExportLogsDialog::accept()
         finished = exportTo(file, size_t(-1), true);
         file.close();
 
-        if (!finished)
-        {
-            //cancelled
+		if (!finished) //canceled
             std::remove(fileName.toUtf8().data());
-        }
     }
 
     QString msg = finished ? QString("Logs were exported to file '%1'").arg(fileName) :
-                             QString("Exporting logs to file '%1' was cancelled").arg(fileName);
+                             QString("Exporting logs to file '%1' was canceled").arg(fileName);
     s_logger.logInfo(msg);
     QMessageBox::information(this, "Success", msg);
 
@@ -198,9 +193,7 @@ bool ExportLogsDialog::exportTo(std::ostream& stream, size_t maxCount, bool show
         {
             progressDialog->setValue((int)i / 16);
             if (progressDialog->wasCanceled())
-            {
                 return false;
-            }
         }
 
         Logger::LogLine const& l = m_model.getLine(i);
@@ -214,21 +207,13 @@ bool ExportLogsDialog::exportTo(std::ostream& stream, size_t maxCount, bool show
             char buf[128];
             time_t t = Logger::Clock::to_time_t(l.timePoint);
             if (dateTimeFormat == DateTimeFormat::YYYY_MM_DD_Slash)
-            {
                 strftime(buf, 128, "%Y/%m/%d %H:%M:%S", localtime(&t));
-            }
             else if (dateTimeFormat == DateTimeFormat::YYYY_MM_DD_Dash)
-            {
                 strftime(buf, 128, "%Y-%m-%d %H:%M:%S", localtime(&t));
-            }
             else if (dateTimeFormat == DateTimeFormat::DD_MM_YYYY_Dash)
-            {
                 strftime(buf, 128, "%d-%m-%Y %H:%M:%S", localtime(&t));
-            }
             else
-            {
                 strftime(buf, 128, "%m/%d/%y %H:%M:%S", localtime(&t));
-            }
 
             stream << buf;
             stream << separator;

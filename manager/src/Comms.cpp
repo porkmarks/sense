@@ -68,9 +68,8 @@ Comms::~Comms()
 		m_discoveredBaseStations.clear();
 
 		for (InitializedBaseStation* cbs : m_initializedBaseStations)
-		{
 			delete cbs;// ->socketAdapter.getSocket().disconnect();
-		}
+
 		m_initializedBaseStations.clear();
 	});
 
@@ -118,9 +117,7 @@ void Comms::broadcastReceived()
                 {
                     auto it = std::find_if(m_initializedBaseStations.begin(), m_initializedBaseStations.end(), [&bs](InitializedBaseStation* const& cbs) { return cbs->descriptor.mac == bs.mac; });
                     if (it != m_initializedBaseStations.end() && (*it)->isConnected == false && (*it)->isConnecting == false)
-                    {
                         reconnectToBaseStation(*it);
-                    }
                 }
 
                 //new BS?
@@ -135,9 +132,7 @@ void Comms::broadcastReceived()
             }
         }
         else
-        {
             m_broadcastSocket.readDatagram(nullptr, 0);
-        }
     }
 }
 
@@ -204,9 +199,8 @@ void Comms::reconnectToBaseStation(InitializedBaseStation* cbs)
     std::lock_guard<std::recursive_mutex> lg(m_mutex);
 
     if (cbs->isConnecting)
-    {
         return;
-    }
+    
     s_logger.logInfo(QString("Attempting to reconnect to BS %1").arg(utils::getMacStr(cbs->descriptor.mac).c_str()));
 
     cbs->isConnecting = true;
@@ -233,13 +227,9 @@ void Comms::connectedToBaseStation(InitializedBaseStation* cbs)
         cbs->socketAdapter.start();
 
         if (cbs->db.findUnboundSensorIndex() >= 0)
-        {
             cbs->stateChange = data::Radio_State::PAIRING;
-        }
         else
-        {
             cbs->stateChange = data::Radio_State::NORMAL;
-        }
     }
 }
 
@@ -286,16 +276,12 @@ QHostAddress Comms::getBaseStationAddress(Mac const& mac) const
     {
         auto it = std::find_if(m_initializedBaseStations.begin(), m_initializedBaseStations.end(), [&mac](InitializedBaseStation* cbs) { return cbs->descriptor.mac == mac; });
         if (it != m_initializedBaseStations.end())
-        {
             return (*it)->descriptor.address;
-        }
     }
     {
         auto it = std::find_if(m_discoveredBaseStations.begin(), m_discoveredBaseStations.end(), [&mac](Comms::BaseStationDescriptor const& _bs) { return _bs.mac == mac; });
         if (it != m_discoveredBaseStations.end())
-        {
             return it->address;
-        }
     }
 
     return QHostAddress();
@@ -362,13 +348,9 @@ void Comms::checkForUnboundSensors(InitializedBaseStation& cbs, DB::SensorId id)
 
 	std::optional<DB::Sensor> unboundSensor = cbs.db.findUnboundSensor();
 	if (unboundSensor.has_value() && unboundSensor->id == id)
-	{
         cbs.stateChange = data::Radio_State::PAIRING;
-	}
     else
-    {
         cbs.stateChange = data::Radio_State::NORMAL;
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -439,27 +421,19 @@ void Comms::processSensorReq(InitializedBaseStation& cbs, SensorRequest const& r
 		{
 		case data::sensor::v1::Type::MEASUREMENT_BATCH_REQUEST:
 			if (request.payload.size() == sizeof(data::sensor::v1::Measurement_Batch_Request))
-			{
 				processSensorReq_MeasurementBatch(cbs, request, *reinterpret_cast<data::sensor::v1::Measurement_Batch_Request const*>(request.payload.data()));
-			}
 			break;
 		case data::sensor::v1::Type::CONFIG_REQUEST:
 			if (request.payload.size() == sizeof(data::sensor::v1::Config_Request))
-			{
 				processSensorReq_ConfigRequest(cbs, request, *reinterpret_cast<data::sensor::v1::Config_Request const*>(request.payload.data()));
-			}
 			break;
 		case data::sensor::v1::Type::FIRST_CONFIG_REQUEST:
 			if (request.payload.size() == sizeof(data::sensor::v1::First_Config_Request))
-			{
 				processSensorReq_FirstConfigRequest(cbs, request, *reinterpret_cast<data::sensor::v1::First_Config_Request const*>(request.payload.data()));
-			}
 			break;
 		case data::sensor::v1::Type::PAIR_REQUEST:
 			if (request.payload.size() == sizeof(data::sensor::v1::Pair_Request))
-			{
 				processSensorReq_PairRequest(cbs, request, *reinterpret_cast<data::sensor::v1::Pair_Request const*>(request.payload.data()));
-			}
 			break;
 		default:
 			std::cerr << "Invalid sensor request: " << int(request.type) << std::endl;
@@ -717,15 +691,12 @@ void Comms::process()
 	for (InitializedBaseStation* cbs : m_initializedBaseStations)
 	{
 		if (!cbs->isConnected)
-		{
 			continue;
-		}
 
 		if (IClock::rtNow() - cbs->lastPingTP > std::chrono::seconds(2))
-		{
 			sendPing(*cbs);
-		}
-		if (IClock::rtNow() - cbs->lastTalkTP > std::chrono::seconds(30))
+
+        if (IClock::rtNow() - cbs->lastTalkTP > std::chrono::seconds(30))
 		{
 			disconnectedFromBaseStation(cbs);
 			continue;

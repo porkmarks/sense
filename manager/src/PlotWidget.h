@@ -125,7 +125,7 @@ private:
     QCPLayer* m_annotationsLayer = nullptr;
     QCPAxis* m_axisDate = nullptr;
     std::array<QCPAxis*, (size_t)PlotType::Count> m_plotAxis;
-    std::vector<QCPAbstractItem*> m_indicatorItems;
+    std::vector<QCPItemTracer*> m_indicatorItems;
 
     std::set<DB::SensorId> m_selectedSensorIds;
 

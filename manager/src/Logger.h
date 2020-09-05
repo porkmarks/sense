@@ -56,7 +56,7 @@ public:
     {
         Clock::time_point timePoint;
         uint64_t index;
-        Type type;
+        Type type = Type::INFO;
         std::string message;
     };
 

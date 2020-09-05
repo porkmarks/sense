@@ -26,13 +26,9 @@ void HtmlItemDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
 	doc.setHtml(options.text);
 
 	if (option.state & QStyle::State_Selected)
-	{
 		painter->fillRect(option.rect, option.palette.highlight());
-	}
 	else
-	{
 		painter->fillRect(option.rect, (index.row() & 1) ? option.palette.base() : option.palette.alternateBase());
-	}
 
 	options.text = "";
 	options.widget->style()->drawControl(QStyle::CE_ItemViewItem, &options, painter);

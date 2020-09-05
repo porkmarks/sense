@@ -66,9 +66,7 @@ void MeasurementDetailsDialog::setMeasurement(DB::Measurement const& measurement
 		m_ui.sensor->setText(QString("%1 (S/N %2)").arg(sensor.descriptor.name.c_str()).arg(sensor.serialNumber, 8, 16, QChar('0')));
 	}
     else
-    {
 		m_ui.sensor->setText("N/A");
-    }
 
     m_ui.timestamp->setText(utils::toString<IClock>(m_measurement.timePoint, m_db.getGeneralSettings().dateTimeFormat));
     m_ui.receivedTimestamp->setText(utils::toString<IClock>(m_measurement.receivedTimePoint, m_db.getGeneralSettings().dateTimeFormat));
@@ -101,7 +99,7 @@ void MeasurementDetailsDialog::setMeasurement(DB::Measurement const& measurement
     {
 		m_ui.temperatureRW->setVisible(false);
 		m_ui.humidityRW->setVisible(false);
-		m_ui.temperatureRO->setText(QString("%1°C").arg(m_measurement.descriptor.temperature, 0, 'f', 2));
+		m_ui.temperatureRO->setText(QString((const char*)(u8"%1\xB0""C")).arg(m_measurement.descriptor.temperature, 0, 'f', 2));
 		m_ui.humidityRO->setText(QString("%1 %RH").arg(m_measurement.descriptor.humidity, 0, 'f', 2));
     }
 }
