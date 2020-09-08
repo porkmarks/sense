@@ -4,37 +4,7 @@
 #include "testUtils.h"
 #include <set>
 #include "ex/Storage.h"
-
-
-class BackingStore
-{
-public:
-	enum { GROUP_COUNT = 1024 };
-
-	static std::vector<std::vector<uint8_t>> s_pages;
-
-	static bool store(uint16_t idx, const void* page, uint16_t size)
-	{
-		if (idx >= GROUP_COUNT)
-			return false;
-
-		std::vector<uint8_t> p;
-		p.reserve(size);
-		std::copy((const uint8_t*)page, (const uint8_t*)page + size, std::back_inserter(p));
-		s_pages.push_back(std::move(p));
-		return true;
-	}
-	static bool load(uint16_t idx, void* page, uint16_t size)
-	{
-		const std::vector<uint8_t>& p = s_pages[idx];
-		assert(size == p.size());
-		std::copy(p.begin(), p.end(), (uint8_t*)page);
-		return true;
-	}
-};
-
-std::vector<std::vector<uint8_t>> BackingStore::s_pages;
-
+#include "ex/BackingStore.h"
 
 void testStorage()
 {
@@ -42,49 +12,72 @@ void testStorage()
 
 	srand(11);
 
-	using S = Storage<BackingStore>;
-	S storage;
-
-	CHECK_TRUE(storage.empty());
-	CHECK_EQUALS(storage.get_data_count(), 0);
-	CHECK_EQUALS(storage.get_group_count(), 0);
-	CHECK_EQUALS(storage.get_first_group_idx(), 0);
-	//CHECK_EQUALS(storage.get_last_group_idx(), 0);
-
-	CHECK_TRUE(storage.push_back(S::Data{0.f, 0.f}));
-	CHECK_FALSE(storage.empty());
-	//CHECK_EQUALS(storage.get_data_count(), 1);
-	//CHECK_EQUALS(storage.get_group_count(), 1);
-	//CHECK_EQUALS(storage.get_first_group_idx(), 0);
-	//CHECK_EQUALS(storage.get_last_group_idx(), 0);
-
-	std::vector<S::Data> datas;
-	float scale = 0.5f;
-	float temperature = 0.f;
-	float humidity = 0.f;
-	while (true)
 	{
-		S::Data data{ temperature, humidity };
-		bool ok = storage.push_back(data);
-		if (!ok)
-			break;
-		datas.push_back(data);
-		temperature += ((float(rand()) / float(RAND_MAX)) - 0.5f) * scale;
-		humidity += ((float(rand()) / float(RAND_MAX)) - 0.5f) * scale;
-	}
-	CHECK_TRUE(BackingStore::s_pages.size() == BackingStore::GROUP_COUNT);
-	CHECK_TRUE(storage.get_group_count() == BackingStore::GROUP_COUNT + 1);
+		Storage storage;
+		CHECK_TRUE(storage.empty());
+		CHECK_EQUALS(storage.get_data_count(), 0);
+		CHECK_EQUALS(storage.get_group_count(), 0);
+		CHECK_EQUALS(storage.get_first_group_idx(), 0);
+		//CHECK_EQUALS(storage.get_last_group_idx(), 0);
 
-	S::iterator it;
-	size_t index = 0;
-	while (storage.unpack_next(it))
+		CHECK_TRUE(storage.push_back(Storage::Data{ 0.f, 0.f }));
+		CHECK_FALSE(storage.empty());
+		//CHECK_EQUALS(storage.get_data_count(), 1);
+		//CHECK_EQUALS(storage.get_group_count(), 1);
+		//CHECK_EQUALS(storage.get_first_group_idx(), 0);
+		//CHECK_EQUALS(storage.get_last_group_idx(), 0);
+	}
+
+	for (size_t r = 0; r < 10000; r++)
 	{
-		S::Data srcData = it.data;
-		S::Data refData = datas[index];
+		std::cout << "\t\tRun " << r << std::endl;
 
-		index++;
+		BackingStore::clear();
+		Storage storage;
+
+		std::vector<Storage::Data> datas;
+		float scale = 9.9f;
+		float temperature = 0.f;
+		float humidity = 0.f;
+		while (true)
+		{
+			Storage::Data data{ temperature, humidity };
+			bool ok = storage.push_back(data);
+			if (!ok)
+				break;
+			datas.push_back(data);
+			temperature += ((float(rand()) / float(RAND_MAX)) - 0.5f) * scale;
+			//temperature += ((float(rand()) / float(RAND_MAX)) < 0.5f) ? scale : -scale;
+			temperature = std::clamp(temperature, -100.f, 100.f);
+			humidity += ((float(rand()) / float(RAND_MAX)) - 0.5f) * scale;
+			//humidity += ((float(rand()) / float(RAND_MAX)) < 0.5f) ? scale : -scale;
+			humidity = std::clamp(humidity, 0.f, 100.f);
+		}
+		CHECK_TRUE(BackingStore::get_used_page_count() == BackingStore::PAGE_COUNT);
+		CHECK_TRUE(storage.get_group_count() == BackingStore::PAGE_COUNT + 1);
+
+		Storage::iterator it;
+		size_t index = 0;
+		while (storage.unpack_next(it))
+		{
+			const Storage::Data& srcData = it.data;
+			const Storage::Data& refData = datas[index];
+
+			float dt = std::abs(srcData.temperature - refData.temperature);
+			float dh = std::abs(srcData.humidity - refData.humidity);
+ 			if (dt > 0.0098f * 0.5f)
+ 				CHECK_FAIL();
+ 			if (dh >= 0.0196f * 0.5f)
+				CHECK_FAIL();
+			if (dt > 0.0978f * 0.5f)
+				CHECK_FAIL();
+			if (dh >= 0.0489f * 0.5f)
+				CHECK_FAIL();
+
+			index++;
+		}
+		CHECK_TRUE(index == storage.get_data_count());
 	}
-	CHECK_TRUE(index == storage.get_data_count());
 
 	int a = 0;
 

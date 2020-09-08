@@ -59,6 +59,11 @@ do {\
         exit(1);\
     }\
 } while (false)
+#define CHECK_FAIL() \
+do {\
+    std::cout << "Failed " << __FILE__ << "@" << __LINE__ << std::endl;\
+    exit(1);\
+} while (false)
 
 void closeDB(DB& db);
 void createDB(DB& db);

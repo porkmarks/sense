@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstring>
 
 #ifndef BITSTREAM_CAPACITY
 #	define BITSTREAM_CAPACITY 128 * 8
@@ -53,18 +54,31 @@ inline bool Bitstream::write(uint32_t data, uint8_t bits)
 	if (bits > CAPACITY - m_size)
 		return false;
 
+	//Little Endian: least significant bit goes first in the stream
+
+	uint8_t byteIndex = m_size >> 3;
+	uint8_t bitIndex = m_size & 7;
+	uint8_t byte = m_data[byteIndex];
+
+	m_size += bits;
+
 	while (bits > 0)
 	{
-		uint8_t byteIndex = m_size >> 3;
-		uint8_t bitIndex = m_size & 7;
-		uint8_t& byte = m_data[byteIndex];
-
 		byte |= (data & 1) << bitIndex;
 		data >>= 1;
 
-		m_size++;
 		bits--;
+		bitIndex++;
+		if (bitIndex & 8)
+		{
+			bitIndex = 0;
+			m_data[byteIndex] = byte;
+			byteIndex++;
+			byte = m_data[byteIndex];
+		}
 	}
+
+	m_data[byteIndex] = byte;
 
 	return true;
 }
@@ -74,17 +88,26 @@ inline uint32_t Bitstream::read(uint16_t& pos, uint8_t bits)
 	if (bits > m_size - pos)
 		return 0;
 
+	//Little Endian: least significant bit goes first in the stream
+
+	uint8_t byteIndex = pos >> 3;
+	uint8_t bitIndex = pos & 7;
+	uint8_t byte = m_data[byteIndex];
+
 	uint32_t data = 0;
 	for (uint8_t i = 0; i < bits; i++)
 	{
-		uint8_t byteIndex = pos >> 3;
-		uint8_t bitIndex = pos & 7;
-		uint8_t byte = m_data[byteIndex];
-
 		data |= ((byte >> bitIndex) & 1) << i;
-
-		pos++;
+		bitIndex++;
+		if (bitIndex & 8)
+		{
+			bitIndex = 0;
+			byteIndex++;
+			byte = m_data[byteIndex];
+		}
 	}
+
+	pos += bits;
 
 	return data;
 }
