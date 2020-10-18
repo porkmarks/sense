@@ -41,8 +41,7 @@ bool SHT2x::getMeasurements(float& temperature, float& humidity)
     {
         return false;
     }
-    //Si7006 / TH06 dowsn't need temperature compensation
-    //humidity = humidity + (25.0f - temperature) * HTU21D_TEMP_COEFFICIENT;    
+    humidity = humidity + (25.0f - temperature) * HTU21D_TEMP_COEFFICIENT;    
     return true;
 }
 

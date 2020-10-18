@@ -1,5 +1,4 @@
 #pragma once
-#pragma once
 
 #include <stdint.h>
 #include <math.h>
@@ -33,8 +32,8 @@ struct Measurement
 {
     void pack(float humidity, float temperature)
     {
-        this->qhumidity = static_cast<uint16_t>(lround(fmin(fmax(humidity, 0.f), 100.f) * 655.f));
-        this->qtemperature = static_cast<int16_t>(lround(fmin(fmax(temperature, -100.f), 100.f) * 327.f));
+        this->qhumidity = static_cast<uint16_t>(fmin(fmax(humidity, 0.f), 100.f) * 655.f + 0.5f);
+        this->qtemperature = static_cast<int16_t>(fmin(fmax(temperature, -100.f), 100.f) * 327.f + 0.5f);
     }
 
     void unpack(float& humidity, float& temperature) const
@@ -56,7 +55,7 @@ struct QVCC
 inline QVCC pack_qvcc(float vcc)
 {
     vcc -= 2.f;
-    return { static_cast<uint8_t>(lround(fmin(fmax(vcc, 0.f), 1.27f) * 200.f)) };
+    return { static_cast<uint8_t>(fmin(fmax(vcc, 0.f), 1.27f) * 200.f + 0.5f) };
 }
 inline float unpack_qvcc(QVCC qvcc)
 {
