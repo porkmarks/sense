@@ -42,9 +42,8 @@ MeasurementsWidget::~MeasurementsWidget()
 void MeasurementsWidget::init(DB& db)
 {
     for (const QMetaObject::Connection& connection: m_uiConnections)
-    {
         QObject::disconnect(connection);
-    }
+
     m_uiConnections.clear();
 
     setEnabled(true);
@@ -52,8 +51,10 @@ void MeasurementsWidget::init(DB& db)
 
 	m_model.reset(new MeasurementsModel(*m_db));
 
-    connect(m_model.get(), &MeasurementsModel::rowsAboutToBeInserted, this, &MeasurementsWidget::refreshCounter);
-    connect(m_model.get(), &MeasurementsModel::modelReset, this, &MeasurementsWidget::refreshCounter);
+    //connect(m_model.get(), &MeasurementsModel::rowsAboutToBeInserted, this, &MeasurementsWidget::refreshCounter);
+    //connect(m_model.get(), &MeasurementsModel::modelReset, this, &MeasurementsWidget::refreshCounter);
+    m_uiConnections.push_back(connect(m_db, &DB::measurementsAdded, this, &MeasurementsWidget::scheduleSlowRefresh));
+    m_uiConnections.push_back(connect(m_db, &DB::measurementsChanged, this, &MeasurementsWidget::scheduleFastRefresh));
 
     m_delegate.reset(new MeasurementsDelegate(*m_model));
 
@@ -62,7 +63,8 @@ void MeasurementsWidget::init(DB& db)
 
     m_ui.list->setUniformRowHeights(true);
 
-    m_uiConnections.push_back(connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &MeasurementsWidget::scheduleFastRefresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.refresh, &QPushButton::released, this, &MeasurementsWidget::refresh, Qt::QueuedConnection));
+    m_uiConnections.push_back(connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &MeasurementsWidget::filterChanged, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.selectSensors, &QPushButton::released, this, &MeasurementsWidget::selectSensors, Qt::QueuedConnection));
     m_uiConnections.push_back(connect(m_ui.exportData, &QPushButton::released, this, &MeasurementsWidget::exportData));
 
@@ -89,6 +91,8 @@ void MeasurementsWidget::init(DB& db)
     m_uiConnections.push_back(connect(m_db, &DB::sensorRemoved, this, &MeasurementsWidget::sensorRemoved, Qt::QueuedConnection));
 
     loadSettings();
+
+	refreshCounter();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -154,21 +158,15 @@ void MeasurementsWidget::loadSettings()
             bool ok = true;
             DB::SensorId id = v.toUInt(&ok);
             if (ok)
-            {
                 m_selectedSensorIds.insert(id);
-            }
         }
 		//validate the selected sensor ids
 		for (auto it = m_selectedSensorIds.begin(); it != m_selectedSensorIds.end(); )
 		{
 			if (m_db->findSensorIndexById(*it) < 0)
-			{
 				it = m_selectedSensorIds.erase(it);
-			}
 			else
-			{
 				++it;
-			}
 		}
     }
 
@@ -200,9 +198,7 @@ void MeasurementsWidget::saveSettings()
 
     QList<QVariant> ssid;
     for (DB::SensorId id: m_selectedSensorIds)
-    {
         ssid.append(id);
-    }
     settings.setValue("filter/selectedSensors", ssid);
 	settings.setValue("measurements/list/state", m_ui.list->header()->saveState());
 }
@@ -214,13 +210,22 @@ void MeasurementsWidget::setActive(bool active)
     if (active)
     {
         loadSettings();
-        refresh();
+        scheduleFastRefresh();
     }
     else
-    {
         saveSettings();
-    }
+
     m_model->setActive(active);
+    
+    m_ui.refresh->setVisible(!canAutoRefresh());
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void MeasurementsWidget::filterChanged()
+{
+	m_ui.refresh->setVisible(!canAutoRefresh());
+	scheduleFastRefresh();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -267,6 +272,14 @@ void MeasurementsWidget::sensorRemoved(DB::SensorId id)
 
 //////////////////////////////////////////////////////////////////////////
 
+bool MeasurementsWidget::canAutoRefresh() const
+{
+	uint64_t diff = m_ui.dateTimeFilter->getToDateTime().toTime_t() - m_ui.dateTimeFilter->getFromDateTime().toTime_t();
+	return (diff < 3600 * 24 * 7); //more than one week? no auto refreshes
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void MeasurementsWidget::scheduleFastRefresh()
 {
     scheduleRefresh(std::chrono::milliseconds(100));
@@ -283,11 +296,13 @@ void MeasurementsWidget::scheduleSlowRefresh()
 
 void MeasurementsWidget::scheduleRefresh(IClock::duration dt)
 {
+	if (!canAutoRefresh())
+		return;
+
     int duration = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(dt).count());
     if (m_scheduleTimer && m_scheduleTimer->remainingTime() < duration)
-    {
         return;
-    }
+
     m_scheduleTimer.reset(new QTimer());
     m_scheduleTimer->setSingleShot(true);
     m_scheduleTimer->setInterval(duration);
@@ -323,7 +338,7 @@ void MeasurementsWidget::refresh()
 
 void MeasurementsWidget::refreshCounter()
 {
-	m_ui.resultCount->setText(QString("%1 out of %2 results.").arg(m_model->getMeasurementCount()).arg(m_db->getAllMeasurementCount()));
+	m_ui.resultCount->setText(QString("%1 out of ~%2 results.").arg(m_model->getMeasurementCount()).arg(m_db->getAllMeasurementApproximativeCount()));
 }
 
 //////////////////////////////////////////////////////////////////////////

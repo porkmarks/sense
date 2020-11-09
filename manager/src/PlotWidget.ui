@@ -299,6 +299,20 @@
            </property>
           </widget>
          </item>
+         <item row="1" column="0">
+          <widget class="QCheckBox" name="useSmoothing">
+           <property name="text">
+            <string>Smooth Results</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/smooth.png</normaloff>:/icons/ui/smooth.png</iconset>
+           </property>
+           <property name="checked">
+            <bool>false</bool>
+           </property>
+          </widget>
+         </item>
         </layout>
        </widget>
       </item>
@@ -318,20 +332,6 @@
           <number>2</number>
          </property>
          <item>
-          <widget class="QCheckBox" name="useSmoothing">
-           <property name="text">
-            <string>Smooth Results</string>
-           </property>
-           <property name="icon">
-            <iconset resource="../res/res.qrc">
-             <normaloff>:/icons/ui/smooth.png</normaloff>:/icons/ui/smooth.png</iconset>
-           </property>
-           <property name="checked">
-            <bool>false</bool>
-           </property>
-          </widget>
-         </item>
-         <item>
           <widget class="QPushButton" name="clearAnnotations">
            <property name="text">
             <string>Clear Annotations</string>
@@ -339,6 +339,17 @@
            <property name="icon">
             <iconset resource="../res/res.qrc">
              <normaloff>:/icons/ui/remove.png</normaloff>:/icons/ui/remove.png</iconset>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="refresh">
+           <property name="text">
+            <string>Refresh</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../res/res.qrc">
+             <normaloff>:/icons/ui/reconnect.png</normaloff>:/icons/ui/reconnect.png</iconset>
            </property>
           </widget>
          </item>
@@ -523,7 +534,6 @@
   <tabstop>maxHumidity</tabstop>
   <tabstop>showTemperature</tabstop>
   <tabstop>showHumidity</tabstop>
-  <tabstop>useSmoothing</tabstop>
   <tabstop>clearAnnotations</tabstop>
   <tabstop>selectSensors</tabstop>
   <tabstop>exportData</tabstop>

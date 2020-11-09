@@ -20,8 +20,8 @@ constexpr size_t k_chunkSize = 10000;
 MeasurementsModel::MeasurementsModel(DB& db)
     : m_db(db)
 {
-    m_refreshTimer = new QTimer(this);
-    m_refreshTimer->setSingleShot(true);
+//     m_refreshTimer = new QTimer(this);
+//     m_refreshTimer->setSingleShot(true);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -35,14 +35,13 @@ MeasurementsModel::~MeasurementsModel()
 void MeasurementsModel::setActive(bool active)
 {
 	for (const QMetaObject::Connection& connection : m_connections)
-	{
 		QObject::disconnect(connection);
-	}
+
     m_connections.clear();
 
-	m_connections.push_back(connect(&m_db, &DB::measurementsAdded, this, &MeasurementsModel::startSlowAutoRefresh));
-	m_connections.push_back(connect(&m_db, &DB::measurementsChanged, this, &MeasurementsModel::startFastAutoRefresh));
-	m_connections.push_back(connect(m_refreshTimer, &QTimer::timeout, this, &MeasurementsModel::refresh));
+// 	m_connections.push_back(connect(&m_db, &DB::measurementsAdded, this, &MeasurementsModel::startSlowAutoRefresh));
+// 	m_connections.push_back(connect(&m_db, &DB::measurementsChanged, this, &MeasurementsModel::startFastAutoRefresh));
+//	m_connections.push_back(connect(m_refreshTimer, &QTimer::timeout, this, &MeasurementsModel::refresh));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -50,13 +49,11 @@ void MeasurementsModel::setActive(bool active)
 QModelIndex MeasurementsModel::index(int row, int column, QModelIndex const& parent) const
 {
     if (row < 0 || column < 0)
-    {
         return {};
-    }
+
     if (!hasIndex(row, column, parent))
-    {
         return {};
-    }
+
     return createIndex(row, column, nullptr);
 }
 
@@ -72,9 +69,8 @@ QModelIndex MeasurementsModel::parent(QModelIndex const& /*index*/) const
 int MeasurementsModel::rowCount(QModelIndex const& index) const
 {
     if (!index.isValid())
-    {
         return static_cast<int>(m_measurements.size());
-    }
+
     return 0;
 }
 
@@ -90,14 +86,11 @@ int MeasurementsModel::columnCount(QModelIndex const& /*index*/) const
 QVariant MeasurementsModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
     if (section < 0)
-    {
-        int a = 0;
         section = 0;
-    }
+
     if (orientation == Qt::Horizontal && role == Qt::DisplayRole)
-    {
         return s_headerNames[static_cast<size_t>(section)];
-    }
+
     return QAbstractItemModel::headerData(section, orientation, role);
 }
 
@@ -106,15 +99,11 @@ QVariant MeasurementsModel::headerData(int section, Qt::Orientation orientation,
 QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
 {
     if (!index.isValid())
-    {
         return QVariant();
-    }
 
     size_t indexRow = static_cast<size_t>(index.row());
     if (indexRow >= m_measurements.size())
-    {
         return QVariant();
-    }
 
     DB::Measurement const& measurement = m_measurements[indexRow];
 
@@ -139,74 +128,43 @@ QVariant MeasurementsModel::data(QModelIndex const& index, int role) const
             return icon;
         }
         else if (column == Column::Battery)
-        {
             return utils::getBatteryIcon(m_db.getSensorSettings(), measurement.descriptor.vcc);
-        }
         else if (column == Column::Signal)
-        {
             return utils::getSignalIcon(m_db.getSensorSettings(), std::min(measurement.descriptor.signalStrength.s2b, measurement.descriptor.signalStrength.b2s));
-        }
     }
     else if (role == Qt::DisplayRole)
     {
         if (column == Column::Id)
-        {
             return static_cast<qulonglong>(measurement.id);
-        }
         else if (column == Column::Sensor)
         {
             std::optional<DB::Sensor> sensor = m_db.findSensorById(measurement.descriptor.sensorId);
             if (sensor.has_value())
-            {
                 return sensor->descriptor.name.c_str();
-            }
             else
-            {
                 return "N/A";
-            }
         }
         else if (column == Column::Index)
-        {
             return measurement.descriptor.index;
-        }
         else if (column == Column::Timestamp)
-        {
 			return utils::toString<IClock>(measurement.timePoint, m_db.getGeneralSettings().dateTimeFormat);
-        }
 		else if (column == Column::ReceivedTimestamp)
-		{
 			return utils::toString<IClock>(measurement.receivedTimePoint, m_db.getGeneralSettings().dateTimeFormat);
-		}
         else if (column == Column::Temperature)
-        {
             return QString("%1°C").arg(measurement.descriptor.temperature, 0, 'f', 1);
-        }
         else if (column == Column::Humidity)
-        {
             return QString("%1 %RH").arg(measurement.descriptor.humidity, 0, 'f', 1);
-        }
         else if (column == Column::Battery)
-        {
             return QString("%1%").arg(static_cast<int>(utils::getBatteryLevel(measurement.descriptor.vcc) * 100.f));
-            //return QString("%1 %").arg(static_cast<int>(measurement.descriptor.signalStrength.s2b));
-        }
         else if (column == Column::Signal)
-        {
             return QString("%1%").arg(static_cast<int>(utils::getSignalLevel(std::min(measurement.descriptor.signalStrength.s2b, measurement.descriptor.signalStrength.b2s)) * 100.f));
-            //return QString("%1 %").arg(static_cast<int>(measurement.descriptor.signalStrength.b2s));
-            //return QString("%1 %").arg(std::min(measurement.descriptor.b2s, measurement.descriptor.s2b));
-        }
         else if (column == Column::Alarms)
-        {
             return measurement.alarmTriggers.current;
-        }
     }
 	else if (role == Qt::ToolTipRole)
 	{
 		if (column == Column::Alarms)
-		{
             return utils::sensorTriggersToString(measurement.alarmTriggers.current & DB::AlarmTrigger::MeasurementMask, true).c_str();
-		}
     }
 
     return QVariant();
@@ -242,9 +200,9 @@ void MeasurementsModel::setFilter(DB::Filter const& filter)
 	}
     m_filter.sortOrder = m_sortOrder;
     //auto start = IClock::now();
-    m_measurementsStartIndex = 0;
-    m_measurementsTotalCount = m_db.getFilteredMeasurementCount(m_filter);
-    m_measurements = m_db.getFilteredMeasurements(m_filter, m_measurementsStartIndex, k_chunkSize);
+    //m_measurementsStartIndex = 0;
+    //m_measurementsTotalCount = m_db.getFilteredMeasurementCount(m_filter);
+    m_measurements = m_db.getFilteredMeasurements(m_filter);//, m_measurementsStartIndex, k_chunkSize);
     //std::cout << "XXX: " << std::chrono::duration_cast<std::chrono::microseconds>(IClock::now() - start).count() << "\n";
     endResetModel();
 
@@ -263,9 +221,9 @@ DB::Filter const& MeasurementsModel::getFilter() const
 void MeasurementsModel::refresh()
 {
     beginResetModel();
-    m_measurementsStartIndex = 0;
-    m_measurementsTotalCount = m_db.getFilteredMeasurementCount(m_filter);
-    m_measurements = m_db.getFilteredMeasurements(m_filter, m_measurementsStartIndex, k_chunkSize);
+    //m_measurementsStartIndex = 0;
+    //m_measurementsTotalCount = m_db.getFilteredMeasurementCount(m_filter);
+    m_measurements = m_db.getFilteredMeasurements(m_filter);//, m_measurementsStartIndex, k_chunkSize);
     endResetModel();
 
     Q_EMIT layoutChanged();
@@ -273,40 +231,39 @@ void MeasurementsModel::refresh()
 
 //////////////////////////////////////////////////////////////////////////
 
-void MeasurementsModel::startSlowAutoRefresh()
-{
-	startAutoRefresh(std::chrono::milliseconds(10000));
-}
+// void MeasurementsModel::startSlowAutoRefresh()
+// {
+// 	startAutoRefresh(std::chrono::milliseconds(10000));
+// }
+// 
+// //////////////////////////////////////////////////////////////////////////
+// 
+// void MeasurementsModel::startFastAutoRefresh()
+// {
+//     startAutoRefresh(std::chrono::milliseconds(3000));
+// }
 
 //////////////////////////////////////////////////////////////////////////
 
-void MeasurementsModel::startFastAutoRefresh()
-{
-    startAutoRefresh(std::chrono::milliseconds(3000));
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-void MeasurementsModel::startAutoRefresh(IClock::duration timer)
-{
-	m_refreshTimer->start(std::chrono::duration_cast<std::chrono::milliseconds>(timer).count());
-}
+// void MeasurementsModel::startAutoRefresh(IClock::duration timer)
+// {
+// 	m_refreshTimer->start(std::chrono::duration_cast<std::chrono::milliseconds>(timer).count());
+// }
 
 //////////////////////////////////////////////////////////////////////////
 
 size_t MeasurementsModel::getMeasurementCount() const
 {
-    return m_measurementsTotalCount;
+    return m_measurements.size();// m_measurementsTotalCount;
 }
 
 //////////////////////////////////////////////////////////////////////////
 
 DB::Measurement const& MeasurementsModel::getMeasurement(size_t index)
 {
-    while (index >= m_measurements.size())
-    {
-        fetchMore(QModelIndex());
-    }
+//     while (index >= m_measurements.size())
+//         fetchMore(QModelIndex());
+
     return m_measurements[index];
 }
 
@@ -315,17 +272,20 @@ DB::Measurement const& MeasurementsModel::getMeasurement(size_t index)
 Result<DB::Measurement> MeasurementsModel::getMeasurement(QModelIndex index) const
 {
 	if (!index.isValid())
-	{
 		return Error("Invalid Index");
-	}
 
 	size_t indexRow = static_cast<size_t>(index.row());
 	if (indexRow >= m_measurements.size())
-	{
         return Error("Invalid Index");
-	}
 
 	return m_measurements[indexRow];
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+std::vector<DB::Measurement> MeasurementsModel::getAllMeasurements() const
+{
+	return m_db.getFilteredMeasurements(m_filter);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -387,23 +347,23 @@ void MeasurementsModel::sort(int column, Qt::SortOrder order)
 
 //////////////////////////////////////////////////////////////////////////
 
-void MeasurementsModel::fetchMore(const QModelIndex& parent)
-{
-	beginInsertRows(QModelIndex(), int(m_measurementsStartIndex), int(m_measurementsStartIndex) + k_chunkSize);
-
-    m_measurementsStartIndex = m_measurements.size();
-    std::vector<DB::Measurement> measurements = m_db.getFilteredMeasurements(m_filter, m_measurementsStartIndex, k_chunkSize);
-    m_measurements.resize(m_measurementsStartIndex + measurements.size());
-    std::move(measurements.begin(), measurements.end(), m_measurements.begin() + m_measurementsStartIndex);
-
-	endInsertRows();
-}
+// void MeasurementsModel::fetchMore(const QModelIndex& parent)
+// {
+// 	beginInsertRows(QModelIndex(), int(m_measurementsStartIndex), int(m_measurementsStartIndex) + k_chunkSize);
+// 
+//     m_measurementsStartIndex = m_measurements.size();
+//     std::vector<DB::Measurement> measurements = m_db.getFilteredMeasurements(m_filter, m_measurementsStartIndex, k_chunkSize);
+//     m_measurements.resize(m_measurementsStartIndex + measurements.size());
+//     std::move(measurements.begin(), measurements.end(), m_measurements.begin() + m_measurementsStartIndex);
+// 
+// 	endInsertRows();
+// }
 
 //////////////////////////////////////////////////////////////////////////
 
-bool MeasurementsModel::canFetchMore(const QModelIndex& parent) const
-{
-    return m_measurements.size() < m_measurementsTotalCount;
-}
+// bool MeasurementsModel::canFetchMore(const QModelIndex& parent) const
+// {
+//     return m_measurements.size() < m_measurementsTotalCount;
+// }
 
 

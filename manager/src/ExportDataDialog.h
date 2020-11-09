@@ -23,8 +23,6 @@ private:
     void saveSettings();
 
     void refreshPreview();
-    std::optional<utils::CsvData> getCsvData(size_t index) const;
-    std::optional<utils::CsvData> getCsvDataWithProgress(size_t index, QProgressDialog* progressDialog) const;
 
     Ui::ExportDataDialog m_ui;
     DB& m_db;

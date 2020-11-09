@@ -98,9 +98,7 @@ void SensorsWidget::setPermissions()
 void SensorsWidget::bindSensor()
 {
     if (!m_db)
-    {
         return;
-    }
 
     if (m_db->getBaseStationCount() == 0)
     {
@@ -120,9 +118,8 @@ void SensorsWidget::bindSensor()
         bool ok = false;
         QString text = QInputDialog::getText(this, tr("Input Sensor Name"), tr("Name:"), QLineEdit::Normal, "", &ok);
         if (!ok)
-        {
             return;
-        }
+
         descriptor.name = text.toUtf8().data();
         if (descriptor.name.empty())
         {
@@ -155,9 +152,7 @@ void SensorsWidget::bindSensor()
 		connect(&dialog, &QDialog::rejected, [this]() { m_db->cancelSensorBinding(); });
 
 		while (m_db->findUnboundSensorIndex() >= 0)
-		{
 			QApplication::instance()->processEvents();
-		}
 
         break;
     }
@@ -193,9 +188,7 @@ void SensorsWidget::removeSensor()
 
     int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to delete sensor '%1'?\nThis will delete all the measurements from this\nsensor as well.").arg(sensor.descriptor.name.c_str()));
     if (response != QMessageBox::Yes)
-    {
         return;
-    }
 
     m_db->removeSensor(index);
 }
@@ -230,9 +223,7 @@ void SensorsWidget::rebindSensor()
 
 	int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to rebind sensor '%1'?\nThis will allow you to replace the sensor\nwhile keeping all the measurements.\n").arg(sensor.descriptor.name.c_str()));
 	if (response != QMessageBox::Yes)
-	{
 		return;
-	}
 
 	Result<void> result = m_db->rebindSensor(sensor.id);
     if (result != success)
@@ -259,9 +250,7 @@ void SensorsWidget::rebindSensor()
     connect(&dialog, &QDialog::rejected, [this]() { m_db->cancelSensorBinding(); });
 
     while (m_db->findUnboundSensorIndex() >= 0)
-    {
         QApplication::instance()->processEvents();
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////

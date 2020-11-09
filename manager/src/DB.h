@@ -454,6 +454,8 @@ public:
         float rtMeasurementHumidity = 0;
         float rtMeasurementVcc = 0;
 
+        mutable std::optional<MeasurementId> mostRecentMeasurementId; //not saved, computed and cached here
+
         IClock::time_point addedTimePoint = IClock::time_point(IClock::duration::zero()); //not saved
     };
 
@@ -719,12 +721,12 @@ public:
         SortOrder sortOrder = SortOrder::Ascending;
     };
 
-    size_t getAllMeasurementCount() const;
+    size_t getAllMeasurementApproximativeCount() const;
 
     std::vector<Measurement> getFilteredMeasurements(Filter filter, size_t start = 0, size_t count = 0) const;
     size_t getFilteredMeasurementCount(Filter const& filter) const;
 
-    Result<Measurement> getLastMeasurementForSensor(SensorId sensorId) const;
+    Result<Measurement> getMostRecentMeasurementForSensor(SensorId sensorId) const;
 
     Result<Measurement> findMeasurementById(MeasurementId id) const;
     Result<void> setMeasurement(MeasurementId id, MeasurementDescriptor const& measurement);
@@ -847,6 +849,9 @@ private:
         ReportId lastReportId = 0;
         MeasurementId lastMeasurementId = 0;
         uint32_t lastSensorAddress = Radio::SLAVE_ADDRESS_BEGIN;
+
+        mutable std::optional<size_t> approximativeMeasurementCount;
+        mutable IClock::time_point lastRefreshedApproximativeMeasurementCount = IClock::time_point(IClock::duration::zero());
     };
 
 	sqlite3* m_sqlite = nullptr;

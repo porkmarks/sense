@@ -1,6 +1,6 @@
 #include "Storage.h"
-#include <cmath>
-#include <cassert>
+#include <math.h>
+#include <assert.h>
 #include "BackingStore.h"
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -14,7 +14,7 @@ template<typename T> T clamp(T a, T min, T max) { return (a < min) ? min : ((a <
 
 
 static constexpr int32_t ABS_T_Q_BIT_COUNT = 15; //precision for 15 bits: 0.0061037018951994. Max error is half this.
-static constexpr int32_t ABS_T_MAX_QVALUE = (1 << ABS_T_Q_BIT_COUNT) - 1;
+static constexpr int32_t ABS_T_MAX_QVALUE = (1ULL << ABS_T_Q_BIT_COUNT) - 1;
 static constexpr float ABS_T_MIN_VALUE = -100.f;
 static constexpr float ABS_T_MAX_VALUE = 100.f;
 static constexpr float ABS_T_SCALE = (ABS_T_MAX_QVALUE - 1) / (ABS_T_MAX_VALUE - ABS_T_MIN_VALUE); //we leave some slack because of rounding paranoia
@@ -24,7 +24,7 @@ static constexpr size_t REL_T_FLAGS_BIT_COUNT = 2; //how many bits for the flags
 static constexpr size_t REL_T_FLAGS_MAX_BIT_COUNT_VALUE = 2; //what is the max value that represents a bit count. This is multiplied by 4 to get the actual bit count
 static constexpr int32_t REL_T_Q_BIT_COUNT = 10;
 static_assert(REL_T_FLAGS_MAX_BIT_COUNT_VALUE * 4 < REL_T_Q_BIT_COUNT);
-static constexpr int32_t REL_T_MAX_QVALUE = (1 << REL_T_Q_BIT_COUNT) - 1;
+static constexpr int32_t REL_T_MAX_QVALUE = (1ULL << REL_T_Q_BIT_COUNT) - 1;
 static constexpr float REL_T_MAX_VALUE1 = 10.f; //precision for 10 bits + sign: 0.0097751710654936. Max error is half this.
 static constexpr float REL_T_SCALE1 = REL_T_MAX_QVALUE / REL_T_MAX_VALUE1;
 static constexpr float REL_T_INV_SCALE1 = 1.f / REL_T_SCALE1;
@@ -33,7 +33,7 @@ static constexpr float REL_T_SCALE2 = REL_T_MAX_QVALUE / REL_T_MAX_VALUE2;
 static constexpr float REL_T_INV_SCALE2 = 1.f / REL_T_SCALE2;
 
 static constexpr int32_t ABS_H_Q_BIT_COUNT = 14;
-static constexpr int32_t ABS_H_MAX_QVALUE = (1 << ABS_H_Q_BIT_COUNT) - 1;
+static constexpr int32_t ABS_H_MAX_QVALUE = (1ULL << ABS_H_Q_BIT_COUNT) - 1;
 static constexpr float ABS_H_MIN_VALUE = 0.f;
 static constexpr float ABS_H_MAX_VALUE = 100.f; //precision for 14 bits: 0.0061038881767686. Max error is half this.
 static constexpr float ABS_H_SCALE = (ABS_H_MAX_QVALUE - 1) / (ABS_H_MAX_VALUE - ABS_H_MIN_VALUE); //we leave some slack because of rounding paranoia
@@ -43,7 +43,7 @@ static constexpr size_t REL_H_FLAGS_BIT_COUNT = 2;
 static constexpr size_t REL_H_FLAGS_MAX_BIT_COUNT_VALUE = 2;
 static constexpr int32_t REL_H_Q_BIT_COUNT = 10;
 static_assert(REL_H_FLAGS_MAX_BIT_COUNT_VALUE * 4 < REL_H_Q_BIT_COUNT);
-static constexpr int32_t REL_H_MAX_QVALUE = (1 << REL_H_Q_BIT_COUNT) - 1;
+static constexpr int32_t REL_H_MAX_QVALUE = (1ULL << REL_H_Q_BIT_COUNT) - 1;
 static constexpr float REL_H_MAX_VALUE1 = 20.f; //precision for 10 bits + sign: 0.0195503421309873. Max error is half this.
 static constexpr float REL_H_SCALE1 = REL_H_MAX_QVALUE / REL_H_MAX_VALUE1;
 static constexpr float REL_H_INV_SCALE1 = 1.f / REL_H_SCALE1;
@@ -97,16 +97,18 @@ bool Storage::Group::unpack_next(Storage::iterator& it) const
 		{
 			uint8_t bit_count = REL_T_Q_BIT_COUNT - REL_T_FLAGS_MAX_BIT_COUNT_VALUE * 4 + flags * 4;
 			uint32_t bits = bs.read(it.bit_offset, bit_count + 1); //+1 sign
-			if (bits & (1 << bit_count)) //negative?
-				bits |= 0xFFFFFFFF & (~((1 << bit_count) - 1));
+			uint32_t negative_mask = 1ULL << bit_count;
+			if (bits & negative_mask) //negative?
+				bits |= 0xFFFFFFFF & (~(negative_mask - 1));
 
 			it.data.temperature += dequantize_signed(*(uint16_t*)&bits, REL_T_INV_SCALE1);
 		}
 		else
 		{
 			uint32_t bits = bs.read(it.bit_offset, REL_T_Q_BIT_COUNT + 1);
-			if (bits & (1 << REL_T_Q_BIT_COUNT)) //negative?
-				bits |= 0xFFFFFFFF & (~((1 << REL_T_Q_BIT_COUNT) - 1));
+			uint32_t negative_mask = 1ULL << REL_T_Q_BIT_COUNT;
+			if (bits & negative_mask) //negative?
+				bits |= 0xFFFFFFFF & (~(negative_mask - 1));
 
 			it.data.temperature = dequantize_signed(*(uint16_t*)&bits, REL_T_INV_SCALE2);
 		}
@@ -119,8 +121,9 @@ bool Storage::Group::unpack_next(Storage::iterator& it) const
 		{
 			uint8_t bit_count = REL_H_Q_BIT_COUNT - REL_H_FLAGS_MAX_BIT_COUNT_VALUE * 4 + flags * 4;
 			uint32_t bits = bs.read(it.bit_offset, bit_count + 1);
-			if (bits & (1 << bit_count)) //negative?
-				bits |= 0xFFFFFFFF & (~((1 << bit_count) - 1));
+			uint32_t negative_mask = 1ULL << bit_count;
+			if (bits & negative_mask) //negative?
+				bits |= 0xFFFFFFFF & (~(negative_mask - 1));
 
 			it.data.humidity += dequantize_signed(*(uint16_t*)&bits, REL_H_INV_SCALE1);
 		}
@@ -134,16 +137,16 @@ bool Storage::Group::unpack_next(Storage::iterator& it) const
 	return true;
 }
 
-uint16_t Storage::Group::get_data_count() const
-{
-	uint16_t data_count = 0;
-	Storage::iterator it;
-
-	while (unpack_next(it))
-		data_count++;
-
-	return data_count;
-}
+// uint16_t Storage::Group::get_data_count() const
+// {
+// 	uint16_t data_count = 0;
+// 	Storage::iterator it;
+// 
+// 	while (unpack_next(it))
+// 		data_count++;
+// 
+// 	return data_count;
+// }
 
 
 Storage::Storage()
@@ -162,7 +165,7 @@ bool Storage::unpack_next(iterator& it) const
 
 		//skip the popped elements in the beginning and warm up the data
 		const Group& g = m_iteration_group;
-		for (uint8_t i = 0; i < g.m_skip_count; i++)
+		for (uint8_t i = 0; i < m_first_group_skip_count; i++)
 		{
 			bool ok = _unpack_next(it);
 			assert(ok);
@@ -195,7 +198,7 @@ bool Storage::_unpack_next(iterator& it) const
 		if (it.group_idx == get_last_group_idx())
 			return false;
 
-		it.group_idx = (it.group_idx + 1) % (BackingStore::PAGE_COUNT + 1);
+		it.group_idx = (it.group_idx + 1) % (BackingStore::PAGE_COUNT);
 		it.bit_offset = -1;
 		return unpack_next(it);
 	}
@@ -205,13 +208,14 @@ bool Storage::_unpack_next(iterator& it) const
 
 size_t Storage::get_data_count() const
 {
-	size_t data_count = 0;
-	Storage::iterator it;
-
-	while (unpack_next(it))
-		data_count++;
-
-	return data_count;
+// 	size_t data_count = 0;
+// 	Storage::iterator it;
+// 
+// 	while (unpack_next(it))
+// 		data_count++;
+// 
+//	return data_count;
+	return m_data_count;
 }
 
 uint16_t Storage::get_group_count() const
@@ -226,7 +230,7 @@ uint16_t Storage::get_first_group_idx() const
 
 uint16_t Storage::get_last_group_idx() const
 {
-	return (m_first_group_idx + m_group_count - 1) % (BackingStore::PAGE_COUNT + 1);
+	return (m_first_group_idx + m_group_count - 1) % (BackingStore::PAGE_COUNT);
 }
 
 // // Storage::Group& Storage::get_first_group()
@@ -254,21 +258,23 @@ bool Storage::pop_first_group()
 	if (m_group_count == 0)
 		return false;
 
-	m_first_group_idx = (m_first_group_idx + 1) % (BackingStore::PAGE_COUNT + 1);
+	m_first_group_skip_count = 0;
+	m_first_group_idx = (m_first_group_idx + 1) % (BackingStore::PAGE_COUNT);
 	m_group_count--;
 	return true;
 }
 
 bool Storage::add_group()
 {
-	if (m_group_count >= (BackingStore::PAGE_COUNT + 1))
-		return false;
-
 	if (m_group_count > 0)
 	{
+		//save the previous group first
 		if (!BackingStore::store(get_last_group_idx(), &m_last_group, sizeof(Group)))
 			return false;
 	}
+
+	if (m_group_count >= (BackingStore::PAGE_COUNT))
+		return false;
 
 	m_group_count++;
 	Group& g = m_last_group;
@@ -278,7 +284,6 @@ bool Storage::add_group()
 
 bool Storage::load_group(uint16_t group_idx) const
 {
-	assert(group_idx < m_group_count);
 	if (group_idx == m_iteration_group_idx) //already loaded
 		return true;
 
@@ -295,8 +300,12 @@ bool Storage::load_group(uint16_t group_idx) const
 void Storage::clear()
 {
 	m_first_group_idx = 0;
+	m_first_group_skip_count = 0;
+
 	m_group_count = 0;
 	m_data_count = 0;
+
+	m_iteration_group_idx = uint16_t(-1);
 
 	memset(&m_last_group, 0, sizeof(Group));
 	memset(&m_iteration_group, 0, sizeof(Group));
@@ -312,10 +321,13 @@ bool Storage::pop_front()
 	if (m_data_count == 0)
 		return false;
 
-// 	Group& g = get_first_group();
-// 	g.skip_count++;
-// 	if (g.skip_count >= g.get_data_count())
-// 		pop_first_group();
+	if (!load_group(m_first_group_idx))
+		return false;
+
+ 	Group& g = m_iteration_group;
+ 	m_first_group_skip_count++;
+ 	if (m_first_group_skip_count >= g.m_data_count)
+ 		pop_first_group();
 
 	m_data_count--;
 
@@ -333,13 +345,15 @@ bool Storage::push_back(const Data& data)
 	if (g.m_is_initialized == 0)
 	{
 		g.m_is_initialized = 1;
-		g.m_skip_count = 0;
 		g.m_qtemperature = quantize(data.temperature, ABS_T_MIN_VALUE, ABS_T_SCALE, ABS_T_MAX_QVALUE);
 		g.m_qhumidity = quantize(data.humidity, ABS_H_MIN_VALUE, ABS_H_SCALE, ABS_H_MAX_QVALUE);
 
 		//unpack to set the last values AFTER the quantization
 		m_last_data.temperature = dequantize(g.m_qtemperature, ABS_T_MIN_VALUE, ABS_T_INV_SCALE);
 		m_last_data.humidity = dequantize(g.m_qhumidity, ABS_H_MIN_VALUE, ABS_H_INV_SCALE);
+
+		g.m_data_count = 1;
+		m_data_count++;
 	}
 	else
 	{
@@ -358,10 +372,10 @@ bool Storage::push_back(const Data& data)
 			new_temperature = m_last_data.temperature + dequantize_signed(qtemperature, REL_T_INV_SCALE1);
 
 			//dynamic bitrate
-			uint16_t qabs = std::abs(qtemperature);
+			uint16_t qabs = abs(qtemperature);
 			uint8_t min_bit_count = REL_T_Q_BIT_COUNT - REL_T_FLAGS_MAX_BIT_COUNT_VALUE * 4;
 			for (tbit_count = min_bit_count; tbit_count <= REL_T_Q_BIT_COUNT; tbit_count += 4)
-				if (qabs < 1 << tbit_count)
+				if (qabs < 1ULL << tbit_count)
 					break;
 
 			tflags = (tbit_count - min_bit_count) >> 2;
@@ -385,10 +399,10 @@ bool Storage::push_back(const Data& data)
 			new_humidity = m_last_data.humidity + dequantize_signed(qhumidity, REL_H_INV_SCALE1);
 
 			//dynamic bitrate
-			uint16_t qabs = std::abs(qhumidity);
+			uint16_t qabs = abs(qhumidity);
 			uint8_t min_bit_count = REL_H_Q_BIT_COUNT - REL_H_FLAGS_MAX_BIT_COUNT_VALUE * 4;
 			for (hbit_count = min_bit_count; hbit_count <= REL_H_Q_BIT_COUNT; hbit_count += 4)
-				if (qabs < 1 << hbit_count)
+				if (qabs < 1ULL << hbit_count)
 					break;
 
 			hflags = (hbit_count - min_bit_count) >> 2;
@@ -414,12 +428,12 @@ bool Storage::push_back(const Data& data)
 		}
 
 		Bitstream bs(g.m_data, g.m_bit_size, false);
-		bool ok = bs.write(tflags, REL_T_FLAGS_BIT_COUNT);
-		ok &= bs.write(qtemperature, tbit_count);
-		ok &= bs.write(hflags, REL_H_FLAGS_BIT_COUNT);
-		ok &= bs.write(qhumidity, hbit_count);
-		assert(ok);
+		bs.write(tflags, REL_T_FLAGS_BIT_COUNT);
+		bs.write(qtemperature, tbit_count);
+		bs.write(hflags, REL_H_FLAGS_BIT_COUNT);
+		bs.write(qhumidity, hbit_count);
 		g.m_bit_size = bs.size();
+		g.m_data_count++;
 
 		m_last_data.temperature = new_temperature;
 		m_last_data.humidity = new_humidity;

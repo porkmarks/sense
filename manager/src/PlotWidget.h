@@ -62,6 +62,9 @@ private slots:
 private:
     void applyFilter(DB::Filter const& filter);
 
+    void filterChanged();
+    bool canAutoRefresh() const;
+
     DB::Filter createFilter() const;
     void clearAnnotations();
 //    void setMarkerVisible(QLegendMarker* marker, bool visible);

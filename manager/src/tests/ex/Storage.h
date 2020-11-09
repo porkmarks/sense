@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <stddef.h>
 #include "Bitstream.h"
+#include "BackingStore.h"
 
 class Storage
 {
@@ -46,14 +47,14 @@ private:
 		friend class Storage;
 	protected:
 		uint8_t m_is_initialized : 1;
-		uint8_t m_skip_count : 7;
+		uint8_t m_data_count : 7; //keep in mind that some elements might be skipped for the first group!!!!
 		int16_t m_qtemperature = 0;
 		int16_t m_qhumidity = 0;
 
-		uint16_t get_data_count() const;
+		//uint16_t get_data_count() const;
 		bool unpack_next(Storage::iterator& it) const;
 
-		static constexpr uint16_t DATA_SIZE = 121;
+		static constexpr uint16_t DATA_SIZE = 117;
 		uint16_t m_bit_size = 0;
 		uint8_t m_data[DATA_SIZE];
 	};
@@ -62,7 +63,7 @@ private:
 #   pragma pack(pop)
 #endif
 
-	static_assert(sizeof(Group) == 128);
+	static_assert(sizeof(Group) == BackingStore::MAX_PAGE_SIZE);
 
 // 	const Group& get_first_group() const;
 // 	Group& get_first_group();
@@ -81,6 +82,8 @@ private:
 	mutable uint16_t m_iteration_group_idx = uint16_t(-1);
 
 	uint16_t m_first_group_idx = 0;
+	uint8_t m_first_group_skip_count = 0;
+
 	uint16_t m_group_count = 0;
 	uint16_t m_data_count = 0;
 };

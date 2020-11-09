@@ -29,16 +29,8 @@ SensorsDelegate::~SensorsDelegate()
 
 //////////////////////////////////////////////////////////////////////////
 
-void SensorsDelegate::refreshMiniPlot(QPixmap& image, DB& db, DB::Sensor const& sensor, bool temperature) const
+void SensorsDelegate::refreshMiniPlot(QPixmap& temperature, QPixmap& humidity, DB& db, DB::Sensor const& sensor) const
 {
-	image = QPixmap(k_miniPlotSize);
-	image.fill(QColor(200, 200, 200, 100));
-
-	QPainter p2;
-	p2.begin(&image);
-	p2.setRenderHints(QPainter::Antialiasing);
-
-
 	DB::Filter filter;
 	filter.useSensorFilter = true;
 	filter.sensorIds.insert(sensor.id);
@@ -49,31 +41,74 @@ void SensorsDelegate::refreshMiniPlot(QPixmap& image, DB& db, DB::Sensor const& 
 	{
 		std::sort(measurements.begin(), measurements.end(), [](DB::Measurement const& a, DB::Measurement const& b) { return a.timePoint < b.timePoint; });
 
-		float minValue = std::numeric_limits<float>::max();
-		float maxValue = std::numeric_limits<float>::lowest();
-		for (DB::Measurement const& m : measurements)
 		{
-			minValue = std::min(minValue, temperature ? m.descriptor.temperature : m.descriptor.humidity);
-			maxValue = std::max(maxValue, temperature ? m.descriptor.temperature : m.descriptor.humidity);
-		}
-		float center = (maxValue + minValue) / 2.f;
-		float range = std::max(maxValue - minValue, 20.f);
-		minValue = center - range / 2.f;
-		maxValue = center + range / 2.f;
+			temperature = QPixmap(k_miniPlotSize);
+			temperature.fill(QColor(200, 200, 200, 100));
 
-		Q_ASSERT(measurements.size() <= (k_miniPlotSize.width()));
-		size_t x = size_t(k_miniPlotSize.width()) - measurements.size(); //right align
-		p2.setPen(QPen(temperature ? QColor(211, 47, 47) : QColor(39, 97, 123)));
-		std::vector<QPointF> points;
-		points.reserve(measurements.size());
-		for (DB::Measurement const& m : measurements)
-		{
-			float nvalue = 1.f - ((temperature ? m.descriptor.temperature : m.descriptor.humidity) - minValue) / range;
-			QPointF p(float(x), nvalue * k_miniPlotSize.height());
-			points.push_back(p);
-			x++;
+			QPainter p2;
+			p2.begin(&temperature);
+			p2.setRenderHints(QPainter::Antialiasing);
+
+			float minValue = std::numeric_limits<float>::max();
+			float maxValue = std::numeric_limits<float>::lowest();
+			for (DB::Measurement const& m : measurements)
+			{
+				minValue = std::min(minValue, m.descriptor.temperature);
+				maxValue = std::max(maxValue, m.descriptor.temperature);
+			}
+			float center = (maxValue + minValue) / 2.f;
+			float range = std::max(maxValue - minValue, 20.f);
+			minValue = center - range / 2.f;
+			maxValue = center + range / 2.f;
+
+			Q_ASSERT(measurements.size() <= (k_miniPlotSize.width()));
+			size_t x = size_t(k_miniPlotSize.width()) - measurements.size(); //right align
+			p2.setPen(QPen(QColor(211, 47, 47)));
+			std::vector<QPointF> points;
+			points.reserve(measurements.size());
+			for (DB::Measurement const& m : measurements)
+			{
+				float nvalue = 1.f - (m.descriptor.temperature - minValue) / range;
+				QPointF p(float(x), nvalue * k_miniPlotSize.height());
+				points.push_back(p);
+				x++;
+			}
+			p2.drawPolyline(points.data(), int(points.size()));
 		}
-		p2.drawPolyline(points.data(), int(points.size()));
+		{
+			humidity = QPixmap(k_miniPlotSize);
+			humidity.fill(QColor(200, 200, 200, 100));
+
+			QPainter p2;
+			p2.begin(&humidity);
+			p2.setRenderHints(QPainter::Antialiasing);
+
+			float minValue = std::numeric_limits<float>::max();
+			float maxValue = std::numeric_limits<float>::lowest();
+			for (DB::Measurement const& m : measurements)
+			{
+				minValue = std::min(minValue, m.descriptor.humidity);
+				maxValue = std::max(maxValue, m.descriptor.humidity);
+			}
+			float center = (maxValue + minValue) / 2.f;
+			float range = std::max(maxValue - minValue, 20.f);
+			minValue = center - range / 2.f;
+			maxValue = center + range / 2.f;
+
+			Q_ASSERT(measurements.size() <= (k_miniPlotSize.width()));
+			size_t x = size_t(k_miniPlotSize.width()) - measurements.size(); //right align
+			p2.setPen(QPen(QColor(39, 97, 123)));
+			std::vector<QPointF> points;
+			points.reserve(measurements.size());
+			for (DB::Measurement const& m : measurements)
+			{
+				float nvalue = 1.f - (m.descriptor.humidity - minValue) / range;
+				QPointF p(float(x), nvalue * k_miniPlotSize.height());
+				points.push_back(p);
+				x++;
+			}
+			p2.drawPolyline(points.data(), int(points.size()));
+		}
 	}
 }
 
@@ -82,11 +117,27 @@ void SensorsDelegate::refreshMiniPlot(QPixmap& image, DB& db, DB::Sensor const& 
 void SensorsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
     if (!index.isValid())
-    {
         return QStyledItemDelegate::paint(painter, option, index);
-    }
 
     SensorsModel::Column column = static_cast<SensorsModel::Column>(index.column());
+
+	if (column == SensorsModel::Column::Temperature || column == SensorsModel::Column::Humidity)
+	{
+		int32_t sensorIndex = m_sensorsModel.getSensorIndex(m_sortingModel.mapToSource(index));
+		if (sensorIndex >= 0)
+		{
+			DB& db = m_sensorsModel.getDB();
+			DB::Sensor sensor = db.getSensor(size_t(sensorIndex));
+			MiniPlot& miniPlot = m_miniPlots[sensor.id];
+			if (IClock::rtNow() - miniPlot.lastRefreshedTimePoint > MiniPlot::k_refreshPeriod && IClock::rtNow() - m_lastMiniPlotRefreshedTimePoint > std::chrono::seconds(1))
+			{
+				miniPlot.lastRefreshedTimePoint = IClock::rtNow();
+				m_lastMiniPlotRefreshedTimePoint = IClock::rtNow();
+				refreshMiniPlot(miniPlot.temperatureImage, miniPlot.humidityImage, db, sensor);
+			}
+		}
+	}
+
     if (column == SensorsModel::Column::Alarms)
     {
         int alarmTriggers = m_sortingModel.data(index).toInt();
@@ -170,14 +221,7 @@ void SensorsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
 		{
 			DB& db = m_sensorsModel.getDB();
 			DB::Sensor sensor = db.getSensor(size_t(sensorIndex));
-
 			MiniPlot& miniPlot = m_miniPlots[sensor.id];
-			if (IClock::rtNow() - miniPlot.temperatureLastRefreshedTimePoint > std::chrono::seconds(60))
-			{
-				miniPlot.temperatureLastRefreshedTimePoint = IClock::rtNow();
-				refreshMiniPlot(miniPlot.temperatureImage, db, sensor, true);
-			}
-
 			painter->save();
 			painter->setClipRect(option.rect);
 			QSize size = sizeHint(option, index);
@@ -199,14 +243,7 @@ void SensorsDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
 		{
 			DB& db = m_sensorsModel.getDB();
 			DB::Sensor sensor = db.getSensor(size_t(sensorIndex));
-
 			MiniPlot& miniPlot = m_miniPlots[sensor.id];
-			if (IClock::rtNow() - miniPlot.humidityLastRefreshedTimePoint > std::chrono::seconds(60))
-			{
-				miniPlot.humidityLastRefreshedTimePoint = IClock::rtNow();
-				refreshMiniPlot(miniPlot.humidityImage, db, sensor, false);
-			}
-
 			painter->save();
 			painter->setClipRect(option.rect);
 			QSize size = sizeHint(option, index);
@@ -228,9 +265,7 @@ QSize SensorsDelegate::sizeHint(const QStyleOptionViewItem& option, const QModel
     QSize sizeHint = QStyledItemDelegate::sizeHint(option, index);
 
     if (!index.isValid())
-    {
         return sizeHint;
-    }
 
     SensorsModel::Column column = static_cast<SensorsModel::Column>(index.column());
     if (column == SensorsModel::Column::Alarms)
@@ -241,13 +276,9 @@ QSize SensorsDelegate::sizeHint(const QStyleOptionViewItem& option, const QModel
         int32_t iconSize = option.rect.height();
 
         if (alarmTriggers == -1)
-        {
             width += iconSize + k_iconMargin.width();
-        }
         else
-        {
             width += (int32_t)std::bitset<64>(alarmTriggers).count();
-        }
 
         return QSize(width, iconSize);
     }

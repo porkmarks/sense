@@ -33,12 +33,10 @@ SensorsModel::SensorsModel(DB& db)
 
     size_t sensorCount = m_db.getSensorCount();
     for (size_t i = 0; i < sensorCount; i++)
-    {
         sensorAdded(m_db.getSensor(i).id);
-    }
 
     m_timer.setSingleShot(false);
-    m_timer.setInterval(1000);
+    m_timer.setInterval(5000);
     m_timer.start();
     connect(&m_timer, &QTimer::timeout, this, &SensorsModel::refreshDetails);
 }
@@ -61,9 +59,7 @@ DB& SensorsModel::getDB()
 void SensorsModel::refreshDetails()
 {
     for (size_t i = 0; i < m_db.getSensorCount(); i++)
-    {
         emit dataChanged(index((int)i, 0), index((int)i, columnCount() - 1));
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -86,9 +82,8 @@ int32_t SensorsModel::getSensorIndex(QModelIndex index) const
 {
     size_t indexRow = static_cast<size_t>(index.row());
     if (indexRow >= m_sensors.size())
-    {
         return -1;
-    }
+
     SensorData const& sensorData = m_sensors[indexRow];
     return m_db.findSensorIndexById(sensorData.sensorId);
 }
@@ -173,9 +168,8 @@ void SensorsModel::setSensorChecked(DB::SensorId id, bool checked)
 {
     auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](SensorData const& sd) { return sd.sensorId == id; });
     if (it == m_sensors.end())
-    {
         return;
-    }
+
     it->isChecked = checked;
 
     int32_t sensorIndex = std::distance(m_sensors.begin(), it);
@@ -188,9 +182,8 @@ bool SensorsModel::isSensorChecked(DB::SensorId id) const
 {
     auto it = std::find_if(m_sensors.begin(), m_sensors.end(), [id](SensorData const& sd) { return sd.sensorId == id; });
     if (it == m_sensors.end())
-    {
         return false;
-    }
+
     return it->isChecked;
 }
 
@@ -199,13 +192,11 @@ bool SensorsModel::isSensorChecked(DB::SensorId id) const
 QModelIndex SensorsModel::index(int row, int column, QModelIndex const& parent) const
 {
     if (row < 0 || column < 0)
-    {
         return QModelIndex();
-    }
+
     if (!hasIndex(row, column, parent))
-    {
         return QModelIndex();
-    }
+
     return createIndex(row, column, nullptr);
 }
 
@@ -221,13 +212,9 @@ QModelIndex SensorsModel::parent(QModelIndex const& /*index*/) const
 int SensorsModel::rowCount(QModelIndex const& index) const
 {
     if (!index.isValid())
-    {
         return static_cast<int>(m_sensors.size());
-    }
     else
-    {
         return 0;
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -244,9 +231,7 @@ QVariant SensorsModel::headerData(int section, Qt::Orientation orientation, int 
     if (orientation == Qt::Horizontal && role == Qt::DisplayRole)
     {
         if (static_cast<size_t>(section) < s_headerNames.size())
-        {
             return s_headerNames[section];
-        }
     }
     return QAbstractItemModel::headerData(section, orientation, role);
 }
@@ -256,61 +241,46 @@ QVariant SensorsModel::headerData(int section, Qt::Orientation orientation, int 
 QVariant SensorsModel::data(QModelIndex const& index, int role) const
 {
     if (!index.isValid())
-    {
         return QVariant();
-    }
 
     size_t indexRow = static_cast<size_t>(index.row());
     if (indexRow >= m_sensors.size())
-    {
         return QVariant();
-    }
 
     SensorData const& sensorData = m_sensors[indexRow];
     std::optional<DB::Sensor> sensor = m_db.findSensorById(sensorData.sensorId);
     if (!sensor.has_value())
-    {
         return QVariant();
-    }
 
     Column column = static_cast<Column>(index.column());
     if (role == Qt::CheckStateRole && m_showCheckboxes)
     {
         if (column == Column::Name)
-        {
             return sensorData.isChecked ? Qt::Checked : Qt::Unchecked;
-        }
     }
     else if (role == Qt::BackgroundRole)
     {
         if (column == Column::NextComms)
         {
             if (sensor->state == DB::Sensor::State::Sleeping)
-            {
                 return QVariant(QColor(150, 150, 150));
-            }
             else
             {
                 if (sensor->blackout)
-                {
 					return QVariant(QColor(255, 150, 150));
-                }
+
                 if (sensor->lastCommsTimePoint.time_since_epoch().count() != 0)
                 {
                     auto p = utils::computeRelativeTimePointString(sensor->lastCommsTimePoint + m_db.computeActualCommsPeriod(m_db.getLastSensorTimeConfig().descriptor));
                     if (p.second < k_imminentMaxSecond)
-                    {
                         return QVariant(QColor(255, 255, 150));
-                    }
                 }
             }
         }
         else if (column == Column::Stored)
         {
             if (sensor->estimatedStoredMeasurementCount > k_alertStoredMeasurementCount)
-            {
                 return QVariant(QColor(255, 150, 150));
-            }
         }
     }
     else if (role == Qt::DecorationRole)
@@ -318,52 +288,36 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         if (column == Column::Name)
         {
             if (sensor->state == DB::Sensor::State::Active)
-            {
                 return QIcon(":/icons/ui/sensor.png");
-            }
+
             if (sensor->state == DB::Sensor::State::Sleeping)
-            {
                 return QIcon(":/icons/ui/sleeping.png");
-            }
+
             if (sensor->state == DB::Sensor::State::Unbound)
-            {
                 return QIcon(":/icons/ui/unbound.png");
-            }
         }
         else if (column == Column::NextComms)
         {
             if (sensor->lastCommsTimePoint.time_since_epoch().count() == 0)
-            {
                 return QIcon(":/icons/ui/question.png");
-            } 
         }
         else if (column == Column::Stored)
         {
 //            if (sensor->storedMeasurementCount < 0)
-//            {
 //                return QIcon(":/icons/ui/question.png");
-//            }
         }
         else
         {
             if (sensor->isRTMeasurementValid)
             {
                 if (column == Column::Battery)
-                {
                     return utils::getBatteryIcon(m_db.getSensorSettings(), sensor->rtMeasurementVcc);
-                }
                 else if (column == Column::Signal)
-                {
                     return utils::getSignalIcon(m_db.getSensorSettings(), std::min(sensor->averageSignalStrength.s2b, sensor->averageSignalStrength.b2s));
-                }
                 else if (column == Column::Temperature)
-                {
                     return QIcon(":/icons/ui/temperature.png");
-                }
                 else if (column == Column::Humidity)
-                {
                     return QIcon(":/icons/ui/humidity.png");
-                }
             }
             else
             {
@@ -371,28 +325,20 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                     column == Column::Signal ||
                     column == Column::Temperature ||
                     column == Column::Humidity)
-                {
                     return QIcon(":/icons/ui/question.png");
-                }
             }
         }
     }
     else if (role == Qt::DisplayRole)
     {
         if (column == Column::Name)
-        {
             return sensor->descriptor.name.c_str();
-        }
         else if (column == Column::SerialNumber)
-        {
             return QString("%1").arg(sensor->serialNumber, 8, 16, QChar('0'));
-        }
         else if (column == Column::NextComms)
         {
             if (sensor->state == DB::Sensor::State::Sleeping)
-            {
                 return "Sleeping...";
-            }
             else
             {
                 if (sensor->lastCommsTimePoint.time_since_epoch().count() != 0)
@@ -401,9 +347,8 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
                     std::string str = p.first;
                     str = (p.second > 0) ? "In " + str : str + " ago";
                     if (p.second < k_imminentMaxSecond && p.second > k_imminentMinSecond)
-                    {
                         return "Imminent";
-                    }
+
                     return str.c_str();
                 }
             }
@@ -415,12 +360,11 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         else if (column == Column::Alarms)
         {
             uint32_t triggers = 0;
-            Result<DB::Measurement> res = m_db.getLastMeasurementForSensor(sensor->id);
+            Result<DB::Measurement> res = m_db.getMostRecentMeasurementForSensor(sensor->id);
             triggers |= (res == success) ? res.payload().alarmTriggers.current : 0;
             if (sensor->blackout)
-            {
                 triggers |= DB::AlarmTrigger::SensorBlackout;
-            }
+
             return triggers;
         }
         else
@@ -428,17 +372,11 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
             if (sensor->isRTMeasurementValid)
             {
                 if (column == Column::Temperature)
-                {
                     return QString("%1°C").arg(sensor->rtMeasurementTemperature, 0, 'f', 1);
-                }
                 else if (column == Column::Humidity)
-                {
                     return QString("%1 %RH").arg(sensor->rtMeasurementHumidity, 0, 'f', 1);
-                }
                 else if (column == Column::Battery)
-                {
                     return QString("%1%").arg(static_cast<int>(utils::getBatteryLevel(sensor->rtMeasurementVcc) * 100.f));
-                }
                 else if (column == Column::Signal)
                 {
                     int average = static_cast<int>(utils::getSignalLevel(std::min(sensor->averageSignalStrength.s2b, sensor->averageSignalStrength.b2s)) * 100.f);
@@ -452,12 +390,11 @@ QVariant SensorsModel::data(QModelIndex const& index, int role) const
         if (column == Column::Alarms)
         {
 			uint32_t triggers = 0;
-			Result<DB::Measurement> res = m_db.getLastMeasurementForSensor(sensor->id);
+			Result<DB::Measurement> res = m_db.getMostRecentMeasurementForSensor(sensor->id);
 			triggers |= (res == success) ? res.payload().alarmTriggers.current : 0;
 			if (sensor->blackout)
-			{
 				triggers |= DB::AlarmTrigger::SensorBlackout;
-			}
+
 			return QVariant(utils::sensorTriggersToString(triggers, true).c_str());
         }
     }
@@ -473,9 +410,8 @@ Qt::ItemFlags SensorsModel::flags(QModelIndex const& index) const
 
     Qt::ItemFlags flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
     if (m_showCheckboxes && column == Column::Name)
-    {
         flags |= Qt::ItemIsUserCheckable | Qt::ItemIsEditable;
-    }
+
     return flags;
 }
 
@@ -484,14 +420,10 @@ Qt::ItemFlags SensorsModel::flags(QModelIndex const& index) const
 bool SensorsModel::setData(QModelIndex const& index, QVariant const& value, int role)
 {
     if (!index.isValid())
-    {
         return false;
-    }
 
     if (static_cast<size_t>(index.row()) >= m_sensors.size())
-    {
         return false;
-    }
 
     SensorData& sensorData = m_sensors[index.row()];
 
@@ -510,7 +442,6 @@ bool SensorsModel::setData(QModelIndex const& index, QVariant const& value, int 
 
 bool SensorsModel::setHeaderData(int /*section*/, Qt::Orientation /*orientation*/, QVariant const& /*value*/, int /*role*/)
 {
-
     return false;
 }
 

@@ -79,9 +79,7 @@ void PlotWidget::shutdown()
     m_plot = nullptr;
     m_axisDate = nullptr;
     for (QCPAxis*& axis : m_plotAxis)
-    {
         axis = nullptr;
-    }
 
     m_db = nullptr;
 }
@@ -162,9 +160,7 @@ void PlotWidget::loadSettings()
             bool ok = true;
             DB::SensorId id = v.toUInt(&ok);
             if (ok)
-            {
                 m_selectedSensorIds.insert(id);
-            }
         }
     }
     if (m_db && m_selectedSensorIds.empty()) //if no sensors were selected, select all
@@ -199,9 +195,7 @@ void PlotWidget::saveSettings()
 
     QList<QVariant> ssid;
     for (DB::SensorId id: m_selectedSensorIds)
-    {
         ssid.append(id);
-    }
     settings.setValue("filter/selectedSensors", ssid);
 }
 
@@ -218,7 +212,8 @@ void PlotWidget::setActive(bool active)
 	if (active)
 	{
 		m_uiConnections.push_back(connect(m_ui.clearAnnotations, &QPushButton::released, this, &PlotWidget::clearAnnotations));
-		m_uiConnections.push_back(connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &PlotWidget::scheduleFastRefresh, Qt::QueuedConnection));
+		m_uiConnections.push_back(connect(m_ui.refresh, &QPushButton::released, this, &PlotWidget::refresh, Qt::QueuedConnection));
+		m_uiConnections.push_back(connect(m_ui.dateTimeFilter, &DateTimeFilterWidget::filterChanged, this, &PlotWidget::filterChanged, Qt::QueuedConnection));
 		m_uiConnections.push_back(connect(m_ui.selectSensors, &QPushButton::released, this, &PlotWidget::selectSensors, Qt::QueuedConnection));
 		m_uiConnections.push_back(connect(m_ui.exportData, &QPushButton::released, this, &PlotWidget::exportData));
 
@@ -243,12 +238,12 @@ void PlotWidget::setActive(bool active)
 		
         loadSettings();
 
-        refresh();
+        scheduleFastRefresh();
 	}
 	else
-	{
 		saveSettings();
-	}
+
+    m_ui.refresh->setVisible(!canAutoRefresh());
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -289,6 +284,14 @@ void PlotWidget::sensorRemoved(DB::SensorId id)
 
 //////////////////////////////////////////////////////////////////////////
 
+void PlotWidget::filterChanged()
+{
+    m_ui.refresh->setVisible(!canAutoRefresh());
+    scheduleFastRefresh();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void PlotWidget::scheduleFastRefresh()
 {
     scheduleRefresh(std::chrono::milliseconds(100));
@@ -312,11 +315,13 @@ void PlotWidget::scheduleSlowRefresh()
 
 void PlotWidget::scheduleRefresh(IClock::duration dt)
 {
+    if (!canAutoRefresh())
+        return;
+
     int duration = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(dt).count());
     if (m_scheduleTimer && m_scheduleTimer->remainingTime() < duration)
-    {
         return;
-    }
+
     m_scheduleTimer.reset(new QTimer());
     m_scheduleTimer->setSingleShot(true);
     m_scheduleTimer->setInterval(duration);
@@ -360,16 +365,12 @@ void PlotWidget::selectSensors()
     if (m_selectedSensorIds.empty()) //if no sensors were selected, select all
     {
         for (size_t i = 0; i < sensorCount; i++)
-        {
             ui.filter->getSensorModel().setSensorChecked(m_db->getSensor(i).id, true);
-        }
     }
     else
     {
         for (DB::SensorId id: m_selectedSensorIds)
-        {
             ui.filter->getSensorModel().setSensorChecked(id, true);
-        }
     }
 
     int result = dialog.exec();
@@ -380,17 +381,13 @@ void PlotWidget::selectSensors()
         {
             DB::Sensor sensor = m_db->getSensor(i);
             if (ui.filter->getSensorModel().isSensorChecked(sensor.id))
-            {
                 m_selectedSensorIds.insert(sensor.id);
-            }
         }
         //if no sensors were selected, select all
         if (m_selectedSensorIds.empty()) //if no sensors were selected, select all
         {
             for (size_t i = 0; i < sensorCount; i++)
-            {
                 m_selectedSensorIds.insert(m_db->getSensor(i).id);
-            }
         }
     }
 
@@ -406,9 +403,7 @@ void PlotWidget::clearAnnotations()
     m_annotations.clear();
     m_ui.clearAnnotations->setEnabled(false);
     if (m_plot)
-    {
         m_annotationsLayer->replot();
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -531,9 +526,8 @@ void PlotWidget::createPlotWidgets()
 void PlotWidget::applyFilter(DB::Filter const& filter)
 {
     if (!m_db || m_isApplyingFilter)
-    {
         return;
-    }
+
     m_isApplyingFilter = true;
     utils::epilogue epi([this] { m_isApplyingFilter = false; });
 
@@ -543,13 +537,11 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
 
     m_graphs.clear();
     while (m_plot->graphCount() > 0)
-    {
         m_plot->removeGraph(m_plot->graph(0));
-    }
+
     for (QCPAbstractItem* item: m_indicatorItems)
-	{
         m_plot->removeItem(item);
-	}
+
     m_indicatorItems.clear();
 
     uint64_t minTS = std::numeric_limits<uint64_t>::max();
@@ -564,7 +556,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
 
     size_t totalCount = m_db->getFilteredMeasurementCount(m_filter);
 
-    m_ui.resultCount->setText(QString("%1 out of %2 results.").arg(totalCount).arg(m_db->getAllMeasurementCount()));
+    m_ui.resultCount->setText(QString("%1 out of ~%2 results.").arg(totalCount).arg(m_db->getAllMeasurementApproximativeCount()));
     m_ui.exportData->setEnabled(totalCount > 0);
 
     for (size_t i = 0; i < m_db->getSensorCount(); i++)
@@ -598,9 +590,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
 
         progressDialog.setValue(int(measurementsIndex / chunkSize));
         if (progressDialog.wasCanceled())
-        {
             break;
-        }
 
 		for (DB::Measurement const& m : measurements)
 		{
@@ -610,10 +600,9 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
 
 			auto it = m_graphs.find(m.descriptor.sensorId);
 			if (it == m_graphs.end())
-			{
 				continue;
-			}
-			GraphData& graphData = it->second;
+
+            GraphData& graphData = it->second;
 
 			bool gap = graphData.lastIndex >= 0 && graphData.lastIndex + 1 != m.descriptor.index;
 			graphData.lastIndex = m.descriptor.index;
@@ -633,19 +622,17 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
 				if (m_ui.useSmoothing->isChecked())
 				{
 					if (!plot.oldValue.has_value() || gap)
-					{
 						plot.oldValue = value;
-					}
-					value = *plot.oldValue * 0.8 + value * 0.2;
+
+                    value = *plot.oldValue * 0.8 + value * 0.2;
 					plot.oldValue = value;
 				}
 				plot.keys.push_back(time);
 				plot.values.push_back(gap ? qQNaN() : value);
 				if ((m.alarmTriggers.added & alarmTriggerMask) || (m.alarmTriggers.removed & alarmTriggerMask))
-				{
 					plot.alarmIndicators.push_back({ double(time), value, m.alarmTriggers & alarmTriggerMask });
-				}
-				auto& minMax = plotMinMax[plotIndex];
+
+                auto& minMax = plotMinMax[plotIndex];
 				minMax.first = std::min(minMax.first, value);
 				minMax.second = std::max(minMax.second, value);
 			}
@@ -728,9 +715,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
         QColor color(k_colors[graphData.sensor.id % k_colors.size()]);
         double brightness = (0.2126*color.redF() + 0.7152*color.greenF() + 0.0722*color.blueF());
         if (brightness > 0.6) //make sure the color is not too bright
-        {
             color.setHslF(color.hueF(), color.saturationF(), 0.4);
-        }
 
         for (size_t plotIndex = 0; plotIndex < graphData.plots.size(); plotIndex++)
         {
@@ -778,9 +763,7 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
 			{
 				annotation.toolTip->refresh(graph);
 				if (annotation.toolTip->isOpen())
-				{
 					m_annotations.push_back(std::move(annotation));
-				}
 			}
 		}
 		m_draggedAnnotationIndex = -1;
@@ -791,6 +774,14 @@ void PlotWidget::applyFilter(DB::Filter const& filter)
 
     m_graphsLayer->replot();
     m_plot->replot();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+bool PlotWidget::canAutoRefresh() const
+{
+	uint64_t diff = m_ui.dateTimeFilter->getToDateTime().toTime_t() - m_ui.dateTimeFilter->getFromDateTime().toTime_t();
+	return (diff < 3600 * 24 * 7); //more than one week? no auto refreshes
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -825,9 +816,7 @@ void PlotWidget::mouseReleaseEvent(QMouseEvent* event)
             const Annotation& annotation = m_annotations[m_draggedAnnotationIndex];
             QCPGraph* graph = findAnnotationGraph(annotation);
             if (graph)
-			{
 				annotation.toolTip->mouseReleased(graph, event->localPos());
-			}
 		}
 		m_draggedAnnotationIndex = -1;
     }
@@ -853,9 +842,7 @@ void PlotWidget::mouseMoveEvent(QMouseEvent* event)
 			const Annotation& annotation = m_annotations[m_draggedAnnotationIndex];
 			QCPGraph* graph = findAnnotationGraph(annotation);
 			if (graph)
-			{
 				annotation.toolTip->mouseMoved(graph, event->localPos());
-			}
 		}
 	}
     else
@@ -873,13 +860,9 @@ void PlotWidget::mouseMoveEvent(QMouseEvent* event)
         }
 
         if (!overlaps)
-        {
             showAnnotation(event->localPos());
-        }
         else
-        {
             m_annotation = Annotation();
-        }
     }
     m_annotationsLayer->replot();
 }
@@ -892,9 +875,7 @@ void PlotWidget::resizeEvent(QResizeEvent *event)
 	{
 		QCPGraph* graph = findAnnotationGraph(annotation);
 		if (graph)
-		{
             annotation.toolTip->refresh(graph);
-		}
 	}
     QWidget::resizeEvent(event);
 }
@@ -942,9 +923,7 @@ void PlotWidget::showAnnotation(const QPointF& pos)
             const Plot& plot = graphData.plots[plotIndex];
             QCPGraph* graph = plot.graph;
             if (!graph)
-            {
                 continue;
-            }
                 
             if (computeClosestPoint(graph, pos))
             {
@@ -990,10 +969,9 @@ const PlotWidget::Plot* PlotWidget::findAnnotationPlot(const Annotation& annotat
 {
 	auto it = m_graphs.find(annotation.sensorId);
 	if (it == m_graphs.end())
-	{
 		return nullptr;
-	}
-	const GraphData& gd = it->second;
+
+    const GraphData& gd = it->second;
 	return &gd.plots[(size_t)annotation.plotType];
 }
 
@@ -1003,9 +981,8 @@ QCPGraph* PlotWidget::findAnnotationGraph(const Annotation& annotation) const
 {
     const Plot* plot = findAnnotationPlot(annotation);
     if (!plot)
-    {
         return nullptr;
-    }
+
     return plot->graph;
 }
 
@@ -1041,9 +1018,8 @@ void PlotWidget::keepAnnotation()
 void PlotWidget::createAnnotation(DB::SensorId sensorId, QPointF point, double key, double value, DB::Sensor const& sensor, PlotType plotType)
 {
     if (m_annotation.toolTip == nullptr)
-    {
         m_annotation.toolTip.reset(new PlotToolTip(m_plot, m_annotationsLayer));
-    }
+
     m_annotation.sensorId = sensorId;
     m_annotation.plotType = plotType;
 
@@ -1080,9 +1056,7 @@ void PlotWidget::createAnnotation(DB::SensorId sensorId, QPointF point, double k
     QColor color = k_colors[sensor.id % k_colors.size()];
 	double brightness = (0.2126 * color.redF() + 0.7152 * color.greenF() + 0.0722 * color.blueF());
 	if (brightness > 0.6) //make sure the color is not too bright
-	{
 		color.setHslF(color.hueF(), color.saturationF(), 0.4);
-	}
 
     QDateTime dt = QDateTime::fromSecsSinceEpoch(static_cast<int64_t>(key));
 	QString dateTimeFormatStr = utils::getQDateTimeFormatString(m_db->getGeneralSettings().dateTimeFormat);
@@ -1143,14 +1117,10 @@ QSize PlotWidget::getPlotSize() const
 void PlotWidget::saveToPng(const QString& fileName, bool showLegend, bool showAnnotations)
 {
     if (m_annotation.toolTip)
-    {
         m_annotation.toolTip->setVisible(false);
-    }
 
     for (const Annotation& annotation: m_annotations)
-    {
         annotation.toolTip->setVisible(showAnnotations);
-    }
 
     if (!showLegend)
 	{
@@ -1167,13 +1137,10 @@ void PlotWidget::saveToPng(const QString& fileName, bool showLegend, bool showAn
 	}
 
     if (m_annotation.toolTip)
-    {
         m_annotation.toolTip->setVisible(true);
-    }
+
     for (const Annotation& annotation: m_annotations)
-    {
         annotation.toolTip->setVisible(true);
-    }
 }
 
 //////////////////////////////////////////////////////////////////////////

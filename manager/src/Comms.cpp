@@ -211,25 +211,27 @@ void Comms::reconnectToBaseStation(InitializedBaseStation* cbs)
 
 void Comms::connectedToBaseStation(InitializedBaseStation* cbs)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mutex);
-
 	auto id = std::this_thread::get_id();
-
     if (cbs)
     {
         s_logger.logInfo(QString("Connected to BS %1").arg(utils::getMacStr(cbs->descriptor.mac).c_str()));
 
-        cbs->isConnecting = false;
-        cbs->isConnected = true;
-        cbs->lastTalkTP = IClock::rtNow(); //this represents communication so reset the pong
+		bool hasUnboundSensor = cbs->db.findUnboundSensorIndex();
 
-        emit baseStationConnected(cbs->descriptor);
-        cbs->socketAdapter.start();
+		{
+			std::lock_guard<std::recursive_mutex> lg(m_mutex);
+			cbs->isConnecting = false;
+			cbs->isConnected = true;
+			cbs->lastTalkTP = IClock::rtNow(); //this represents communication so reset the pong
 
-        if (cbs->db.findUnboundSensorIndex() >= 0)
-            cbs->stateChange = data::Radio_State::PAIRING;
-        else
-            cbs->stateChange = data::Radio_State::NORMAL;
+			emit baseStationConnected(cbs->descriptor);
+			cbs->socketAdapter.start();
+
+			if (cbs->db.findUnboundSensorIndex() >= 0)
+				cbs->stateChange = data::Radio_State::PAIRING;
+			else
+				cbs->stateChange = data::Radio_State::NORMAL;
+		}
     }
 }
 
@@ -344,13 +346,14 @@ void Comms::processPong(InitializedBaseStation& cbs)
 
 void Comms::checkForUnboundSensors(InitializedBaseStation& cbs, DB::SensorId id)
 {
-    std::lock_guard<std::recursive_mutex> lg(m_mutex);
-
 	std::optional<DB::Sensor> unboundSensor = cbs.db.findUnboundSensor();
-	if (unboundSensor.has_value() && unboundSensor->id == id)
-        cbs.stateChange = data::Radio_State::PAIRING;
-    else
-        cbs.stateChange = data::Radio_State::NORMAL;
+	{
+		std::lock_guard<std::recursive_mutex> lg(m_mutex);
+		if (unboundSensor.has_value() && unboundSensor->id == id)
+			cbs.stateChange = data::Radio_State::PAIRING;
+		else
+			cbs.stateChange = data::Radio_State::NORMAL;
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////

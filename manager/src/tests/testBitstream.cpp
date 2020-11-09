@@ -24,7 +24,7 @@ void testBitstream()
 			for (volatile uint8_t i = 0; i < 32; i++)
 			{
 				uint32_t value = rand() % (1 << i);
-				CHECK_TRUE(bs.write(value, i));
+				bs.write(value, i);
 				size += i;
 				CHECK_EQUALS(bs.size(), size);
 				values.push_back(value);
@@ -32,7 +32,7 @@ void testBitstream()
 			for (volatile uint8_t i = 31; i > 0; i--)
 			{
 				uint32_t value = rand() % (1 << i);
-				CHECK_TRUE(bs.write(value, i));
+				bs.write(value, i);
 				size += i;
 				CHECK_EQUALS(bs.size(), size);
 				values.push_back(value);

@@ -220,6 +220,11 @@ Result<void> DB::create(sqlite3& db)
 		Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
 		return error;
 	}
+	if (sqlite3_exec(&db, "CREATE INDEX measurementsSensorId ON Measurements(sensorId);", nullptr, nullptr, nullptr))
+	{
+		Error error(QString("Error executing SQLite3 statement: %1").arg(sqlite3_errmsg(&db)).toUtf8().data());
+		return error;
+	}
 
 	return success;
 }
@@ -2581,6 +2586,8 @@ void DB::removeSensor(size_t index)
 
 	m_data.reportsChanged = true;
 
+	m_data.approximativeMeasurementCount = std::nullopt;
+
     s_logger.logInfo(QString("Removing sensor '%1'").arg(m_data.sensors[index].descriptor.name.c_str()));
 
     m_data.sensors.erase(m_data.sensors.begin() + index);
@@ -3366,6 +3373,10 @@ bool DB::addSingleSensorMeasurements(SensorId sensorId, std::vector<MeasurementD
 
 		if (!mds.empty())
 		{
+			//update the total approx count
+			if (m_data.approximativeMeasurementCount.has_value())
+				m_data.approximativeMeasurementCount = *m_data.approximativeMeasurementCount + mds.size();
+
             sqlite3_exec(m_sqlite, "BEGIN TRANSACTION;", nullptr, nullptr, nullptr);
             utils::epilogue epi1([this] { sqlite3_exec(m_sqlite, "END TRANSACTION;", nullptr, nullptr, nullptr); });
 
@@ -3386,6 +3397,8 @@ bool DB::addSingleSensorMeasurements(SensorId sensorId, std::vector<MeasurementD
                 m.receivedTimePoint = m_clock->now();
 				//m.alarmTriggers = computeAlarmTriggersForMeasurement(m);
                 asyncMeasurements.emplace_back(m);
+
+				sensor.mostRecentMeasurementId = std::nullopt;
 
 				sqlite3_bind_int64(stmt, 1, IClock::to_time_t(m.timePoint));
 				sqlite3_bind_int64(stmt, 2, IClock::to_time_t(m.receivedTimePoint));
@@ -3487,9 +3500,12 @@ IClock::time_point DB::computeMeasurementTimepoint(MeasurementDescriptor const& 
 
 //////////////////////////////////////////////////////////////////////////
 
-size_t DB::getAllMeasurementCount() const
+size_t DB::getAllMeasurementApproximativeCount() const
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
+
+	if (m_data.approximativeMeasurementCount.has_value() && IClock::rtNow() - m_data.lastRefreshedApproximativeMeasurementCount < std::chrono::hours(24))
+		return *m_data.approximativeMeasurementCount;
 
 	const char* sql = "SELECT COUNT(*) FROM Measurements;";
 	sqlite3_stmt* stmt;
@@ -3508,7 +3524,9 @@ size_t DB::getAllMeasurementCount() const
         return 0;
     }
 
-    return size_t(sqlite3_column_int64(stmt, 0));
+	m_data.lastRefreshedApproximativeMeasurementCount = IClock::rtNow();
+	m_data.approximativeMeasurementCount = size_t(sqlite3_column_int64(stmt, 0));
+	return *m_data.approximativeMeasurementCount;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -3527,15 +3545,16 @@ static std::string getQueryWherePart(DB::Filter const& filter, bool order)
 		str += std::to_string(IClock::to_time_t(filter.timePointFilter.max));
 		conditions.push_back(str);
 	}
-	if (filter.useSensorFilter)
+	if (filter.useSensorFilter && !filter.sensorIds.empty())
 	{
 		std::string str;
 		for (DB::SensorId sensorId : filter.sensorIds)
 		{
 			if (!str.empty()) 
-				str += " OR";
-			str += " sensorId = " + std::to_string(sensorId);
+				str += ", ";
+			str += std::to_string(sensorId);
 		}
+		str = " sensorId IN (" + str + ")";
 		conditions.push_back(str);
 	}
 	if (filter.useTemperatureFilter)
@@ -3685,16 +3704,48 @@ size_t DB::getFilteredMeasurementCount(Filter const& filter) const
 
 //////////////////////////////////////////////////////////////////////////
 
-Result<DB::Measurement> DB::getLastMeasurementForSensor(SensorId sensorId) const
+Result<DB::Measurement> DB::getMostRecentMeasurementForSensor(SensorId sensorId) const
 {
     std::lock_guard<std::recursive_mutex> lg(m_dataMutex);
 
-    QString sql = QString("SELECT * "
-                          "FROM Measurements "
-                          "WHERE sensorId = %1 "
-                          "ORDER BY idx DESC LIMIT 1;").arg(sensorId);
+	int32_t _index = findSensorIndexById(sensorId);
+	if (_index < 0)
+		return Error("Invalid sensor id");
+
+	size_t index = static_cast<size_t>(_index);
+	const Sensor& sensor = m_data.sensors[index];
+
+	//fast path, ID search
+	if (sensor.mostRecentMeasurementId.has_value())
+	{
+		QString sql = QString("SELECT * "
+							  "FROM Measurements "
+							  "WHERE id = %1 ").arg(*sensor.mostRecentMeasurementId);
+		sqlite3_stmt* stmt;
+		if (sqlite3_prepare_v2(m_sqlite, sql.toUtf8().data(), -1, &stmt, nullptr) != SQLITE_OK)
+		{
+			const char* msg = sqlite3_errmsg(m_sqlite);
+			Q_ASSERT(false);
+			return Error(QString("Failed to get last measurement from the db: %1").arg(sqlite3_errmsg(m_sqlite)).toUtf8().data());
+		}
+		utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
+
+		if (sqlite3_step(stmt) == SQLITE_ROW)
+		{
+			Measurement m = unpackMeasurement(stmt);
+			Q_ASSERT(sensor.mostRecentMeasurementId == m.id);
+			return m;
+		}
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	//fallback - full search!
+	QString sql = QString("SELECT * "
+							"FROM Measurements "
+							"WHERE sensorId = %1 "
+							"ORDER BY idx DESC LIMIT 1;").arg(sensorId);
 	sqlite3_stmt* stmt;
-    if (sqlite3_prepare_v2(m_sqlite, sql.toUtf8().data(), -1, &stmt, nullptr) != SQLITE_OK)
+	if (sqlite3_prepare_v2(m_sqlite, sql.toUtf8().data(), -1, &stmt, nullptr) != SQLITE_OK)
 	{
 		const char* msg = sqlite3_errmsg(m_sqlite);
 		Q_ASSERT(false);
@@ -3703,7 +3754,11 @@ Result<DB::Measurement> DB::getLastMeasurementForSensor(SensorId sensorId) const
 	utils::epilogue epi([stmt] { sqlite3_finalize(stmt); });
 
 	if (sqlite3_step(stmt) == SQLITE_ROW)
-		return unpackMeasurement(stmt);
+	{
+		Measurement m = unpackMeasurement(stmt);
+		sensor.mostRecentMeasurementId = m.id;
+		return m;
+	}
 
 	return Error("No data");
 }

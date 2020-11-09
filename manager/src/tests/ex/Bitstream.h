@@ -1,7 +1,8 @@
 #pragma once
 
-#include <cstdint>
-#include <cstring>
+#include <stdint.h>
+#include <string.h>
+#include <assert.h>
 
 #ifndef BITSTREAM_CAPACITY
 #	define BITSTREAM_CAPACITY 128 * 8
@@ -18,7 +19,11 @@ public:
 
 	void clear();
 	uint16_t size() const;
-	bool write(uint32_t data, uint8_t bits);
+
+	void write8(uint8_t data, uint8_t bits);
+	uint8_t read8(uint16_t& pos, uint8_t bits);
+
+	void write(uint32_t data, uint8_t bits);
 	uint32_t read(uint16_t& pos, uint8_t bits);
 
 private:
@@ -49,38 +54,88 @@ inline uint16_t Bitstream::size() const
 	return m_size;
 }
 
-inline bool Bitstream::write(uint32_t data, uint8_t bits)
+const static uint8_t k_left_shift[8] = { 1, 2, 4, 8, 16, 32, 64, 128 };
+
+inline void Bitstream::write8(uint8_t data, uint8_t bits)
 {
 	if (bits > CAPACITY - m_size)
-		return false;
+		return;
 
 	//Little Endian: least significant bit goes first in the stream
 
-	uint8_t byteIndex = m_size >> 3;
-	uint8_t bitIndex = m_size & 7;
-	uint8_t byte = m_data[byteIndex];
+	uint8_t dst_byte_index = m_size >> 3;
+	uint8_t dst_bit_index = m_size & 7;
+	uint8_t dst_mask = k_left_shift[dst_bit_index]; //1 << dst_bit_index
+	uint8_t dst_byte = m_data[dst_byte_index];
 
 	m_size += bits;
 
-	while (bits > 0)
+	uint8_t src_mask = k_left_shift[bits - 1]; //1 << (bits - 1)
+	while (src_mask > 0)
 	{
-		byte |= (data & 1) << bitIndex;
-		data >>= 1;
+		if (data & src_mask)
+			dst_byte |= dst_mask;
 
-		bits--;
-		bitIndex++;
-		if (bitIndex & 8)
+		src_mask >>= 1;
+		dst_mask <<= 1;
+		if (dst_mask == 0)
 		{
-			bitIndex = 0;
-			m_data[byteIndex] = byte;
-			byteIndex++;
-			byte = m_data[byteIndex];
+			dst_mask = 1;
+			m_data[dst_byte_index] = dst_byte;
+			dst_byte = m_data[++dst_byte_index];
 		}
 	}
 
-	m_data[byteIndex] = byte;
+	m_data[dst_byte_index] = dst_byte;
+}
 
-	return true;
+inline uint8_t Bitstream::read8(uint16_t& pos, uint8_t bits)
+{
+	if (bits > m_size - pos)
+		return 0;
+
+	//Little Endian: least significant bit goes first in the stream
+
+	uint8_t src_byte_index = pos >> 3;
+	uint8_t src_bit_index = pos & 7;
+	uint8_t src_mask = k_left_shift[src_bit_index];
+	uint8_t src = m_data[src_byte_index++];
+
+	pos += bits;
+
+	uint8_t dst = 0;
+	uint8_t dst_mask = k_left_shift[bits - 1];
+	while (dst_mask > 0)
+	{
+		if (src & src_mask)
+			dst |= dst_mask;
+
+		dst_mask >>= 1;
+		src_mask <<= 1;
+		if (src_mask == 0)
+		{
+			src_mask = 1;
+			src = m_data[src_byte_index++];
+		}
+	}
+
+	return dst;
+}
+
+inline void Bitstream::write(uint32_t data, uint8_t bits)
+{
+	if (bits > CAPACITY - m_size)
+		return;
+
+	const uint8_t* src_ptr = (const uint8_t*)&data;
+	while (bits >= 8)
+	{
+		write8(*src_ptr++, 8);
+		bits -= 8;
+	}
+
+	if (bits > 0)
+		write8(*src_ptr++, bits);
 }
 
 inline uint32_t Bitstream::read(uint16_t& pos, uint8_t bits)
@@ -88,26 +143,16 @@ inline uint32_t Bitstream::read(uint16_t& pos, uint8_t bits)
 	if (bits > m_size - pos)
 		return 0;
 
-	//Little Endian: least significant bit goes first in the stream
-
-	uint8_t byteIndex = pos >> 3;
-	uint8_t bitIndex = pos & 7;
-	uint8_t byte = m_data[byteIndex];
-
 	uint32_t data = 0;
-	for (uint8_t i = 0; i < bits; i++)
+	uint8_t* src_ptr = (uint8_t*)&data;
+	while (bits >= 8)
 	{
-		data |= ((byte >> bitIndex) & 1) << i;
-		bitIndex++;
-		if (bitIndex & 8)
-		{
-			bitIndex = 0;
-			byteIndex++;
-			byte = m_data[byteIndex];
-		}
+		*src_ptr++ = read8(pos, 8);
+		bits -= 8;
 	}
 
-	pos += bits;
+	if (bits > 0)
+		*src_ptr++ = read8(pos, bits);
 
 	return data;
 }

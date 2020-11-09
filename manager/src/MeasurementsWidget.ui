@@ -338,6 +338,9 @@
                </sizepolicy>
               </property>
               <layout class="QVBoxLayout" name="verticalLayout_2">
+               <property name="spacing">
+                <number>2</number>
+               </property>
                <property name="leftMargin">
                 <number>4</number>
                </property>
@@ -369,6 +372,17 @@
                  <property name="icon">
                   <iconset resource="../res/res.qrc">
                    <normaloff>:/icons/ui/export.png</normaloff>:/icons/ui/export.png</iconset>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QPushButton" name="refresh">
+                 <property name="text">
+                  <string>Refresh</string>
+                 </property>
+                 <property name="icon">
+                  <iconset resource="../res/res.qrc">
+                   <normaloff>:/icons/ui/reconnect.png</normaloff>:/icons/ui/reconnect.png</iconset>
                  </property>
                 </widget>
                </item>

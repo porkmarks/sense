@@ -24,6 +24,7 @@ public:
     void setActive(bool active);
 
 private slots:
+    void filterChanged();
     void scheduleSlowRefresh();
     void scheduleFastRefresh();
     void refresh();
@@ -43,6 +44,7 @@ private slots:
 private:
 
     DB::Filter createFilter() const;
+    bool canAutoRefresh() const;
 
     Ui::MeasurementsWidget m_ui;
 

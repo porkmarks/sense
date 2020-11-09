@@ -45,35 +45,17 @@ void ExportDataDialog::refreshPreview()
 
     size_t count = std::min<size_t>(m_model.getMeasurementCount(), 100);
     utils::exportCsvTo(stream, m_db.getGeneralSettings(), m_ui.overrideSettings->isChecked() ? m_ui.csvSettings->getCsvSettings() : m_db.getCsvSettings(), 
-                       [this](size_t index) { return getCsvData(index); }, count, true);
+                       [this](size_t index) 
+    { 
+		utils::CsvData data;
+		data.measurement = m_model.getMeasurement(index);
+		std::optional<DB::Sensor> sensor = m_db.findSensorById(data.measurement.descriptor.sensorId);
+		if (sensor.has_value())
+			data.sensor = *sensor;
+		return std::move(data);
+    }, count, true);
 
     m_ui.preview->setPlainText((stream.str() + "\n.....\n").c_str());
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-std::optional<utils::CsvData> ExportDataDialog::getCsvData(size_t index) const
-{
-    utils::CsvData data;
-    data.measurement = m_model.getMeasurement(index);
-    std::optional<DB::Sensor> sensor = m_db.findSensorById(data.measurement.descriptor.sensorId);
-    if (sensor.has_value())
-        data.sensor = *sensor;
-
-    return std::move(data);
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-std::optional<utils::CsvData> ExportDataDialog::getCsvDataWithProgress(size_t index, QProgressDialog* progressDialog) const
-{
-	if (progressDialog && (index & 63) == 0)
-	{
-		progressDialog->setValue((int)index / 64);
-		if (progressDialog->wasCanceled())
-			return std::nullopt;
-	}
-	return getCsvData(index);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -142,8 +124,24 @@ void ExportDataDialog::accept()
             return;
         }
 
+        auto allMeasurements = m_model.getAllMeasurements();
+
 		finished = utils::exportCsvTo(file, m_db.getGeneralSettings(), m_ui.overrideSettings->isChecked() ? m_ui.csvSettings->getCsvSettings() : m_db.getCsvSettings(),
-                                      [this, &progressDialog](size_t index) { return getCsvDataWithProgress(index, progressDialog.get()); }, m_model.getMeasurementCount(), false);
+                                      [this, &allMeasurements, &progressDialog](size_t index) -> std::optional<utils::CsvData>
+        { 
+			utils::CsvData data;
+			data.measurement = allMeasurements[index];
+			std::optional<DB::Sensor> sensor = m_db.findSensorById(data.measurement.descriptor.sensorId);
+			if (sensor.has_value())
+				data.sensor = *sensor;
+			if (progressDialog && (index & 63) == 0)
+			{
+				progressDialog->setValue((int)index / 64);
+				if (progressDialog->wasCanceled())
+					return std::nullopt;
+			}
+			return std::move(data);
+        }, allMeasurements.size(), false);
 
         file.close();
 
