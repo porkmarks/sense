@@ -101,6 +101,25 @@ void Logger::close()
 
 //////////////////////////////////////////////////////////////////////////
 
+void Logger::clearAllLogs()
+{
+	std::lock_guard<std::recursive_mutex> lg(m_mutex);
+
+    if (!m_sqlite)
+        return;
+
+	QString sql = QString("DELETE FROM Logs;");
+	if (sqlite3_exec(m_sqlite, sql.toUtf8().data(), nullptr, nullptr, nullptr))
+	{
+		std::cout << "CRITICAL: " << QDateTime::currentDateTime().toString("dd-MM-yyyy HH:mm:ss.zzz").toUtf8().data() << ": Failed to clear the logs table\n";
+		std::cout.flush();
+        return;
+	}
+    emit logsChanged();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
 void Logger::setStdOutput(Type minType)
 {
     m_stdOutputMinType = minType;

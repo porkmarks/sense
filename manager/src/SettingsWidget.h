@@ -26,6 +26,7 @@ signals:
 private slots:
     void setPermissions();
     void clearMeasurements();
+    void clearLogs();
     void sendTestEmail();
     void testFtpSettings();
     void applyGeneralSettings();

@@ -13,8 +13,11 @@
 
 #define NOMINMAX
 #include <Windows.h>
+#include "Logger.h"
 
 //////////////////////////////////////////////////////////////////////////
+
+extern Logger s_logger;
 
 SettingsWidget::SettingsWidget(QWidget *parent)
     : QWidget(parent)
@@ -73,6 +76,7 @@ void SettingsWidget::init(DB& db)
     m_uiConnections.push_back(connect(m_ui.ftpTest, &QPushButton::released, this, &SettingsWidget::testFtpSettings));
 
     m_uiConnections.push_back(connect(m_ui.clearMeasurements, &QPushButton::released, this, &SettingsWidget::clearMeasurements));
+    m_uiConnections.push_back(connect(m_ui.clearLogs, &QPushButton::released, this, &SettingsWidget::clearLogs));
 
     setGeneralSettings(m_db->getGeneralSettings());
     m_ui.csvTab->init(*m_db);
@@ -127,7 +131,7 @@ void SettingsWidget::setPermissions()
 	m_ui.signalStrengthAlertThreshold->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
 	m_ui.sensorsCommsPeriod->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
 	m_ui.sensorsMeasurementPeriod->setEnabled(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeSensorSettings));
-	m_ui.clearMeasurementsSection->setVisible(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeMeasurements));
+	m_ui.clearDataSection->setVisible(hasPermission(*m_db, DB::UserDescriptor::PermissionChangeMeasurements));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -141,6 +145,19 @@ void SettingsWidget::clearMeasurements()
 	}
 
     m_db->clearAllMeasurements();
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void SettingsWidget::clearLogs()
+{
+	int response = QMessageBox::question(this, "Confirmation", QString("Are you sure you want to clear all logs?\nThis will keep all the other settings.\n"));
+	if (response != QMessageBox::Yes)
+	{
+		return;
+	}
+
+    s_logger.clearAllLogs();
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -40,13 +40,6 @@
        <string>General</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout_3">
-       <item row="2" column="0" colspan="2">
-        <widget class="QCheckBox" name="showDebugConsole">
-         <property name="text">
-          <string>Show Debug Console</string>
-         </property>
-        </widget>
-       </item>
        <item row="0" column="1">
         <widget class="QComboBox" name="dateTimeFormat">
          <item>
@@ -71,26 +64,36 @@
          </item>
         </widget>
        </item>
+       <item row="0" column="0">
+        <widget class="QLabel" name="label_28">
+         <property name="text">
+          <string>Date/Time Format:</string>
+         </property>
+        </widget>
+       </item>
        <item row="3" column="0" colspan="2">
-        <widget class="QWidget" name="clearMeasurementsSection" native="true">
-         <layout class="QHBoxLayout" name="horizontalLayout_2">
-          <property name="spacing">
-           <number>6</number>
-          </property>
+        <widget class="QWidget" name="clearDataSection" native="true">
+         <layout class="QFormLayout" name="formLayout_3">
           <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
            <number>0</number>
           </property>
           <property name="rightMargin">
            <number>0</number>
           </property>
-          <item>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <item row="0" column="0">
            <widget class="QPushButton" name="clearMeasurements">
             <property name="text">
              <string>Clear All Measurements</string>
             </property>
            </widget>
           </item>
-          <item>
+          <item row="0" column="1">
            <widget class="QLabel" name="label_31">
             <property name="font">
              <font>
@@ -102,20 +105,36 @@
             </property>
            </widget>
           </item>
-          <item>
-           <spacer name="horizontalSpacer">
-            <property name="orientation">
-             <enum>Qt::Horizontal</enum>
+          <item row="1" column="0">
+           <widget class="QPushButton" name="clearLogs">
+            <property name="text">
+             <string>Clear All Logs</string>
             </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>88</width>
-              <height>20</height>
-             </size>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLabel" name="label_32">
+            <property name="font">
+             <font>
+              <pointsize>7</pointsize>
+             </font>
             </property>
-           </spacer>
+            <property name="text">
+             <string>This will clear all logs</string>
+            </property>
+           </widget>
           </item>
          </layout>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QCheckBox" name="showCriticalLogsPopup">
+         <property name="text">
+          <string>Show Critical Logs Popup</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
         </widget>
        </item>
        <item row="4" column="0">
@@ -131,20 +150,10 @@
          </property>
         </spacer>
        </item>
-       <item row="0" column="0">
-        <widget class="QLabel" name="label_28">
+       <item row="2" column="0" colspan="2">
+        <widget class="QCheckBox" name="showDebugConsole">
          <property name="text">
-          <string>Date/Time Format:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="0">
-        <widget class="QCheckBox" name="showCriticalLogsPopup">
-         <property name="text">
-          <string>Show Critical Logs Popup</string>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
+          <string>Show Debug Console</string>
          </property>
         </widget>
        </item>

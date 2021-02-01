@@ -36,7 +36,7 @@ void LogsModel::setAutoRefresh(bool enabled)
     {
         m_autoRefreshEnabled = enabled;
         if (enabled)
-            m_autoRefreshConnection = connect(&m_logger, &Logger::logLinesAdded, this, &LogsModel::startAutoRefreshLogLines);
+            m_autoRefreshConnection = connect(&m_logger, &Logger::logsChanged, this, &LogsModel::startAutoRefreshLogLines);
         else
             QObject::disconnect(m_autoRefreshConnection);
     }

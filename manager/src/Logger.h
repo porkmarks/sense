@@ -26,6 +26,8 @@ public:
     bool load(sqlite3& db);
     void close();
 
+    void clearAllLogs();
+
     enum class Type : uint8_t
     {
         VERBOSE = 0,
@@ -74,6 +76,7 @@ public:
 
 signals:
     void logLinesAdded(std::vector<LogLine> const& logLines);
+    void logsChanged();
 
 private:
     void addToDB(std::string const& message, Type type);
